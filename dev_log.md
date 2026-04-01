@@ -31,6 +31,20 @@
 
 ---
 
+## [2026-04-02] - Supabase 클라이언트 라이브러리 구현
+- **Status:** ✅ 완료
+- **Files Created:**
+  - `src/lib/supabase/client.ts`
+  - `src/lib/supabase/server.ts`
+- **Summary:**
+  - Next.js 15 SSR 환경에 대응하는 Supabase 클라이언트 이원화 구성 완료
+  - 쿠키 핸들링 및 환경 변수 주입 로직 검증
+- **Next Steps:**
+  - `src/app/page.tsx`에서 실제 데이터 페칭 테스트
+  - Supabase Auth를 활용한 회원가입/로그인 UI 구현
+
+---
+
 ## 📑 Commit Message Protocol
 1. 모든 커밋 메시지는 이 로그의 최신 기록을 바탕으로 작성한다.
 2. **형식**: `type: [작업명] #이슈번호(선택)`
@@ -40,6 +54,3 @@
    - `docs`: 문서 수정 (`dev_log.md`, `README.md` 등)
    - `refactor`: 코드 구조 개선, 불필요한 파일 삭제
    - `chore`: 패키지 설치, 설정 변경
-
-
-   - [2026-04-01] `.env.local` 생성 및 Supabase API Key 보안 주입 완료.
