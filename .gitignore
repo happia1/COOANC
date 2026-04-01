@@ -1,1 +1,75 @@
+# ========================
+# 환경변수 (절대 깃헙에 올리면 안 됨!)
+# ========================
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env*.local
 
+# ========================
+# Next.js
+# ========================
+.next/
+out/
+build/
+
+# ========================
+# Node.js
+# ========================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# ========================
+# 패키지 매니저 락파일
+# (npm 쓸 거면 yarn.lock 삭제, yarn 쓸 거면 package-lock.json 삭제)
+# ========================
+# yarn.lock
+# package-lock.json
+
+# ========================
+# OS 자동생성 파일 (맥북 사용 시)
+# ========================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+
+# ========================
+# IDE / 에디터
+# ========================
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+
+# ========================
+# 빌드 & 캐시
+# ========================
+.cache/
+dist/
+*.tsbuildinfo
+next-env.d.ts
+
+# ========================
+# 테스트 커버리지
+# ========================
+coverage/
+.nyc_output/
+
+# ========================
+# Vercel
+# ========================
+.vercel/
+
+# ========================
+# Supabase 로컬 개발 (나중에 쓸 수도 있음)
+# ========================
+supabase/.branches/
+supabase/.temp/
