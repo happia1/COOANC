@@ -45,6 +45,20 @@
 
 ---
 
+## [2026-04-03] - page.tsx Postgres(PostgREST) 연결 검증
+- **Status:** ✅ 완료
+- **Files Modified:**
+  - `src/app/page.tsx`
+  - `dev_log.md`
+- **Summary:**
+  - 서버 컴포넌트에서 `from().select()`로 PostgREST 경유 Postgres 조회를 수행해 DB 연결을 검증함
+  - 테이블 미생성·RLS 차단 시 대시보드 SQL Editor용 `connection_test` 스크립트를 화면에 노출
+- **Next Steps:**
+  - 운영 전 `connection_test` 정책 정리 또는 제거, 실제 도메인 테이블·RLS 설계
+  - Supabase Auth 기반 회원가입/로그인 UI
+
+---
+
 ## 📑 Commit Message Protocol
 1. 모든 커밋 메시지는 이 로그의 최신 기록을 바탕으로 작성한다.
 2. **형식**: `type: [작업명] #이슈번호(선택)`
