@@ -45,17 +45,15 @@
 
 ---
 
-## [2026-04-03] - page.tsx Postgres(PostgREST) 연결 검증
-- **Status:** ✅ 완료
-- **Files Modified:**
-  - `src/app/page.tsx`
-  - `dev_log.md`
-- **Summary:**
-  - 서버 컴포넌트에서 `from().select()`로 PostgREST 경유 Postgres 조회를 수행해 DB 연결을 검증함
-  - 테이블 미생성·RLS 차단 시 대시보드 SQL Editor용 `connection_test` 스크립트를 화면에 노출
+## [2026-04-03] - 시스템 통합(Integration) 성공 및 실데이터 렌더링
+- **Status:** ✅ MISSION COMPLETE
+- **Achievement:**
+  - Supabase `children` 테이블 생성 및 `anon` 정책 수립 완료.
+  - SQL Editor를 통한 실데이터(김민재, 500crd, 5exp) 주입 성공.
+  - `page.tsx`에서 서버 컴포넌트 방식으로 실시간 데이터 페칭 및 JSON 렌더링 확인.
 - **Next Steps:**
-  - 운영 전 `connection_test` 정책 정리 또는 제거, 실제 도메인 테이블·RLS 설계
-  - Supabase Auth 기반 회원가입/로그인 UI
+  - 기획안 UI(대시보드 카드, 캐릭터 영역) 컴포넌트화 시작.
+  - Lucide-react 아이콘 및 Tailwind CSS를 활용한 스타일링 적용.
 
 ---
 

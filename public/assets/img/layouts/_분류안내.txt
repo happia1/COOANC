@@ -1,0 +1,4 @@
+# layouts — 화면 골격·장식
+# - backgrounds/  : 앱·화면별 배경화면
+# - banners/      : 홈·이벤트 배너
+# - mission-cards/ : 미션 카드 테두리·프레임
