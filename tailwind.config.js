@@ -11,7 +11,20 @@ module.exports = {
     "./public/**/*.html",
   ],
   theme: {
-    extend: {},
+    extend: {
+      colors: {
+        brand: {
+          blue:   '#4A90E2',
+          green:  '#7ED321',
+          yellow: '#F8E71C',
+          gray:   '#F5F5F5',
+          text:   '#333333',
+        },
+      },
+      fontFamily: {
+        sans: ['Pretendard', '-apple-system', 'BlinkMacSystemFont', 'system-ui', 'sans-serif'],
+      },
+    },
   },
   plugins: [],
 }

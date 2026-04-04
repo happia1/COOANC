@@ -1,6 +1,16 @@
-/* Tailwind의 기본 리셋·기본 스타일(노멀라이즈에 가까운 층) */
+/* Pretendard 웹폰트 (CDN) */
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css');
+
 @tailwind base;
-/* 재사용 컴포넌트용 레이어(필요 시 @layer components 로 정의) */
 @tailwind components;
-/* 유틸리티 클래스(bg-red-500, flex 등) — 평소에 가장 많이 쓰는 부분 */
 @tailwind utilities;
+
+@layer base {
+  html {
+    font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  }
+  /* 모바일 스크롤 최적화 */
+  body {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
