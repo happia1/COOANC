@@ -26,24 +26,28 @@ export default async function ParentHomePage() {
   if (profile?.role !== 'parent') redirect('/home')
 
   // 자녀 목록
-  const { data: links } = await supabase
+  const { data: links, error: linksErr } = await supabase
     .from('family_links')
     .select('child_id')
     .eq('parent_id', user.id)
 
+  console.log('[parent/home] user.id:', user.id)
+  console.log('[parent/home] family_links rows:', links?.length ?? 0, linksErr ? linksErr.message : 'ok')
+
   const childIds = (links ?? []).map((l) => l.child_id)
+  console.log('[parent/home] childIds:', childIds)
 
   const [profilesRes, statsRes, logsRes, pendingRes] = await Promise.all([
     childIds.length > 0
       ? supabase.from('profiles').select('id, name, age').in('id', childIds)
-      : Promise.resolve({ data: [] }),
+      : Promise.resolve({ data: [], error: null }),
 
     childIds.length > 0
       ? supabase
           .from('child_stats')
           .select('child_id, credits, hearts, current_level, exp, exp_to_next_level, streak_days, eq_delay_score, eq_routine_rate, eq_save_ratio')
           .in('child_id', childIds)
-      : Promise.resolve({ data: [] }),
+      : Promise.resolve({ data: [], error: null }),
 
     // 최근 미션 완료 로그 (홈 활동 피드)
     childIds.length > 0
@@ -54,7 +58,7 @@ export default async function ParentHomePage() {
           .eq('is_completed', true)
           .order('completed_at', { ascending: false })
           .limit(10)
-      : Promise.resolve({ data: [] }),
+      : Promise.resolve({ data: [], error: null }),
 
     // 미승인 구매 요청 수
     childIds.length > 0
@@ -65,6 +69,8 @@ export default async function ParentHomePage() {
           .eq('status', 'pending')
       : Promise.resolve({ count: 0 }),
   ])
+
+  console.log('[parent/home] profiles rows:', profilesRes.data?.length ?? 0, (profilesRes as {error?: {message:string}}).error?.message ?? 'ok')
 
   const children = (profilesRes.data ?? []) as { id: string; name: string; age: number | null }[]
   const statsMap = Object.fromEntries(
