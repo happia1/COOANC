@@ -125,9 +125,11 @@ export default async function ParentHomePage() {
             {(children ?? []).map(child => {
               const s = statsMap[child.id]
               return (
-                <div
+                // 카드 전체를 누르면 해당 자녀의 상세 화면으로 이동합니다.
+                <Link
                   key={child.id}
-                  className="bg-white rounded-3xl shadow-md px-5 py-4 flex items-center justify-between"
+                  href={`/parent/child/${child.id}`}
+                  className="flex w-full items-center justify-between bg-white rounded-3xl shadow-md px-5 py-4 transition hover:shadow-lg active:scale-[0.99] focus:outline-none focus:ring-2 focus:ring-brand-blue/30"
                 >
                   <div className="flex items-center gap-3">
                     <span className="text-4xl">🐣</span>
@@ -142,7 +144,7 @@ export default async function ParentHomePage() {
                     <p className="text-lg font-black text-brand-blue">{s?.credits ?? 0}</p>
                     <p className="text-[11px] text-gray-400">크레딧</p>
                   </div>
-                </div>
+                </Link>
               )
             })}
 
