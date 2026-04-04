@@ -26,20 +26,16 @@ export default async function ParentHomePage() {
   if (profile?.role !== 'parent') redirect('/home')
 
   // 자녀 목록
-  const { data: links, error: linksErr } = await supabase
+  const { data: links } = await supabase
     .from('family_links')
     .select('child_id')
     .eq('parent_id', user.id)
 
-  console.log('[parent/home] user.id:', user.id)
-  console.log('[parent/home] family_links rows:', links?.length ?? 0, linksErr ? linksErr.message : 'ok')
-
   const childIds = (links ?? []).map((l) => l.child_id)
-  console.log('[parent/home] childIds:', childIds)
 
   const [profilesRes, statsRes, logsRes, pendingRes] = await Promise.all([
     childIds.length > 0
-      ? supabase.from('profiles').select('id, name, age').in('id', childIds)
+      ? supabase.from('profiles').select('id, name').in('id', childIds)
       : Promise.resolve({ data: [], error: null }),
 
     childIds.length > 0
@@ -70,9 +66,7 @@ export default async function ParentHomePage() {
       : Promise.resolve({ count: 0 }),
   ])
 
-  console.log('[parent/home] profiles rows:', profilesRes.data?.length ?? 0, (profilesRes as {error?: {message:string}}).error?.message ?? 'ok')
-
-  const children = (profilesRes.data ?? []) as { id: string; name: string; age: number | null }[]
+  const children = (profilesRes.data ?? []) as { id: string; name: string }[]
   const statsMap = Object.fromEntries(
     ((statsRes.data ?? []) as { child_id: string; [key: string]: unknown }[]).map((s) => [s.child_id, s]),
   )
@@ -174,10 +168,7 @@ export default async function ParentHomePage() {
                           Lv.{level} {LEVEL_NAMES[level]}
                         </span>
                       </div>
-                      {child.age && (
-                        <p className="text-xs text-gray-400">{child.age}세</p>
-                      )}
-                    </div>
+                      </div>
                   </div>
 
                   {/* 스탯 행 */}
