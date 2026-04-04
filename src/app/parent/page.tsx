@@ -123,7 +123,7 @@ export default async function ParentHomePage() {
           </div>
         ) : (
           <div className="flex flex-col gap-3">
-            {(children ?? []).map(child => {
+            {(children ?? []).filter(c => c.id).map(child => {
               const s = statsMap[child.id]
               return (
                 <ChildAccountCard

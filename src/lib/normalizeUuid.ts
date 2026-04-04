@@ -5,7 +5,14 @@
  */
 export function normalizeUuidParam(raw: string | undefined | null): string | null {
   if (raw == null) return null
-  const s = String(raw).trim()
+  let s = String(raw).trim()
+  if (!s) return null
+  try {
+    s = decodeURIComponent(s)
+  } catch {
+    /* 주소에 잘못된 % 시퀀스가 있으면 원문으로 계속 진행 */
+  }
+  s = s.trim()
   if (!s) return null
   const hex = s.replace(/-/g, '').toLowerCase()
   if (!/^[0-9a-f]{32}$/.test(hex)) return null

@@ -37,7 +37,7 @@ export default async function ParentChildDetailPage({ params }: PageProps) {
   // family_links 에 연결이 없으면 다른 사람 자녀를 볼 수 없음 → 부모 홈으로
   const { data: link } = await supabase
     .from('family_links')
-    .select('id')
+    .select('id, nickname')
     .eq('parent_id', user.id)
     .eq('child_id', childId)
     .maybeSingle()
@@ -52,10 +52,20 @@ export default async function ParentChildDetailPage({ params }: PageProps) {
     .eq('id', childId)
     .maybeSingle()
 
-  // RLS 미적용·데이터 불일치 시에도 404보다 목록으로 돌아가게 함
-  if (!childProfile || childProfile.role !== 'child') {
+  // profiles RLS(019)가 없으면 자녀 행이 비어 보일 수 있음 → 가족 연결만 있어도 상세는 유지
+  if (childProfile && childProfile.role !== 'child') {
     redirect('/parent')
   }
+
+  const displayName =
+    childProfile?.role === 'child' && childProfile.name?.trim()
+      ? childProfile.name.trim()
+      : link.nickname?.trim() || '자녀'
+
+  const childAge =
+    childProfile?.role === 'child' && typeof childProfile.age === 'number'
+      ? childProfile.age
+      : null
 
   const { data: stats } = await supabase
     .from('child_stats')
@@ -88,9 +98,14 @@ export default async function ParentChildDetailPage({ params }: PageProps) {
             </span>
             <div className="flex-1 min-w-0">
               <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">자녀 계정</p>
-              <h1 className="text-xl font-black text-brand-text truncate">{childProfile.name}</h1>
-              {typeof childProfile.age === 'number' && (
-                <p className="text-sm text-gray-500 mt-1">{childProfile.age}세</p>
+              <h1 className="text-xl font-black text-brand-text truncate">{displayName}</h1>
+              {childAge !== null && (
+                <p className="text-sm text-gray-500 mt-1">{childAge}세</p>
+              )}
+              {!childProfile && (
+                <p className="text-[11px] text-gray-400 mt-2">
+                  이름은 보안 설정에 따라 잠시 표시되지 않을 수 있어요. 아래 통계는 그대로 볼 수 있어요.
+                </p>
               )}
               <p className="text-[11px] text-gray-400 mt-2">
                 자녀는 이 계정으로 앱에 로그인해요. PIN은 자녀만 알고 있어요.
