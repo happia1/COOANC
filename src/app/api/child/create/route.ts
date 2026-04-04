@@ -84,10 +84,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: '가족 연결 생성에 실패했어요.' }, { status: 500 })
   }
 
-  // profiles 테이블에 age 업데이트 (handle_new_user 트리거가 기본값으로 생성함)
+  // 트리거로 만든 profiles 행에 자녀 이름·나이를 확실히 반영 (메타데이터 타이밍 이슈 대비)
   await admin
     .from('profiles')
-    .update({ age })
+    .update({ age, name })
     .eq('id', childId)
 
   return NextResponse.json({ childId, name }, { status: 201 })

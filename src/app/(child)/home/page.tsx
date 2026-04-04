@@ -4,6 +4,7 @@
  * - child_stats, child_badges, badges 조회 후 HomeTab에 전달
  */
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import HomeTab from '@/components/child/HomeTab'
 import type { ChildStats, BadgeRow } from '@/types/database'
@@ -48,7 +49,7 @@ export default async function ChildHomePage() {
 
     supabase
       .from('profiles')
-      .select('name')
+      .select('name, role')
       .eq('id', user.id)
       .maybeSingle(),
 
@@ -68,7 +69,18 @@ export default async function ChildHomePage() {
   const initialStats   = (statsRes.data   ?? null) as ChildStats | null
   const displayBadges  = (badgesRes.data   ?? [])   as BadgeRow[]
   const earnedBadgeIds = (earnedRes.data   ?? []).map(b => b.badge_id)
-  const childName      = profileRes.data?.name ?? '쿠앵이'
+
+  // 레이아웃에서 부모는 redirect 되지만, 페이지 단에서도 한 번 더 막음
+  if (profileRes.data?.role === 'parent') {
+    redirect('/parent')
+  }
+
+  // 표시 이름: DB profiles 우선, 없으면 가입 시 넣은 user_metadata.name (자녀 계정)
+  const meta = user.user_metadata as { name?: string } | undefined
+  const childName =
+    profileRes.data?.name?.trim() ||
+    (typeof meta?.name === 'string' ? meta.name.trim() : '') ||
+    '쿠앵이'
 
   return (
     <HomeTab
