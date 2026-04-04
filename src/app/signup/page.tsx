@@ -2,11 +2,11 @@
 
 import { useState } from 'react'
 import Image from 'next/image'
+import { AUTH_LOGO_SRC } from '@/constants/branding'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
 import { getSignupCatchMessage } from '@/lib/getSignupCatchMessage'
+import { parseJsonFromResponse } from '@/lib/parseJsonResponse'
 import { signupViaServerApi } from '@/lib/signupServerApi'
-import { shouldUseServerSignupFallback } from '@/lib/shouldUseServerSignupFallback'
 
 export default function SignupPage() {
   const [name, setName] = useState('')
@@ -14,7 +14,6 @@ export default function SignupPage() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-  const [done, setDone] = useState(false)
 
   async function handleSignup(e: React.FormEvent) {
     e.preventDefault()
@@ -26,65 +25,48 @@ export default function SignupPage() {
     }
 
     setLoading(true)
-    const supabase = createClient()
 
     try {
-      const { data, error: signUpError } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: { role: 'parent', name },
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
-        },
-      })
+      // ① service_role 로만 가입 (클라이언트 signUp 은 User not allowed 에 취약)
+      const serverResult = await signupViaServerApi(email, password, name)
 
-      if (signUpError) {
-        const msg = signUpError.message
-
-        if (msg.includes('already registered') || msg.includes('already been registered')) {
-          setError('이미 사용 중인 이메일이에요. 로그인해 주세요.')
-          setLoading(false)
-          return
-        }
-
-        // 공개 가입 비활성·DB 트리거 등: service_role 서버 API로 재시도
-        if (shouldUseServerSignupFallback(msg)) {
-          const result = await signupViaServerApi(email, password, name)
-          if (result.ok === false) {
-            setError(result.error)
-            setLoading(false)
-            return
-          }
-          if (result.hasSession) {
-            window.location.href = '/onboarding'
-            return
-          }
-          // 서버에서만 유저가 만들어진 경우: 즉시 로그인 시도 후 온보딩으로
-          const { error: signInErr } = await supabase.auth.signInWithPassword({ email, password })
-          if (!signInErr) {
-            window.location.href = '/onboarding'
-            return
-          }
-          setError(
-            signInErr.message ||
-              '계정은 만들어졌어요. 로그인 페이지에서 이메일·비밀번호로 들어가 주세요.',
-          )
-          setLoading(false)
-          return
-        }
-
-        setError(msg)
+      if (serverResult.ok === false) {
+        setError(serverResult.error)
         setLoading(false)
         return
       }
 
-      if (data.session) {
-        window.location.href = '/onboarding'
+      // ② 세션은 서버 라우트에서 쿠키로 설정 (클라이언트 signIn 과 동일 anon 키지만 쿠키 처리가 안정적)
+      const signInRes = await fetch('/api/auth/sign-in', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ email, password }),
+      })
+
+      const { data: signInJson, parseError } = await parseJsonFromResponse<{
+        error?: string
+        ok?: boolean
+      }>(signInRes)
+      const body = signInJson ?? {}
+
+      if (parseError) {
+        setError('로그인 응답을 읽을 수 없어요. 잠시 후 다시 시도해 주세요.')
+        setLoading(false)
         return
       }
 
-      setDone(true)
-      setLoading(false)
+      if (!signInRes.ok) {
+        const errMsg =
+          typeof body.error === 'string'
+            ? body.error
+            : '가입 후 로그인에 실패했어요. 로그인 페이지에서 다시 시도해 주세요.'
+        setError(errMsg)
+        setLoading(false)
+        return
+      }
+
+      window.location.href = '/onboarding'
     } catch (err) {
       console.error('signup error:', err)
       setError(getSignupCatchMessage(err))
@@ -92,36 +74,10 @@ export default function SignupPage() {
     }
   }
 
-  if (done) {
-    return (
-      <div className="min-h-screen bg-gradient-to-b from-sky-100 via-white to-green-50 flex flex-col items-center justify-center px-6">
-        <div className="w-full max-w-sm bg-white rounded-3xl shadow-lg p-8 flex flex-col items-center gap-5 text-center">
-          <span className="text-7xl">📬</span>
-          <div className="space-y-1.5">
-            <h2 className="text-lg font-bold text-brand-text">이메일을 확인해 주세요!</h2>
-            <p className="text-sm text-gray-500">
-              <span className="font-bold text-brand-blue">{email}</span>로<br />
-              인증 링크를 보냈어요.
-            </p>
-            <p className="text-xs text-gray-400 mt-1">
-              링크를 클릭하면 자동으로 자녀 등록 화면으로 이동해요.
-            </p>
-          </div>
-          <Link
-            href="/login"
-            className="w-full text-center bg-brand-blue text-white font-bold py-3 rounded-2xl shadow-md transition-all active:scale-95"
-          >
-            로그인 페이지로
-          </Link>
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div className="min-h-screen bg-gradient-to-b from-sky-100 via-white to-green-50 flex flex-col items-center justify-center px-6 py-10">
       <div className="flex flex-col items-center gap-3 mb-7">
-        <Image src="/COOANC_Logo.png" alt="COOANC" width={320} height={320} className="rounded-2xl" style={{ height: 'auto' }} />
+        <Image src={AUTH_LOGO_SRC} alt="COOANC" width={320} height={320} className="rounded-2xl" style={{ height: 'auto' }} priority />
         <p className="text-sm text-gray-400">자녀 경제 성장의 닻을 내리다</p>
       </div>
 

@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Image from 'next/image'
+import { AUTH_LOGO_SRC } from '@/constants/branding'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 
@@ -70,8 +71,7 @@ export default function LoginPage() {
     <div className="min-h-screen bg-gradient-to-b from-sky-100 via-white to-green-50 flex flex-col items-center justify-center px-6">
 
       <div className="flex flex-col items-center gap-3 mb-8">
-        <Image src="/COOANC_Logo.png" alt="COOANC" width={320} height={320} className="rounded-2xl" style={{ height: 'auto' }} />
-        <h1 className="text-2xl font-black text-brand-blue tracking-tight">COOANC</h1>
+        <Image src={AUTH_LOGO_SRC} alt="COOANC" width={320} height={320} className="rounded-2xl" style={{ height: 'auto' }} priority />
         <p className="text-sm text-gray-400">자녀 경제 성장의 닻을 내리다</p>
       </div>
 

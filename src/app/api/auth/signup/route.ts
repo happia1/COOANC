@@ -17,16 +17,25 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: '필수 항목이 누락됐어요.' }, { status: 400 })
   }
 
-  if (!process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()) {
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()
+  if (!serviceKey) {
     return NextResponse.json(
-      { error: '서버에 SUPABASE_SERVICE_ROLE_KEY 가 설정되지 않았어요. .env.local 을 확인해 주세요.' },
+      {
+        error:
+          '서버에 SUPABASE_SERVICE_ROLE_KEY 가 없어요. Supabase 대시보드 → Project Settings → API → service_role (secret) 전체를 .env.local 에 넣고 개발 서버를 재시작해 주세요. (anon 키와 혼동하지 마세요)',
+      },
       { status: 500 },
     )
   }
 
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim()
+  if (!supabaseUrl) {
+    return NextResponse.json({ error: 'NEXT_PUBLIC_SUPABASE_URL 이 설정되지 않았어요.' }, { status: 500 })
+  }
+
   const admin = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY,
+    supabaseUrl,
+    serviceKey,
     { auth: { autoRefreshToken: false, persistSession: false } },
   )
 
@@ -43,6 +52,24 @@ export async function POST(req: NextRequest) {
     const msg = createErr.message
     if (msg.includes('already registered') || msg.includes('email_exists')) {
       return NextResponse.json({ error: '이미 사용 중인 이메일이에요. 로그인해 주세요.' }, { status: 409 })
+    }
+    if (msg.includes('User not allowed')) {
+      return NextResponse.json(
+        {
+          error:
+            '계정 생성이 거절됐어요. (1) .env.local 의 SUPABASE_SERVICE_ROLE_KEY 가 Project Settings → API 의 service_role 전체인지 (anon 키와 바뀌지 않았는지) (2) 프로젝트가 일시정지 아닌지 확인해 주세요.',
+        },
+        { status: 403 },
+      )
+    }
+    if (msg.includes('Database error') || msg.toLowerCase().includes('creating new user')) {
+      return NextResponse.json(
+        {
+          error:
+            'DB에서 신규 사용자를 만드는 중 오류가 났어요. 대시보드 → SQL Editor 에서 저장소의 supabase/migrations/018_fix_profiles_rls_and_handle_new_user.sql 내용을 실행해 주세요. (profiles RLS와 handle_new_user 트리거 수정)',
+        },
+        { status: 500 },
+      )
     }
     return NextResponse.json({ error: msg }, { status: 500 })
   }

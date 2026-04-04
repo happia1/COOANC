@@ -1,7 +1,10 @@
 import { redirect } from 'next/navigation'
 import Image from 'next/image'
+import { AUTH_LOGO_SRC } from '@/constants/branding'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
+
+const isDev = process.env.NODE_ENV === 'development'
 
 export default async function ParentHomePage() {
   const supabase = await createClient()
@@ -10,35 +13,81 @@ export default async function ParentHomePage() {
   if (!user) redirect('/login')
 
   // 부모 프로필
-  const { data: profile } = await supabase
+  const {
+    data: profile,
+    error: profileErr,
+  } = await supabase
     .from('profiles')
     .select('name, role')
     .eq('id', user.id)
     .maybeSingle()
 
+  if (profileErr && isDev) {
+    console.warn('[parent] profiles(본인) error:', profileErr.message)
+  }
+
   if (profile?.role !== 'parent') redirect('/home')
 
-  // 자녀 목록 조회
-  const { data: links } = await supabase
+  // 자녀 목록: 스키마에는 children 테이블이 없고 family_links + profiles 로 연결됨
+  const {
+    data: links,
+    error: linksErr,
+  } = await supabase
     .from('family_links')
     .select('child_id')
     .eq('parent_id', user.id)
 
+  if (isDev) {
+    console.log('[parent] user.id', user.id)
+    console.log('[parent] family_links rows:', links?.length ?? 0, linksErr ? linksErr.message : 'ok')
+  }
+
   const childIds = (links ?? []).map(l => l.child_id)
 
-  const { data: children } = childIds.length > 0
+  const {
+    data: children,
+    error: childrenProfilesErr,
+  } = childIds.length > 0
     ? await supabase
         .from('profiles')
         .select('id, name')
         .in('id', childIds)
-    : { data: [] }
+    : { data: [], error: null }
 
-  const { data: stats } = childIds.length > 0
+  if (isDev) {
+    console.log('[parent] childIds from links:', childIds)
+    console.log(
+      '[parent] profiles(자녀) rows:',
+      children?.length ?? 0,
+      childrenProfilesErr ? childrenProfilesErr.message : 'ok',
+    )
+  }
+
+  // (디버그) children 테이블이 프로젝트에 있으면 결과 확인 — 없으면 PostgREST 에러가 찍힘
+  if (isDev) {
+    const probe = await supabase.from('children').select('*').limit(5)
+    console.log(
+      '[parent] supabase.from("children").select("*") [프로젝트에 테이블 없을 수 있음]',
+      {
+        rowCount: probe.data?.length ?? 0,
+        error: probe.error?.message ?? null,
+      },
+    )
+  }
+
+  const {
+    data: stats,
+    error: statsErr,
+  } = childIds.length > 0
     ? await supabase
         .from('child_stats')
         .select('child_id, credits, current_level, streak_days')
         .in('child_id', childIds)
-    : { data: [] }
+    : { data: [], error: null }
+
+  if (isDev && statsErr) {
+    console.warn('[parent] child_stats error:', statsErr.message)
+  }
 
   const statsMap = Object.fromEntries((stats ?? []).map(s => [s.child_id, s]))
 
@@ -49,7 +98,7 @@ export default async function ParentHomePage() {
         {/* 헤더 */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-2">
-            <Image src="/COOANC_Logo.png" alt="COOANC" width={36} height={36} className="rounded-xl" style={{ height: 'auto' }} />
+            <Image src={AUTH_LOGO_SRC} alt="COOANC" width={36} height={36} className="rounded-xl" style={{ height: 'auto' }} />
             <span className="text-lg font-black text-brand-blue">COOANC</span>
           </div>
           <div className="text-right">
@@ -59,7 +108,7 @@ export default async function ParentHomePage() {
         </div>
 
         {/* 자녀 카드 목록 */}
-        <h2 className="text-base font-bold text-brand-text mb-3">우리 아이들</h2>
+        <h2 className="text-base font-bold text-brand-text mb-3">자녀 계정</h2>
 
         {(children ?? []).length === 0 ? (
           <div className="bg-white rounded-3xl shadow p-6 text-center text-sm text-gray-400">

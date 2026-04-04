@@ -19,6 +19,10 @@ export function getSignupCatchMessage(err: unknown): string {
   }
 
   const lower = raw.toLowerCase()
+  if (lower.includes('unexpected end of json input') || lower.includes("failed to execute 'json' on 'response'")) {
+    return 'Supabase 응답이 비어 있거나 잘못됐어요. NEXT_PUBLIC_SUPABASE_URL·anon 키를 확인하고, .env.local 에 SUPABASE_SERVICE_ROLE_KEY 를 넣어 서버 가입을 쓰는 것을 권장해요.'
+  }
+
   if (
     lower.includes('failed to fetch') ||
     lower.includes('networkerror') ||
