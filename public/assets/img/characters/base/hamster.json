@@ -1,0 +1,36 @@
+{"frames": {
+
+"hams (1).png":
+{
+	"frame": {"x":1,"y":541,"w":292,"h":538},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":292,"h":538},
+	"sourceSize": {"w":292,"h":538}
+},
+"hams (2).png":
+{
+	"frame": {"x":1,"y":1081,"w":292,"h":537},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":292,"h":537},
+	"sourceSize": {"w":292,"h":537}
+},
+"hams (3).png":
+{
+	"frame": {"x":1,"y":1,"w":296,"h":538},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":296,"h":538},
+	"sourceSize": {"w":296,"h":538}
+}},
+"meta": {
+	"app": "https://www.codeandweb.com/texturepacker",
+	"version": "1.0",
+	"image": "hamster.png",
+	"format": "RGBA8888",
+	"size": {"w":298,"h":1619},
+	"scale": "1",
+	"smartupdate": "$TexturePacker:SmartUpdate:3ec8e7f5cee1cda95f0c9d8169b9cd90:878932d67ada005d9da4b91ed36ac6e9:1eabc9ece7da24d89bc5440fd2986758$"
+}
+}

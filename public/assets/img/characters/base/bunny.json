@@ -1,0 +1,36 @@
+{"frames": {
+
+"레이어 19.png":
+{
+	"frame": {"x":1,"y":546,"w":243,"h":537},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":243,"h":537},
+	"sourceSize": {"w":243,"h":537}
+},
+"레이어 20.png":
+{
+	"frame": {"x":1,"y":1085,"w":241,"h":537},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":241,"h":537},
+	"sourceSize": {"w":241,"h":537}
+},
+"레이어 21.png":
+{
+	"frame": {"x":1,"y":1,"w":251,"h":543},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":2,"y":0,"w":251,"h":543},
+	"sourceSize": {"w":253,"h":543}
+}},
+"meta": {
+	"app": "https://www.codeandweb.com/texturepacker",
+	"version": "1.0",
+	"image": "bunny.png",
+	"format": "RGBA8888",
+	"size": {"w":253,"h":1623},
+	"scale": "1",
+	"smartupdate": "$TexturePacker:SmartUpdate:02d696b6ce82de6e74d76614e4603a68:76c334ca4b9b81a2a5122bddfd8c1b04:8cd39669a6554f33ec81b353c76b4981$"
+}
+}

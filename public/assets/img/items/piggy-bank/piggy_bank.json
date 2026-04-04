@@ -1,0 +1,84 @@
+{"frames": {
+
+"레이어 279.png":
+{
+	"frame": {"x":382,"y":134,"w":124,"h":115},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":124,"h":115},
+	"sourceSize": {"w":124,"h":115},
+	"pivot": {"x":0.5,"y":0.5}
+},
+"레이어 280.png":
+{
+	"frame": {"x":131,"y":133,"w":126,"h":117},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":126,"h":117},
+	"sourceSize": {"w":126,"h":117},
+	"pivot": {"x":0.5,"y":0.5}
+},
+"레이어 281.png":
+{
+	"frame": {"x":3,"y":136,"w":124,"h":116},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":124,"h":116},
+	"sourceSize": {"w":124,"h":116},
+	"pivot": {"x":0.5,"y":0.5}
+},
+"레이어 282.png":
+{
+	"frame": {"x":128,"y":3,"w":126,"h":123},
+	"rotated": true,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":126,"h":123},
+	"sourceSize": {"w":126,"h":123},
+	"pivot": {"x":0.5,"y":0.5}
+},
+"레이어 283.png":
+{
+	"frame": {"x":255,"y":3,"w":127,"h":121},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":127,"h":121},
+	"sourceSize": {"w":127,"h":121},
+	"pivot": {"x":0.5,"y":0.5}
+},
+"레이어 284.png":
+{
+	"frame": {"x":386,"y":3,"w":127,"h":121},
+	"rotated": true,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":127,"h":121},
+	"sourceSize": {"w":127,"h":121},
+	"pivot": {"x":0.5,"y":0.5}
+},
+"레이어 285.png":
+{
+	"frame": {"x":3,"y":3,"w":129,"h":121},
+	"rotated": true,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":129,"h":121},
+	"sourceSize": {"w":129,"h":121},
+	"pivot": {"x":0.5,"y":0.5}
+},
+"레이어 286.png":
+{
+	"frame": {"x":261,"y":128,"w":124,"h":117},
+	"rotated": true,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":124,"h":117},
+	"sourceSize": {"w":124,"h":117},
+	"pivot": {"x":0.5,"y":0.5}
+}},
+"meta": {
+	"app": "https://www.codeandweb.com/texturepacker",
+	"version": "1.0",
+	"image": "piggy_bank.png",
+	"format": "RGBA8888",
+	"size": {"w":510,"h":255},
+	"scale": "1",
+	"smartupdate": "$TexturePacker:SmartUpdate:e61b9dca96a5c1846a9b26751138e8e0:ee6bdd9e3ef0b6cc735d035061b0655c:f3489ca324e10155674b1c27a69d741d$"
+}
+}

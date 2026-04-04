@@ -1,0 +1,132 @@
+{"frames": {
+
+"bag.png":
+{
+	"frame": {"x":95,"y":172,"w":85,"h":100},
+	"rotated": true,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":85,"h":100},
+	"sourceSize": {"w":85,"h":100}
+},
+"bunch_of_flowers.png":
+{
+	"frame": {"x":3,"y":261,"w":89,"h":117},
+	"rotated": true,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":89,"h":117},
+	"sourceSize": {"w":89,"h":117}
+},
+"credit.png":
+{
+	"frame": {"x":102,"y":449,"w":93,"h":97},
+	"rotated": true,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":93,"h":97},
+	"sourceSize": {"w":93,"h":97}
+},
+"credit_wink.png":
+{
+	"frame": {"x":101,"y":85,"w":83,"h":85},
+	"rotated": true,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":83,"h":85},
+	"sourceSize": {"w":83,"h":85}
+},
+"credits.png":
+{
+	"frame": {"x":3,"y":447,"w":95,"h":93},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":95,"h":93},
+	"sourceSize": {"w":95,"h":93}
+},
+"happy.png":
+{
+	"frame": {"x":104,"y":3,"w":93,"h":78},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":93,"h":78},
+	"sourceSize": {"w":93,"h":78}
+},
+"heart.png":
+{
+	"frame": {"x":3,"y":68,"w":94,"h":82},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":94,"h":82},
+	"sourceSize": {"w":94,"h":82}
+},
+"market.png":
+{
+	"frame": {"x":124,"y":261,"w":97,"h":89},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":97,"h":89},
+	"sourceSize": {"w":97,"h":89}
+},
+"piggy_bank.png":
+{
+	"frame": {"x":3,"y":354,"w":96,"h":89},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":96,"h":89},
+	"sourceSize": {"w":96,"h":89}
+},
+"star.png":
+{
+	"frame": {"x":3,"y":154,"w":88,"h":85},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":88,"h":85},
+	"sourceSize": {"w":88,"h":85}
+},
+"star2.png":
+{
+	"frame": {"x":118,"y":546,"w":102,"h":97},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":102,"h":97},
+	"sourceSize": {"w":102,"h":97}
+},
+"star_with_wing.png":
+{
+	"frame": {"x":3,"y":3,"w":97,"h":61},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":97,"h":61},
+	"sourceSize": {"w":97,"h":61}
+},
+"timer.png":
+{
+	"frame": {"x":3,"y":546,"w":111,"h":96},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":111,"h":96},
+	"sourceSize": {"w":111,"h":96}
+},
+"wallet.png":
+{
+	"frame": {"x":103,"y":354,"w":107,"h":91},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":107,"h":91},
+	"sourceSize": {"w":107,"h":91}
+},
+"레이어 11.png":
+{
+	"frame": {"x":3,"y":647,"w":220,"h":175},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":220,"h":175},
+	"sourceSize": {"w":220,"h":175}
+}},
+"meta": {
+	"app": "https://www.codeandweb.com/texturepacker",
+	"version": "1.0",
+	"image": "icons.png",
+	"format": "RGBA8888",
+	"size": {"w":226,"h":825},
+	"scale": "1",
+	"smartupdate": "$TexturePacker:SmartUpdate:ca1efd64aabf4ae7736241b8befa64ca:c6e7140a8922bd3e2479d733c5aeadb3:b5c5bd7252d2048fecbb1bda1760f9ef$"
+}
+}

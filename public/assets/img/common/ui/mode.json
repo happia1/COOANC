@@ -1,0 +1,30 @@
+{"frames": {
+
+"morning.png":
+{
+	"frame": {"x":3,"y":3,"w":234,"h":169},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":234,"h":169},
+	"sourceSize": {"w":234,"h":169},
+	"pivot": {"x":0.5,"y":0.5}
+},
+"sleep_mode.png":
+{
+	"frame": {"x":241,"y":3,"w":132,"h":139},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":132,"h":139},
+	"sourceSize": {"w":132,"h":139},
+	"pivot": {"x":0.5,"y":0.5}
+}},
+"meta": {
+	"app": "https://www.codeandweb.com/texturepacker",
+	"version": "1.0",
+	"image": "mode.png",
+	"format": "RGBA8888",
+	"size": {"w":376,"h":175},
+	"scale": "1",
+	"smartupdate": "$TexturePacker:SmartUpdate:d33da8b61e050292c7c1b9b1ae3f15d7:3edbae8afeae6fb7bc58f0148f36dc81:2dbc9f8330670a5b42ebb75a75c52500$"
+}
+}

@@ -1,0 +1,36 @@
+{"frames": {
+
+"Bears (1).png":
+{
+	"frame": {"x":333,"y":1,"w":280,"h":495},
+	"rotated": true,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":280,"h":495},
+	"sourceSize": {"w":280,"h":495}
+},
+"Bears (2).png":
+{
+	"frame": {"x":1,"y":1,"w":330,"h":558},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":330,"h":558},
+	"sourceSize": {"w":330,"h":558}
+},
+"Bears (3).png":
+{
+	"frame": {"x":333,"y":283,"w":238,"h":495},
+	"rotated": true,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":238,"h":495},
+	"sourceSize": {"w":238,"h":495}
+}},
+"meta": {
+	"app": "https://www.codeandweb.com/texturepacker",
+	"version": "1.0",
+	"image": "bears.png",
+	"format": "RGBA8888",
+	"size": {"w":829,"h":560},
+	"scale": "1",
+	"smartupdate": "$TexturePacker:SmartUpdate:e51596bda324945124c25ef01702955b:c3375794beb72f32a9947569d56672da:968da652e7e0fd170445a626ca952cb0$"
+}
+}

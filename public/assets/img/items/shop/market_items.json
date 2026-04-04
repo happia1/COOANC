@@ -1,0 +1,188 @@
+{"frames": {
+
+"bear.png":
+{
+	"frame": {"x":882,"y":167,"w":77,"h":98},
+	"rotated": true,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":77,"h":98},
+	"sourceSize": {"w":77,"h":98}
+},
+"blocks.png":
+{
+	"frame": {"x":1082,"y":161,"w":95,"h":89},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":95,"h":89},
+	"sourceSize": {"w":95,"h":89}
+},
+"bluberry_juice.png":
+{
+	"frame": {"x":876,"y":3,"w":66,"h":160},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":66,"h":160},
+	"sourceSize": {"w":66,"h":160}
+},
+"candy.png":
+{
+	"frame": {"x":1428,"y":123,"w":119,"h":106},
+	"rotated": true,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":119,"h":106},
+	"sourceSize": {"w":119,"h":106}
+},
+"chew.png":
+{
+	"frame": {"x":567,"y":3,"w":125,"h":167},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":125,"h":167},
+	"sourceSize": {"w":125,"h":167}
+},
+"chew2.png":
+{
+	"frame": {"x":696,"y":3,"w":114,"h":167},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":114,"h":167},
+	"sourceSize": {"w":114,"h":167}
+},
+"chips.png":
+{
+	"frame": {"x":437,"y":3,"w":126,"h":167},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":126,"h":167},
+	"sourceSize": {"w":126,"h":167}
+},
+"choco_milk.png":
+{
+	"frame": {"x":946,"y":3,"w":89,"h":155},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":89,"h":155},
+	"sourceSize": {"w":89,"h":155}
+},
+"chocolate (2).png":
+{
+	"frame": {"x":1328,"y":147,"w":99,"h":96},
+	"rotated": true,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":99,"h":96},
+	"sourceSize": {"w":99,"h":96}
+},
+"chocolate.png":
+{
+	"frame": {"x":1244,"y":3,"w":112,"h":140},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":112,"h":140},
+	"sourceSize": {"w":112,"h":140}
+},
+"coockie.png":
+{
+	"frame": {"x":1428,"y":3,"w":116,"h":114},
+	"rotated": true,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":116,"h":114},
+	"sourceSize": {"w":116,"h":114}
+},
+"drink.png":
+{
+	"frame": {"x":360,"y":3,"w":73,"h":205},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":73,"h":205},
+	"sourceSize": {"w":73,"h":205}
+},
+"flower.png":
+{
+	"frame": {"x":437,"y":174,"w":74,"h":112},
+	"rotated": true,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":74,"h":112},
+	"sourceSize": {"w":74,"h":112}
+},
+"gummy.png":
+{
+	"frame": {"x":814,"y":3,"w":58,"h":161},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":58,"h":161},
+	"sourceSize": {"w":58,"h":161}
+},
+"icecream.png":
+{
+	"frame": {"x":1181,"y":157,"w":91,"h":143},
+	"rotated": true,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":91,"h":143},
+	"sourceSize": {"w":91,"h":143}
+},
+"luckybox.png":
+{
+	"frame": {"x":984,"y":162,"w":86,"h":94},
+	"rotated": true,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":86,"h":94},
+	"sourceSize": {"w":86,"h":94}
+},
+"mango_juice.png":
+{
+	"frame": {"x":553,"y":174,"w":68,"h":161},
+	"rotated": true,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":68,"h":161},
+	"sourceSize": {"w":68,"h":161}
+},
+"pudding.png":
+{
+	"frame": {"x":1132,"y":3,"w":150,"h":108},
+	"rotated": true,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":150,"h":108},
+	"sourceSize": {"w":150,"h":108}
+},
+"strawberry_juice.png":
+{
+	"frame": {"x":718,"y":174,"w":67,"h":160},
+	"rotated": true,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":67,"h":160},
+	"sourceSize": {"w":67,"h":160}
+},
+"strawberry_milk.png":
+{
+	"frame": {"x":1039,"y":3,"w":89,"h":154},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":89,"h":154},
+	"sourceSize": {"w":89,"h":154}
+},
+"레이어 9.png":
+{
+	"frame": {"x":172,"y":3,"w":221,"h":184},
+	"rotated": true,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":221,"h":184},
+	"sourceSize": {"w":221,"h":184}
+},
+"레이어 10.png":
+{
+	"frame": {"x":3,"y":3,"w":165,"h":226},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":165,"h":226},
+	"sourceSize": {"w":165,"h":226}
+}},
+"meta": {
+	"app": "https://www.codeandweb.com/texturepacker",
+	"version": "1.0",
+	"image": "market_items.png",
+	"format": "RGBA8888",
+	"size": {"w":1545,"h":253},
+	"scale": "1",
+	"smartupdate": "$TexturePacker:SmartUpdate:a9cd2fb74d66986b48c7cf47479e5a04:d4708725d9f4b29d20488ee07c7b1647:cc182e42fb6fedd08f1d4d00a32c36c3$"
+}
+}

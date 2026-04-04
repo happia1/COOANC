@@ -1,0 +1,36 @@
+{"frames": {
+
+"chics (1).png":
+{
+	"frame": {"x":612,"y":1,"w":302,"h":480},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":302,"h":480},
+	"sourceSize": {"w":302,"h":480}
+},
+"chics (2).png":
+{
+	"frame": {"x":1,"y":1,"w":292,"h":481},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":292,"h":481},
+	"sourceSize": {"w":292,"h":481}
+},
+"chics (3).png":
+{
+	"frame": {"x":295,"y":1,"w":315,"h":480},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":315,"h":480},
+	"sourceSize": {"w":315,"h":480}
+}},
+"meta": {
+	"app": "https://www.codeandweb.com/texturepacker",
+	"version": "1.0",
+	"image": "chicks.png",
+	"format": "RGBA8888",
+	"size": {"w":915,"h":483},
+	"scale": "1",
+	"smartupdate": "$TexturePacker:SmartUpdate:6134859c397792c9c4b0302a51eb39bc:fe56b0e3bdbe26742aed65d483ffb9a7:7e37e3e62e8cc2907ec229d5e00385d6$"
+}
+}
