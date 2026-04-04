@@ -85,8 +85,7 @@ export default function SignupPage() {
     <div className="min-h-screen bg-gradient-to-b from-sky-100 via-white to-green-50 flex flex-col items-center justify-center px-6 py-10">
 
       <div className="flex flex-col items-center gap-3 mb-7">
-        <Image src="/COOANC_Logo.png" alt="COOANC" width={64} height={64} className="rounded-2xl" style={{ height: 'auto' }} />
-        <h1 className="text-2xl font-black text-brand-blue tracking-tight">COOANC</h1>
+        <Image src="/COOANC_Logo.png" alt="COOANC" width={192} height={192} className="rounded-2xl" style={{ height: 'auto' }} />
         <p className="text-sm text-gray-400">자녀 경제 성장의 닻을 내리다</p>
       </div>
 
@@ -97,18 +96,6 @@ export default function SignupPage() {
         <div className="text-center">
           <h2 className="text-lg font-bold text-brand-text">부모 계정 만들기</h2>
           <p className="text-xs text-gray-400 mt-1">부모 계정을 먼저 만든 뒤, 자녀 프로필을 등록해요</p>
-        </div>
-
-        {/* 부모 전용 안내 배너 */}
-        <div className="flex items-start gap-2 bg-brand-blue/5 border border-brand-blue/20 rounded-2xl px-3.5 py-3">
-          <span className="text-xl leading-none mt-0.5">👨‍👩‍👧</span>
-          <div>
-            <p className="text-xs font-bold text-brand-blue">부모(보호자) 계정</p>
-            <p className="text-[11px] text-gray-500 leading-relaxed mt-0.5">
-              자녀 미션 관리, 크레딧 승인, 성장 대시보드를 이용할 수 있어요.
-              자녀 프로필은 가입 후 등록해요.
-            </p>
-          </div>
         </div>
 
         <div className="flex flex-col gap-1.5">
