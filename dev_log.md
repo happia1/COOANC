@@ -99,6 +99,29 @@
 
 ---
 
+## [2026-04-04 Session 2] - 회원가입 구조 재설계 + 온보딩 + 부모 홈
+- **Status:** ✅ 완료
+- **Files Created:**
+  - `src/app/onboarding/page.tsx` — 자녀 이름·나이·PIN 등록 온보딩 페이지
+  - `src/app/api/child/create/route.ts` — 자녀 auth 계정 생성 서버 API (service_role)
+  - `src/app/parent/page.tsx` — 부모 홈 (자녀 목록·크레딧·레벨 카드)
+  - `supabase/migrations/016_add_age_to_profiles.sql` — profiles.age 컬럼 추가
+  - `public/COOANC_Logo.png`, `public/favicon-96x96.png`, `public/apple-touch-icon.png`, `public/web-app-manifest-*.png`, `public/favicon.ico`, `public/favicon.svg`, `public/site.webmanifest` — 로고 및 PWA 아이콘
+- **Files Modified:**
+  - `src/app/signup/page.tsx` — 역할 선택 제거, 부모 전용 계정 생성 UI
+  - `src/app/login/page.tsx` — 로그인 후 role 기반 분기 (부모→/parent or /onboarding, 자녀→/home)
+  - `src/app/auth/callback/route.ts` — 이메일 인증 콜백 role 기반 리다이렉트
+- **Summary:**
+  - COPPA 원칙("부모 주계정 산하 서브 프로필 구조") 준수를 위해 회원가입을 부모 전용으로 재설계. 자녀는 독립 auth 계정이 아닌 부모 온보딩 플로우에서 service_role Admin API로 생성된다.
+  - 온보딩(이름·나이·PIN)→API 라우트→auth.users 생성→child_stats+family_links 레코드 생성의 전체 파이프라인 구현 완료.
+  - COOANC_Logo.png 및 파비콘/PWA 아이콘 파일을 public/ 디렉터리에 배치하여 로그인·회원가입·온보딩 화면에 실제 로고 이미지 반영.
+- **Next Steps:**
+  - `SUPABASE_SERVICE_ROLE_KEY` 를 `.env.local`에 추가해야 /api/child/create 동작
+  - 아이 앱 미션 탭 구현 (오늘의 미션 카드, 정직 확인 카드 팝업, 크레딧 적립 애니메이션)
+  - 부모 홈 대시보드 고도화 (미션 달성률, 최근 활동 로그, AI 한 줄 가이드)
+
+---
+
 ## 📑 Commit Message Protocol
 1. 모든 커밋 메시지는 이 로그의 최신 기록을 바탕으로 작성한다.
 2. **형식**: `type: [작업명] #이슈번호(선택)`
