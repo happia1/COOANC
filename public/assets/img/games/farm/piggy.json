@@ -1,0 +1,44 @@
+{"frames": {
+
+"feed_piggy.png":
+{
+	"frame": {"x":235,"y":1,"w":230,"h":146},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":230,"h":146},
+	"sourceSize": {"w":230,"h":146}
+},
+"piggy.png":
+{
+	"frame": {"x":699,"y":1,"w":175,"h":157},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":175,"h":157},
+	"sourceSize": {"w":175,"h":157}
+},
+"piggy_food.png":
+{
+	"frame": {"x":1,"y":1,"w":232,"h":156},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":232,"h":156},
+	"sourceSize": {"w":232,"h":156}
+},
+"piggy_house.png":
+{
+	"frame": {"x":467,"y":1,"w":230,"h":146},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":230,"h":146},
+	"sourceSize": {"w":230,"h":146}
+}},
+"meta": {
+	"app": "https://www.codeandweb.com/texturepacker",
+	"version": "1.0",
+	"image": "piggy.png",
+	"format": "RGBA8888",
+	"size": {"w":875,"h":159},
+	"scale": "1",
+	"smartupdate": "$TexturePacker:SmartUpdate:3e4bb9585bf28f1203fc8559a51fbadf:6d3cac14a77ebaf28ae4f626aff42710:3d96dbdc439b1e30d097852a7c93f9e2$"
+}
+}

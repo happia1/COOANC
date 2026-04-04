@@ -1,0 +1,44 @@
+{"frames": {
+
+"cow.png":
+{
+	"frame": {"x":3,"y":620,"w":215,"h":210},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":215,"h":210},
+	"sourceSize": {"w":215,"h":210}
+},
+"cow_food.png":
+{
+	"frame": {"x":3,"y":3,"w":227,"h":235},
+	"rotated": true,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":227,"h":235},
+	"sourceSize": {"w":227,"h":235}
+},
+"cow_house.png":
+{
+	"frame": {"x":3,"y":234,"w":225,"h":223},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":225,"h":223},
+	"sourceSize": {"w":225,"h":223}
+},
+"feed_cow.png":
+{
+	"frame": {"x":3,"y":461,"w":225,"h":155},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":225,"h":155},
+	"sourceSize": {"w":225,"h":155}
+}},
+"meta": {
+	"app": "https://www.codeandweb.com/texturepacker",
+	"version": "1.0",
+	"image": "cow.png",
+	"format": "RGBA8888",
+	"size": {"w":241,"h":833},
+	"scale": "1",
+	"smartupdate": "$TexturePacker:SmartUpdate:c0252eeff1b4dbf47efe8095aed64b12:4dbe27076eadb4f63890518d72124294:1bd846ce2102e34324d6f267c01f5ead$"
+}
+}

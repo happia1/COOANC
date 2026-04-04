@@ -1,0 +1,44 @@
+{"frames": {
+
+"dog.png":
+{
+	"frame": {"x":1,"y":434,"w":169,"h":201},
+	"rotated": true,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":169,"h":201},
+	"sourceSize": {"w":169,"h":201}
+},
+"dog_food.png":
+{
+	"frame": {"x":1,"y":605,"w":185,"h":135},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":185,"h":135},
+	"sourceSize": {"w":185,"h":135}
+},
+"dog_house.png":
+{
+	"frame": {"x":1,"y":222,"w":220,"h":210},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":220,"h":210},
+	"sourceSize": {"w":220,"h":210}
+},
+"feep_dog.png":
+{
+	"frame": {"x":1,"y":1,"w":223,"h":219},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":223,"h":219},
+	"sourceSize": {"w":223,"h":219}
+}},
+"meta": {
+	"app": "https://www.codeandweb.com/texturepacker",
+	"version": "1.0",
+	"image": "dog.png",
+	"format": "RGBA8888",
+	"size": {"w":225,"h":741},
+	"scale": "1",
+	"smartupdate": "$TexturePacker:SmartUpdate:b3ea226816644d75d69a8b8cb05ca177:1c755485e98434e2a84ec01d862687df:ec6c3e0b9eb3cd3c555a7c426f3b0ee8$"
+}
+}

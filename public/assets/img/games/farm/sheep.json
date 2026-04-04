@@ -1,0 +1,44 @@
+{"frames": {
+
+"feed_sheep.png":
+{
+	"frame": {"x":3,"y":170,"w":227,"h":139},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":227,"h":139},
+	"sourceSize": {"w":227,"h":139}
+},
+"sheep.png":
+{
+	"frame": {"x":3,"y":450,"w":185,"h":180},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":185,"h":180},
+	"sourceSize": {"w":185,"h":180}
+},
+"sheep_food.png":
+{
+	"frame": {"x":3,"y":313,"w":227,"h":133},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":227,"h":133},
+	"sourceSize": {"w":227,"h":133}
+},
+"sheep_house.png":
+{
+	"frame": {"x":3,"y":3,"w":227,"h":163},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":227,"h":163},
+	"sourceSize": {"w":227,"h":163}
+}},
+"meta": {
+	"app": "https://www.codeandweb.com/texturepacker",
+	"version": "1.0",
+	"image": "sheep.png",
+	"format": "RGBA8888",
+	"size": {"w":233,"h":633},
+	"scale": "1",
+	"smartupdate": "$TexturePacker:SmartUpdate:af69f658a4e90fc573b514f7056d0474:a5056af8fbdf86c6e8977a27174a601a:a02d5ee6262bd8732bc34b293ec3862a$"
+}
+}
