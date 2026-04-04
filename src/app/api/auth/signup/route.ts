@@ -6,7 +6,12 @@ import { createClient } from '@supabase/supabase-js'
  * 트리거 오류 시 폴백: service_role로 auth user + profile 직접 생성
  */
 export async function POST(req: NextRequest) {
-  const { email, password, name } = await req.json()
+  let email: string, password: string, name: string
+  try {
+    ;({ email, password, name } = await req.json())
+  } catch {
+    return NextResponse.json({ error: '요청 형식이 올바르지 않아요.' }, { status: 400 })
+  }
 
   if (!email || !password || !name) {
     return NextResponse.json({ error: '필수 항목이 누락됐어요.' }, { status: 400 })

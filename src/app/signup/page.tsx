@@ -46,7 +46,11 @@ export default function SignupPage() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email, password, name }),
           })
-          const json = await res.json()
+          let json: Record<string, unknown> = {}
+          const text = await res.text()
+          if (text) {
+            try { json = JSON.parse(text) } catch { /* non-JSON response */ }
+          }
           if (!res.ok) {
             setError(json.error ?? '회원가입에 실패했어요. 잠시 후 다시 시도해 주세요.')
             setLoading(false)
