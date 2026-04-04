@@ -47,24 +47,8 @@ export default function LoginPage() {
     // 역할 확인
     const role = user.user_metadata?.role as string | undefined
 
-    if (role === 'child') {
-      window.location.href = '/home'
-      return
-    }
-
-    // 부모: 자녀가 등록돼 있는지 확인
-    const { count } = await supabase
-      .from('family_links')
-      .select('*', { count: 'exact', head: true })
-      .eq('parent_id', user.id)
-
-    if (!count || count === 0) {
-      // 자녀 미등록 → 온보딩으로
-      window.location.href = '/onboarding'
-    } else {
-      // 자녀 있음 → 부모 홈으로
-      window.location.href = '/parent'
-    }
+    // 로그인 후 루트로 → 디바이스 모드 라우터가 적절한 화면으로 분기
+    window.location.href = '/'
   }
 
   return (

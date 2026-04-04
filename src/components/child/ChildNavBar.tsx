@@ -4,10 +4,11 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
 const TABS = [
-  { href: '/home',    label: '홈',    emoji: '🏠' },
-  { href: '/mission', label: '미션',  emoji: '⭐' },
-  { href: '/market',  label: '마켓',  emoji: '🛒' },
-  { href: '/sticker', label: '스티커', emoji: '🎀' },
+  { href: '/home',     label: '홈',    emoji: '🏠' },
+  { href: '/mission',  label: '미션',  emoji: '⭐' },
+  { href: '/market',   label: '마켓',  emoji: '🛒' },
+  { href: '/sticker',  label: '스티커', emoji: '🎀' },
+  { href: '/settings', label: '설정',  emoji: '⚙️' },
 ] as const
 
 /**

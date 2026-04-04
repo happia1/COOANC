@@ -82,9 +82,14 @@ export default function HomeTab({ parentName, childrenData, pendingCount }: Prop
           <Image src={AUTH_LOGO_SRC} alt="COOANC" width={28} height={28} className="rounded-xl" style={{ height: 'auto' }} />
           <span className="text-base font-black text-[#4A90E2]">COOANC</span>
         </div>
-        <div className="text-right">
-          <p className="text-[10px] text-gray-400">안녕하세요</p>
-          <p className="text-xs font-bold text-gray-700">{parentName}</p>
+        <div className="flex items-center gap-3">
+          <div className="text-right">
+            <p className="text-[10px] text-gray-400">안녕하세요</p>
+            <p className="text-xs font-bold text-gray-700">{parentName}</p>
+          </div>
+          <Link href="/settings" className="w-8 h-8 flex items-center justify-center rounded-xl bg-gray-100 text-gray-500 hover:bg-gray-200 transition-colors">
+            <span className="text-base">⚙️</span>
+          </Link>
         </div>
       </div>
 

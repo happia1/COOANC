@@ -122,6 +122,62 @@
 
 ---
 
+## [2026-04-04 Session 3] - 자녀 앱 탭 + 부모 앱 전체 구조 구현
+- **Status:** ✅ 완료
+- **Files Created:**
+  - `src/app/(child)/mission/page.tsx` — 오늘의 미션 서버 컴포넌트 (mission_logs 배정 + 완료 현황 조회)
+  - `src/components/child/MissionTab.tsx` — 미션 카드 리스트, 정직 확인 팝업, API 호출
+  - `src/app/api/mission/complete/route.ts` — 미션 완료 처리 API (mission_logs is_completed 업데이트)
+  - `src/app/(child)/market/page.tsx` — 마켓 서버 컴포넌트 (store_items + 크레딧 조회)
+  - `src/components/child/MarketTab.tsx` — 상품 카드, 구매 요청 팝업
+  - `src/app/api/market/purchase/route.ts` — 구매 요청 생성 API
+  - `src/app/(child)/sticker/page.tsx` — 스티커 서버 컴포넌트 (badges 조회)
+  - `src/components/child/StickerTab.tsx` — 뱃지 그리드 (획득/미획득 구분)
+  - `src/app/parent/(tabs)/home/page.tsx` — 부모 홈 서버 컴포넌트 (자녀별 통계 병렬 조회)
+  - `src/components/parent/HomeTab.tsx` — EQ 지수, 미션 달성률, 최근 활동, AI 가이드
+  - `src/app/parent/(tabs)/routine/page.tsx` — 루틴 서버 컴포넌트 (전체 미션 조회)
+  - `src/components/parent/RoutineTab.tsx` — 자녀별 미션 현황 + 레벨별 필터링
+  - `src/app/parent/(tabs)/approval/page.tsx` — 승인 서버 컴포넌트 (pending 구매 요청 조회)
+  - `src/components/parent/ApprovalTab.tsx` — 요청 카드, 승인/거절 API 호출
+  - `src/app/api/parent/purchase/[id]/route.ts` — 구매 요청 승인/거절 API
+  - `src/store/parentStore.ts` — Zustand 자녀 선택 상태 (selectedChildId)
+  - `src/components/parent/ChildSwitcher.tsx` — 자녀 전환 탭 (1명이면 숨김)
+- **Files Modified:**
+  - `src/app/parent/layout.tsx` — 부모 앱 레이아웃 (홈→루틴→승인 탭 순서)
+  - `src/app/parent/(tabs)/home/page.tsx` — `profiles.age` 컬럼 제거로 조회 오류 수정
+  - `src/app/login/page.tsx` — 로그인 후 role 기반 분기
+- **Summary:**
+  - 자녀 앱 4개 탭(홈/미션/마켓/스티커) 및 부모 앱 3개 탭(홈/루틴/승인) 전체 구현 완료.
+  - 부모 앱을 Zustand(parentStore)로 selectedChildId 전역 공유하여 홈·루틴 탭 간 자녀 선택 상태 동기화.
+  - `profiles.age` 컬럼 미존재로 자녀 목록이 빈 배열로 반환되던 버그 수정 (select 쿼리에서 age 필드 제거).
+- **Next Steps:**
+  - 디바이스 모드 시스템 구현 (setup/settings + DeviceModeRouter)
+
+---
+
+## [2026-04-05] - 디바이스 모드 설정 및 자동 분기 시스템 구현
+- **Status:** ✅ 완료
+- **Files Created:**
+  - `src/store/deviceStore.ts` — Zustand deviceMode + pin 스토어 (localStorage 동기화)
+  - `src/app/setup/page.tsx` — 2단계 모드 설정 화면 (모드 선택 카드 → PIN 4자리 숫자 키패드)
+  - `src/app/settings/page.tsx` — 앱 설정 페이지 (PIN 인증 후 모드 변경, 프로필 이름 편집, 알림/소리 토글, 로그아웃)
+  - `src/middleware.ts` — Supabase 세션 쿠키 자동 갱신 미들웨어
+- **Files Modified:**
+  - `src/app/page.tsx` — 서버 redirect 제거 → 클라이언트 DeviceModeRouter로 교체 (localStorage → Supabase session → role 기반 분기)
+  - `src/app/login/page.tsx` — 로그인 후 `/`로 라우팅 (DeviceModeRouter에 분기 위임)
+  - `src/components/parent/HomeTab.tsx` — 헤더에 ⚙️ 설정 아이콘 (→ /settings) 추가
+  - `src/components/child/ChildNavBar.tsx` — 하단 네비에 설정(⚙️) 탭 추가
+- **Summary:**
+  - `cooanc_device_mode`(shared/child/parent)를 localStorage에 저장하고, 루트(/) 접근 시 클라이언트에서 모드 + Supabase 세션을 읽어 적절한 화면으로 자동 분기하는 DeviceModeRouter 구현.
+  - 첫 실행 시 /setup으로 이동하여 3가지 모드 카드 선택 + PIN 4자리 입력(확인 포함)으로 설정을 완료하고, /settings에서 PIN 인증 후 모드 변경 가능.
+  - 미들웨어는 localStorage 접근 불가(서버 사이드)이므로 Supabase 쿠키 세션 갱신만 담당하고, 라우팅 분기 전체는 클라이언트 컴포넌트에서 처리하는 구조.
+- **Next Steps:**
+  - /setup 및 /settings 페이지에 대한 (child) 레이아웃 예외 처리 확인
+  - 자녀 앱 홈 탭 AI 코칭 가이드 실제 AI 연동
+  - 부모 앱 실시간 알림 (Supabase Realtime) 연동
+
+---
+
 ## 📑 Commit Message Protocol
 1. 모든 커밋 메시지는 이 로그의 최신 기록을 바탕으로 작성한다.
 2. **형식**: `type: [작업명] #이슈번호(선택)`
