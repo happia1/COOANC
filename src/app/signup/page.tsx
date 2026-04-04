@@ -25,34 +25,43 @@ export default function SignupPage() {
     setLoading(true)
     const supabase = createClient()
 
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { role: 'parent', name },
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
-      },
-    })
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: { role: 'parent', name },
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+        },
+      })
 
-    if (error) {
-      setError(
-        error.message.includes('already registered') || error.message.includes('already been registered')
-          ? '이미 사용 중인 이메일이에요. 로그인해 주세요.'
-          : error.message,
-      )
+      if (error) {
+        const msg = error.message
+        if (msg.includes('already registered') || msg.includes('already been registered')) {
+          setError('이미 사용 중인 이메일이에요. 로그인해 주세요.')
+        } else if (msg.includes('Database error')) {
+          setError('서버 오류가 발생했어요. 잠시 후 다시 시도해 주세요. (DB 오류)')
+        } else {
+          setError(msg)
+        }
+        setLoading(false)
+        return
+      }
+
+      // 이메일 인증 불필요(개발 환경) → 바로 온보딩으로
+      if (data.session) {
+        window.location.href = '/onboarding'
+        return
+      }
+
+      // 이메일 인증 필요 → 안내 화면
+      setDone(true)
       setLoading(false)
-      return
+    } catch (err) {
+      console.error('signup error:', err)
+      setError('네트워크 오류가 발생했어요. 인터넷 연결을 확인해 주세요.')
+      setLoading(false)
     }
-
-    // 이메일 인증 불필요(개발 환경) → 바로 온보딩으로
-    if (data.session) {
-      window.location.href = '/onboarding'
-      return
-    }
-
-    // 이메일 인증 필요 → 안내 화면
-    setDone(true)
-    setLoading(false)
   }
 
   if (done) {

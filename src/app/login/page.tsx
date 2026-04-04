@@ -17,17 +17,25 @@ export default function LoginPage() {
     setLoading(true)
 
     const supabase = createClient()
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-
-    if (error) {
-      const msg = error.message
-      if (msg === 'Invalid login credentials') {
-        setError('이메일 또는 비밀번호가 맞지 않아요.')
-      } else if (msg === 'Email not confirmed') {
-        setError('이메일 인증이 필요해요. 받은 편지함에서 인증 링크를 확인해 주세요.')
-      } else {
-        setError(msg)
+    let data: Awaited<ReturnType<typeof supabase.auth.signInWithPassword>>['data']
+    try {
+      const res = await supabase.auth.signInWithPassword({ email, password })
+      if (res.error) {
+        const msg = res.error.message
+        if (msg === 'Invalid login credentials') {
+          setError('이메일 또는 비밀번호가 맞지 않아요.')
+        } else if (msg === 'Email not confirmed') {
+          setError('이메일 인증이 필요해요. 받은 편지함에서 인증 링크를 확인해 주세요.')
+        } else {
+          setError(msg)
+        }
+        setLoading(false)
+        return
       }
+      data = res.data
+    } catch (err) {
+      console.error('login error:', err)
+      setError('네트워크 오류가 발생했어요. 인터넷 연결을 확인해 주세요.')
       setLoading(false)
       return
     }
