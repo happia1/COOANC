@@ -1,24 +1,17 @@
 'use client'
 
 import { useState } from 'react'
+import Image from 'next/image'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-
-type Role = 'parent' | 'child'
-
-const ROLE_OPTIONS: { value: Role; label: string; emoji: string; desc: string }[] = [
-  { value: 'parent', emoji: '👨‍👩‍👧', label: '부모',   desc: '자녀 미션을 관리해요' },
-  { value: 'child',  emoji: '🐣',       label: '자녀',   desc: '미션을 수행하고 크레딧을 모아요' },
-]
 
 export default function SignupPage() {
   const [name, setName]         = useState('')
   const [email, setEmail]       = useState('')
   const [password, setPassword] = useState('')
-  const [role, setRole]         = useState<Role>('parent')
   const [error, setError]       = useState<string | null>(null)
   const [loading, setLoading]   = useState(false)
-  const [done, setDone]         = useState(false)  // 이메일 인증 대기 상태
+  const [done, setDone]         = useState(false)
 
   async function handleSignup(e: React.FormEvent) {
     e.preventDefault()
@@ -36,8 +29,7 @@ export default function SignupPage() {
       email,
       password,
       options: {
-        data: { role, name },
-        // 이메일 인증 후 /auth/callback 으로 리다이렉트
+        data: { role: 'parent', name },
         emailRedirectTo: `${window.location.origin}/auth/callback`,
       },
     })
@@ -52,18 +44,17 @@ export default function SignupPage() {
       return
     }
 
-    // 이메일 인증이 비활성화된 경우 → 세션 즉시 발급
+    // 이메일 인증 불필요(개발 환경) → 바로 온보딩으로
     if (data.session) {
-      window.location.href = '/home'
+      window.location.href = '/onboarding'
       return
     }
 
-    // 이메일 인증이 필요한 경우 → 안내 화면 표시
+    // 이메일 인증 필요 → 안내 화면
     setDone(true)
     setLoading(false)
   }
 
-  // ── 이메일 인증 안내 화면
   if (done) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-sky-100 via-white to-green-50 flex flex-col items-center justify-center px-6">
@@ -76,7 +67,7 @@ export default function SignupPage() {
               인증 링크를 보냈어요.
             </p>
             <p className="text-xs text-gray-400 mt-1">
-              링크를 클릭하면 자동으로 로그인돼요.
+              링크를 클릭하면 자동으로 자녀 등록 화면으로 이동해요.
             </p>
           </div>
           <Link
@@ -93,42 +84,30 @@ export default function SignupPage() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-sky-100 via-white to-green-50 flex flex-col items-center justify-center px-6 py-10">
 
-      <div className="flex flex-col items-center gap-2 mb-7">
-        <span className="text-6xl">🌱</span>
+      <div className="flex flex-col items-center gap-3 mb-7">
+        <Image src="/COOANC_Logo.png" alt="COOANC" width={64} height={64} className="rounded-2xl" />
         <h1 className="text-2xl font-black text-brand-blue tracking-tight">COOANC</h1>
-        <p className="text-sm text-gray-400">새로운 모험을 시작해요!</p>
+        <p className="text-sm text-gray-400">자녀 경제 성장의 닻을 내리다</p>
       </div>
 
       <form
         onSubmit={handleSignup}
         className="w-full max-w-sm bg-white rounded-3xl shadow-lg p-7 flex flex-col gap-4"
       >
-        <h2 className="text-lg font-bold text-brand-text text-center">회원가입</h2>
+        <div className="text-center">
+          <h2 className="text-lg font-bold text-brand-text">부모 계정 만들기</h2>
+          <p className="text-xs text-gray-400 mt-1">부모 계정을 먼저 만든 뒤, 자녀 프로필을 등록해요</p>
+        </div>
 
-        <div className="flex flex-col gap-1.5">
-          <span className="text-xs font-bold text-gray-500">나는 누구인가요?</span>
-          <div className="grid grid-cols-2 gap-2">
-            {ROLE_OPTIONS.map(opt => (
-              <button
-                key={opt.value}
-                type="button"
-                onClick={() => setRole(opt.value)}
-                className={[
-                  'flex flex-col items-center gap-1 py-3 rounded-2xl border-2 transition-all',
-                  role === opt.value
-                    ? 'border-brand-blue bg-brand-blue/5 scale-[1.02]'
-                    : 'border-gray-100 bg-gray-50 hover:border-gray-200',
-                ].join(' ')}
-              >
-                <span className="text-3xl leading-none">{opt.emoji}</span>
-                <span className={`text-sm font-bold ${role === opt.value ? 'text-brand-blue' : 'text-gray-500'}`}>
-                  {opt.label}
-                </span>
-                <span className="text-[10px] text-gray-400 text-center leading-tight px-1">
-                  {opt.desc}
-                </span>
-              </button>
-            ))}
+        {/* 부모 전용 안내 배너 */}
+        <div className="flex items-start gap-2 bg-brand-blue/5 border border-brand-blue/20 rounded-2xl px-3.5 py-3">
+          <span className="text-xl leading-none mt-0.5">👨‍👩‍👧</span>
+          <div>
+            <p className="text-xs font-bold text-brand-blue">부모(보호자) 계정</p>
+            <p className="text-[11px] text-gray-500 leading-relaxed mt-0.5">
+              자녀 미션 관리, 크레딧 승인, 성장 대시보드를 이용할 수 있어요.
+              자녀 프로필은 가입 후 등록해요.
+            </p>
           </div>
         </div>
 
@@ -140,7 +119,7 @@ export default function SignupPage() {
             required
             value={name}
             onChange={e => setName(e.target.value)}
-            placeholder={role === 'child' ? '쿠앵이의 이름을 입력해요' : '부모님 이름을 입력해요'}
+            placeholder="부모님 이름을 입력해요"
             className="rounded-xl border border-gray-200 px-4 py-3 text-sm text-brand-text placeholder:text-gray-300 focus:outline-none focus:ring-2 focus:ring-brand-blue/40 transition"
           />
         </div>
@@ -183,9 +162,9 @@ export default function SignupPage() {
         <button
           type="submit"
           disabled={loading}
-          className="mt-1 w-full bg-brand-green hover:bg-green-500 active:scale-95 text-white font-bold py-3 rounded-2xl shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          className="mt-1 w-full bg-brand-blue hover:bg-blue-600 active:scale-95 text-white font-bold py-3 rounded-2xl shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {loading ? '가입 중...' : '시작하기 🚀'}
+          {loading ? '가입 중...' : '시작하기'}
         </button>
 
         <p className="text-center text-xs text-gray-400">

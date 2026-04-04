@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Image from 'next/image'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 
@@ -16,7 +17,7 @@ export default function LoginPage() {
     setLoading(true)
 
     const supabase = createClient()
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
 
     if (error) {
       const msg = error.message
@@ -31,15 +32,37 @@ export default function LoginPage() {
       return
     }
 
-    // 세션 쿠키가 설정된 뒤 서버 컴포넌트가 새 세션을 읽도록 hard navigation 사용
-    window.location.href = '/home'
+    const user = data.user
+    if (!user) { setLoading(false); return }
+
+    // 역할 확인
+    const role = user.user_metadata?.role as string | undefined
+
+    if (role === 'child') {
+      window.location.href = '/home'
+      return
+    }
+
+    // 부모: 자녀가 등록돼 있는지 확인
+    const { count } = await supabase
+      .from('family_links')
+      .select('*', { count: 'exact', head: true })
+      .eq('parent_id', user.id)
+
+    if (!count || count === 0) {
+      // 자녀 미등록 → 온보딩으로
+      window.location.href = '/onboarding'
+    } else {
+      // 자녀 있음 → 부모 홈으로
+      window.location.href = '/parent'
+    }
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-sky-100 via-white to-green-50 flex flex-col items-center justify-center px-6">
 
-      <div className="flex flex-col items-center gap-2 mb-8">
-        <span className="text-7xl">🐣</span>
+      <div className="flex flex-col items-center gap-3 mb-8">
+        <Image src="/COOANC_Logo.png" alt="COOANC" width={64} height={64} className="rounded-2xl" />
         <h1 className="text-2xl font-black text-brand-blue tracking-tight">COOANC</h1>
         <p className="text-sm text-gray-400">자녀 경제 성장의 닻을 내리다</p>
       </div>
