@@ -5,8 +5,8 @@ import { usePathname } from 'next/navigation'
 
 const TABS = [
   { href: '/parent/home',     label: '홈',   emoji: '🏠' },
-  { href: '/parent/approval', label: '승인',  emoji: '✅' },
   { href: '/parent/routine',  label: '루틴',  emoji: '📋' },
+  { href: '/parent/approval', label: '승인',  emoji: '✅' },
 ] as const
 
 export default function ParentNavBar() {
