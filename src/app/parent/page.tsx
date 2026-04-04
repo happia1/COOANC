@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import Image from 'next/image'
 import { AUTH_LOGO_SRC } from '@/constants/branding'
 import Link from 'next/link'
+import { ChildAccountCard } from '@/components/parent/ChildAccountCard'
 import { createClient } from '@/lib/supabase/server'
 
 const isDev = process.env.NODE_ENV === 'development'
@@ -125,26 +126,14 @@ export default async function ParentHomePage() {
             {(children ?? []).map(child => {
               const s = statsMap[child.id]
               return (
-                // 카드 전체를 누르면 해당 자녀의 상세 화면으로 이동합니다.
-                <Link
+                <ChildAccountCard
                   key={child.id}
-                  href={`/parent/child/${child.id}`}
-                  className="flex w-full items-center justify-between bg-white rounded-3xl shadow-md px-5 py-4 transition hover:shadow-lg active:scale-[0.99] focus:outline-none focus:ring-2 focus:ring-brand-blue/30"
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="text-4xl">🐣</span>
-                    <div>
-                      <p className="font-bold text-brand-text">{child.name}</p>
-                      <p className="text-xs text-gray-400">
-                        Lv.{s?.current_level ?? 0} · 🔥 {s?.streak_days ?? 0}일
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-lg font-black text-brand-blue">{s?.credits ?? 0}</p>
-                    <p className="text-[11px] text-gray-400">크레딧</p>
-                  </div>
-                </Link>
+                  childId={String(child.id)}
+                  name={child.name ?? '자녀'}
+                  level={s?.current_level ?? 0}
+                  streakDays={s?.streak_days ?? 0}
+                  credits={s?.credits ?? 0}
+                />
               )
             })}
 

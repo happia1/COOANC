@@ -10,12 +10,16 @@ import type { ReactNode } from 'react'
 export const metadata: Metadata = {
   title: 'COOANC - 아이의 올바른 경제 습관',
   description: '미션을 수행하고 크레딧을 모으며 배우는 경제 교육 서비스',
-  manifest: '/site.webmanifest', // 매니페스트 연결
+  // public/site.webmanifest — PWA 아이콘은 web-app-manifest-*.png 를 참조합니다.
+  manifest: '/site.webmanifest',
   icons: {
+    // 브라우저·검색 탭: 전통 ico → 벡터 → 비트맵 → PWA 크기 순으로 나열
     icon: [
-      { url: '/favicon-96x96.png', sizes: '96x96', type: 'image/png' },
+      { url: '/favicon.ico', sizes: '48x48' },
       { url: '/favicon.svg', type: 'image/svg+xml' },
-      { url: '/favicon.ico' },
+      { url: '/favicon-96x96.png', sizes: '96x96', type: 'image/png' },
+      { url: '/web-app-manifest-192x192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/web-app-manifest-512x512.png', sizes: '512x512', type: 'image/png' },
     ],
     shortcut: '/favicon.ico',
     apple: [{ url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' }],

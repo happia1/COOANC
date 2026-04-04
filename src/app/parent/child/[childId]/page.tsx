@@ -1,6 +1,7 @@
 import Link from 'next/link'
-import { redirect, notFound } from 'next/navigation'
+import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { normalizeUuidParam } from '@/lib/normalizeUuid'
 
 type PageProps = { params: Promise<{ childId: string }> }
 
@@ -9,11 +10,12 @@ type PageProps = { params: Promise<{ childId: string }> }
  * - family_links 로 연결된 자녀만 조회 가능합니다(RLS + 서버에서 한 번 더 검증).
  */
 export default async function ParentChildDetailPage({ params }: PageProps) {
-  const { childId } = await params
+  const { childId: rawId } = await params
+  const childId = normalizeUuidParam(rawId)
 
-  // 주소창에 이상한 문자열이 들어오면 404 (UUID 형식만 허용)
-  if (!childId || !/^[0-9a-f-]{36}$/i.test(childId)) {
-    notFound()
+  // UUID가 아니면 부모 홈으로 (404 대신 — 사용자가 주소를 잘못 쓴 경우)
+  if (!childId) {
+    redirect('/parent')
   }
 
   const supabase = await createClient()
@@ -50,8 +52,9 @@ export default async function ParentChildDetailPage({ params }: PageProps) {
     .eq('id', childId)
     .maybeSingle()
 
+  // RLS 미적용·데이터 불일치 시에도 404보다 목록으로 돌아가게 함
   if (!childProfile || childProfile.role !== 'child') {
-    notFound()
+    redirect('/parent')
   }
 
   const { data: stats } = await supabase
