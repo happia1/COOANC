@@ -40,7 +40,25 @@ export default function SignupPage() {
         if (msg.includes('already registered') || msg.includes('already been registered')) {
           setError('이미 사용 중인 이메일이에요. 로그인해 주세요.')
         } else if (msg.includes('Database error')) {
-          setError('서버 오류가 발생했어요. 잠시 후 다시 시도해 주세요. (DB 오류)')
+          // 트리거 오류: 서버 API를 통해 직접 회원가입 시도
+          const res = await fetch('/api/auth/signup', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password, name }),
+          })
+          const json = await res.json()
+          if (!res.ok) {
+            setError(json.error ?? '회원가입에 실패했어요. 잠시 후 다시 시도해 주세요.')
+            setLoading(false)
+            return
+          }
+          if (json.session) {
+            window.location.href = '/onboarding'
+            return
+          }
+          setDone(true)
+          setLoading(false)
+          return
         } else {
           setError(msg)
         }
@@ -94,7 +112,7 @@ export default function SignupPage() {
     <div className="min-h-screen bg-gradient-to-b from-sky-100 via-white to-green-50 flex flex-col items-center justify-center px-6 py-10">
 
       <div className="flex flex-col items-center gap-3 mb-7">
-        <Image src="/COOANC_Logo.png" alt="COOANC" width={192} height={192} className="rounded-2xl" style={{ height: 'auto' }} />
+        <Image src="/COOANC_Logo.png" alt="COOANC" width={320} height={320} className="rounded-2xl" style={{ height: 'auto' }} />
         <p className="text-sm text-gray-400">자녀 경제 성장의 닻을 내리다</p>
       </div>
 
