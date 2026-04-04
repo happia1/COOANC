@@ -10,7 +10,15 @@ import { createClient as createAdminClient } from '@supabase/supabase-js'
  * - child_stats, family_links 레코드 생성
  */
 export async function POST(req: NextRequest) {
-  const { name, age, pin, parentId } = await req.json()
+  let name: string
+  let age: number
+  let pin: string
+  let parentId: string
+  try {
+    ;({ name, age, pin, parentId } = await req.json())
+  } catch {
+    return NextResponse.json({ error: '요청 형식이 올바르지 않아요.' }, { status: 400 })
+  }
 
   if (!name || !age || !pin || !parentId) {
     return NextResponse.json({ error: '필수 항목이 누락됐어요.' }, { status: 400 })

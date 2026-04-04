@@ -4,14 +4,17 @@ import { useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { getSignupCatchMessage } from '@/lib/getSignupCatchMessage'
+import { signupViaServerApi } from '@/lib/signupServerApi'
+import { shouldUseServerSignupFallback } from '@/lib/shouldUseServerSignupFallback'
 
 export default function SignupPage() {
-  const [name, setName]         = useState('')
-  const [email, setEmail]       = useState('')
+  const [name, setName] = useState('')
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError]       = useState<string | null>(null)
-  const [loading, setLoading]   = useState(false)
-  const [done, setDone]         = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [done, setDone] = useState(false)
 
   async function handleSignup(e: React.FormEvent) {
     e.preventDefault()
@@ -26,7 +29,7 @@ export default function SignupPage() {
     const supabase = createClient()
 
     try {
-      const { data, error } = await supabase.auth.signUp({
+      const { data, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -35,53 +38,56 @@ export default function SignupPage() {
         },
       })
 
-      if (error) {
-        const msg = error.message
+      if (signUpError) {
+        const msg = signUpError.message
+
         if (msg.includes('already registered') || msg.includes('already been registered')) {
           setError('이미 사용 중인 이메일이에요. 로그인해 주세요.')
-        } else if (msg.includes('Database error')) {
-          // 트리거 오류: 서버 API를 통해 직접 회원가입 시도
-          const res = await fetch('/api/auth/signup', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password, name }),
-          })
-          let json: Record<string, unknown> = {}
-          const text = await res.text()
-          if (text) {
-            try { json = JSON.parse(text) } catch { /* non-JSON response */ }
-          }
-          if (!res.ok) {
-            setError(json.error ?? '회원가입에 실패했어요. 잠시 후 다시 시도해 주세요.')
+          setLoading(false)
+          return
+        }
+
+        // 공개 가입 비활성·DB 트리거 등: service_role 서버 API로 재시도
+        if (shouldUseServerSignupFallback(msg)) {
+          const result = await signupViaServerApi(email, password, name)
+          if (result.ok === false) {
+            setError(result.error)
             setLoading(false)
             return
           }
-          if (json.session) {
+          if (result.hasSession) {
             window.location.href = '/onboarding'
             return
           }
-          setDone(true)
+          // 서버에서만 유저가 만들어진 경우: 즉시 로그인 시도 후 온보딩으로
+          const { error: signInErr } = await supabase.auth.signInWithPassword({ email, password })
+          if (!signInErr) {
+            window.location.href = '/onboarding'
+            return
+          }
+          setError(
+            signInErr.message ||
+              '계정은 만들어졌어요. 로그인 페이지에서 이메일·비밀번호로 들어가 주세요.',
+          )
           setLoading(false)
           return
-        } else {
-          setError(msg)
         }
+
+        setError(msg)
         setLoading(false)
         return
       }
 
-      // 이메일 인증 불필요(개발 환경) → 바로 온보딩으로
       if (data.session) {
         window.location.href = '/onboarding'
         return
       }
 
-      // 이메일 인증 필요 → 안내 화면
       setDone(true)
       setLoading(false)
     } catch (err) {
       console.error('signup error:', err)
-      setError('네트워크 오류가 발생했어요. 인터넷 연결을 확인해 주세요.')
+      setError(getSignupCatchMessage(err))
       setLoading(false)
     }
   }
@@ -114,7 +120,6 @@ export default function SignupPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-sky-100 via-white to-green-50 flex flex-col items-center justify-center px-6 py-10">
-
       <div className="flex flex-col items-center gap-3 mb-7">
         <Image src="/COOANC_Logo.png" alt="COOANC" width={320} height={320} className="rounded-2xl" style={{ height: 'auto' }} />
         <p className="text-sm text-gray-400">자녀 경제 성장의 닻을 내리다</p>
@@ -130,7 +135,9 @@ export default function SignupPage() {
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-bold text-gray-500" htmlFor="name">이름</label>
+          <label className="text-xs font-bold text-gray-500" htmlFor="name">
+            이름
+          </label>
           <input
             id="name"
             type="text"
@@ -143,7 +150,9 @@ export default function SignupPage() {
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-bold text-gray-500" htmlFor="email">이메일</label>
+          <label className="text-xs font-bold text-gray-500" htmlFor="email">
+            이메일
+          </label>
           <input
             id="email"
             type="email"

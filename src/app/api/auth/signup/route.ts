@@ -17,17 +17,25 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: '필수 항목이 누락됐어요.' }, { status: 400 })
   }
 
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()) {
+    return NextResponse.json(
+      { error: '서버에 SUPABASE_SERVICE_ROLE_KEY 가 설정되지 않았어요. .env.local 을 확인해 주세요.' },
+      { status: 500 },
+    )
+  }
+
   const admin = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY,
     { auth: { autoRefreshToken: false, persistSession: false } },
   )
 
   // auth user 생성 (이메일 확인 필요 → email_confirm: false)
+  // 서버에서 생성하는 계정은 이메일 확인을 바로 완료 처리해 로그인까지 이어지기 쉽게 함
   const { data: created, error: createErr } = await admin.auth.admin.createUser({
     email,
     password,
-    email_confirm: false,
+    email_confirm: true,
     user_metadata: { role: 'parent', name },
   })
 

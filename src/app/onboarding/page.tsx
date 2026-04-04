@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
+import { parseJsonFromResponse } from '@/lib/parseJsonResponse'
 
 const AGE_OPTIONS = [4, 5, 6, 7, 8, 9, 10, 11]
 
@@ -40,9 +41,22 @@ export default function OnboardingPage() {
       body: JSON.stringify({ name: childName, age: childAge, pin, parentId: user.id }),
     })
 
-    const json = await res.json()
+    const { data: json, parseError } = await parseJsonFromResponse<{
+      error?: string
+      childId?: string
+      name?: string
+    }>(res)
+    const payload = json ?? {}
+    if (parseError) {
+      setError('서버 응답을 읽을 수 없어요. 잠시 후 다시 시도해 주세요.')
+      setLoading(false)
+      return
+    }
+
     if (!res.ok) {
-      setError(json.error ?? '자녀 등록에 실패했어요. 다시 시도해 주세요.')
+      const errMsg =
+        typeof payload.error === 'string' ? payload.error : '자녀 등록에 실패했어요. 다시 시도해 주세요.'
+      setError(errMsg)
       setLoading(false)
       return
     }
