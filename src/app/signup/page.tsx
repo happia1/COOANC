@@ -85,7 +85,7 @@ export default function SignupPage() {
     <div className="min-h-screen bg-gradient-to-b from-sky-100 via-white to-green-50 flex flex-col items-center justify-center px-6 py-10">
 
       <div className="flex flex-col items-center gap-3 mb-7">
-        <Image src="/COOANC_Logo.png" alt="COOANC" width={64} height={64} className="rounded-2xl" />
+        <Image src="/COOANC_Logo.png" alt="COOANC" width={64} height={64} className="rounded-2xl" style={{ height: 'auto' }} />
         <h1 className="text-2xl font-black text-brand-blue tracking-tight">COOANC</h1>
         <p className="text-sm text-gray-400">자녀 경제 성장의 닻을 내리다</p>
       </div>

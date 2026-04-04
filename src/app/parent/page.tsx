@@ -49,7 +49,7 @@ export default async function ParentHomePage() {
         {/* 헤더 */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-2">
-            <Image src="/COOANC_Logo.png" alt="COOANC" width={36} height={36} className="rounded-xl" />
+            <Image src="/COOANC_Logo.png" alt="COOANC" width={36} height={36} className="rounded-xl" style={{ height: 'auto' }} />
             <span className="text-lg font-black text-brand-blue">COOANC</span>
           </div>
           <div className="text-right">

@@ -56,7 +56,7 @@ export default function OnboardingPage() {
 
       {/* 헤더 */}
       <div className="flex flex-col items-center gap-3 mb-7">
-        <Image src="/COOANC_Logo.png" alt="COOANC" width={60} height={60} className="rounded-2xl" />
+        <Image src="/COOANC_Logo.png" alt="COOANC" width={60} height={60} className="rounded-2xl" style={{ height: 'auto' }} />
         <div className="text-center">
           <h1 className="text-xl font-black text-brand-blue">첫 번째 자녀를 등록해요</h1>
           <p className="text-sm text-gray-400 mt-1">자녀 프로필을 만들면 미션을 시작할 수 있어요</p>
