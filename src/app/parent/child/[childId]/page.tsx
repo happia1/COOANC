@@ -2,18 +2,21 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { normalizeUuidParam } from '@/lib/normalizeUuid'
+import { resolveDisplayAge } from '@/lib/ageFromBirthDate'
+import { CompactChildProfileCard } from '@/components/parent/CompactChildProfileCard'
+import { selectChildProfileDetailById } from '@/lib/supabase/childProfileSelect'
 
 type PageProps = { params: Promise<{ childId: string }> }
 
 /**
  * 부모가 자녀 카드를 눌렀을 때 보는 상세 화면입니다.
  * - family_links 로 연결된 자녀만 조회 가능합니다(RLS + 서버에서 한 번 더 검증).
+ * - 상단 프로필은 부모 홈과 동일한 컴팩트 카드 컴포넌트를 사용합니다.
  */
 export default async function ParentChildDetailPage({ params }: PageProps) {
   const { childId: rawId } = await params
   const childId = normalizeUuidParam(rawId)
 
-  // UUID가 아니면 부모 홈으로 (404 대신 — 사용자가 주소를 잘못 쓴 경우)
   if (!childId) {
     redirect('/parent')
   }
@@ -25,7 +28,6 @@ export default async function ParentChildDetailPage({ params }: PageProps) {
 
   if (!user) redirect('/login')
 
-  // 부모 계정만 이 페이지를 볼 수 있음
   const { data: me } = await supabase
     .from('profiles')
     .select('role')
@@ -34,7 +36,6 @@ export default async function ParentChildDetailPage({ params }: PageProps) {
 
   if (me?.role !== 'parent') redirect('/home')
 
-  // family_links 에 연결이 없으면 다른 사람 자녀를 볼 수 없음 → 부모 홈으로
   const { data: link } = await supabase
     .from('family_links')
     .select('id, nickname')
@@ -46,13 +47,11 @@ export default async function ParentChildDetailPage({ params }: PageProps) {
     redirect('/parent')
   }
 
-  const { data: childProfile } = await supabase
-    .from('profiles')
-    .select('id, name, role, age, created_at')
-    .eq('id', childId)
-    .maybeSingle()
+  const { data: childProfile, error: profileErr } = await selectChildProfileDetailById(supabase, childId)
+  if (profileErr) {
+    console.error('[parent child detail] profile:', profileErr.message)
+  }
 
-  // profiles RLS(019)가 없으면 자녀 행이 비어 보일 수 있음 → 가족 연결만 있어도 상세는 유지
   if (childProfile && childProfile.role !== 'child') {
     redirect('/parent')
   }
@@ -62,10 +61,7 @@ export default async function ParentChildDetailPage({ params }: PageProps) {
       ? childProfile.name.trim()
       : link.nickname?.trim() || '자녀'
 
-  const childAge =
-    childProfile?.role === 'child' && typeof childProfile.age === 'number'
-      ? childProfile.age
-      : null
+  const displayAge = resolveDisplayAge(childProfile?.birth_date ?? null, childProfile?.age ?? null)
 
   const { data: stats } = await supabase
     .from('child_stats')
@@ -80,8 +76,7 @@ export default async function ParentChildDetailPage({ params }: PageProps) {
   return (
     <div className="min-h-screen bg-gradient-to-b from-sky-100 via-white to-green-50">
       <div className="w-full max-w-md mx-auto px-4 pt-6 pb-12">
-        {/* 상단: 부모 홈으로 돌아가기 */}
-        <div className="mb-6">
+        <div className="mb-4">
           <Link
             href="/parent"
             className="inline-flex items-center gap-1 text-sm font-bold text-brand-blue hover:underline"
@@ -90,121 +85,77 @@ export default async function ParentChildDetailPage({ params }: PageProps) {
           </Link>
         </div>
 
-        {/* 자녀 이름·나이·안내 문구 */}
-        <div className="bg-white rounded-3xl shadow-lg p-6 mb-4">
-          <div className="flex items-start gap-4">
-            <span className="text-5xl" aria-hidden>
-              🐣
+        <CompactChildProfileCard
+          name={displayName}
+          age={displayAge}
+          avatarUrl={childProfile?.avatar_url ?? null}
+          level={s?.current_level ?? 0}
+          credits={s?.credits ?? 0}
+          hearts={s?.hearts ?? 0}
+          streakDays={s?.streak_days ?? 0}
+          className="mb-3 shadow-md"
+        />
+
+        {!childProfile && (
+          <p className="text-[11px] text-gray-400 mb-2 px-0.5">
+            이름은 보안 설정에 따라 잠시 표시되지 않을 수 있어요. 아래 통계는 그대로 볼 수 있어요.
+          </p>
+        )}
+        <p className="text-[11px] text-gray-400 mb-4 px-0.5">
+          자녀는 이 계정으로 앱에 로그인해요. PIN은 자녀만 알고 있어요.
+        </p>
+
+        <h2 className="text-xs font-bold text-brand-text mb-2 px-0.5">경제 활동 요약</h2>
+
+        <div className="bg-white rounded-xl shadow-sm ring-1 ring-black/[0.04] px-3 py-2.5 mb-3 text-xs">
+          <div className="flex flex-wrap justify-between gap-x-3 gap-y-1 tabular-nums">
+            <span className="text-gray-500">
+              누적 <strong className="text-brand-text">{s?.total_credits_earned ?? 0}</strong>🪙
             </span>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">자녀 계정</p>
-              <h1 className="text-xl font-black text-brand-text truncate">{displayName}</h1>
-              {childAge !== null && (
-                <p className="text-sm text-gray-500 mt-1">{childAge}세</p>
-              )}
-              {!childProfile && (
-                <p className="text-[11px] text-gray-400 mt-2">
-                  이름은 보안 설정에 따라 잠시 표시되지 않을 수 있어요. 아래 통계는 그대로 볼 수 있어요.
-                </p>
-              )}
-              <p className="text-[11px] text-gray-400 mt-2">
-                자녀는 이 계정으로 앱에 로그인해요. PIN은 자녀만 알고 있어요.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <h2 className="text-sm font-bold text-brand-text mb-3 px-1">경제 활동 요약</h2>
-
-        {/* 크레딧·하트·레벨·연속 미션을 한눈에 */}
-        <div className="grid grid-cols-2 gap-3 mb-4">
-          <div className="bg-white rounded-2xl shadow px-4 py-3 text-center">
-            <p className="text-2xl font-black text-brand-blue">{s?.credits ?? 0}</p>
-            <p className="text-[11px] text-gray-400">크레딧</p>
-          </div>
-          <div className="bg-white rounded-2xl shadow px-4 py-3 text-center">
-            <p className="text-2xl font-black text-rose-500">{s?.hearts ?? 0}</p>
-            <p className="text-[11px] text-gray-400">하트</p>
-          </div>
-          <div className="bg-white rounded-2xl shadow px-4 py-3 text-center">
-            <p className="text-2xl font-black text-brand-text">Lv.{s?.current_level ?? 0}</p>
-            <p className="text-[11px] text-gray-400">레벨</p>
-          </div>
-          <div className="bg-white rounded-2xl shadow px-4 py-3 text-center">
-            <p className="text-2xl font-black text-amber-500">🔥 {s?.streak_days ?? 0}</p>
-            <p className="text-[11px] text-gray-400">연속 미션(일)</p>
-          </div>
-        </div>
-
-        {/* EXP, 누적 획득, 연속 기록 */}
-        <div className="bg-white rounded-3xl shadow-md p-5 mb-4">
-          <h3 className="text-xs font-bold text-gray-400 mb-3">경험치 · 성장</h3>
-          <div className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-gray-500">EXP</span>
-              <span className="font-mono font-bold">
-                {s?.exp ?? 0} / {s?.exp_to_next_level ?? 100}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">누적 크레딧 획득</span>
-              <span className="font-mono font-bold">{s?.total_credits_earned ?? 0}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">최장 연속</span>
-              <span className="font-mono font-bold">{s?.longest_streak ?? 0}일</span>
-            </div>
+            <span className="text-gray-500">
+              최장 <strong className="text-amber-600">{s?.longest_streak ?? 0}</strong>일
+            </span>
             {s?.last_mission_date && (
-              <div className="flex justify-between">
-                <span className="text-gray-500">마지막 미션일</span>
-                <span className="font-mono text-xs">{s.last_mission_date}</span>
-              </div>
+              <span className="text-gray-400 w-full sm:w-auto">마지막 미션 {s.last_mission_date}</span>
             )}
           </div>
         </div>
 
-        {/* EQ: 만족 지연·루틴·저축 비중 (막대로 시각화) */}
-        <div className="bg-white rounded-3xl shadow-md p-5">
-          <h3 className="text-xs font-bold text-gray-400 mb-3">경제 습관 지표 (EQ)</h3>
-          <div className="space-y-3 text-sm">
-            <div>
-              <div className="flex justify-between mb-1">
-                <span className="text-gray-500">만족 지연</span>
-                <span className="font-bold">{s?.eq_delay_score ?? 0}</span>
-              </div>
-              <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
-                <div
-                  className="h-full rounded-full bg-brand-blue/80"
-                  style={{ width: `${Math.min(100, s?.eq_delay_score ?? 0)}%` }}
-                />
-              </div>
-            </div>
-            <div>
-              <div className="flex justify-between mb-1">
-                <span className="text-gray-500">루틴 완주</span>
-                <span className="font-bold">{s?.eq_routine_rate ?? 0}%</span>
-              </div>
-              <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
-                <div
-                  className="h-full rounded-full bg-green-500/80"
-                  style={{ width: `${Math.min(100, s?.eq_routine_rate ?? 0)}%` }}
-                />
-              </div>
-            </div>
-            <div>
-              <div className="flex justify-between mb-1">
-                <span className="text-gray-500">저축 비중</span>
-                <span className="font-bold">{s?.eq_save_ratio ?? 0}%</span>
-              </div>
-              <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
-                <div
-                  className="h-full rounded-full bg-sky-500/80"
-                  style={{ width: `${Math.min(100, s?.eq_save_ratio ?? 0)}%` }}
-                />
-              </div>
-            </div>
+        <div className="bg-white rounded-xl shadow-sm ring-1 ring-black/[0.04] p-3 mb-3">
+          <h3 className="text-[10px] font-bold text-gray-400 mb-2 uppercase tracking-wide">경제 습관 (EQ)</h3>
+          <div className="space-y-2 text-xs">
+            <EqRow label="만족 지연" value={s?.eq_delay_score ?? 0} barClass="bg-brand-blue/80" />
+            <EqRow label="루틴 완주" value={s?.eq_routine_rate ?? 0} barClass="bg-green-500/80" suffix="%" />
+            <EqRow label="저축 비중" value={s?.eq_save_ratio ?? 0} barClass="bg-sky-500/80" suffix="%" />
           </div>
         </div>
+      </div>
+    </div>
+  )
+}
+
+function EqRow({
+  label,
+  value,
+  barClass,
+  suffix = '',
+}: {
+  label: string
+  value: number
+  barClass: string
+  suffix?: string
+}) {
+  return (
+    <div>
+      <div className="flex justify-between mb-0.5">
+        <span className="text-gray-500">{label}</span>
+        <span className="font-bold tabular-nums">
+          {value}
+          {suffix}
+        </span>
+      </div>
+      <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden">
+        <div className={`h-full rounded-full ${barClass}`} style={{ width: `${Math.min(100, value)}%` }} />
       </div>
     </div>
   )

@@ -9,6 +9,10 @@ export type Profile = {
   id: string
   role: UserRole
   name: string
+  /** 자녀 연령(세). 생년월일이 있으면 표시는 생일 기반으로 계산하고 이 값은 보조·호환용 */
+  age: number | null
+  /** 자녀 생년월일 YYYY-MM-DD (만 나이 계산의 기준) */
+  birth_date: string | null
   avatar_url: string | null
   created_at: string
   updated_at: string

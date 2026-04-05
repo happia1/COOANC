@@ -5,10 +5,8 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { useParentStore } from '@/store/parentStore'
 import ChildSwitcher, { type ChildTab } from '@/components/parent/ChildSwitcher'
+import { CompactChildProfileCard } from '@/components/parent/CompactChildProfileCard'
 import { AUTH_LOGO_SRC } from '@/constants/branding'
-
-const LEVEL_NAMES = ['씨앗', '새싹', '교환사', '저축왕', '나눔이', '투자가']
-const LEVEL_EMOJI = ['🌱', '🌿', '🤝', '🐷', '💝', '🚀']
 
 // 하드코딩 AI 한줄 가이드 (추후 실제 AI로 교체)
 const AI_HINTS = [
@@ -22,6 +20,10 @@ const AI_HINTS = [
 export type ChildSummary = {
   id: string
   name: string
+  /** 표시용 만 나이(생년월일 우선, 없으면 DB age) */
+  age: number | null
+  /** 프로필 사진 URL (없으면 레벨 이모지 아바타) */
+  avatarUrl: string | null
   stats: {
     credits: number
     hearts: number
@@ -76,15 +78,21 @@ export default function HomeTab({ parentName, childrenData, pendingCount }: Prop
   return (
     <div className="flex flex-col gap-4">
 
-      {/* 헤더 */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Image src={AUTH_LOGO_SRC} alt="COOANC" width={28} height={28} className="rounded-xl" style={{ height: 'auto' }} />
-          <span className="text-base font-black text-[#4A90E2]">COOANC</span>
+      {/* 상단 바: 브랜드 로고(큼직하게), 오른쪽 부모 이름 + 설정 */}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex min-w-0 flex-1 items-center">
+          <Image
+            src={AUTH_LOGO_SRC}
+            alt="COOANC"
+            width={180}
+            height={180}
+            className="h-auto max-h-[min(180px,42vw)] w-auto max-w-[min(180px,52vw)] rounded-2xl object-contain"
+            style={{ height: 'auto' }}
+            priority
+          />
         </div>
         <div className="flex items-center gap-3">
           <div className="text-right">
-            <p className="text-[10px] text-gray-400">안녕하세요</p>
             <p className="text-xs font-bold text-gray-700">{parentName}</p>
           </div>
           <Link href="/settings" className="w-8 h-8 flex items-center justify-center rounded-xl bg-gray-100 text-gray-500 hover:bg-gray-200 transition-colors">
@@ -125,65 +133,21 @@ export default function HomeTab({ parentName, childrenData, pendingCount }: Prop
         </div>
       ) : (
         <>
-          {/* 자녀 현황 카드 */}
-          <div className="bg-white rounded-2xl p-5 shadow-sm">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#4A90E2]/10 to-[#7ED321]/10 flex items-center justify-center text-2xl">
-                {LEVEL_EMOJI[s?.current_level ?? 0]}
-              </div>
-              <div>
-                <p className="font-black text-gray-800 text-base">{child.name}</p>
-                <span className="text-xs bg-[#4A90E2]/10 text-[#4A90E2] font-bold px-2 py-0.5 rounded-full">
-                  Lv.{s?.current_level ?? 0} {LEVEL_NAMES[s?.current_level ?? 0]}
-                </span>
-              </div>
-            </div>
-
-            {/* 스탯 3종 */}
-            <div className="grid grid-cols-3 gap-2 mb-4">
-              <StatBox emoji="🪙" value={s?.credits ?? 0} label="크레딧" color="text-[#4A90E2]" />
-              <StatBox emoji="❤️" value={s?.hearts ?? 0} label="하트" color="text-rose-500" />
-              <StatBox emoji="🔥" value={`${s?.streak_days ?? 0}일`} label="연속" color="text-amber-500" />
-            </div>
-
-            {/* EXP 게이지 */}
-            <div>
-              <div className="flex justify-between items-center mb-1">
-                <span className="text-[11px] font-bold text-gray-500">✨ EXP</span>
-                <span className="text-[11px] text-gray-400 tabular-nums">
-                  {s?.exp ?? 0} / {s?.exp_to_next_level ?? 100}
-                </span>
-              </div>
-              <div className="h-3 rounded-full bg-gray-100 overflow-hidden">
-                <div
-                  className="h-full rounded-full bg-gradient-to-r from-[#4A90E2] to-[#7ED321] transition-all"
-                  style={{ width: `${s ? Math.min((s.exp / s.exp_to_next_level) * 100, 100) : 0}%` }}
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* 오늘 미션 달성률 */}
-          <div className="bg-white rounded-2xl p-4 shadow-sm">
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-sm font-bold text-gray-700">⭐ 오늘 미션 달성률</p>
-              <span className="text-lg font-black text-[#4A90E2]">
-                {missionRate}%
-                <span className="text-xs text-gray-400 font-normal ml-1">
-                  ({child.todayCompleted}/{child.totalMissions})
-                </span>
-              </span>
-            </div>
-            <div className="h-3 rounded-full bg-gray-100 overflow-hidden">
-              <div
-                className="h-full rounded-full bg-gradient-to-r from-[#F8E71C] to-[#7ED321] transition-all"
-                style={{ width: `${missionRate}%` }}
-              />
-            </div>
-            {missionRate === 100 && (
-              <p className="text-xs text-[#7ED321] font-bold mt-1.5 text-right">🎉 오늘 미션 모두 완료!</p>
-            )}
-          </div>
+          {/* 자녀 현황 카드 — 여백·텍스트 최소화, 가로 배치 + 우측 마스코트 (참고 UI) */}
+          <CompactChildProfileCard
+            name={child.name}
+            age={child.age}
+            avatarUrl={child.avatarUrl}
+            level={s?.current_level ?? 0}
+            credits={s?.credits ?? 0}
+            hearts={s?.hearts ?? 0}
+            streakDays={s?.streak_days ?? 0}
+            mission={{
+              ratePercent: missionRate,
+              completed: child.todayCompleted,
+              total: child.totalMissions,
+            }}
+          />
 
           {/* AI 한줄 가이드 */}
           <div className="bg-gradient-to-r from-[#4A90E2]/10 to-[#7ED321]/10 rounded-2xl px-4 py-3 flex items-start gap-2">
@@ -224,15 +188,6 @@ export default function HomeTab({ parentName, childrenData, pendingCount }: Prop
           )}
         </>
       )}
-    </div>
-  )
-}
-
-function StatBox({ emoji, value, label, color }: { emoji: string; value: number | string; label: string; color: string }) {
-  return (
-    <div className="bg-gray-50 rounded-xl p-2.5 text-center">
-      <p className={`text-base font-black tabular-nums ${color}`}>{emoji} {value}</p>
-      <p className="text-[10px] text-gray-400 mt-0.5">{label}</p>
     </div>
   )
 }

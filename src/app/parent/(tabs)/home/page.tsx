@@ -4,6 +4,8 @@
  */
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { resolveDisplayAge } from '@/lib/ageFromBirthDate'
+import { selectChildProfilesByIds } from '@/lib/supabase/childProfileSelect'
 import HomeTab, { type ChildSummary } from '@/components/parent/HomeTab'
 
 export default async function ParentHomePage() {
@@ -38,47 +40,41 @@ export default async function ParentHomePage() {
 
   const today = new Date().toISOString().split('T')[0]
 
-  const [profilesRes, statsRes, todayLogsRes, recentLogsRes, missionsRes, pendingRes] =
-    await Promise.all([
-      supabase.from('profiles').select('id, name').in('id', childIds),
+  const { rows: profileRows, error: profilesFetchErr } = await selectChildProfilesByIds(supabase, childIds)
+  if (profilesFetchErr) {
+    console.error('[parent home] profiles:', profilesFetchErr.message)
+  }
+  const profiles = profileRows ?? []
 
-      supabase
-        .from('child_stats')
-        .select('child_id, credits, hearts, current_level, exp, exp_to_next_level, streak_days, eq_delay_score, eq_routine_rate, eq_save_ratio')
-        .in('child_id', childIds),
+  const [statsRes, todayLogsRes, recentLogsRes, missionsRes, pendingRes] = await Promise.all([
+    supabase
+      .from('child_stats')
+      .select('child_id, credits, hearts, current_level, exp, exp_to_next_level, streak_days, eq_delay_score, eq_routine_rate, eq_save_ratio')
+      .in('child_id', childIds),
 
-      // 오늘 완료된 미션 로그
-      supabase
-        .from('mission_logs')
-        .select('child_id, is_completed')
-        .in('child_id', childIds)
-        .eq('assigned_date', today)
-        .eq('is_completed', true),
+    supabase
+      .from('mission_logs')
+      .select('child_id, is_completed')
+      .in('child_id', childIds)
+      .eq('assigned_date', today)
+      .eq('is_completed', true),
 
-      // 최근 활동 피드 (완료된 것, 각 자녀별)
-      supabase
-        .from('mission_logs')
-        .select('child_id, completed_at, credit_earned, missions(title, icon_emoji)')
-        .in('child_id', childIds)
-        .eq('is_completed', true)
-        .order('completed_at', { ascending: false })
-        .limit(30),
+    supabase
+      .from('mission_logs')
+      .select('child_id, completed_at, credit_earned, missions(title, icon_emoji)')
+      .in('child_id', childIds)
+      .eq('is_completed', true)
+      .order('completed_at', { ascending: false })
+      .limit(30),
 
-      // 오늘 달성률 분모: 활성 미션 수 (전체)
-      supabase
-        .from('missions')
-        .select('id, level_required')
-        .eq('is_active', true),
+    supabase.from('missions').select('id, level_required').eq('is_active', true),
 
-      // 미승인 구매 요청 수
-      supabase
-        .from('purchase_requests')
-        .select('id', { count: 'exact', head: true })
-        .in('child_id', childIds)
-        .eq('status', 'pending'),
-    ])
-
-  const profiles = (profilesRes.data ?? []) as { id: string; name: string }[]
+    supabase
+      .from('purchase_requests')
+      .select('id', { count: 'exact', head: true })
+      .in('child_id', childIds)
+      .eq('status', 'pending'),
+  ])
   const statsMap = Object.fromEntries(
     ((statsRes.data ?? []) as { child_id: string; [key: string]: unknown }[]).map((s) => [s.child_id, s])
   )
@@ -110,6 +106,8 @@ export default async function ParentHomePage() {
     return {
       id: p.id,
       name: p.name,
+      age: resolveDisplayAge(p.birth_date ?? null, p.age),
+      avatarUrl: p.avatar_url ?? null,
       stats: stats ?? null,
       todayCompleted: todayCompletedMap[p.id] ?? 0,
       totalMissions,
