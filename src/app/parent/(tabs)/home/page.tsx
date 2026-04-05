@@ -89,7 +89,7 @@ export default async function ParentHomePage() {
   // 최근 활동: child_id별 분류 (최대 5개)
   type RawLog = { child_id: string; completed_at: string | null; credit_earned: number; missions: { title: string; icon_emoji: string } | null }
   const recentMap: Record<string, RawLog[]> = {}
-  for (const log of (recentLogsRes.data ?? []) as RawLog[]) {
+  for (const log of (recentLogsRes.data ?? []) as unknown as RawLog[]) {
     if (!recentMap[log.child_id]) recentMap[log.child_id] = []
     if (recentMap[log.child_id].length < 5) recentMap[log.child_id].push(log)
   }
@@ -98,7 +98,7 @@ export default async function ParentHomePage() {
 
   // ChildSummary 조합
   const childrenData: ChildSummary[] = profiles.map((p) => {
-    const stats = statsMap[p.id] as ChildSummary['stats'] | undefined
+    const stats = statsMap[p.id] as unknown as ChildSummary['stats'] | undefined
     const level = stats?.current_level ?? 0
     const totalMissions = missions.filter((m) => m.level_required <= level).length
 

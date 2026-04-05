@@ -4,6 +4,13 @@ import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { getAgeFromBirthDateIso } from '@/lib/ageFromBirthDate'
 import { isRetriableMissingColumnError } from '@/lib/supabase/childProfileSelect'
 
+/** Supabase 비밀번호 — UI에서 PIN 을 받지 않으므로 서버만 아는 난수로 둡니다. */
+function generateInternalChildPassword(): string {
+  const bytes = new Uint8Array(32)
+  crypto.getRandomValues(bytes)
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
+}
+
 /**
  * POST /api/child/create
  * 부모가 자녀 프로필을 생성합니다.
@@ -15,15 +22,17 @@ import { isRetriableMissingColumnError } from '@/lib/supabase/childProfileSelect
 export async function POST(req: NextRequest) {
   let name: string
   let birthDate: string
-  let pin: string
   let parentId: string
   try {
-    ;({ name, birthDate, pin, parentId } = await req.json())
+    const body = await req.json()
+    name = body?.name
+    birthDate = body?.birthDate
+    parentId = body?.parentId
   } catch {
     return NextResponse.json({ error: '요청 형식이 올바르지 않아요.' }, { status: 400 })
   }
 
-  if (!name || !birthDate || !pin || !parentId) {
+  if (!name || !birthDate || !parentId) {
     return NextResponse.json({ error: '필수 항목이 누락됐어요.' }, { status: 400 })
   }
 
@@ -35,9 +44,7 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  if (!/^\d{4}$/.test(pin)) {
-    return NextResponse.json({ error: 'PIN은 4자리 숫자여야 해요.' }, { status: 400 })
-  }
+  const password = generateInternalChildPassword()
 
   // 서버 Supabase 클라이언트로 요청자 인증 확인
   const supabase = await createServerClient()
@@ -60,7 +67,7 @@ export async function POST(req: NextRequest) {
   // auth.users에 자녀 계정 생성 (이메일 확인 건너뜀)
   const { data: created, error: createErr } = await admin.auth.admin.createUser({
     email: childEmail,
-    password: pin,
+    password,
     email_confirm: true,
     user_metadata: { role: 'child', name, birth_date: birthDate, age },
   })

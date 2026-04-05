@@ -102,7 +102,7 @@ export default async function ParentChildDetailPage({ params }: PageProps) {
           </p>
         )}
         <p className="text-[11px] text-gray-400 mb-4 px-0.5">
-          자녀는 이 계정으로 앱에 로그인해요. PIN은 자녀만 알고 있어요.
+          자녀 앱은 이 계정으로 동작해요. 미션·보상은 부모 화면에서도 함께 관리할 수 있어요.
         </p>
 
         <h2 className="text-xs font-bold text-brand-text mb-2 px-0.5">경제 활동 요약</h2>

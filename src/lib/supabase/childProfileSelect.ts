@@ -64,7 +64,7 @@ export async function selectChildProfilesByIds(
     const res = await supabase.from('profiles').select(cols).in('id', childIds)
     if (!res.error && res.data) {
       return {
-        rows: (res.data as Record<string, unknown>[]).map(normalizeChildProfileRow),
+        rows: (res.data as unknown as Record<string, unknown>[]).map(normalizeChildProfileRow),
         error: null,
       }
     }
@@ -119,7 +119,7 @@ export async function selectChildProfileDetailById(
     const res = await supabase.from('profiles').select(cols).eq('id', childId).maybeSingle()
     if (!res.error) {
       if (!res.data) return { data: null, error: null }
-      return { data: normalizeDetailRow(res.data as Record<string, unknown>), error: null }
+      return { data: normalizeDetailRow(res.data as unknown as Record<string, unknown>), error: null }
     }
     if (!isRetriableMissingColumnError(res.error)) {
       return { data: null, error: { message: res.error.message } }

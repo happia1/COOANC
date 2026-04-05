@@ -13,7 +13,6 @@ export default function OnboardingPage() {
 
   const [childName, setChildName] = useState('')
   const [birthDate, setBirthDate] = useState('')
-  const [pin, setPin] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -30,10 +29,6 @@ export default function OnboardingPage() {
     }
     if (getAgeFromBirthDateIso(birthDate) === null) {
       setError('생년월일을 확인해 주세요. 만 1~18세만 등록할 수 있어요.')
-      return
-    }
-    if (pin.length !== 4 || !/^\d{4}$/.test(pin)) {
-      setError('PIN은 숫자 4자리로 입력해 주세요.')
       return
     }
 
@@ -53,7 +48,7 @@ export default function OnboardingPage() {
     const res = await fetch('/api/child/create', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: childName, birthDate, pin, parentId: user.id }),
+      body: JSON.stringify({ name: childName, birthDate, parentId: user.id }),
     })
 
     const { data: json, parseError } = await parseJsonFromResponse<{
@@ -152,24 +147,6 @@ export default function OnboardingPage() {
           <p className="text-[11px] text-gray-400 leading-snug">
             만 나이는 생일을 기준으로 자동으로 맞춰져요. (등록 가능: 만 1~18세)
           </p>
-        </div>
-
-        <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-bold text-gray-500" htmlFor="pin">
-            자녀 PIN <span className="font-normal text-gray-400">(4자리 숫자)</span>
-          </label>
-          <input
-            id="pin"
-            type="password"
-            inputMode="numeric"
-            maxLength={4}
-            required
-            value={pin}
-            onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
-            placeholder="••••"
-            className="rounded-xl border border-gray-200 px-4 py-3 text-sm text-brand-text placeholder:text-gray-300 focus:outline-none focus:ring-2 focus:ring-brand-blue/40 transition tracking-[0.5em] text-center"
-          />
-          <p className="text-[11px] text-gray-400">자녀가 앱에 접속할 때 사용하는 비밀번호예요</p>
         </div>
 
         {error && (
