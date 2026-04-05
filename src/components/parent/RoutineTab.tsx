@@ -3,7 +3,16 @@
 import { useState, useEffect } from 'react'
 import { useParentStore } from '@/store/parentStore'
 import ChildSwitcher, { type ChildTab } from '@/components/parent/ChildSwitcher'
+import CalendarSection from '@/components/parent/CalendarSection'
 import type { Mission } from '@/types/database'
+
+const BLOCK_OPTIONS: { value: Mission['block']; label: string }[] = [
+  { value: null,        label: '블록 없음' },
+  { value: 'morning',   label: '🌅 아침' },
+  { value: 'afternoon', label: '☀️ 오후' },
+  { value: 'evening',   label: '🌆 저녁' },
+  { value: 'bedtime',   label: '🌙 잠자리' },
+]
 
 const DIFFICULTY_LABEL: Record<string, { text: string; color: string }> = {
   easy:    { text: '쉬움',   color: 'bg-green-100 text-green-700' },
@@ -32,6 +41,7 @@ const EMPTY_FORM = {
   concept_tag: null as Mission['concept_tag'],
   level_required: 0,
   scheduled_time: '' as string, // HH:MM or ''
+  block: null as Mission['block'],
 }
 
 /** HH:MM → "오전/오후 H:MM" 표시용 변환 */
@@ -120,6 +130,7 @@ export default function RoutineTab({ missions: initial, children }: Props) {
         body: JSON.stringify({
           ...form,
           scheduled_time: form.scheduled_time || null,
+          block: form.block ?? null,
         }),
       })
       const text = await res.text()
@@ -179,6 +190,20 @@ export default function RoutineTab({ missions: initial, children }: Props) {
                   className={`w-10 h-10 rounded-xl text-2xl flex items-center justify-center transition-all ${form.icon_emoji === ic ? 'bg-[#4A90E2]/20 ring-2 ring-[#4A90E2]' : 'bg-gray-50'}`}
                 >
                   {ic}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* 루틴 블록 */}
+          <div>
+            <label className="text-xs font-bold text-gray-500 block mb-1.5">루틴 블록</label>
+            <div className="flex flex-wrap gap-2">
+              {BLOCK_OPTIONS.map((opt) => (
+                <button key={String(opt.value)} type="button"
+                  onClick={() => setForm({ ...form, block: opt.value })}
+                  className={`text-xs font-bold px-3 py-1.5 rounded-full transition-all border ${form.block === opt.value ? 'bg-[#4A90E2] text-white border-[#4A90E2]' : 'bg-gray-50 text-gray-500 border-gray-200'}`}>
+                  {opt.label}
                 </button>
               ))}
             </div>
@@ -335,14 +360,21 @@ export default function RoutineTab({ missions: initial, children }: Props) {
           </p>
         </div>
       )}
+
+      {/* 📅 캘린더 섹션 */}
+      <CalendarSection childId={currentId ?? null} />
     </div>
   )
 }
 
 // ── 서브 컴포넌트 ─────────────────────────────
 
+const BLOCK_LABEL: Record<string, string> = {
+  morning: '🌅 아침', afternoon: '☀️ 오후', evening: '🌆 저녁', bedtime: '🌙 잠자리',
+}
+
 function MissionCard({ mission: m, onToggle, loading }: { mission: Mission; onToggle: (m: Mission) => void; loading: boolean }) {
-  const diff = DIFFICULTY_LABEL[m.difficulty]
+  const diff      = DIFFICULTY_LABEL[m.difficulty]
   const timeLabel = formatTime(m.scheduled_time)
   return (
     <div className="bg-white rounded-xl px-4 py-3 shadow-sm flex items-center gap-3">
@@ -350,6 +382,11 @@ function MissionCard({ mission: m, onToggle, loading }: { mission: Mission; onTo
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5 flex-wrap">
           <p className="text-sm font-bold text-gray-800 truncate">{m.title}</p>
+          {m.block && (
+            <span className="text-[10px] font-bold bg-purple-50 text-purple-600 px-1.5 py-0.5 rounded-full flex-shrink-0">
+              {BLOCK_LABEL[m.block]}
+            </span>
+          )}
           {timeLabel && (
             <span className="text-[10px] font-bold bg-sky-50 text-sky-600 px-1.5 py-0.5 rounded-full flex-shrink-0">
               🕐 {timeLabel}

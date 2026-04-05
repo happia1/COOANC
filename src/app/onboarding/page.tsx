@@ -6,7 +6,7 @@ import { AUTH_LOGO_SRC } from '@/constants/branding'
 import { createClient } from '@/lib/supabase/client'
 import { birthDateInputBounds, getAgeFromBirthDateIso } from '@/lib/ageFromBirthDate'
 import { parseJsonFromResponse } from '@/lib/parseJsonResponse'
-import ChildOnboardingSurvey from '@/components/parent/ChildOnboardingSurvey'
+import RoutineOnboarding from '@/components/onboarding/RoutineOnboarding'
 
 export default function OnboardingPage() {
   const dateBounds = useMemo(() => birthDateInputBounds(), [])
@@ -89,7 +89,7 @@ export default function OnboardingPage() {
           <p className="text-sm text-gray-400">🎉 {createdChildName} 프로필이 만들어졌어요!</p>
           <h1 className="text-xl font-black text-brand-blue text-center">초기 루틴을 함께 만들어볼게요</h1>
         </div>
-        <ChildOnboardingSurvey
+        <RoutineOnboarding
           childName={createdChildName}
           onComplete={() => { window.location.href = '/parent' }}
         />

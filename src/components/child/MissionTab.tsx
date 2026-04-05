@@ -1,13 +1,10 @@
 'use client'
 
 import { useState } from 'react'
-import type { Mission } from '@/types/database'
+import type { DailyMissionWithTemplate } from '@/types/database'
 
 const DIFFICULTY_LABEL: Record<string, string> = {
-  easy:    '쉬움',
-  normal:  '보통',
-  hard:    '어려움',
-  special: '특별',
+  easy: '쉬움', normal: '보통', hard: '어려움', special: '특별',
 }
 const DIFFICULTY_COLOR: Record<string, string> = {
   easy:    'bg-green-100 text-green-700',
@@ -15,8 +12,11 @@ const DIFFICULTY_COLOR: Record<string, string> = {
   hard:    'bg-orange-100 text-orange-700',
   special: 'bg-purple-100 text-purple-700',
 }
+const BLOCK_LABEL: Record<string, string> = {
+  morning: '🌅 아침', afternoon: '☀️ 오후', evening: '🌆 저녁', bedtime: '🌙 잠자리',
+}
 
-/** HH:MM → "오전/오후 H:MM" */
+/** "HH:MM" → "오전/오후 H:MM" */
 function formatTime(t: string | null | undefined): string {
   if (!t) return ''
   const [hStr, mStr] = t.split(':')
@@ -28,40 +28,39 @@ function formatTime(t: string | null | undefined): string {
 
 type Props = {
   childId: string
-  missions: Mission[]
-  completedIds: string[]
+  dailyMissions: DailyMissionWithTemplate[]
   credits: number
   streak: number
   today: string
+  isHoliday: boolean
 }
 
-export default function MissionTab({ childId, missions, completedIds, credits, streak, today }: Props) {
-  const [done, setDone] = useState<Set<string>>(new Set(completedIds))
+export default function MissionTab({ childId, dailyMissions, credits, streak, today, isHoliday }: Props) {
+  const [done, setDone] = useState<Set<string>>(
+    new Set(dailyMissions.filter(dm => dm.is_completed).map(dm => dm.id))
+  )
   const [loading, setLoading] = useState<string | null>(null)
-  const [toast, setToast] = useState<string | null>(null)
+  const [toast, setToast]     = useState<string | null>(null)
 
   const showToast = (msg: string) => {
     setToast(msg)
     setTimeout(() => setToast(null), 2500)
   }
 
-  async function handleComplete(missionId: string, mission: Mission) {
-    if (done.has(missionId) || loading) return
-    setLoading(missionId)
+  async function handleComplete(dm: DailyMissionWithTemplate) {
+    if (done.has(dm.id) || loading) return
+    setLoading(dm.id)
     try {
-      const res = await fetch('/api/mission/complete', {
+      const res = await fetch('/api/daily-mission/complete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ missionId, childId, today }),
+        body: JSON.stringify({ dailyMissionId: dm.id, today }),
       })
       const text = await res.text()
       const json = text ? JSON.parse(text) : {}
-      if (!res.ok) {
-        showToast(json.error ?? '오류가 발생했어요')
-        return
-      }
-      setDone((prev) => new Set([...prev, missionId]))
-      showToast(`🎉 +${mission.credit_reward}🪙 +${mission.exp_reward}EXP`)
+      if (!res.ok) { showToast(json.error ?? '오류가 발생했어요'); return }
+      setDone(prev => new Set([...prev, dm.id]))
+      showToast(`🎉 +${dm.missions.credit_reward}🪙 +${dm.missions.exp_reward}EXP`)
     } catch {
       showToast('네트워크 오류가 발생했어요')
     } finally {
@@ -70,7 +69,37 @@ export default function MissionTab({ childId, missions, completedIds, credits, s
   }
 
   const completedCount = done.size
-  const total = missions.length
+  const total          = dailyMissions.length
+
+  // ── 블록 그룹핑 (block 있는 미션은 묶어서 표시)
+  const blockOrder: (string | null)[] = ['morning', 'afternoon', 'evening', 'bedtime', null]
+  const grouped = blockOrder.map(bk => ({
+    block: bk,
+    items: dailyMissions.filter(dm => (dm.missions.block ?? null) === bk),
+  })).filter(g => g.items.length > 0)
+
+  // ── 오늘은 쉬는 날 화면
+  if (isHoliday) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[60vh] gap-5">
+        <span className="text-8xl">🏖️</span>
+        <div className="text-center space-y-1">
+          <p className="font-black text-brand-text text-xl">오늘은 쉬는 날이에요!</p>
+          <p className="text-sm text-gray-400">푹 쉬고 내일 또 열심히 해봐요 🌟</p>
+        </div>
+        <div className="flex items-center gap-4 mt-2">
+          <div className="flex items-center gap-1.5 bg-white/80 rounded-full px-3.5 py-1.5 shadow-sm">
+            <span className="text-lg">🔥</span>
+            <span className="font-bold text-sm text-brand-text tabular-nums">{streak}일 연속</span>
+          </div>
+          <div className="flex items-center gap-1.5 bg-brand-yellow/30 ring-1 ring-brand-yellow rounded-full px-3.5 py-1.5 shadow-sm">
+            <span className="text-lg">🪙</span>
+            <span className="font-bold text-sm text-brand-text tabular-nums">{credits.toLocaleString()}</span>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -108,8 +137,6 @@ export default function MissionTab({ childId, missions, completedIds, credits, s
             </div>
           )}
         </div>
-
-        {/* 진행 바 */}
         {total > 0 && (
           <div className="mt-3 h-2.5 rounded-full bg-gray-100 overflow-hidden">
             <div
@@ -121,7 +148,7 @@ export default function MissionTab({ childId, missions, completedIds, credits, s
       </div>
 
       {/* 미션 목록 */}
-      {missions.length === 0 ? (
+      {dailyMissions.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 gap-4">
           <span className="text-7xl">🌱</span>
           <div className="text-center space-y-1">
@@ -130,74 +157,84 @@ export default function MissionTab({ childId, missions, completedIds, credits, s
           </div>
         </div>
       ) : (
-        <div className="flex flex-col gap-3">
-          {missions.map((mission) => {
-            const isCompleted = done.has(mission.id)
-            const isLoading = loading === mission.id
-            const timeLabel = formatTime(mission.scheduled_time)
-            return (
-              <div
-                key={mission.id}
-                className={[
-                  'bg-white rounded-2xl p-4 shadow-sm border-2 transition-all',
-                  isCompleted ? 'border-brand-green/40 opacity-75' : 'border-transparent',
-                ].join(' ')}
-              >
-                <div className="flex items-start gap-3">
-                  {/* 아이콘 */}
-                  <div className={[
-                    'flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center text-2xl',
-                    isCompleted ? 'bg-brand-green/20' : 'bg-sky-50',
-                  ].join(' ')}>
-                    {isCompleted ? '✅' : (mission.icon_emoji || '⭐')}
-                  </div>
+        <div className="flex flex-col gap-4">
+          {grouped.map(({ block, items }) => (
+            <div key={block ?? 'none'}>
+              {block && (
+                <p className="text-xs font-black text-gray-500 mb-2 px-1">{BLOCK_LABEL[block]}</p>
+              )}
+              <div className="flex flex-col gap-3">
+                {items.map((dm) => {
+                  const isCompleted = done.has(dm.id)
+                  const isLoading   = loading === dm.id
+                  const timeLabel   = formatTime(dm.scheduled_time)
+                  const m           = dm.missions
+                  return (
+                    <div
+                      key={dm.id}
+                      className={[
+                        'bg-white rounded-2xl p-4 shadow-sm border-2 transition-all',
+                        isCompleted ? 'border-brand-green/40 opacity-75' : 'border-transparent',
+                      ].join(' ')}
+                    >
+                      <div className="flex items-start gap-3">
+                        {/* 아이콘 */}
+                        <div className={[
+                          'flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center text-2xl',
+                          isCompleted ? 'bg-brand-green/20' : 'bg-sky-50',
+                        ].join(' ')}>
+                          {isCompleted ? '✅' : (m.icon_emoji || '⭐')}
+                        </div>
 
-                  {/* 내용 */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className={`font-bold text-sm ${isCompleted ? 'line-through text-gray-400' : 'text-brand-text'}`}>
-                        {mission.title}
-                      </p>
-                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${DIFFICULTY_COLOR[mission.difficulty] ?? 'bg-gray-100 text-gray-500'}`}>
-                        {DIFFICULTY_LABEL[mission.difficulty]}
-                      </span>
-                      {timeLabel && (
-                        <span className="text-[10px] font-bold bg-sky-50 text-sky-600 px-1.5 py-0.5 rounded-full">
-                          🕐 {timeLabel}
-                        </span>
-                      )}
+                        {/* 내용 */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className={`font-bold text-sm ${isCompleted ? 'line-through text-gray-400' : 'text-brand-text'}`}>
+                              {m.title}
+                            </p>
+                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${DIFFICULTY_COLOR[m.difficulty] ?? 'bg-gray-100 text-gray-500'}`}>
+                              {DIFFICULTY_LABEL[m.difficulty]}
+                            </span>
+                            {timeLabel && (
+                              <span className="text-[10px] font-bold bg-sky-50 text-sky-600 px-1.5 py-0.5 rounded-full">
+                                🕐 {timeLabel}
+                              </span>
+                            )}
+                          </div>
+                          {m.description && (
+                            <p className="text-xs text-gray-400 mt-0.5 line-clamp-2">{m.description}</p>
+                          )}
+
+                          {/* 보상 */}
+                          <div className="flex items-center gap-2 mt-2">
+                            <RewardBadge emoji="🪙" value={m.credit_reward} />
+                            {m.heart_reward > 0 && <RewardBadge emoji="❤️" value={m.heart_reward} />}
+                            <RewardBadge emoji="✨" value={`+${m.exp_reward}EXP`} />
+                          </div>
+                        </div>
+
+                        {/* 완료 버튼 */}
+                        <button
+                          onClick={() => handleComplete(dm)}
+                          disabled={isCompleted || isLoading !== false}
+                          className={[
+                            'flex-shrink-0 ml-1 text-sm font-bold px-3 py-2 rounded-xl transition-all active:scale-95',
+                            isCompleted
+                              ? 'bg-brand-green/20 text-brand-green cursor-default'
+                              : isLoading
+                                ? 'bg-gray-100 text-gray-400 cursor-wait'
+                                : 'bg-brand-blue text-white shadow-md hover:bg-blue-600',
+                          ].join(' ')}
+                        >
+                          {isCompleted ? '완료!' : isLoading ? '⏳' : '완료'}
+                        </button>
+                      </div>
                     </div>
-                    {mission.description && (
-                      <p className="text-xs text-gray-400 mt-0.5 line-clamp-2">{mission.description}</p>
-                    )}
-
-                    {/* 보상 */}
-                    <div className="flex items-center gap-2 mt-2">
-                      <RewardBadge emoji="🪙" value={mission.credit_reward} />
-                      {mission.heart_reward > 0 && <RewardBadge emoji="❤️" value={mission.heart_reward} />}
-                      <RewardBadge emoji="✨" value={`+${mission.exp_reward}EXP`} />
-                    </div>
-                  </div>
-
-                  {/* 완료 버튼 */}
-                  <button
-                    onClick={() => handleComplete(mission.id, mission)}
-                    disabled={isCompleted || isLoading !== false}
-                    className={[
-                      'flex-shrink-0 ml-1 text-sm font-bold px-3 py-2 rounded-xl transition-all active:scale-95',
-                      isCompleted
-                        ? 'bg-brand-green/20 text-brand-green cursor-default'
-                        : isLoading
-                          ? 'bg-gray-100 text-gray-400 cursor-wait'
-                          : 'bg-brand-blue text-white shadow-md hover:bg-blue-600',
-                    ].join(' ')}
-                  >
-                    {isCompleted ? '완료!' : isLoading ? '⏳' : '완료'}
-                  </button>
-                </div>
+                  )
+                })}
               </div>
-            )
-          })}
+            </div>
+          ))}
         </div>
       )}
 

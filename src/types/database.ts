@@ -59,10 +59,52 @@ export type Mission = {
   concept_tag: '미션' | '교환' | '저축' | '나눔' | '투자' | '도전' | '학습' | '기여' | '건강' | '습관' | null
   difficulty: 'easy' | 'normal' | 'hard' | 'special'
   repeat_type: 'daily' | 'weekly' | 'monthly' | 'event'
+  /** 루틴 블록 */
+  block: 'morning' | 'afternoon' | 'evening' | 'bedtime' | null
   /** 실행 예정 시간 HH:MM (예: "07:30"). null이면 시간 미지정 */
   scheduled_time: string | null
   is_active: boolean
   created_at: string
+}
+
+export type DailyMission = {
+  id: string
+  child_id: string
+  mission_template_id: string
+  date: string          // YYYY-MM-DD
+  scheduled_time: string | null  // HH:MM
+  routine_type: 'weekday' | 'weekend' | 'holiday' | 'vacation' | null
+  is_completed: boolean
+  completed_at: string | null
+  created_at: string
+}
+
+/** daily_missions + missions 조인 결과 */
+export type DailyMissionWithTemplate = DailyMission & {
+  missions: Pick<Mission, 'title' | 'icon_emoji' | 'description' | 'credit_reward' | 'heart_reward' | 'exp_reward' | 'difficulty' | 'block'>
+}
+
+export type CalendarEvent = {
+  id: string
+  parent_id: string
+  child_id: string | null
+  title: string
+  start_date: string    // YYYY-MM-DD
+  end_date: string      // YYYY-MM-DD
+  event_type: 'holiday' | 'vacation' | 'special'
+  routine_override: 'weekend' | 'none'
+  created_at: string
+}
+
+/** localStorage 저장용 캘린더 이벤트 (Supabase 마이그레이션 전) */
+export type LocalCalendarEvent = {
+  id: string
+  childId: string | null  // null = 모든 자녀에 적용
+  title: string
+  startDate: string       // YYYY-MM-DD
+  endDate: string         // YYYY-MM-DD
+  eventType: 'holiday' | 'vacation' | 'special'
+  routineOverride: 'weekend' | 'none'
 }
 
 export type MissionLog = {
