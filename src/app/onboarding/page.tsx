@@ -6,16 +6,19 @@ import { AUTH_LOGO_SRC } from '@/constants/branding'
 import { createClient } from '@/lib/supabase/client'
 import { birthDateInputBounds, getAgeFromBirthDateIso } from '@/lib/ageFromBirthDate'
 import { parseJsonFromResponse } from '@/lib/parseJsonResponse'
+import ChildOnboardingSurvey from '@/components/parent/ChildOnboardingSurvey'
 
 export default function OnboardingPage() {
   const dateBounds = useMemo(() => birthDateInputBounds(), [])
 
   const [childName, setChildName] = useState('')
-  /** input[type=date] 값 — YYYY-MM-DD */
   const [birthDate, setBirthDate] = useState('')
   const [pin, setPin] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+
+  // 자녀 생성 완료 후 설문 단계로 전환
+  const [createdChildName, setCreatedChildName] = useState<string | null>(null)
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault()
@@ -73,9 +76,35 @@ export default function OnboardingPage() {
       return
     }
 
-    window.location.href = '/parent'
+    // 자녀 생성 완료 → 설문 화면으로 전환
+    setCreatedChildName(childName.trim() || '자녀')
   }
 
+  // ── 설문 화면 ────────────────────────────────────────────
+  if (createdChildName !== null) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-sky-100 via-white to-green-50 flex flex-col items-center justify-center px-6 py-10">
+        <div className="flex flex-col items-center gap-2 mb-7">
+          <Image src={AUTH_LOGO_SRC} alt="COOANC" width={48} height={48} className="rounded-2xl" style={{ height: 'auto' }} />
+          <p className="text-sm text-gray-400">🎉 {createdChildName} 프로필이 만들어졌어요!</p>
+          <h1 className="text-xl font-black text-brand-blue text-center">초기 루틴을 함께 만들어볼게요</h1>
+        </div>
+        <ChildOnboardingSurvey
+          childName={createdChildName}
+          onComplete={() => { window.location.href = '/parent' }}
+        />
+        {/* 건너뛰기 */}
+        <button
+          onClick={() => { window.location.href = '/parent' }}
+          className="mt-6 text-xs text-gray-400 underline"
+        >
+          건너뛰고 나중에 설정할게요
+        </button>
+      </div>
+    )
+  }
+
+  // ── 자녀 등록 폼 ────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-gradient-to-b from-sky-100 via-white to-green-50 flex flex-col items-center justify-center px-6 py-10">
 
@@ -106,7 +135,6 @@ export default function OnboardingPage() {
           />
         </div>
 
-        {/* 생년월일 → 서버·화면에서 만 나이로 환산 (숫자 나이 버튼 대체) */}
         <div className="flex flex-col gap-1.5">
           <label className="text-xs font-bold text-gray-500" htmlFor="birthDate">
             자녀 생년월일
