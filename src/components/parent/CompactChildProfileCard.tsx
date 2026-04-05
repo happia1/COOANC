@@ -65,7 +65,7 @@ export function CompactChildProfileCard({
               className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm font-black tabular-nums leading-tight"
               aria-label="크레딧, 하트, 연속 미션 일수"
             >
-              <span className="text-[#4A90E2]" title="크레딧">
+              <span className="text-purple-600" title="크레딧">
                 🪙{credits.toLocaleString()}
               </span>
               <span className="text-rose-500" title="하트">
@@ -88,7 +88,7 @@ export function CompactChildProfileCard({
           </span>
           <div className="flex w-full flex-col items-center gap-0.5 text-center">
             <span
-              className="rounded-full bg-[#4A90E2]/12 px-2 py-0.5 text-[10px] font-black leading-none text-[#4A90E2] tabular-nums"
+              className="rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-black leading-none text-purple-700 tabular-nums"
               title={`레벨 ${lv} ${stageName}`}
             >
               Lv.{lv}
@@ -102,7 +102,7 @@ export function CompactChildProfileCard({
         <div className="mt-2 border-t border-gray-100 pt-2">
           <div className="mb-1.5 flex items-center justify-between gap-2">
             <p className="text-[11px] font-bold text-gray-700">⭐ 오늘 미션 달성률</p>
-            <span className="shrink-0 text-sm font-black text-[#4A90E2] tabular-nums">
+            <span className="shrink-0 text-sm font-black text-purple-700 tabular-nums">
               {mission.ratePercent}%
               <span className="text-[10px] font-normal text-gray-400 ml-1">
                 ({mission.completed}/{mission.total})

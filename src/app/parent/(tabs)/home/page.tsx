@@ -31,7 +31,6 @@ export default async function ParentHomePage() {
   if (childIds.length === 0) {
     return (
       <HomeTab
-        parentName={profile?.name ?? '부모님'}
         childrenData={[]}
         pendingCount={0}
       />
@@ -122,7 +121,6 @@ export default async function ParentHomePage() {
 
   return (
     <HomeTab
-      parentName={profile?.name ?? '부모님'}
       childrenData={childrenData}
       pendingCount={pendingCount}
     />
