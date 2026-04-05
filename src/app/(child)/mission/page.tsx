@@ -29,7 +29,7 @@ export default async function MissionPage() {
       .from('missions')
       .select('*')
       .eq('is_active', true)
-      .order('difficulty', { ascending: true }),
+      .order('scheduled_time', { ascending: true, nullsFirst: false }),
 
     supabase
       .from('mission_logs')

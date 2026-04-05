@@ -59,6 +59,8 @@ export type Mission = {
   concept_tag: '미션' | '교환' | '저축' | '나눔' | '투자' | '도전' | '학습' | '기여' | '건강' | '습관' | null
   difficulty: 'easy' | 'normal' | 'hard' | 'special'
   repeat_type: 'daily' | 'weekly' | 'monthly' | 'event'
+  /** 실행 예정 시간 HH:MM (예: "07:30"). null이면 시간 미지정 */
+  scheduled_time: string | null
   is_active: boolean
   created_at: string
 }

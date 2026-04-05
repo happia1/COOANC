@@ -31,6 +31,28 @@ const EMPTY_FORM = {
   repeat_type: 'daily' as Mission['repeat_type'],
   concept_tag: null as Mission['concept_tag'],
   level_required: 0,
+  scheduled_time: '' as string, // HH:MM or ''
+}
+
+/** HH:MM → "오전/오후 H:MM" 표시용 변환 */
+function formatTime(t: string | null | undefined): string {
+  if (!t) return ''
+  const [hStr, mStr] = t.split(':')
+  const h = parseInt(hStr, 10)
+  const m = mStr ?? '00'
+  const period = h < 12 ? '오전' : '오후'
+  const h12 = h % 12 === 0 ? 12 : h % 12
+  return `${period} ${h12}:${m}`
+}
+
+/** scheduled_time 기준 오름차순 정렬 (null → 맨 뒤) */
+function sortByTime(missions: Mission[]): Mission[] {
+  return [...missions].sort((a, b) => {
+    if (!a.scheduled_time && !b.scheduled_time) return 0
+    if (!a.scheduled_time) return 1
+    if (!b.scheduled_time) return -1
+    return a.scheduled_time.localeCompare(b.scheduled_time)
+  })
 }
 
 type ChildInfo = { id: string; name: string; level: number }
@@ -61,8 +83,8 @@ export default function RoutineTab({ missions: initial, children }: Props) {
 
   const tabs: ChildTab[] = children.map((c) => ({ id: c.id, name: c.name }))
 
-  // 선택된 자녀 레벨 기준으로 미션 필터
-  const filteredMissions = missions.filter((m) => m.level_required <= childLevel)
+  // 선택된 자녀 레벨 기준 필터 → 시간순 정렬
+  const filteredMissions = sortByTime(missions.filter((m) => m.level_required <= childLevel))
   const activeMissions = filteredMissions.filter((m) => m.is_active)
   const inactiveMissions = filteredMissions.filter((m) => !m.is_active)
 
@@ -95,7 +117,10 @@ export default function RoutineTab({ missions: initial, children }: Props) {
       const res = await fetch('/api/mission/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify({
+          ...form,
+          scheduled_time: form.scheduled_time || null,
+        }),
       })
       const text = await res.text()
       const json = text ? JSON.parse(text) : {}
@@ -157,6 +182,20 @@ export default function RoutineTab({ missions: initial, children }: Props) {
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* 시간 */}
+          <div>
+            <label className="text-xs font-bold text-gray-500 block mb-1">실행 시간 (선택)</label>
+            <input
+              type="time"
+              value={form.scheduled_time}
+              onChange={(e) => setForm({ ...form, scheduled_time: e.target.value })}
+              className="border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/40"
+            />
+            {form.scheduled_time && (
+              <span className="ml-2 text-xs text-[#4A90E2] font-bold">{formatTime(form.scheduled_time)}</span>
+            )}
           </div>
 
           {/* 이름 */}
@@ -304,11 +343,19 @@ export default function RoutineTab({ missions: initial, children }: Props) {
 
 function MissionCard({ mission: m, onToggle, loading }: { mission: Mission; onToggle: (m: Mission) => void; loading: boolean }) {
   const diff = DIFFICULTY_LABEL[m.difficulty]
+  const timeLabel = formatTime(m.scheduled_time)
   return (
     <div className="bg-white rounded-xl px-4 py-3 shadow-sm flex items-center gap-3">
       <span className="text-2xl flex-shrink-0">{m.icon_emoji || '⭐'}</span>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-bold text-gray-800 truncate">{m.title}</p>
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <p className="text-sm font-bold text-gray-800 truncate">{m.title}</p>
+          {timeLabel && (
+            <span className="text-[10px] font-bold bg-sky-50 text-sky-600 px-1.5 py-0.5 rounded-full flex-shrink-0">
+              🕐 {timeLabel}
+            </span>
+          )}
+        </div>
         <div className="flex items-center gap-2 mt-0.5 flex-wrap">
           <span className="text-[10px] text-gray-400">Lv.{m.level_required}+</span>
           {diff && (

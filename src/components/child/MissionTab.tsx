@@ -16,6 +16,16 @@ const DIFFICULTY_COLOR: Record<string, string> = {
   special: 'bg-purple-100 text-purple-700',
 }
 
+/** HH:MM → "오전/오후 H:MM" */
+function formatTime(t: string | null | undefined): string {
+  if (!t) return ''
+  const [hStr, mStr] = t.split(':')
+  const h = parseInt(hStr, 10)
+  const period = h < 12 ? '오전' : '오후'
+  const h12 = h % 12 === 0 ? 12 : h % 12
+  return `${period} ${h12}:${mStr ?? '00'}`
+}
+
 type Props = {
   childId: string
   missions: Mission[]
@@ -124,6 +134,7 @@ export default function MissionTab({ childId, missions, completedIds, credits, s
           {missions.map((mission) => {
             const isCompleted = done.has(mission.id)
             const isLoading = loading === mission.id
+            const timeLabel = formatTime(mission.scheduled_time)
             return (
               <div
                 key={mission.id}
@@ -150,6 +161,11 @@ export default function MissionTab({ childId, missions, completedIds, credits, s
                       <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${DIFFICULTY_COLOR[mission.difficulty] ?? 'bg-gray-100 text-gray-500'}`}>
                         {DIFFICULTY_LABEL[mission.difficulty]}
                       </span>
+                      {timeLabel && (
+                        <span className="text-[10px] font-bold bg-sky-50 text-sky-600 px-1.5 py-0.5 rounded-full">
+                          🕐 {timeLabel}
+                        </span>
+                      )}
                     </div>
                     {mission.description && (
                       <p className="text-xs text-gray-400 mt-0.5 line-clamp-2">{mission.description}</p>

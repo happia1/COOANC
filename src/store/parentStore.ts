@@ -2,7 +2,7 @@ import { create } from 'zustand'
 
 type ParentStore = {
   selectedChildId: string | null
-  setSelectedChildId: (id: string) => void
+  setSelectedChildId: (id: string | null) => void
 }
 
 export const useParentStore = create<ParentStore>((set) => ({
