@@ -16,8 +16,9 @@ export default function OnboardingPage() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
-  // 자녀 생성 완료 후 설문 단계로 전환
+  // 자녀 생성 완료 후 설문 단계로 전환 (id 는 미션을 자녀에게 묶는 데 사용)
   const [createdChildName, setCreatedChildName] = useState<string | null>(null)
+  const [createdChildId, setCreatedChildId] = useState<string | null>(null)
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault()
@@ -72,6 +73,8 @@ export default function OnboardingPage() {
     }
 
     // 자녀 생성 완료 → 설문 화면으로 전환
+    const cid = typeof payload.childId === 'string' ? payload.childId : null
+    setCreatedChildId(cid)
     setCreatedChildName(childName.trim() || '자녀')
   }
 
@@ -83,7 +86,7 @@ export default function OnboardingPage() {
           <Image src={AUTH_LOGO_SRC} alt="COOANC" width={144} height={144} className="rounded-2xl max-h-24 w-auto" style={{ height: 'auto' }} />
           <h1 className="text-base font-black text-brand-blue text-center">초기 루틴 설정</h1>
         </div>
-        <RoutineOnboarding onComplete={() => { window.location.href = '/parent' }} />
+        <RoutineOnboarding linkedChildId={createdChildId} onComplete={() => { window.location.href = '/parent' }} />
         <button
           type="button"
           onClick={() => { window.location.href = '/parent' }}

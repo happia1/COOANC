@@ -171,9 +171,14 @@ type HolidayRoutineMode = 'as_weekday' | 'custom'
 
 interface Props {
   onComplete: () => void
+  /**
+   * 방금 등록한 자녀 프로필 id — 생성되는 미션 행에 linked_child_id 로 저장합니다.
+   * 자녀 삭제 시 DB CASCADE 로 해당 미션만 함께 지워져 루틴 탭에 남지 않습니다.
+   */
+  linkedChildId: string | null
 }
 
-export default function RoutineOnboarding({ onComplete }: Props) {
+export default function RoutineOnboarding({ onComplete, linkedChildId }: Props) {
   const [step, setStep] = useState(1)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -469,7 +474,7 @@ export default function RoutineOnboarding({ onComplete }: Props) {
     amIds: string[],
     pmIds: string[],
     repeatType: 'daily' | 'weekly',
-    options: { hasSchoolForAnchor: boolean },
+    options: { hasSchoolForAnchor: boolean; linkedChildId: string | null },
     customs: CustomAlarm[],
   ) {
     /** 풀 정의 순서대로 미션 생성 (가로 스크롤 순서와 동일) */
@@ -502,6 +507,7 @@ export default function RoutineOnboarding({ onComplete }: Props) {
           difficulty: 'easy',
           repeat_type: repeatType,
           level_required: 0,
+          ...(options.linkedChildId ? { linked_child_id: options.linkedChildId } : {}),
         }),
       })
       if (!res.ok) {
@@ -534,6 +540,7 @@ export default function RoutineOnboarding({ onComplete }: Props) {
             difficulty: 'easy',
             repeat_type: 'daily',
             level_required: 0,
+            ...(options.linkedChildId ? { linked_child_id: options.linkedChildId } : {}),
           }),
         })
         if (!res.ok) {
@@ -549,9 +556,9 @@ export default function RoutineOnboarding({ onComplete }: Props) {
     setSubmitting(true)
     setError(null)
     try {
-      await createMissionsFromIds(weekdayAm, weekdayPm, 'daily', { hasSchoolForAnchor: hasSchool }, customAlarms)
+      await createMissionsFromIds(weekdayAm, weekdayPm, 'daily', { hasSchoolForAnchor: hasSchool, linkedChildId }, customAlarms)
       if (mode === 'withCustomHoliday') {
-        await createMissionsFromIds(holidayAm, holidayPm, 'weekly', { hasSchoolForAnchor: false }, [])
+        await createMissionsFromIds(holidayAm, holidayPm, 'weekly', { hasSchoolForAnchor: false, linkedChildId }, [])
       }
       if (typeof window !== 'undefined') {
         localStorage.setItem('cooanc_notify_wake', notifyWake ? '1' : '0')

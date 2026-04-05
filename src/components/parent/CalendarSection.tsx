@@ -10,8 +10,10 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import type { LocalCalendarEvent } from '@/types/database'
+import { getSeoulDateString } from '@/lib/koreaDate'
+import { COOANC_CALENDAR_EVENTS_STORAGE_KEY } from '@/lib/localStorageChildScope'
 
-const STORAGE_KEY = 'cooanc_calendar_events_v1'
+const STORAGE_KEY = COOANC_CALENDAR_EVENTS_STORAGE_KEY
 
 const EVENT_COLORS: Record<LocalCalendarEvent['eventType'], { bg: string; text: string; dot: string }> = {
   holiday:  { bg: 'bg-red-50',    text: 'text-red-700',    dot: 'bg-red-400' },
@@ -47,7 +49,7 @@ function datesInRange(start: string, end: string): string[] {
   const cur = parseDate(start)
   const last = parseDate(end)
   while (cur <= last) {
-    result.push(cur.toISOString().split('T')[0])
+    result.push(dateKey(cur.getFullYear(), cur.getMonth(), cur.getDate()))
     cur.setDate(cur.getDate() + 1)
   }
   return result
@@ -56,9 +58,14 @@ function datesInRange(start: string, end: string): string[] {
 // ── 메인 ────────────────────────────────────────────────────
 
 export default function CalendarSection({ childId }: Props) {
-  const today = new Date()
-  const [year,  setYear]  = useState(today.getFullYear())
-  const [month, setMonth] = useState(today.getMonth())   // 0-indexed
+  const [year, setYear] = useState(() => {
+    const s = getSeoulDateString()
+    return Number(s.slice(0, 4))
+  })
+  const [month, setMonth] = useState(() => {
+    const s = getSeoulDateString()
+    return Number(s.slice(5, 7)) - 1
+  })
 
   const [events, setEvents] = useState<LocalCalendarEvent[]>([])
 
@@ -166,7 +173,7 @@ export default function CalendarSection({ childId }: Props) {
     if (month === 11) { setYear(y => y + 1); setMonth(0) } else setMonth(m => m + 1)
   }
 
-  const todayStr = today.toISOString().split('T')[0]
+  const todayStr = getSeoulDateString()
 
   return (
     <section className="bg-white rounded-2xl p-4 shadow-sm">

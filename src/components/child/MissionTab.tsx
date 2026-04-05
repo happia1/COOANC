@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import type { DailyMissionWithTemplate } from '@/types/database'
+import { formatDateDot } from '@/lib/koreaDate'
 
 const DIFFICULTY_LABEL: Record<string, string> = {
   easy: '쉬움', normal: '보통', hard: '어려움', special: '특별',
@@ -127,7 +128,7 @@ export default function MissionTab({ childId, dailyMissions, credits, streak, to
       <div className="bg-white rounded-2xl p-4 shadow-sm">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-xs text-gray-400">{today}</p>
+            <p className="text-xs text-gray-400">{formatDateDot(today)}</p>
             <p className="font-black text-brand-text text-lg">⭐ 오늘의 미션</p>
           </div>
           {total > 0 && (

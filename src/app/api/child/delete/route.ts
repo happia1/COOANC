@@ -67,13 +67,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: '자녀 계정만 삭제할 수 있어요.' }, { status: 403 })
   }
 
-  // 5. Admin API로 auth.users 삭제 (FK CASCADE로 관련 데이터 전부 정리)
   const admin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
     { auth: { autoRefreshToken: false, persistSession: false } },
   )
 
+  // 5a. 이 자녀에만 묶인 미션 템플릿 행을 먼저 제거 (FK 미적용·지연 환경에서도 루틴 탭 잔상 방지)
+  const { error: missionDelErr } = await admin.from('missions').delete().eq('linked_child_id', childId)
+  if (missionDelErr) {
+    console.error('[child/delete] missions delete:', missionDelErr)
+    return NextResponse.json({ error: '연결된 미션 정리 중 오류가 났어요. 잠시 후 다시 시도해 주세요.' }, { status: 500 })
+  }
+
+  // 5b. auth.users 삭제 → profiles·나머지 테이블은 FK CASCADE 로 정리
   const { error: deleteErr } = await admin.auth.admin.deleteUser(childId)
 
   if (deleteErr) {

@@ -6,6 +6,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { resolveDisplayAge } from '@/lib/ageFromBirthDate'
 import { selectChildProfilesByIds } from '@/lib/supabase/childProfileSelect'
+import { getSeoulDateString } from '@/lib/koreaDate'
 import HomeTab, { type ChildSummary } from '@/components/parent/HomeTab'
 
 export default async function ParentHomePage() {
@@ -37,7 +38,7 @@ export default async function ParentHomePage() {
     )
   }
 
-  const today = new Date().toISOString().split('T')[0]
+  const today = getSeoulDateString()
 
   const { rows: profileRows, error: profilesFetchErr } = await selectChildProfilesByIds(supabase, childIds)
   if (profilesFetchErr) {
@@ -66,7 +67,7 @@ export default async function ParentHomePage() {
       .order('completed_at', { ascending: false })
       .limit(30),
 
-    supabase.from('missions').select('id, level_required').eq('is_active', true),
+    supabase.from('missions').select('id, level_required, linked_child_id').eq('is_active', true),
 
     supabase
       .from('purchase_requests')
@@ -77,7 +78,11 @@ export default async function ParentHomePage() {
   const statsMap = Object.fromEntries(
     ((statsRes.data ?? []) as { child_id: string; [key: string]: unknown }[]).map((s) => [s.child_id, s])
   )
-  const missions = (missionsRes.data ?? []) as { id: string; level_required: number }[]
+  const missions = (missionsRes.data ?? []) as {
+    id: string
+    level_required: number
+    linked_child_id: string | null
+  }[]
 
   // 오늘 완료 수: child_id별 집계
   const todayCompletedMap: Record<string, number> = {}
@@ -100,7 +105,11 @@ export default async function ParentHomePage() {
   const childrenData: ChildSummary[] = profiles.map((p) => {
     const stats = statsMap[p.id] as unknown as ChildSummary['stats'] | undefined
     const level = stats?.current_level ?? 0
-    const totalMissions = missions.filter((m) => m.level_required <= level).length
+    const totalMissions = missions.filter(
+      (m) =>
+        m.level_required <= level &&
+        (m.linked_child_id == null || m.linked_child_id === p.id),
+    ).length
 
     return {
       id: p.id,

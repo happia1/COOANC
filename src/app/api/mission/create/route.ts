@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createServiceRoleClient } from '@/lib/supabase/admin'
 
 /**
  * POST /api/mission/create
  * 부모가 새 미션 카드를 생성
+ *
+ * 삽입은 가능하면 service_role 로 수행합니다(RLS 정책 누락·원격 DB 불일치에도 동작).
+ * SUPABASE_SERVICE_ROLE_KEY 가 없을 때만 세션 클라이언트로 insert(이때는 022/023 RLS 필요).
  */
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
@@ -20,7 +24,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: '요청 형식이 올바르지 않아요' }, { status: 400 })
   }
 
-  const { title, description, icon_emoji, credit_reward, heart_reward, exp_reward, difficulty, repeat_type, concept_tag, level_required, scheduled_time, block } = body
+  const {
+    title,
+    description,
+    icon_emoji,
+    credit_reward,
+    heart_reward,
+    exp_reward,
+    difficulty,
+    repeat_type,
+    concept_tag,
+    level_required,
+    scheduled_time,
+    block,
+    linked_child_id,
+  } = body
 
   if (!title || typeof title !== 'string' || !title.trim()) {
     return NextResponse.json({ error: '미션 이름을 입력해주세요' }, { status: 400 })
@@ -43,6 +61,26 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: '부모 계정만 미션을 만들 수 있어요' }, { status: 403 })
   }
 
+  /** 이 미션을 특정 자녀에게만 묶을 때(온보딩·루틴 탭). 없으면 전역 풀(null). */
+  let parsedLinkedChildId: string | null = null
+  if (linked_child_id != null && linked_child_id !== '') {
+    const id = String(linked_child_id).trim()
+    const uuidOk = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)
+    if (!uuidOk) {
+      return NextResponse.json({ error: '자녀 id 형식이 올바르지 않아요' }, { status: 400 })
+    }
+    const { data: link } = await supabase
+      .from('family_links')
+      .select('id')
+      .eq('parent_id', user.id)
+      .eq('child_id', id)
+      .maybeSingle()
+    if (!link) {
+      return NextResponse.json({ error: '연결된 자녀에게만 미션을 묶을 수 있어요' }, { status: 403 })
+    }
+    parsedLinkedChildId = id
+  }
+
   const validBlocks = ['morning', 'afternoon', 'evening', 'bedtime']
   const parsedBlock = typeof block === 'string' && validBlocks.includes(block) ? block : null
 
@@ -61,19 +99,45 @@ export async function POST(req: NextRequest) {
     block: parsedBlock,
   }
 
-  // scheduled_time 컬럼이 있으면 함께 저장, 없으면(42703) 없이 재시도
-  let result = await supabase
-    .from('missions')
-    .insert({ ...basePayload, scheduled_time: parsedTime })
-    .select()
-    .single()
+  const service = createServiceRoleClient()
+  const db = service ?? supabase
 
-  if (result.error?.code === '42703') {
-    result = await supabase.from('missions').insert(basePayload).select().single()
+  // DB 마이그레이션 단계별 호환: 없는 컬럼(42703)이면 더 짧은 payload 로 재시도 (중복 시도 제거)
+  type InsertRow = Record<string, unknown>
+  const attempts: InsertRow[] = []
+  const seen = new Set<string>()
+  const addAttempt = (row: InsertRow) => {
+    const key = JSON.stringify(row)
+    if (seen.has(key)) return
+    seen.add(key)
+    attempts.push(row)
+  }
+  if (parsedLinkedChildId) {
+    addAttempt({ ...basePayload, scheduled_time: parsedTime, linked_child_id: parsedLinkedChildId })
+  }
+  addAttempt({ ...basePayload, scheduled_time: parsedTime })
+  if (parsedLinkedChildId) {
+    addAttempt({ ...basePayload, linked_child_id: parsedLinkedChildId })
+  }
+  addAttempt({ ...basePayload })
+
+  let result = await db.from('missions').insert(attempts[0]).select().single()
+  for (let a = 1; a < attempts.length && result.error?.code === '42703'; a++) {
+    result = await db.from('missions').insert(attempts[a]).select().single()
   }
 
   if (result.error) {
-    console.error('[mission/create]', result.error)
+    const rlsHint =
+      result.error.message?.includes('row-level security') || result.error.code === '42501'
+    console.error('[mission/create]', {
+      code: result.error.code,
+      message: result.error.message,
+      details: result.error.details,
+      usedServiceRole: Boolean(service),
+      hint: rlsHint
+        ? 'RLS 차단 가능: .env.local 에 SUPABASE_SERVICE_ROLE_KEY 추가 또는 migrations 022/023 적용'
+        : undefined,
+    })
     return NextResponse.json({ error: '미션 생성에 실패했어요. 다시 시도해 주세요.' }, { status: 500 })
   }
 

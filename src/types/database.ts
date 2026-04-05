@@ -63,6 +63,8 @@ export type Mission = {
   block: 'morning' | 'afternoon' | 'evening' | 'bedtime' | null
   /** 실행 예정 시간 HH:MM (예: "07:30"). null이면 시간 미지정 */
   scheduled_time: string | null
+  /** 이 템플릿이 귀속된 자녀(온보딩·루틴에서 생성). null 이면 전역 풀 */
+  linked_child_id: string | null
   is_active: boolean
   created_at: string
 }

@@ -1,6 +1,6 @@
 import Image from 'next/image'
 import Link from 'next/link'
-import { AUTH_LOGO_SRC } from '@/constants/branding'
+import { AUTH_LOGO_SRC, TOPBAR_LOGO_CLASSNAME, TOPBAR_LOGO_HEIGHT, TOPBAR_LOGO_WIDTH } from '@/constants/branding'
 
 type Props = { childName: string }
 
@@ -16,9 +16,9 @@ export default function ChildTopBar({ childName }: Props) {
         <Image
           src={AUTH_LOGO_SRC}
           alt="COOANC"
-          width={360}
-          height={120}
-          className="h-[108px] w-auto max-w-[min(100%,360px)] object-contain"
+          width={TOPBAR_LOGO_WIDTH}
+          height={TOPBAR_LOGO_HEIGHT}
+          className={TOPBAR_LOGO_CLASSNAME}
           priority
         />
         <div className="flex items-center gap-2">

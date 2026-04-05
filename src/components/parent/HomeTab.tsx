@@ -3,7 +3,7 @@
 import { useEffect } from 'react'
 import Link from 'next/link'
 import { useParentStore } from '@/store/parentStore'
-import ChildSwitcher, { type ChildTab } from '@/components/parent/ChildSwitcher'
+import ChildProfileNav, { type ChildTab } from '@/components/parent/ChildProfileNav'
 import { CompactChildProfileCard } from '@/components/parent/CompactChildProfileCard'
 
 // 하드코딩 AI 한줄 가이드 (추후 실제 AI로 교체)
@@ -51,9 +51,14 @@ type Props = {
 export default function HomeTab({ childrenData, pendingCount }: Props) {
   const { selectedChildId, setSelectedChildId } = useParentStore()
 
-  // 초기 자동 선택
+  // 자녀 목록이 바뀌면(삭제 등) 선택 id 가 없거나 목록에 없으면 첫 자녀로 맞춤
   useEffect(() => {
-    if (!selectedChildId && childrenData.length > 0) {
+    if (childrenData.length === 0) {
+      setSelectedChildId(null)
+      return
+    }
+    const stillThere = selectedChildId && childrenData.some((c) => c.id === selectedChildId)
+    if (!stillThere) {
       setSelectedChildId(childrenData[0].id)
     }
   }, [childrenData, selectedChildId, setSelectedChildId])
@@ -75,8 +80,8 @@ export default function HomeTab({ childrenData, pendingCount }: Props) {
   return (
     <div className="flex flex-col gap-4">
 
-      {/* 자녀 전환 탭 */}
-      <ChildSwitcher children={tabs} />
+      {/* 자녀 전환: ◀ ▶ 및 스와이프 (Zustand 로 루틴 탭과 동일한 자녀 선택) */}
+      <ChildProfileNav tabs={tabs} />
 
       {/* 승인 대기 배너 */}
       {pendingCount > 0 && (

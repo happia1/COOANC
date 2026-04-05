@@ -8,6 +8,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import MissionTab from '@/components/child/MissionTab'
+import { getSeoulDateString } from '@/lib/koreaDate'
 import type { DailyMissionWithTemplate, Mission, LocalCalendarEvent } from '@/types/database'
 
 type RoutineType = 'weekday' | 'weekend' | 'holiday' | 'vacation'
@@ -18,7 +19,8 @@ function getTodayRoutineType(
 ): RoutineType {
   const ev = calendarEvents.find(e => today >= e.start_date && today <= e.end_date)
   if (ev) return ev.routine_override === 'none' ? 'holiday' : 'vacation'
-  const dow = new Date(today).getDay()
+  const [yy, mm, dd] = today.split('-').map(Number)
+  const dow = new Date(yy, mm - 1, dd).getDay()
   return dow === 0 || dow === 6 ? 'weekend' : 'weekday'
 }
 
@@ -27,7 +29,7 @@ export default async function MissionPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const today = new Date().toISOString().split('T')[0]
+  const today = getSeoulDateString()
 
   // ── 자녀 스탯 + 부모 ID (calendar_events 조회용)
   const [statsRes, familyRes] = await Promise.all([
@@ -87,7 +89,11 @@ export default async function MissionPage() {
       .eq('is_active', true)
       .order('scheduled_time', { ascending: true, nullsFirst: false })
 
-    const filtered = ((templates ?? []) as Mission[]).filter(m => m.level_required <= level)
+    // 공용(null) + 이 아이에게만 묶인 템플릿만 오늘 일정에 넣음
+    const filtered = ((templates ?? []) as Mission[]).filter(
+      (m) =>
+        m.level_required <= level && (m.linked_child_id == null || m.linked_child_id === user.id),
+    )
 
     if (filtered.length > 0) {
       const inserts = filtered.map(m => ({

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { addSeoulCalendarDays } from '@/lib/koreaDate'
 
 /**
  * POST /api/daily-mission/complete
@@ -101,7 +102,7 @@ export async function POST(req: NextRequest) {
     if (newLevel === 5) promoPending = true
   }
 
-  const yesterday = new Date(Date.now() - 86_400_000).toISOString().split('T')[0]
+  const yesterday = addSeoulCalendarDays(today, -1)
   let newStreak = stats.streak_days
   if (stats.last_mission_date !== today) {
     newStreak = stats.last_mission_date === yesterday ? newStreak + 1 : 1
