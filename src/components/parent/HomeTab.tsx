@@ -1,12 +1,10 @@
 'use client'
 
 import { useEffect } from 'react'
-import Image from 'next/image'
 import Link from 'next/link'
 import { useParentStore } from '@/store/parentStore'
 import ChildSwitcher, { type ChildTab } from '@/components/parent/ChildSwitcher'
 import { CompactChildProfileCard } from '@/components/parent/CompactChildProfileCard'
-import { AUTH_LOGO_SRC } from '@/constants/branding'
 
 // 하드코딩 AI 한줄 가이드 (추후 실제 AI로 교체)
 const AI_HINTS = [
@@ -46,12 +44,11 @@ export type ChildSummary = {
 }
 
 type Props = {
-  parentName: string
   childrenData: ChildSummary[]
   pendingCount: number
 }
 
-export default function HomeTab({ parentName, childrenData, pendingCount }: Props) {
+export default function HomeTab({ childrenData, pendingCount }: Props) {
   const { selectedChildId, setSelectedChildId } = useParentStore()
 
   // 초기 자동 선택
@@ -77,29 +74,6 @@ export default function HomeTab({ parentName, childrenData, pendingCount }: Prop
 
   return (
     <div className="flex flex-col gap-4">
-
-      {/* 상단 바: 브랜드 로고(큼직하게), 오른쪽 부모 이름 + 설정 */}
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex min-w-0 flex-1 items-center">
-          <Image
-            src={AUTH_LOGO_SRC}
-            alt="COOANC"
-            width={180}
-            height={180}
-            className="h-auto max-h-[min(180px,42vw)] w-auto max-w-[min(180px,52vw)] rounded-2xl object-contain"
-            style={{ height: 'auto' }}
-            priority
-          />
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="text-right">
-            <p className="text-xs font-bold text-gray-700">{parentName}</p>
-          </div>
-          <Link href="/settings" className="w-8 h-8 flex items-center justify-center rounded-xl bg-gray-100 text-gray-500 hover:bg-gray-200 transition-colors">
-            <span className="text-base">⚙️</span>
-          </Link>
-        </div>
-      </div>
 
       {/* 자녀 전환 탭 */}
       <ChildSwitcher children={tabs} />
@@ -133,21 +107,23 @@ export default function HomeTab({ parentName, childrenData, pendingCount }: Prop
         </div>
       ) : (
         <>
-          {/* 자녀 현황 카드 — 여백·텍스트 최소화, 가로 배치 + 우측 마스코트 (참고 UI) */}
-          <CompactChildProfileCard
-            name={child.name}
-            age={child.age}
-            avatarUrl={child.avatarUrl}
-            level={s?.current_level ?? 0}
-            credits={s?.credits ?? 0}
-            hearts={s?.hearts ?? 0}
-            streakDays={s?.streak_days ?? 0}
-            mission={{
-              ratePercent: missionRate,
-              completed: child.todayCompleted,
-              total: child.totalMissions,
-            }}
-          />
+          {/* 자녀 현황 카드 — 탭 시 자녀 앱 화면으로 이동 */}
+          <Link href={`/parent/child/${child.id}`} className="block active:opacity-80 transition-opacity">
+            <CompactChildProfileCard
+              name={child.name}
+              age={child.age}
+              avatarUrl={child.avatarUrl}
+              level={s?.current_level ?? 0}
+              credits={s?.credits ?? 0}
+              hearts={s?.hearts ?? 0}
+              streakDays={s?.streak_days ?? 0}
+              mission={{
+                ratePercent: missionRate,
+                completed: child.todayCompleted,
+                total: child.totalMissions,
+              }}
+            />
+          </Link>
 
           {/* AI 한줄 가이드 */}
           <div className="bg-gradient-to-r from-[#4A90E2]/10 to-[#7ED321]/10 rounded-2xl px-4 py-3 flex items-start gap-2">
