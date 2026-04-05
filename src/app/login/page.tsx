@@ -55,7 +55,14 @@ export default function LoginPage() {
     <div className="min-h-screen bg-gradient-to-b from-sky-100 via-white to-green-50 flex flex-col items-center justify-center px-6">
 
       <div className="flex flex-col items-center gap-3 mb-8">
-        <Image src={AUTH_LOGO_SRC} alt="COOANC" width={320} height={320} className="rounded-2xl" style={{ height: 'auto' }} priority />
+        <Image
+          src={AUTH_LOGO_SRC}
+          alt="COOANC"
+          width={960}
+          height={960}
+          className="rounded-2xl max-w-[min(960px,calc(100vw-3rem))] w-full h-auto"
+          priority
+        />
         <p className="text-sm text-gray-400">자녀 경제 성장의 닻을 내리다</p>
       </div>
 

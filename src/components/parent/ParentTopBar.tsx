@@ -12,13 +12,13 @@ type Props = { parentName: string }
 export default function ParentTopBar({ parentName }: Props) {
   return (
     <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-sm border-b border-gray-100 shadow-sm">
-      <div className="flex items-center justify-between max-w-md mx-auto px-4 py-2.5">
+      <div className="flex items-center justify-between max-w-md mx-auto px-4 py-3">
         <Image
           src={AUTH_LOGO_SRC}
           alt="COOANC"
-          width={120}
-          height={40}
-          className="h-9 w-auto object-contain"
+          width={360}
+          height={120}
+          className="h-[108px] w-auto max-w-[min(100%,360px)] object-contain"
           priority
         />
         <div className="flex items-center gap-2">

@@ -11,6 +11,7 @@ import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { AUTH_LOGO_SRC } from '@/constants/branding'
+import MissionSuggestCard from '@/components/settings/MissionSuggestCard'
 
 export default function SettingsPage() {
   const router = useRouter()
@@ -81,7 +82,7 @@ export default function SettingsPage() {
             ← 뒤로
           </button>
           <div className="ml-auto flex items-center gap-2">
-            <Image src={AUTH_LOGO_SRC} alt="COOANC" width={24} height={24} className="rounded-lg" style={{ height: 'auto' }} />
+            <Image src={AUTH_LOGO_SRC} alt="COOANC" width={72} height={72} className="rounded-lg" style={{ height: 'auto' }} />
             <span className="text-sm font-black text-[#4A90E2]">설정</span>
           </div>
         </div>
@@ -144,6 +145,8 @@ export default function SettingsPage() {
           <ToggleRow label="푸시 알림" emoji="🔔" on={notifOn} onToggle={toggleNotif} />
           <ToggleRow label="효과음" emoji="🔊" on={soundOn} onToggle={toggleSound} />
         </div>
+
+        <MissionSuggestCard />
 
         <button
           type="button"

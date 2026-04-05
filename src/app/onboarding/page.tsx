@@ -78,20 +78,16 @@ export default function OnboardingPage() {
   // ── 설문 화면 ────────────────────────────────────────────
   if (createdChildName !== null) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-sky-100 via-white to-green-50 flex flex-col items-center justify-center px-6 py-10">
-        <div className="flex flex-col items-center gap-2 mb-7">
-          <Image src={AUTH_LOGO_SRC} alt="COOANC" width={48} height={48} className="rounded-2xl" style={{ height: 'auto' }} />
-          <p className="text-sm text-gray-400">🎉 {createdChildName} 프로필이 만들어졌어요!</p>
-          <h1 className="text-xl font-black text-brand-blue text-center">초기 루틴을 함께 만들어볼게요</h1>
+      <div className="min-h-screen bg-gradient-to-b from-sky-100 via-white to-green-50 flex flex-col items-center px-4 py-6 sm:px-6 sm:py-8">
+        <div className="flex w-full max-w-sm flex-col items-center gap-1.5 mb-3 shrink-0">
+          <Image src={AUTH_LOGO_SRC} alt="COOANC" width={144} height={144} className="rounded-2xl max-h-24 w-auto" style={{ height: 'auto' }} />
+          <h1 className="text-base font-black text-brand-blue text-center">초기 루틴 설정</h1>
         </div>
-        <RoutineOnboarding
-          childName={createdChildName}
-          onComplete={() => { window.location.href = '/parent' }}
-        />
-        {/* 건너뛰기 */}
+        <RoutineOnboarding onComplete={() => { window.location.href = '/parent' }} />
         <button
+          type="button"
           onClick={() => { window.location.href = '/parent' }}
-          className="mt-6 text-xs text-gray-400 underline"
+          className="mt-4 text-xs text-gray-400 underline"
         >
           건너뛰고 나중에 설정할게요
         </button>
@@ -104,7 +100,7 @@ export default function OnboardingPage() {
     <div className="min-h-screen bg-gradient-to-b from-sky-100 via-white to-green-50 flex flex-col items-center justify-center px-6 py-10">
 
       <div className="flex flex-col items-center gap-3 mb-7">
-        <Image src={AUTH_LOGO_SRC} alt="COOANC" width={60} height={60} className="rounded-2xl" style={{ height: 'auto' }} />
+        <Image src={AUTH_LOGO_SRC} alt="COOANC" width={180} height={180} className="rounded-2xl" style={{ height: 'auto' }} />
         <div className="text-center">
           <h1 className="text-xl font-black text-brand-blue">첫 번째 자녀를 등록해요</h1>
           <p className="text-sm text-gray-400 mt-1">자녀 프로필을 만들면 미션을 시작할 수 있어요</p>
@@ -158,7 +154,7 @@ export default function OnboardingPage() {
           disabled={loading}
           className="w-full bg-brand-green hover:bg-green-500 active:scale-95 text-white font-bold py-3 rounded-2xl shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {loading ? '등록 중...' : '자녀 등록하기 🐣'}
+          {loading ? '등록 중...' : '자녀 등록하기'}
         </button>
       </form>
     </div>
