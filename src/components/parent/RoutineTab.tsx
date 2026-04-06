@@ -19,6 +19,7 @@ import RoutineKeywordBuilderSheet from '@/components/parent/RoutineKeywordBuilde
 import SpecialMissionAddSheet from '@/components/parent/SpecialMissionAddSheet'
 import SpecialMissionBonusSheet from '@/components/parent/SpecialMissionBonusSheet'
 import type { Mission } from '@/types/database'
+import { uuidStringsEqual } from '@/lib/normalizeUuid'
 import { ROUTINE_HAS_SCHOOL_KEY } from '@/lib/routineAlarmLocalPrefs'
 import { normalizeRewardMultiplier } from '@/lib/missionRewardMultiplier'
 import {
@@ -332,7 +333,7 @@ type Props = {
 /** 루틴 탭 목록: 이 자녀 전용 행만 (시스템 공용 행은 추가 시트에서만 선택) */
 function missionsLinkedToChild(list: Mission[], childId: string | null): Mission[] {
   if (!childId) return []
-  return list.filter((m) => m.linked_child_id === childId)
+  return list.filter((m) => uuidStringsEqual(m.linked_child_id, childId))
 }
 
 export default function RoutineTab({ missions: initial, children, todayDailyMissions = [] }: Props) {

@@ -28,12 +28,16 @@ type Props = {
 }
 
 /**
- * 기본 루틴 알람 카드 안의 모든 줄이 같은 열 폭을 씁니다.
- * (예전에는 첫 줄 오른쪽만 좁게 잡혀 「주말」·토글이 아래 줄과 세로로 안 맞았습니다.)
- * 열: 라벨+시간(가변) | 소리 | 주중 | 주말 | 삭제(또는 빈 칸)
+ * 기본 루틴 알람 카드 — 데이터·헤더 줄 공통 그리드(3열)
+ * - 1열 auto: 라벨+시간(왼쪽)
+ * - 2열 1fr: 가운데 빈 여백(소리·주중·주말을 오른쪽으로 몰아 줌)
+ * - 3열 auto: 소리·주중·주말을 한 줄에 `justify-end`로 묶은 영역(+와 같은 쪽)
  */
-/** 열만 공통; 세로 정렬은 줄마다 items-center / items-end 등으로 지정 */
-const ROUTINE_ALARM_CARD_GRID = 'grid grid-cols-[minmax(0,1fr)_2rem_2rem_2rem_2rem] gap-x-1'
+const ROUTINE_ALARM_CARD_GRID =
+  'grid w-full min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] gap-x-2 items-center'
+
+/** 소리 / 주중 / 주말(옵션 삭제)을 오른쪽 끝으로 붙이는 가로 묶음 */
+const ROUTINE_ALARM_RIGHT_CLUSTER = 'flex shrink-0 items-center justify-end gap-1'
 
 export default function RoutineAlarmSettingsSheet({ open, onClose }: Props) {
   const [hasSchool, setHasSchool] = useState(true)
@@ -234,30 +238,29 @@ export default function RoutineAlarmSettingsSheet({ open, onClose }: Props) {
 
           <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
             <div className="rounded-lg border border-gray-100 bg-white px-2 py-1.5 shadow-sm">
-              {/* 첫 줄: 제목 + 주말 열 위치에만 +(추가) 버튼 — 열 폭은 데이터 행과 동일한 5열 그리드 */}
-              <div className={`${ROUTINE_ALARM_CARD_GRID} mb-1 items-center`}>
-                <p className="min-w-0 truncate pt-0.5 text-[10px] font-bold text-gray-600">기본 루틴 알람</p>
-                <div aria-hidden className="min-h-px" />
-                <div aria-hidden className="min-h-px" />
-                <div className="flex justify-center">
-                  <button
-                    type="button"
-                    onClick={openAddCustom}
-                    className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-lg font-light leading-none text-[#4A90E2] transition-opacity active:opacity-60"
-                    aria-label="알람 일정 추가"
-                  >
-                    +
-                  </button>
-                </div>
-                <div aria-hidden className="min-h-px" />
+              {/* 제목은 flex로 한 줄에, +만 블록 오른쪽 끝(그리드 밖이라 빈 열 낭비 없음) */}
+              <div className="mb-1 flex w-full min-w-0 items-center gap-2">
+                <p className="min-w-0 flex-1 truncate pt-0.5 text-[10px] font-bold text-gray-600">기본 루틴 알람</p>
+                <button
+                  type="button"
+                  onClick={openAddCustom}
+                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-lg font-light leading-none text-[#4A90E2] transition-opacity active:opacity-60"
+                  aria-label="알람 일정 추가"
+                >
+                  +
+                </button>
               </div>
-              {/* 소리·주중·주말 라벨을 한 줄에 같은 높이로 */}
+              {/* 소리·주중·주말 라벨 — 아래 컨트롤과 같은 오른쪽 묶음 안에서 열맞춤(각 w-8, 글자는 오른쪽) */}
               <div className={`${ROUTINE_ALARM_CARD_GRID} mb-0.5 items-end border-b border-gray-200 pb-1`}>
-                <div aria-hidden className="min-h-px" />
-                <span className="block text-center text-[8px] font-bold leading-none text-gray-500">소리</span>
-                <span className="block text-center text-[8px] font-bold leading-none text-gray-500">주중</span>
-                <span className="block text-center text-[8px] font-bold leading-none text-gray-500">주말</span>
-                <div aria-hidden className="min-h-px" />
+                <div aria-hidden className="min-h-px min-w-0" />
+                <div className="min-w-0" aria-hidden />
+                <div className={ROUTINE_ALARM_RIGHT_CLUSTER}>
+                  <span className="flex w-8 justify-end text-[8px] font-bold leading-none text-gray-500">소리</span>
+                  <span className="flex w-8 justify-end text-[8px] font-bold leading-none text-gray-500">주중</span>
+                  <span className="flex w-8 justify-end text-[8px] font-bold leading-none text-gray-500">주말</span>
+                  {/* 맞춤 알람 행의 삭제 버튼 칸과 너비 맞춤(라벨 없음) */}
+                  <div className="w-8 shrink-0" aria-hidden />
+                </div>
               </div>
               <AlarmScheduleRow
                 label="기상"
@@ -461,7 +464,7 @@ function CustomAlarmRow({
 }) {
   const weekend = item.onWeekend !== false
   return (
-    <div className={`${ROUTINE_ALARM_CARD_GRID} items-center py-1.5`}>
+    <div className={`${ROUTINE_ALARM_CARD_GRID} py-1.5`}>
       <div className="flex min-w-0 items-center gap-1">
         <span className="w-[3.25rem] shrink-0 truncate text-[11px] font-bold text-gray-700" title={item.label}>
           {item.label}
@@ -473,32 +476,35 @@ function CustomAlarmRow({
           className="text-xs"
         />
       </div>
-      <div className="flex justify-center">
-        <button
-          type="button"
-          onClick={onPickSound}
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-[#4A90E2] hover:bg-[#4A90E2]/10"
-          title={soundTitle}
-          aria-label={`알람 소리: ${soundTitle}`}
-        >
-          <MusicNoteIcon className="h-4 w-4" />
-        </button>
-      </div>
-      <div className="flex justify-center">
-        <NotifyToggleSmall notify={item.notify} onToggle={() => onNotifyChange(!item.notify)} />
-      </div>
-      <div className="flex justify-center">
-        <WeekendMiniToggle on={weekend} onToggle={() => onWeekendChange(!weekend)} />
-      </div>
-      <div className="flex justify-center">
-        <button
-          type="button"
-          onClick={onRemove}
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-red-400 hover:bg-red-50"
-          aria-label="삭제"
-        >
-          <TrashIcon className="h-4 w-4" />
-        </button>
+      <div className="min-w-0" aria-hidden />
+      <div className={ROUTINE_ALARM_RIGHT_CLUSTER}>
+        <div className="flex w-8 justify-end">
+          <button
+            type="button"
+            onClick={onPickSound}
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-[#4A90E2] hover:bg-[#4A90E2]/10"
+            title={soundTitle}
+            aria-label={`알람 소리: ${soundTitle}`}
+          >
+            <MusicNoteIcon className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="flex w-8 justify-end">
+          <NotifyToggleSmall notify={item.notify} onToggle={() => onNotifyChange(!item.notify)} />
+        </div>
+        <div className="flex w-8 justify-end">
+          <WeekendMiniToggle on={weekend} onToggle={() => onWeekendChange(!weekend)} />
+        </div>
+        <div className="flex w-8 justify-end">
+          <button
+            type="button"
+            onClick={onRemove}
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-red-400 hover:bg-red-50"
+            aria-label="삭제"
+          >
+            <TrashIcon className="h-4 w-4" />
+          </button>
+        </div>
       </div>
     </div>
   )
@@ -533,7 +539,7 @@ function InlineTimeInput({
       value={value}
       onChange={(e) => onChange(e.target.value)}
       aria-label={ariaLabel}
-      className={`relative z-0 min-w-0 flex-1 cursor-pointer border-0 bg-transparent p-0 font-bold text-gray-900 [color-scheme:light] focus:outline-none focus:ring-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:m-0 [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-0 ${className ?? 'text-xs'}`}
+      className={`relative z-0 min-w-0 w-auto max-w-[9rem] shrink-0 cursor-pointer border-0 bg-transparent p-0 font-bold text-gray-900 [color-scheme:light] focus:outline-none focus:ring-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:m-0 [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-0 ${className ?? 'text-xs'}`}
     />
   )
 }
@@ -601,32 +607,34 @@ function AlarmScheduleRow({
   onPickSound: () => void
 }) {
   return (
-    <div className={`${ROUTINE_ALARM_CARD_GRID} items-center border-b border-gray-100 py-1.5`}>
+    <div className={`${ROUTINE_ALARM_CARD_GRID} border-b border-gray-100 py-1.5`}>
       <div className="flex min-w-0 items-center gap-1">
         <span className="w-[3.25rem] shrink-0 truncate text-[11px] font-bold text-gray-700" title={label}>
           {label}
         </span>
         <InlineTimeInput value={time} onChange={onTimeChange} ariaLabel={`${label} 시각`} className="text-xs" />
       </div>
-      <div className="flex justify-center">
-        <button
-          type="button"
-          onClick={onPickSound}
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-[#4A90E2] hover:bg-[#4A90E2]/10"
-          title={soundTitle}
-          aria-label={`알람 소리: ${soundTitle}`}
-        >
-          <MusicNoteIcon className="h-4 w-4" />
-        </button>
+      <div className="min-w-0" aria-hidden />
+      <div className={ROUTINE_ALARM_RIGHT_CLUSTER}>
+        <div className="flex w-8 justify-end">
+          <button
+            type="button"
+            onClick={onPickSound}
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-[#4A90E2] hover:bg-[#4A90E2]/10"
+            title={soundTitle}
+            aria-label={`알람 소리: ${soundTitle}`}
+          >
+            <MusicNoteIcon className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="flex w-8 justify-end">
+          <NotifyToggleSmall notify={notify} onToggle={() => onNotifyChange(!notify)} />
+        </div>
+        <div className="flex w-8 justify-end">
+          <WeekendMiniToggle on={weekendOn} onToggle={() => onWeekendChange(!weekendOn)} />
+        </div>
+        <div className="w-8 shrink-0" aria-hidden />
       </div>
-      <div className="flex justify-center">
-        <NotifyToggleSmall notify={notify} onToggle={() => onNotifyChange(!notify)} />
-      </div>
-      <div className="flex justify-center">
-        <WeekendMiniToggle on={weekendOn} onToggle={() => onWeekendChange(!weekendOn)} />
-      </div>
-      {/* 맞춤 일정 행과 열 수를 맞추기 위한 빈 칸(삭제 버튼 없음) */}
-      <div aria-hidden className="min-h-px" />
     </div>
   )
 }

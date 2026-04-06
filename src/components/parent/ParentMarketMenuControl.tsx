@@ -81,6 +81,8 @@ export default function ParentMarketMenuControl({
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null)
   /** 새 상품이 들어갈 마켓 구역(DB category) */
   const [addCategory, setAddCategory] = useState<string>('food')
+  /** 마켓 보이기/숨기기 토글 API 실패 시 잠깐 보여 줄 메시지 */
+  const [toggleSaveErr, setToggleSaveErr] = useState<string | null>(null)
 
   const cameraInputRef = useRef<HTMLInputElement>(null)
   const galleryInputRef = useRef<HTMLInputElement>(null)
@@ -149,10 +151,14 @@ export default function ParentMarketMenuControl({
         const json = await res.json().catch(() => ({}))
         if (!res.ok) {
           onHiddenChange(previous)
-          console.error(json.error ?? res.status)
+          const msg = typeof json.error === 'string' ? json.error : '저장하지 못했어요'
+          setToggleSaveErr(msg)
+          window.setTimeout(() => setToggleSaveErr(null), 4000)
         }
       } catch {
         onHiddenChange(previous)
+        setToggleSaveErr('네트워크 오류로 저장하지 못했어요')
+        window.setTimeout(() => setToggleSaveErr(null), 4000)
       }
     },
     [childId, hiddenItemIds, onHiddenChange],
@@ -223,6 +229,12 @@ export default function ParentMarketMenuControl({
       <p className="mb-3 text-[11px] leading-snug text-gray-400">
         자녀의 마켓에 올라갈 상품을 구성해보세요.
       </p>
+
+      {toggleSaveErr && (
+        <p className="mb-2 rounded-xl bg-red-50 px-3 py-2 text-[11px] font-bold text-red-600 ring-1 ring-red-100" role="alert">
+          {toggleSaveErr}
+        </p>
+      )}
 
       {!childId ? (
         <div className="rounded-2xl bg-white p-6 text-center text-sm text-gray-400 shadow-sm">자녀를 연결해 주세요</div>

@@ -172,13 +172,15 @@ export default function MarketTab({ childId, items, requests, credits, level }: 
             {items.map((item) => {
               const isPending = pendingItems.has(item.id)
               const canAfford = currentCredits >= item.credit_price
+              const meetsLevel = level >= item.level_required
               const isLoading = loading === item.id
+              const canRequest = canAfford && meetsLevel && !isPending && !isLoading
               return (
                 <div
                   key={item.id}
                   className={[
                     'bg-white rounded-2xl p-4 shadow-sm flex flex-col gap-2',
-                    !canAfford && !isPending ? 'opacity-60' : '',
+                    !canRequest && !isPending ? 'opacity-60' : '',
                   ].join(' ')}
                 >
                   {/* 카테고리 */}
@@ -203,25 +205,36 @@ export default function MarketTab({ childId, items, requests, credits, level }: 
                     )}
                   </div>
 
-                  {/* 가격 */}
+                  {/* 가격 · 필요 레벨(시드 상품 등) */}
                   <p className="text-center font-black text-brand-blue text-base">
                     {item.credit_price.toLocaleString()} 크레딧
                   </p>
+                  {item.level_required > 0 && (
+                    <p className="text-center text-[10px] font-bold text-gray-400">필요 Lv.{item.level_required}</p>
+                  )}
 
-                  {/* 버튼 */}
+                  {/* 버튼 — 레벨 부족은 API 와 동일하게 막고 문구로 안내 */}
                   <button
                     onClick={() => handleRequest(item)}
-                    disabled={isPending || isLoading || !canAfford}
+                    disabled={isPending || isLoading || !canAfford || !meetsLevel}
                     className={[
                       'w-full py-2 rounded-xl text-xs font-bold transition-all active:scale-95',
                       isPending
                         ? 'bg-amber-50 text-amber-500 border border-amber-200 cursor-default'
-                        : !canAfford
+                        : !meetsLevel
                           ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                          : 'bg-brand-blue text-white shadow-md hover:bg-blue-600',
+                          : !canAfford
+                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                            : 'bg-brand-blue text-white shadow-md hover:bg-blue-600',
                     ].join(' ')}
                   >
-                    {isPending ? '요청 중 ⏳' : !canAfford ? '크레딧 부족' : '구매 요청'}
+                    {isPending
+                      ? '요청 중 ⏳'
+                      : !meetsLevel
+                        ? `Lv.${item.level_required} 필요`
+                        : !canAfford
+                          ? '크레딧 부족'
+                          : '구매 요청'}
                   </button>
                 </div>
               )

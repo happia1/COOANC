@@ -18,3 +18,11 @@ export function normalizeUuidParam(raw: string | undefined | null): string | nul
   if (!/^[0-9a-f]{32}$/.test(hex)) return null
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`
 }
+
+/** DB·쿠키 등에서 온 UUID 두 개가 같은지(하이픈·대소문자 무시) */
+export function uuidStringsEqual(a: string | null | undefined, b: string | null | undefined): boolean {
+  if (a == null || b == null) return false
+  const ha = String(a).replace(/-/g, '').toLowerCase()
+  const hb = String(b).replace(/-/g, '').toLowerCase()
+  return ha.length === 32 && hb.length === 32 && ha === hb
+}

@@ -55,11 +55,10 @@ export async function POST(req: NextRequest) {
   if (!dm) return NextResponse.json({ error: '미션을 찾을 수 없어요' }, { status: 404 })
   if (dm.is_completed) return NextResponse.json({ error: '이미 완료한 미션이에요' }, { status: 409 })
 
+  /** reward_multiplier 는 028 마이그레이션 전 DB 에 없을 수 있어 select 에 넣지 않음(보상은 1배 기본) */
   const { data: mission } = await supabase
     .from('missions')
-    .select(
-      'credit_reward, heart_reward, exp_reward, reward_multiplier, is_active, level_required, title, icon_emoji',
-    )
+    .select('credit_reward, heart_reward, exp_reward, is_active, level_required, title, icon_emoji')
     .eq('id', dm.mission_template_id)
     .maybeSingle()
 

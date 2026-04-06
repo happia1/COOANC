@@ -5,12 +5,25 @@
  * 「이 자녀 템플릿 중 오늘 넣어야 할 것」이 빠져 있으면 추가 삽입합니다.
  * (부모가 스페셜만 assign-today 로 한 줄 넣은 뒤에는 예전 로직이 전체 백필을 건너뛰어
  * 루틴·다른 스페셜이 안 보이던 문제를 막습니다.)
+ *
+ * 템플릿 조회·daily_missions 쓰기/읽기는 가능하면 service_role 로 통일합니다.
+ * - 자녀 세션 RLS·조인(embed) 환경 차이로 목록이 비는 경우를 줄입니다.
+ * - actorChildId 는 getActorChildContext 가 이미 검증했습니다.
  */
 import { createClient } from '@/lib/supabase/server'
+import { createServiceRoleClient } from '@/lib/supabase/admin'
 import { getActorChildContext } from '@/lib/getActorChildContext'
 import MissionTab from '@/components/child/MissionTab'
 import { getSeoulDateString } from '@/lib/koreaDate'
-import type { DailyMissionWithTemplate, Mission, LocalCalendarEvent } from '@/types/database'
+import { uuidStringsEqual } from '@/lib/normalizeUuid'
+import type {
+  BadgeRow,
+  ChildStats,
+  DailyMissionWithTemplate,
+  Mission,
+  PraiseStickerGrant,
+  PraiseStickerPlacement,
+} from '@/types/database'
 
 type RoutineType = 'weekday' | 'weekend' | 'holiday' | 'vacation'
 
@@ -38,7 +51,7 @@ function templatePoolForToday(
     (m) =>
       m.is_active &&
       m.level_required <= level &&
-      m.linked_child_id === childId &&
+      uuidStringsEqual(m.linked_child_id, childId) &&
       m.repeat_type !== 'event',
   )
 
@@ -55,26 +68,51 @@ export default async function MissionPage() {
   const ctx = await getActorChildContext()
   const supabase = await createClient()
   const childId = ctx.actorChildId
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
 
   const today = getSeoulDateString()
 
-  const [statsRes, familyRes] = await Promise.all([
-    supabase
-      .from('child_stats')
-      .select('credits, current_level, streak_days')
-      .eq('child_id', childId)
-      .maybeSingle(),
-    supabase
-      .from('family_links')
-      .select('parent_id')
-      .eq('child_id', childId)
-      .limit(1)
-      .maybeSingle(),
-  ])
+  const [statsRes, familyRes, profileRes, earnedRes, allBadgesRes, grantsRes, placementsRes] =
+    await Promise.all([
+      supabase.from('child_stats').select('*').eq('child_id', childId).maybeSingle(),
+      supabase.from('family_links').select('parent_id').eq('child_id', childId).limit(1).maybeSingle(),
+      supabase.from('profiles').select('name, role').eq('id', childId).maybeSingle(),
+      supabase.from('child_badges').select('badge_id, earned_at').eq('child_id', childId),
+      supabase
+        .from('badges')
+        .select('badge_id, name, description, icon_emoji, badge_type, condition')
+        .order('badge_type', { ascending: true }),
+      supabase
+        .from('praise_sticker_grants')
+        .select('*')
+        .eq('child_id', childId)
+        .order('created_at', { ascending: false }),
+      supabase.from('praise_sticker_placements').select('*').eq('child_id', childId),
+    ])
 
-  const level = statsRes.data?.current_level ?? 0
-  const credits = statsRes.data?.credits ?? 0
-  const streak = statsRes.data?.streak_days ?? 0
+  const initialStats = (statsRes.data ?? null) as ChildStats | null
+  const level = initialStats?.current_level ?? 0
+
+  const earnedMap: Record<string, string> = {}
+  for (const row of earnedRes.data ?? []) {
+    earnedMap[row.badge_id] = row.earned_at
+  }
+  const growthMapData = {
+    badges: (allBadgesRes.data ?? []) as BadgeRow[],
+    earnedMap,
+    level: initialStats?.current_level ?? 0,
+    streak: initialStats?.streak_days ?? 0,
+    longestStreak: initialStats?.longest_streak ?? 0,
+  }
+
+  const meta = user?.user_metadata as { name?: string } | undefined
+  const childName =
+    profileRes.data?.name?.trim() ||
+    (ctx.sessionUserId === childId && typeof meta?.name === 'string' ? meta.name.trim() : '') ||
+    '쿠앵이'
+
   const parentId = familyRes.data?.parent_id ?? null
 
   let routineType: RoutineType = getTodayRoutineType(today, [])
@@ -92,18 +130,31 @@ export default async function MissionPage() {
     }
   }
 
+  /**
+   * reward_multiplier 는 028 마이그레이션 이후 컬럼 — 없는 DB 에서 embed 시 PostgREST 가 전체 조회를 실패시킵니다.
+   * 생략 시 missionRewardMultiplier 가 1배로 동작합니다.
+   */
   const missionJoin =
-    'title, icon_emoji, description, credit_reward, heart_reward, exp_reward, reward_multiplier, difficulty, block, repeat_type'
+    'title, icon_emoji, description, credit_reward, heart_reward, exp_reward, difficulty, block, repeat_type'
 
-  const { data: templates } = await supabase
+  /**
+   * 미션 템플릿·일일행은 service_role 로 조회하면 RLS·embed 이슈 없이 부모 루틴 탭과 동일 스냅샷에 가깝습니다.
+   * 키가 없으면 자녀 세션 클라이언트로 폴백합니다.
+   */
+  const missionDb = createServiceRoleClient() ?? supabase
+
+  const { data: templates, error: templatesErr } = await missionDb
     .from('missions')
     .select('*')
-    .eq('is_active', true)
     .order('scheduled_time', { ascending: true, nullsFirst: false })
+
+  if (templatesErr) {
+    console.error('[child/mission] missions select', templatesErr.message)
+  }
 
   const pool = templatePoolForToday((templates ?? []) as Mission[], childId, level, routineType)
 
-  const { data: existingBefore } = await supabase
+  const { data: existingBefore } = await missionDb
     .from('daily_missions')
     .select('mission_template_id')
     .eq('child_id', childId)
@@ -112,6 +163,7 @@ export default async function MissionPage() {
   const haveIds = new Set((existingBefore ?? []).map((r) => r.mission_template_id))
   const missing = pool.filter((m) => !haveIds.has(m.id))
 
+  let firstDailyInsertErr: { code?: string; message?: string } | null = null
   if (missing.length > 0 && routineType !== 'holiday') {
     for (const m of missing) {
       const row = {
@@ -122,19 +174,24 @@ export default async function MissionPage() {
         routine_type: routineType,
         is_completed: false,
       }
-      const { error } = await supabase.from('daily_missions').insert(row)
+      const { error } = await missionDb.from('daily_missions').insert(row)
       if (error && error.code !== '23505') {
         console.error('[child/mission] daily_missions insert', error)
+        if (!firstDailyInsertErr) firstDailyInsertErr = { code: error.code, message: error.message }
       }
     }
   }
 
-  const { data: existing } = await supabase
+  const { data: existing, error: existingErr } = await missionDb
     .from('daily_missions')
     .select(`*, missions(${missionJoin})`)
     .eq('child_id', childId)
     .eq('date', today)
     .order('scheduled_time', { ascending: true, nullsFirst: false })
+
+  if (existingErr) {
+    console.error('[child/mission] daily_missions select', existingErr.message)
+  }
 
   const dailyMissions = (existing ?? []) as DailyMissionWithTemplate[]
 
@@ -143,9 +200,12 @@ export default async function MissionPage() {
   return (
     <MissionTab
       childId={childId}
+      childName={childName}
+      initialStats={initialStats}
+      growthMapData={growthMapData}
+      initialPraiseGrants={(grantsRes.data ?? []) as PraiseStickerGrant[]}
+      initialPraisePlacements={(placementsRes.data ?? []) as PraiseStickerPlacement[]}
       dailyMissions={dailyMissions}
-      credits={credits}
-      streak={streak}
       today={today}
       isFullRestDay={fullRest}
     />

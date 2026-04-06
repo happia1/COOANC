@@ -14,7 +14,7 @@ type Props = {
 /**
  * 자녀 앱 공통 상단바
  * - 좌: COOANC 로고
- * - 우: 자녀 이름 칩 (+ 부모 미리보기 안내) + 나가기
+ * - 우: 자녀 이름 칩 + 나가기
  */
 export default function ChildTopBar({ childName, isParentPreview = false }: Props) {
   const exitHref = isParentPreview ? '/api/parent/exit-child-ui' : '/parent/home'
@@ -31,14 +31,6 @@ export default function ChildTopBar({ childName, isParentPreview = false }: Prop
           priority
         />
         <div className="flex flex-wrap items-center justify-end gap-2 max-w-[min(100%,14rem)]">
-          {isParentPreview && (
-            <span
-              className="bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-1 rounded-full shrink-0"
-              title="부모 계정으로 이 아이 화면을 보는 중이에요"
-            >
-              부모 보기
-            </span>
-          )}
           <span className="bg-teal-100 text-teal-700 text-xs font-bold px-3 py-1.5 rounded-full truncate max-w-[9rem]">
             {childName}
           </span>

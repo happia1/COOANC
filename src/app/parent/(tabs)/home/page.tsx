@@ -15,7 +15,8 @@ import {
   resolveProfileAgeGroup,
 } from '@/lib/childProfileDisplay'
 import { selectChildProfilesByIds } from '@/lib/supabase/childProfileSelect'
-import { getSeoulDateString } from '@/lib/koreaDate'
+import { addSeoulCalendarDays, getSeoulDateString } from '@/lib/koreaDate'
+import { buildWeeklyRoutineDays, type DailyMissionCompletionRow } from '@/lib/childWeeklyRoutine'
 import HomeTab, { type ChildSummary } from '@/components/parent/HomeTab'
 
 export default async function ParentHomePage() {
@@ -48,6 +49,7 @@ export default async function ParentHomePage() {
   }
 
   const today = getSeoulDateString()
+  const weekStart = addSeoulCalendarDays(today, -6)
 
   const { rows: profileRows, error: profilesFetchErr } = await selectChildProfilesByIds(supabase, childIds)
   if (profilesFetchErr) {
@@ -55,7 +57,7 @@ export default async function ParentHomePage() {
   }
   const profiles = profileRows ?? []
 
-  const [statsRes, todayDailyRes, recentLogsRes, pendingRes] = await Promise.all([
+  const [statsRes, todayDailyRes, weekDailyRes, recentLogsRes, pendingRes] = await Promise.all([
     supabase
       .from('child_stats')
       .select('child_id, credits, hearts, current_level, exp, exp_to_next_level, streak_days, eq_delay_score, eq_routine_rate, eq_save_ratio')
@@ -67,6 +69,14 @@ export default async function ParentHomePage() {
       .select('child_id, is_completed')
       .in('child_id', childIds)
       .eq('date', today),
+
+    // 경제 EQ 카드 — 요일별 막대용 최근 7일(서울) 배정 미션
+    supabase
+      .from('daily_missions')
+      .select('child_id, date, is_completed')
+      .in('child_id', childIds)
+      .gte('date', weekStart)
+      .lte('date', today),
 
     supabase
       .from('mission_logs')
@@ -96,6 +106,19 @@ export default async function ParentHomePage() {
     if (row.is_completed) acc.completed += 1
   }
 
+  // 자녀별 최근 7일 daily_missions → 요일 막대 데이터
+  const weekRowsByChild: Record<string, DailyMissionCompletionRow[]> = {}
+  for (const cid of childIds) weekRowsByChild[cid] = []
+  for (const row of (weekDailyRes.data ?? []) as {
+    child_id: string
+    date: string
+    is_completed: boolean
+  }[]) {
+    const bucket = weekRowsByChild[row.child_id]
+    if (!bucket) continue
+    bucket.push({ date: row.date, is_completed: row.is_completed })
+  }
+
   // 최근 활동: child_id별 분류 (최대 5개)
   type RawLog = { child_id: string; completed_at: string | null; credit_earned: number; missions: { title: string; icon_emoji: string } | null }
   const recentMap: Record<string, RawLog[]> = {}
@@ -122,6 +145,7 @@ export default async function ParentHomePage() {
       childcareLabel: profileInstitutionLabel(ag, p.institution_type),
       avatarUrl: p.avatar_url ?? null,
       stats: stats ?? null,
+      weeklyRoutine: buildWeeklyRoutineDays(today, weekRowsByChild[p.id] ?? []),
       todayCompleted: prog.completed,
       totalMissions: prog.total,
       recentActivity: (recentMap[p.id] ?? []).map((log) => ({

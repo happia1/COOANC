@@ -43,11 +43,12 @@ export default async function MarketPage() {
   )
 
   const rawItems = (itemsRes.data ?? []) as StoreItem[]
+  /**
+   * 부모가 메뉴에서 켠 상품은 Lv.0 이어도 목록에 보이게 합니다.
+   * 실제 구매 요청은 /api/market/request 에서 레벨·크레딧을 다시 검증합니다.
+   */
   const items = rawItems.filter(
-    (item) =>
-      !hiddenIds.has(item.id) &&
-      item.level_required <= level &&
-      (item.family_link_id == null || familyLinkIds.has(item.family_link_id)),
+    (item) => !hiddenIds.has(item.id) && (item.family_link_id == null || familyLinkIds.has(item.family_link_id)),
   )
   const requests = (requestsRes.data ?? []) as PurchaseRequest[]
 

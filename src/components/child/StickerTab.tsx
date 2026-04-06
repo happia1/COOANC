@@ -16,9 +16,24 @@ type Props = {
   streak: number
   longestStreak: number
   childName: string
+  /** 헤더 윗줄(기본: 「OO의 뱃지 컬렉션」) */
+  headingSub?: string
+  /** 헤더 큰 제목(기본: 스티커 보관함) */
+  headingMain?: string
 }
 
-export default function StickerTab({ badges, earnedMap, level, streak, longestStreak, childName }: Props) {
+export default function StickerTab({
+  badges,
+  earnedMap,
+  level,
+  streak,
+  longestStreak,
+  childName,
+  headingSub,
+  headingMain,
+}: Props) {
+  const subLine = headingSub ?? `${childName}의 뱃지 컬렉션`
+  const mainLine = headingMain ?? '스티커 보관함'
   const earnedCount = Object.keys(earnedMap).length
   const total = badges.length
 
@@ -37,8 +52,8 @@ export default function StickerTab({ badges, earnedMap, level, streak, longestSt
       {/* 헤더 */}
       <div className="bg-white rounded-2xl p-4 shadow-sm flex items-center justify-between">
         <div>
-          <p className="text-xs text-gray-400">{childName}의 뱃지 컬렉션</p>
-          <p className="text-lg font-black text-brand-text">스티커 보관함</p>
+          <p className="text-xs text-gray-400">{subLine}</p>
+          <p className="text-lg font-black text-brand-text">{mainLine}</p>
         </div>
         {total > 0 && (
           <div className="text-right">

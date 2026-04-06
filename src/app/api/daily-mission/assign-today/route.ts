@@ -113,27 +113,6 @@ export async function POST(req: NextRequest) {
     } else if (isDev) {
       hint = `개발: insert 실패 (code=${errCode}). 터미널 로그의 전체 메시지를 확인해 주세요.`
     }
-    // #region agent log
-    fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '2bd468' },
-      body: JSON.stringify({
-        sessionId: '2bd468',
-        location: 'assign-today/route.ts:insertErr',
-        message: 'daily_missions insert failed',
-        data: {
-          code: errCode,
-          msgSlice: errMsg.slice(0, 220),
-          looksLikeTableMissingInApi,
-          looksLikeRlsOrPermission,
-          usingServiceRole: !!service,
-          isDev,
-        },
-        timestamp: Date.now(),
-        hypothesisId: 'H-assign-insert',
-      }),
-    }).catch(() => {})
-    // #endregion
     return NextResponse.json(
       {
         error: '오늘 일정에 넣지 못했어요',

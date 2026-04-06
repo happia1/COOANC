@@ -1,45 +1,125 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import type { ChildStats, BadgeRow } from '@/types/database'
-
-// ============================================================
-// 레벨 메타데이터 (master_doc Part 1 기준)
-// ============================================================
-const LEVELS = [
-  { level: 0, name: '씨앗' },
-  { level: 1, name: '새싹' },
-  { level: 2, name: '교환사' },
-  { level: 3, name: '저축왕' },
-  { level: 4, name: '나눔이' },
-  { level: 5, name: '투자가' },
-] as const
+import type { ChildStats, PraiseStickerGrant, PraiseStickerPlacement } from '@/types/database'
+import GrowthMapSheet, { type GrowthMapSheetData } from '@/components/child/GrowthMapSheet'
+import BearStickerSheet from '@/components/child/BearStickerSheet'
+import PraiseGiftArrivalModal from '@/components/child/PraiseGiftArrivalModal'
+import ChildHomeIslandStage from '@/components/child/ChildHomeIslandStage'
+import ChildHomeSceneryBand from '@/components/child/ChildHomeSceneryBand'
+import { MapActionPill, StatPill, StickerActionPill } from '@/components/child/ChildSceneryTopPills'
+import { mergePraiseStickerGrantsFromServer } from '@/lib/mergePraiseStickerGrantsFromServer'
 
 type Props = {
   childId: string
   initialStats: ChildStats | null
-  displayBadges: BadgeRow[]
-  earnedBadgeIds: string[]
   childName: string
+  /** 지도 시트 안의 뱃지 컬렉션용(전체 뱃지 + 획득 맵) */
+  growthMapData: GrowthMapSheetData
+  initialPraiseGrants: PraiseStickerGrant[]
+  initialPraisePlacements: PraiseStickerPlacement[]
 }
 
 /**
- * 아이 앱 홈 탭 — 클라이언트 컴포넌트
- *
- * Realtime 구독: child_stats (UPDATE)
- * 표시: 캐릭터 / 레벨 / EXP 게이지 / 성장 지도 / 뱃지
- *
- * 가드레일: credits 직접 조작 없음 — 표시 전용
+ * 아이 앱 홈 탭
+ * - 상단·하단 비율은 **미션 탭과 동일**: `ChildHomeSceneryBand` = 60dvh, 하단 = min 40dvh + flex-1 + 라임 그라데이션
+ * - 홈만 풍경 밴드에 `className` 으로 배경·알약·섬·토끼 묶음을 한꺼번에 살짝 위로
+ * - 섬 박스는 `ChildHomeIslandStage` 가 미션 섬과 같은 높이 + 홈용 추가 translate
+ * - EXP 바는 홈에서 숨김 · 꾸미기는 슬롯별 블록
+ * - 부모가 칭찬 스티커를 내면 팝업 후 곰돌이 판에서 붙일 수 있음
  */
-export default function HomeTab({ childId, initialStats, displayBadges, earnedBadgeIds, childName }: Props) {
+export default function HomeTab({
+  childId,
+  initialStats,
+  childName,
+  growthMapData,
+  initialPraiseGrants,
+  initialPraisePlacements,
+}: Props) {
   const [stats, setStats] = useState<ChildStats | null>(initialStats)
-  const [earnedIds] = useState<Set<string>>(new Set(earnedBadgeIds))
+  const [mapOpen, setMapOpen] = useState(false)
+  const [bearOpen, setBearOpen] = useState(false)
+  const [grants, setGrants] = useState(initialPraiseGrants)
+  const [placements, setPlacements] = useState(initialPraisePlacements)
+  const [arrivalOpen, setArrivalOpen] = useState(false)
+  const [stickerFabImgOk, setStickerFabImgOk] = useState(true)
+  /** 클라이언트 마운트 후에만 커스텀 FAB 이미지 사용 → SSR HTML 과 첫 페인트를 맞춤 */
+  const [clientReady, setClientReady] = useState(false)
 
-  // ── Realtime 구독 (child_stats UPDATE)
+  useEffect(() => {
+    setClientReady(true)
+  }, [])
+
+  useEffect(() => {
+    setGrants((prev) => {
+      const merged = mergePraiseStickerGrantsFromServer(initialPraiseGrants, prev)
+      const restoredDismiss = merged.filter(
+        (g) =>
+          g.popup_dismissed_at != null &&
+          initialPraiseGrants.find((s) => s.id === g.id)?.popup_dismissed_at == null,
+      ).length
+      // #region agent log
+      if (restoredDismiss > 0) {
+        fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'f7174a' },
+          body: JSON.stringify({
+            sessionId: 'f7174a',
+            location: 'HomeTab.tsx:grantsSync',
+            message: 'kept client popup_dismissed over stale server row',
+            data: { restoredDismiss },
+            timestamp: Date.now(),
+            runId: 'verify2',
+            hypothesisId: 'H4',
+          }),
+        }).catch(() => {})
+      }
+      // #endregion
+      return merged
+    })
+  }, [initialPraiseGrants])
+
+  useEffect(() => {
+    setPlacements(initialPraisePlacements)
+  }, [initialPraisePlacements])
+
+  /** 곰돌이 판에서 스티커만 붙였을 때: placements 만 다시 가져와서 도착 팝업용 grants 낙관적 상태를 덮어쓰지 않음 */
+  const refreshStickerPlacementsOnly = useCallback(async () => {
+    const supabase = createClient()
+    const { data } = await supabase.from('praise_sticker_placements').select('*').eq('child_id', childId)
+    if (data) setPlacements(data as PraiseStickerPlacement[])
+  }, [childId])
+
+  useEffect(() => {
+    const pending = grants.some((x) => x.popup_dismissed_at == null)
+    setArrivalOpen(pending)
+  }, [grants])
+
   useEffect(() => {
     const supabase = createClient()
+    const ch = supabase
+      .channel(`praise_grants:${childId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'praise_sticker_grants',
+          filter: `child_id=eq.${childId}`,
+        },
+        (payload) => {
+          setGrants((prev) => [payload.new as PraiseStickerGrant, ...prev])
+        },
+      )
+      .subscribe()
+    return () => {
+      void supabase.removeChannel(ch)
+    }
+  }, [childId])
 
+  useEffect(() => {
+    const supabase = createClient()
     const channel = supabase
       .channel(`child_stats:${childId}`)
       .on(
@@ -61,190 +141,189 @@ export default function HomeTab({ childId, initialStats, displayBadges, earnedBa
     }
   }, [childId])
 
-  // ── 아직 child_stats 미생성 상태
+  const dismissArrival = useCallback(async () => {
+    const now = new Date().toISOString()
+    setGrants((prev) =>
+      prev.map((g) => (g.popup_dismissed_at ? g : { ...g, popup_dismissed_at: now })),
+    )
+    setArrivalOpen(false)
+    const supabase = createClient()
+    const { data: updatedRows, error } = await supabase
+      .from('praise_sticker_grants')
+      .update({ popup_dismissed_at: now })
+      .eq('child_id', childId)
+      .is('popup_dismissed_at', null)
+      .select('id')
+    // #region agent log
+    fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'f7174a' },
+      body: JSON.stringify({
+        sessionId: 'f7174a',
+        location: 'HomeTab.tsx:dismissArrival',
+        message: 'popup_dismissed_at DB update',
+        data: {
+          hasError: Boolean(error),
+          err: error?.message ?? null,
+          updatedCount: Array.isArray(updatedRows) ? updatedRows.length : 0,
+        },
+        timestamp: Date.now(),
+        runId: 'verify2',
+        hypothesisId: 'H2',
+      }),
+    }).catch(() => {})
+    // #endregion
+  }, [childId])
+
+  const openBearFromFab = useCallback(() => {
+    setBearOpen(true)
+  }, [])
+
+  const openBearFromGift = useCallback(() => {
+    setBearOpen(true)
+    void dismissArrival()
+  }, [dismissArrival])
+
+  const growthPayload: GrowthMapSheetData = stats
+    ? {
+        ...growthMapData,
+        level: stats.current_level,
+        streak: stats.streak_days,
+        longestStreak: stats.longest_streak,
+      }
+    : growthMapData
+
+  const sheets = (
+    <>
+      <GrowthMapSheet
+        open={mapOpen}
+        onClose={() => setMapOpen(false)}
+        childName={childName}
+        stats={stats}
+        data={growthPayload}
+      />
+      <BearStickerSheet
+        open={bearOpen}
+        onClose={() => setBearOpen(false)}
+        childId={childId}
+        initialGrants={grants}
+        initialPlacements={placements}
+        onInventoryChange={() => void refreshStickerPlacementsOnly()}
+      />
+    </>
+  )
+
+  const arrivalModal = (
+    <PraiseGiftArrivalModal open={arrivalOpen} onGoStickers={openBearFromGift} />
+  )
+
+  /** 미션 `bottomPanel` 과 동일: 최소 40dvh + 남는 높이 흡수 + 배경 그라데이션 */
+  const homeDecorPanelClass =
+    'flex min-h-[40dvh] flex-1 flex-col gap-2 overflow-y-auto bg-gradient-to-b from-lime-50/80 via-amber-50/30 to-white px-1 pb-2 pt-2'
+
+  /** 배경 이미지 + 상단 알약 + 섬·토끼 블록 전체를 조금 위로 (미션 탭은 className 미전달) */
+  const homeSceneryLiftClass = '-translate-y-7 sm:-translate-y-9'
+
   if (!stats) {
     return (
-      <div className="flex h-[70vh] flex-col items-center justify-center gap-5">
-        <div className="text-center space-y-1">
-          <p className="text-xl font-bold text-brand-text">안녕, {childName}!</p>
-          <p className="text-sm text-gray-400">부모님이 미션을 만들어주실 거야.</p>
+      <>
+        <div className="flex min-h-0 flex-1 flex-col">
+          <ChildHomeSceneryBand ariaLabel="홈 배경" className={homeSceneryLiftClass}>
+            <div className="shrink-0 space-y-2 py-1 text-center">
+              <p className="text-sm text-gray-500">부모님이 미션을 만들어주실 거야.</p>
+              <div className="mt-8 flex w-full items-center justify-center gap-2">
+                <MapActionPill onClick={() => setMapOpen(true)} />
+                <StickerActionPill
+                  useCustomImage={clientReady && stickerFabImgOk}
+                  onImageError={() => setStickerFabImgOk(false)}
+                  onClick={openBearFromFab}
+                />
+              </div>
+            </div>
+            <div className="flex min-h-0 flex-1 flex-col justify-end">
+              <div className="relative mx-auto flex w-full max-w-sm flex-col items-center">
+                <ChildHomeIslandStage />
+              </div>
+            </div>
+          </ChildHomeSceneryBand>
+          <section className={homeDecorPanelClass} aria-label="내 캐릭터 꾸미기">
+            <CharacterDecorInventoryPlaceholder />
+          </section>
         </div>
-      </div>
+        {sheets}
+        {arrivalModal}
+      </>
     )
   }
 
-  const currentLevel = LEVELS[stats.current_level]
-  const expPercent   = Math.min((stats.exp / stats.exp_to_next_level) * 100, 100)
-  const expRemaining = stats.exp_to_next_level - stats.exp
-
   return (
-    <div className="flex flex-col gap-5">
-
-      {/* ── 상단 스탯 바 */}
-      <div className="flex justify-between items-center">
-        <StatPill label="연속" value={`${stats.streak_days}일`} />
-        <StatPill label="크레딧" value={stats.credits.toLocaleString()} highlight />
-      </div>
-
-      {/* ── 캐릭터 영역 */}
-      <div className="flex flex-col items-center gap-3">
-        {/* 캐릭터 원형 배경 — 에셋 준비 전 이모지 플레이스홀더 */}
-        <div className="relative flex h-48 w-48 items-center justify-center rounded-full bg-gradient-to-br from-brand-blue/10 to-brand-green/10 shadow-lg ring-4 ring-white">
-          <span className="select-none text-4xl font-black text-brand-blue/40" aria-hidden>
-            COOANC
-          </span>
-
-          {/* 레벨 뱃지 */}
-          <div className="absolute -bottom-3 bg-brand-blue text-white text-xs font-bold px-4 py-1.5 rounded-full shadow-md">
-            Lv.{stats.current_level}&nbsp;{currentLevel.name}
+    <div className="flex min-h-0 flex-1 flex-col">
+      <ChildHomeSceneryBand ariaLabel="홈 배경" className={homeSceneryLiftClass}>
+        <div className="mt-8 flex w-full shrink-0 items-center justify-between gap-1.5 sm:mt-10">
+          <StatPill label="연속" value={`${stats.streak_days}일`} className="shrink-0" />
+          <div className="flex shrink-0 items-center gap-1.5">
+            <MapActionPill onClick={() => setMapOpen(true)} />
+            <StickerActionPill
+              useCustomImage={clientReady && stickerFabImgOk}
+              onImageError={() => setStickerFabImgOk(false)}
+              onClick={openBearFromFab}
+            />
           </div>
-        </div>
-
-        <p className="mt-2 font-bold text-brand-text text-lg">
-          {childName}의 쿠앵이
-        </p>
-
-        {/* 승급 대기 중 배너 */}
-        {stats.promotion_pending && (
-          <div className="flex items-center gap-2 rounded-xl border border-brand-yellow bg-brand-yellow/40 px-4 py-2">
-            <span className="text-xs font-bold text-brand-text">레벨 업 대기 중! 부모님 확인을 기다려요</span>
-          </div>
-        )}
-      </div>
-
-      {/* ── EXP 게이지 */}
-      <section className="bg-white rounded-2xl p-4 shadow-sm">
-        <div className="flex justify-between items-center mb-2.5">
-          <span className="text-sm font-bold text-brand-text">경험치 (EXP)</span>
-          <span className="text-xs text-gray-400 tabular-nums">
-            {stats.exp} / {stats.exp_to_next_level}
-          </span>
-        </div>
-
-        <div className="h-5 rounded-full bg-gray-100 overflow-hidden">
-          <div
-            className="h-full rounded-full bg-gradient-to-r from-brand-blue to-brand-green transition-all duration-700 ease-out"
-            style={{ width: `${expPercent}%` }}
+          <StatPill
+            label="크레딧"
+            value={stats.credits.toLocaleString('ko-KR')}
+            highlight
+            className="shrink-0"
           />
         </div>
 
-        {stats.current_level < 5 ? (
-          <p className="text-[11px] text-gray-400 mt-1.5 text-right">
-            다음 레벨까지 <span className="font-bold text-brand-blue">{expRemaining}</span> EXP
-          </p>
-        ) : (
-          <p className="mt-1.5 text-right text-[11px] font-bold text-brand-green">최고 레벨 달성!</p>
-        )}
-      </section>
-
-      {/* ── 성장 지도 (레벨 맵) */}
-      <section className="bg-white rounded-2xl p-4 shadow-sm">
-        <p className="mb-3 text-sm font-bold text-brand-text">성장 지도</p>
-        <div className="flex items-center overflow-x-auto pb-1 gap-1" style={{ scrollbarWidth: 'none' }}>
-          {LEVELS.map((lv, idx) => {
-            const isPast    = lv.level < stats.current_level
-            const isCurrent = lv.level === stats.current_level
-            const isFuture  = lv.level > stats.current_level
-            return (
-              <div key={lv.level} className="flex items-center gap-1 flex-shrink-0">
-                <div
-                  className={[
-                    'flex flex-col items-center gap-1 rounded-xl px-2.5 py-2 min-w-[52px] transition-all',
-                    isPast    ? 'bg-brand-green/20'                              : '',
-                    isCurrent ? 'bg-brand-yellow/40 ring-2 ring-brand-yellow scale-105' : '',
-                    isFuture  ? 'opacity-35'                                     : '',
-                  ].join(' ')}
-                >
-                  <span className="text-[10px] font-black tabular-nums text-gray-500">Lv.{lv.level}</span>
-                  <span className={`text-[10px] font-bold leading-none ${isCurrent ? 'text-brand-text' : 'text-gray-400'}`}>
-                    {lv.name}
-                  </span>
-                </div>
-
-                {idx < LEVELS.length - 1 && (
-                  <span className={`text-xs font-bold ${isPast ? 'text-brand-green' : 'text-gray-200'}`}>
-                    →
-                  </span>
-                )}
-              </div>
-            )
-          })}
-        </div>
-      </section>
-
-      {/* ── EQ 지수 요약 */}
-      <section className="bg-white rounded-2xl p-4 shadow-sm">
-        <p className="text-sm font-bold text-brand-text mb-3">📊 경제 EQ 지수</p>
-        <div className="grid grid-cols-3 gap-2">
-          <EqBar label="루틴 완주율" value={stats.eq_routine_rate} color="bg-brand-blue" />
-          <EqBar label="만족 지연"   value={stats.eq_delay_score}  color="bg-brand-green" />
-          <EqBar label="저축 비중"   value={stats.eq_save_ratio}   color="bg-amber-400" />
-        </div>
-      </section>
-
-      {/* ── 뱃지 */}
-      {displayBadges.length > 0 && (
-        <section className="bg-white rounded-2xl p-4 shadow-sm">
-          <p className="text-sm font-bold text-brand-text mb-3">🏅 내 뱃지</p>
-          <div className="grid grid-cols-4 gap-2">
-            {displayBadges.map(badge => {
-              const isEarned = earnedIds.has(badge.badge_id)
-              return (
-                <div
-                  key={badge.badge_id}
-                  title={badge.name}
-                  className={[
-                    'flex flex-col items-center gap-1 p-2 rounded-xl transition-all',
-                    isEarned
-                      ? 'bg-brand-yellow/20 ring-1 ring-brand-yellow/50'
-                      : 'bg-gray-50 opacity-35 grayscale',
-                  ].join(' ')}
-                >
-                  <span className="text-xs font-black text-gray-500">
-                    {(badge.icon_emoji?.trim() || badge.name.slice(0, 1))}
-                  </span>
-                  <span className="text-[9px] text-center text-gray-600 leading-tight line-clamp-2 w-full">
-                    {badge.name}
-                  </span>
-                </div>
-              )
-            })}
+        <div className="flex min-h-0 flex-1 flex-col justify-end gap-1.5">
+          <div className="relative mx-auto flex w-full max-w-sm flex-col items-center">
+            <ChildHomeIslandStage />
           </div>
-        </section>
-      )}
+          {stats.promotion_pending && (
+            <div className="flex items-center gap-2 rounded-xl border border-brand-yellow bg-brand-yellow/40 px-4 py-2">
+              <span className="text-xs font-bold text-brand-text">레벨 업 대기 중! 부모님 확인을 기다려요</span>
+            </div>
+          )}
+        </div>
+      </ChildHomeSceneryBand>
 
+      <section className={homeDecorPanelClass} aria-label="내 캐릭터 꾸미기">
+        <CharacterDecorInventoryPlaceholder />
+      </section>
+
+      {sheets}
+      {arrivalModal}
     </div>
   )
 }
 
-// ── 서브 컴포넌트 ──────────────────────────────────────────
-
-function StatPill({ label, value, highlight = false }: { label: string; value: string; highlight?: boolean }) {
+/**
+ * 꾸미기 인벤토리 — 위에 제목·부제 한 줄, 아래는 슬롯마다 둥근 블록만.
+ * (실제 아이템은 마켓 구매 후 썸네일로 채울 예정)
+ */
+function CharacterDecorInventoryPlaceholder() {
   return (
-    <div
-      className={[
-        'flex items-center gap-1.5 rounded-full px-3.5 py-1.5 shadow-sm',
-        highlight ? 'bg-brand-yellow/30 ring-1 ring-brand-yellow' : 'bg-white/80',
-      ].join(' ')}
-    >
-      <span className="text-[10px] font-bold text-gray-500">{label}</span>
-      <span className="text-sm font-bold tabular-nums text-brand-text">{value}</span>
-    </div>
-  )
-}
-
-function EqBar({ label, value, color }: { label: string; value: number; color: string }) {
-  return (
-    <div className="flex flex-col items-center gap-1.5">
-      {/* 세로 바 */}
-      <div className="w-full h-16 bg-gray-100 rounded-lg overflow-hidden flex flex-col-reverse">
-        <div
-          className={`${color} rounded-lg transition-all duration-700`}
-          style={{ height: `${value}%` }}
-        />
+    <div className="w-full pt-0.5" aria-labelledby="child-decor-heading">
+      {/* 메인 제목 옆에 회색 작은 설명(화살표는 더 보기 느낌용) */}
+      <div className="mb-2 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+        <h2 id="child-decor-heading" className="text-base font-bold text-brand-text">
+          내 캐릭터 꾸미기
+        </h2>
+        <p className="text-[11px] leading-tight text-gray-500">나만의 캐릭터를 꾸며요! &gt;</p>
       </div>
-      <span className="text-[10px] font-bold text-brand-blue tabular-nums">{value}%</span>
-      <span className="text-[9px] text-gray-400 text-center leading-tight">{label}</span>
+      <ul className="grid w-full grid-cols-3 gap-2.5" aria-label="꾸미기 아이템 칸">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <li
+            key={i}
+            className="flex aspect-square items-center justify-center rounded-xl border border-amber-100/80 bg-[#f7f4eb] text-center text-[10px] font-medium text-gray-400 shadow-sm"
+          >
+            비어 있음
+          </li>
+        ))}
+      </ul>
     </div>
   )
 }
+

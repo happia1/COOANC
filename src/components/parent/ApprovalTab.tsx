@@ -12,6 +12,7 @@ import { useParentStore } from '@/store/parentStore'
 import ChildProfileNav, { type ChildTab } from '@/components/parent/ChildProfileNav'
 import { CompactChildProfileCard } from '@/components/parent/CompactChildProfileCard'
 import ParentMarketMenuControl from '@/components/parent/ParentMarketMenuControl'
+import PraiseStickerPanel from '@/components/parent/PraiseStickerPanel'
 import type { PurchaseRequest, StoreItem } from '@/types/database'
 
 const REJECT_PRESETS = [
@@ -329,6 +330,8 @@ export default function ApprovalTab({
           <ChildProfileNav tabs={tabs} compact />
         </div>
       )}
+
+      <PraiseStickerPanel childId={currentId} childName={currentChild?.name ?? '자녀'} />
 
       {/* 구매 요청 — 선택 자녀만 */}
       <section>

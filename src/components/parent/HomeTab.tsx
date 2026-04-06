@@ -3,23 +3,29 @@
 /**
  * 부모 앱 「홈」 탭 본문입니다.
  * - 위쪽에서 자녀를 바꾸면(◀▶ 또는 스와이프) 아래 카드·통계가 그 아이 기준으로 바뀝니다.
+ * - 「우리아이 경제 EQ 지수」는 선택한 자녀 기준 차트·코칭 블록이며, 미션 완료 시 막대가 갱신됩니다.
  * - 프로필 카드를 누르면 그 아이의 「자녀용 앱 화면」(미션·홈 등)으로 들어갑니다(쿠키 설정 후 /home).
  */
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { createClient } from '@/lib/supabase/client'
+import { addSeoulCalendarDays, getSeoulDateString } from '@/lib/koreaDate'
+import { buildWeeklyRoutineDays, type WeeklyRoutineDay } from '@/lib/childWeeklyRoutine'
 import { useParentStore } from '@/store/parentStore'
 import ChildProfileNav, { type ChildTab } from '@/components/parent/ChildProfileNav'
 import { CompactChildProfileCard } from '@/components/parent/CompactChildProfileCard'
+import EconomicEqPanel from '@/components/parent/EconomicEqPanel'
 
-// 하드코딩 AI 한줄 가이드 (추후 실제 AI로 교체) — 문장만 두고 장식 이모지는 쓰지 않음
-const AI_HINTS = [
-  '오늘도 미션을 잘 해냈어요! 칭찬 한마디 어떠세요?',
-  '경제 습관이 쑥쑥 자라고 있어요. 함께 저금통을 확인해봐요.',
-  '루틴을 꾸준히 지키고 있어요. 대단한 우리 아이!',
-  '작은 습관이 큰 변화를 만들어요. 오늘 하루도 수고했어요.',
-  '미션 달성률이 올라가고 있어요. 오늘도 화이팅!',
-]
+/** 자녀 레벨 번호 → 성장 단계 한글명(EQ 코칭 문구·차트 설명에 사용) */
+const LEVELS = [
+  { level: 0, name: '씨앗' },
+  { level: 1, name: '새싹' },
+  { level: 2, name: '교환사' },
+  { level: 3, name: '저축왕' },
+  { level: 4, name: '나눔이' },
+  { level: 5, name: '투자가' },
+] as const
 
 export type ChildSummary = {
   id: string
@@ -51,6 +57,8 @@ export type ChildSummary = {
     completedAt: string
     creditEarned: number
   }[]
+  /** 최근 7일 루틴 막대 — 서버에서 채우고, 클라이언트에서 미션 변경 시 다시 불러옵니다. */
+  weeklyRoutine: WeeklyRoutineDay[]
 }
 
 type Props = {
@@ -60,6 +68,13 @@ type Props = {
 
 export default function HomeTab({ childrenData, pendingCount }: Props) {
   const { selectedChildId, setSelectedChildId } = useParentStore()
+
+  const currentId = selectedChildId ?? childrenData[0]?.id
+  const child = childrenData.find((c) => c.id === currentId) ?? childrenData[0]
+  const s = child?.stats
+
+  /** 선택 자녀가 바뀌면 서버에서 받은 주간 막대 데이터로 맞춘 뒤, Realtime 으로 최신화합니다. */
+  const [weeklyRoutine, setWeeklyRoutine] = useState<WeeklyRoutineDay[]>(child?.weeklyRoutine ?? [])
 
   // 자녀 목록이 바뀌면(삭제 등) 선택 id 가 없거나 목록에 없으면 첫 자녀로 맞춤
   useEffect(() => {
@@ -73,17 +88,61 @@ export default function HomeTab({ childrenData, pendingCount }: Props) {
     }
   }, [childrenData, selectedChildId, setSelectedChildId])
 
-  const currentId = selectedChildId ?? childrenData[0]?.id
-  const child = childrenData.find((c) => c.id === currentId) ?? childrenData[0]
-  const s = child?.stats
+  useEffect(() => {
+    if (!child) {
+      setWeeklyRoutine([])
+      return
+    }
+    setWeeklyRoutine(child.weeklyRoutine)
+  }, [child?.id, child?.weeklyRoutine])
+
+  useEffect(() => {
+    if (!child) return
+
+    const supabase = createClient()
+
+    const loadWeek = async () => {
+      const today = getSeoulDateString()
+      const start = addSeoulCalendarDays(today, -6)
+      const { data, error } = await supabase
+        .from('daily_missions')
+        .select('date, is_completed')
+        .eq('child_id', child.id)
+        .gte('date', start)
+        .lte('date', today)
+
+      if (error) {
+        console.error('[parent home] weekly routine:', error.message)
+        return
+      }
+      setWeeklyRoutine(buildWeeklyRoutineDays(today, data ?? []))
+    }
+
+    const dm = supabase
+      .channel(`parent_home_dm:${child.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'daily_missions',
+          filter: `child_id=eq.${child.id}`,
+        },
+        () => {
+          void loadWeek()
+        },
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(dm)
+    }
+  }, [child?.id])
 
   // 오늘 미션 달성률
   const missionRate = child?.totalMissions > 0
     ? Math.round((child.todayCompleted / child.totalMissions) * 100)
     : 0
-
-  // AI 힌트 — 요일 기반으로 고정
-  const aiHint = AI_HINTS[new Date().getDay() % AI_HINTS.length]
 
   const tabs: ChildTab[] = childrenData.map((c) => ({ id: c.id, name: c.name }))
 
@@ -149,21 +208,18 @@ export default function HomeTab({ childrenData, pendingCount }: Props) {
             />
           </Link>
 
-          {/* AI 한줄 가이드 — 아이콘 없이 텍스트만 */}
-          <div className="bg-gradient-to-r from-[#4A90E2]/10 to-[#7ED321]/10 rounded-2xl px-4 py-3">
-            <p className="text-[10px] font-bold text-[#4A90E2] mb-0.5">AI 코칭 가이드</p>
-            <p className="text-xs text-gray-700 leading-relaxed">{aiHint}</p>
-          </div>
-
-          {/* EQ 지수 */}
-          <div className="bg-white rounded-2xl p-4 shadow-sm">
-            <p className="text-sm font-bold text-gray-700 mb-3">경제 EQ 지수</p>
-            <div className="flex flex-col gap-2.5">
-              <EqBar label="루틴 완주율" value={s?.eq_routine_rate ?? 0} color="bg-[#4A90E2]" />
-              <EqBar label="만족 지연" value={s?.eq_delay_score ?? 0} color="bg-[#7ED321]" />
-              <EqBar label="저축 비중" value={s?.eq_save_ratio ?? 0} color="bg-[#F8E71C]" />
-            </div>
-          </div>
+          <EconomicEqPanel
+            stats={{
+              eq_routine_rate: s?.eq_routine_rate ?? 0,
+              eq_delay_score: s?.eq_delay_score ?? 0,
+              eq_save_ratio: s?.eq_save_ratio ?? 0,
+              streak_days: s?.streak_days ?? 0,
+              credits: s?.credits ?? 0,
+            }}
+            weeklyRoutine={weeklyRoutine}
+            growthStageName={LEVELS[Math.min(5, Math.max(0, s?.current_level ?? 0))].name}
+            childName={child.name}
+          />
 
           {/* 최근 활동 로그 */}
           {child.recentActivity.length > 0 && (
@@ -187,20 +243,6 @@ export default function HomeTab({ childrenData, pendingCount }: Props) {
           )}
         </>
       )}
-    </div>
-  )
-}
-
-function EqBar({ label, value, color }: { label: string; value: number; color: string }) {
-  return (
-    <div>
-      <div className="flex justify-between items-center mb-1">
-        <span className="text-xs text-gray-500">{label}</span>
-        <span className="text-xs font-bold text-gray-600">{value}%</span>
-      </div>
-      <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
-        <div className={`h-full rounded-full ${color} transition-all`} style={{ width: `${value}%` }} />
-      </div>
     </div>
   )
 }

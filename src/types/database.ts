@@ -201,3 +201,25 @@ export type ChildBadge = {
   badge_id: string
   earned_at: string
 }
+
+/** 부모가 보낸 칭찬 스티커(한 건 = 판에 한 번 붙일 수 있음) */
+export type PraiseStickerGrant = {
+  id: string
+  child_id: string
+  parent_id: string
+  sprite_key: string
+  created_at: string
+  popup_dismissed_at: string | null
+}
+
+export type PraiseStickerPlacement = {
+  id: string
+  grant_id: string
+  child_id: string
+  x_ratio: number
+  y_ratio: number
+  scale_ratio: number
+  /** 1~20: 곰돌이 판 숫자 칸. null 이면 예전 자유 좌표(x_ratio,y_ratio) */
+  board_slot: number | null
+  created_at: string
+}

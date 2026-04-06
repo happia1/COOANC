@@ -28,3 +28,23 @@ export function formatDateDot(isoDate: string): string {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(isoDate)) return isoDate
   return isoDate.replace(/-/g, '.')
 }
+
+/** 서울 달력 날짜(YYYY-MM-DD)에 해당하는 요일 — 짧은 한글 (일~토) */
+const KO_WEEKDAY_SHORT = ['일', '월', '화', '수', '목', '금', '토'] as const
+
+/**
+ * `isoDate` 는 앱 전역에서 쓰는 **서울 기준 달력 날짜** 문자열이어야 합니다.
+ * 그날 정오(KST) 시각을 기준으로 요일을 구해, 경계(자정)에서 하루가 밀리지 않게 합니다.
+ */
+export function getSeoulWeekdayShort(isoDate: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(isoDate)
+  if (!m) return '?'
+  const y = Number(m[1])
+  const mo = Number(m[2])
+  const d = Number(m[3])
+  if (!y || !mo || !d) return '?'
+  // 정오 KST = UTC 03:00 같은 달력일 → getUTCDay() 가 그 날의 요일과 일치
+  const utcNoonKst = Date.UTC(y, mo - 1, d, 3, 0, 0)
+  const idx = new Date(utcNoonKst).getUTCDay()
+  return KO_WEEKDAY_SHORT[idx]
+}
