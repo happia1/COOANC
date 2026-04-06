@@ -77,7 +77,7 @@ function orderedMissionsForSlider(list: DailyMissionWithTemplate[]): DailyMissio
  * 미션 탭
  * - 상단: `ChildHomeSceneryBand`(60dvh, 배경만 리프트) + 알약 + 지피뱅크 섬 — 홈과 동일
  * - 하단 카드 위 한 줄: 왼쪽 「오늘의 미션」·오른쪽 EXP(날짜 없음)
- * - 하단: `-mt-12` 로 풍경에 붙임 · 라임 그라데이션 패널 없음 + 가로 스냅 카드
+ * - 하단: `-mt-20`(sm: `-mt-24`) 로 풍경·섬에 붙임 · 가로 스냅 카드
  */
 export default function MissionTab({
   childId,
@@ -304,7 +304,8 @@ export default function MissionTab({
         <StatPill label="크레딧" value={credits.toLocaleString()} highlight className="shrink-0" />
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col justify-end">
+      {/** 홈과 동일: 알약은 그대로, 섬 블록만 `-mt-3` 으로 위로 */}
+      <div className="-mt-3 flex min-h-0 flex-1 flex-col justify-end">
         <div className="relative mx-auto flex w-full max-w-sm flex-col items-center">
           {/* 홈 `ChildHomeIslandStage` 와 동일 STAGE_OUTER_CLASS · translate — 섬만 gippybank PNG */}
           <ChildHomeIslandStage scene="gippybank" />
@@ -315,7 +316,7 @@ export default function MissionTab({
 
   const bottomPanel = (
     <section
-      className="-mt-12 relative z-10 flex min-h-[40dvh] flex-1 flex-col gap-1 px-1 pb-1.5 pt-1 sm:-mt-14"
+      className="-mt-20 relative z-10 flex min-h-[40dvh] flex-1 flex-col gap-1 px-1 pb-1.5 pt-1 sm:-mt-24"
       aria-label="오늘의 미션 카드"
     >
       {missionTitleAboveCards}

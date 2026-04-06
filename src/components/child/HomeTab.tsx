@@ -219,9 +219,10 @@ export default function HomeTab({
 
   /**
    * 풍경에 붙여 올림(`-mt-*`). 배경 블록(그라데이션) 없이 레이아웃만.
+   * `-mt-*` 로 풍경·섬과 겹치며 꾸미기 블록을 위로 붙임(알약 행은 그대로).
    */
   const homeDecorPanelClass =
-    '-mt-12 relative z-10 flex min-h-[40dvh] flex-1 flex-col gap-2 overflow-y-auto px-1 pb-2 pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:-mt-14'
+    '-mt-20 relative z-10 flex min-h-[40dvh] flex-1 flex-col gap-2 overflow-y-auto px-1 pb-2 pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:-mt-24'
 
   if (!stats) {
     return (
@@ -230,7 +231,7 @@ export default function HomeTab({
           <ChildHomeSceneryBand ariaLabel="홈 배경">
             <div className="shrink-0 space-y-2 py-1 text-center">
               <p className="text-sm text-gray-500">부모님이 미션을 만들어주실 거야.</p>
-              <div className="mt-8 flex w-full items-center justify-center gap-2">
+              <div className="mt-1 flex w-full items-center justify-center gap-2">
                 <MapActionPill onClick={() => setMapOpen(true)} />
                 <StickerActionPill
                   useCustomImage={clientReady && stickerFabImgOk}
@@ -239,7 +240,8 @@ export default function HomeTab({
                 />
               </div>
             </div>
-            <div className="flex min-h-0 flex-1 flex-col justify-end">
+            {/** `-mt-3`: 알약은 그대로 두고 섬·아래쪽만 위로 당김 */}
+            <div className="-mt-3 flex min-h-0 flex-1 flex-col justify-end">
               <div className="relative mx-auto flex w-full max-w-sm flex-col items-center">
                 <ChildHomeIslandStage />
               </div>
@@ -258,7 +260,8 @@ export default function HomeTab({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <ChildHomeSceneryBand ariaLabel="홈 배경">
-        <div className="mt-8 flex w-full shrink-0 items-center justify-between gap-1.5 sm:mt-10">
+        {/** 상단 여백 거의 없음 — 부모 `pt-4` 만으로 알약과 가장자리 간격 유지 */}
+        <div className="mt-0 flex w-full shrink-0 items-center justify-between gap-1.5 sm:mt-1">
           <StatPill label="연속" value={`${stats.streak_days}일`} className="shrink-0" />
           <div className="flex shrink-0 items-center gap-1.5">
             <MapActionPill onClick={() => setMapOpen(true)} />
@@ -276,7 +279,8 @@ export default function HomeTab({
           />
         </div>
 
-        <div className="flex min-h-0 flex-1 flex-col justify-end gap-1.5">
+        {/** 알약 아래 섬·레벨업 배너만 위로 — 알약 행 마진은 변경하지 않음 */}
+        <div className="-mt-3 flex min-h-0 flex-1 flex-col justify-end gap-1.5">
           <div className="relative mx-auto flex w-full max-w-sm flex-col items-center">
             <ChildHomeIslandStage />
           </div>
@@ -316,11 +320,12 @@ function CharacterDecorInventoryPlaceholder() {
 
   return (
     <div className="w-full pt-0.5" aria-labelledby="child-decor-heading">
-      <div className="mb-2 flex flex-wrap items-baseline gap-x-2 gap-y-1">
-        <h2 id="child-decor-heading" className="text-base font-bold text-brand-text">
+      {/** 제목·부제는 미션 「오늘의 미션」 줄과 같은 글자 크기·굵기 체계(`font-black`, `leading-tight`) */}
+      <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1">
+        <h2 id="child-decor-heading" className="text-base font-black leading-tight text-brand-text">
           내 캐릭터 꾸미기
         </h2>
-        <p className="text-[11px] leading-tight text-gray-500">나만의 캐릭터를 꾸며요! &gt;</p>
+        <p className="text-[11px] font-black leading-tight text-gray-500">나만의 캐릭터를 꾸며요! &gt;</p>
       </div>
       <div
         className="-mx-1 overflow-x-auto overflow-y-hidden px-2 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden snap-x snap-mandatory"

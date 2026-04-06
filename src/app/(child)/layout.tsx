@@ -32,8 +32,11 @@ export default async function ChildLayout({ children }: { children: ReactNode })
   return (
     <div className="relative flex min-h-screen flex-col bg-gradient-to-b from-sky-100/90 via-amber-50/50 to-green-50/80">
       <ChildTopBar childName={childName} isParentPreview={ctx.isParentPreview} />
-      {/* 홈·미션 등 세로 스크롤은 유지하되 스크롤바만 숨김(모바일 앱 느낌) */}
-      <main className="relative z-10 flex-1 overflow-y-auto w-full max-w-md mx-auto px-4 pt-4 pb-24 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      {/**
+       * `min-h-0` + `flex` 로 자식이 뷰포트 높이를 넘지 않게 할 수 있음(홈·미션 한 화면).
+       * 세로 스크롤이 필요한 탭(마켓·스티커)은 각 탭 루트에 `overflow-y-auto` 를 둠.
+       */}
+      <main className="relative z-10 flex min-h-0 flex-1 flex-col overflow-hidden w-full max-w-md mx-auto px-4 pt-4 pb-24">
         {children}
       </main>
       <ChildNavBar />
