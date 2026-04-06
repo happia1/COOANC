@@ -25,6 +25,11 @@ type Props = {
   level: number
 }
 
+type SelectedInfo = {
+  item: StoreItem
+  frame: keyof typeof MARKET_ITEMS.frames
+}
+
 export default function MarketTab({ childId, items, requests, credits, level }: Props) {
   const [currentCredits, setCurrentCredits] = useState(credits)
   const [myRequests, setMyRequests] = useState<PurchaseRequest[]>(requests)
@@ -33,31 +38,29 @@ export default function MarketTab({ childId, items, requests, credits, level }: 
   )
   const [loading, setLoading] = useState<string | null>(null)
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null)
-  const [selectedItem, setSelectedItem] = useState<StoreItem | null>(null)
-  const [messageInput, setMessageInput] = useState('')
+  const [selected, setSelected] = useState<SelectedInfo | null>(null)
 
   const showToast = (msg: string, ok = true) => {
     setToast({ msg, ok })
     setTimeout(() => setToast(null), 2500)
   }
 
-  function handleItemClick(item: StoreItem) {
+  function handleItemClick(item: StoreItem, frame: keyof typeof MARKET_ITEMS.frames) {
     if (pendingItems.has(item.id) || loading) return
     if (currentCredits < item.credit_price || level < item.level_required) return
-    setSelectedItem(item)
-    setMessageInput('')
+    setSelected({ item, frame })
   }
 
   async function submitRequest() {
-    if (!selectedItem) return
-    const item = selectedItem
-    setSelectedItem(null)
+    if (!selected) return
+    const { item } = selected
+    setSelected(null)
     setLoading(item.id)
     try {
       const res = await fetch('/api/market/request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ itemId: item.id, childId, childMessage: messageInput || null }),
+        body: JSON.stringify({ itemId: item.id, childId }),
       })
       const text = await res.text()
       const json = text ? JSON.parse(text) : {}
@@ -76,10 +79,10 @@ export default function MarketTab({ childId, items, requests, credits, level }: 
     }
   }
 
-  // Up to 9 items arranged on 3 shelves
+  // Up to 9 items on 3 shelves
   const shelfItems = items.slice(0, 9)
 
-  // The highest-priced item gets the BEST badge
+  // Highest-priced item gets the BEST badge
   const bestItemId = shelfItems.reduce<string | null>((best, item) => {
     if (!best) return item.id
     const bestItem = shelfItems.find((i) => i.id === best)!
@@ -93,7 +96,7 @@ export default function MarketTab({ childId, items, requests, credits, level }: 
   ]
 
   return (
-    // -mx-4 -mt-4 cancels the parent layout's px-4 pt-4 so the cream bg fills edge-to-edge
+    // -mx-4 -mt-4 cancels parent layout's px-4 pt-4 so the cream bg fills edge-to-edge
     <div className="-mx-4 -mt-4 flex flex-col min-h-full pb-4" style={{ background: '#FFF8F0' }}>
 
       {/* ── Toast ── */}
@@ -129,25 +132,36 @@ export default function MarketTab({ childId, items, requests, credits, level }: 
           <p className="text-sm text-gray-400">부모님이 상품을 추가해주실 거예요!</p>
         </div>
       ) : (
-        <div className="px-3">
-          {/*
-            market_shelf.png is used as the shelf background.
-            Items sit in 3 rows that align with the 3 shelf boards in the image.
-            background-size: 100% 100% stretches the image to fill the container exactly.
-          */}
+        /*
+          Shelf background fills edge-to-edge (no horizontal padding).
+          overflow:visible on all ancestors lets sprites taller than a row
+          poke upward without being clipped.
+        */
+        <div style={{ overflow: 'visible' }}>
           <div
-            className="w-full rounded-2xl overflow-visible"
             style={{
               backgroundImage: 'url(/assets/img/layouts/backgrounds/market_shelf.png)',
               backgroundSize: '100% 100%',
               backgroundRepeat: 'no-repeat',
+              // 3 rows × 150 px = 450 px — shelf image stretches to fill exactly
+              minHeight: 450,
+              overflow: 'visible',
             }}
           >
             {rows.map((row, rowIdx) => (
               <div
                 key={rowIdx}
-                className="flex justify-around items-end"
-                style={{ height: 120, paddingBottom: 14 }}
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-around',
+                  alignItems: 'flex-end',
+                  height: 150,
+                  // space for price badge below + shelf board thickness
+                  paddingBottom: 22,
+                  paddingLeft: 12,
+                  paddingRight: 12,
+                  overflow: 'visible',
+                }}
               >
                 {row.map((item, colIdx) => {
                   const frameKey = ITEM_FRAMES[(rowIdx * 3 + colIdx) % ITEM_FRAMES.length]
@@ -160,36 +174,74 @@ export default function MarketTab({ childId, items, requests, credits, level }: 
                   return (
                     <button
                       key={item.id}
-                      onClick={() => handleItemClick(item)}
-                      className="relative flex flex-col items-center gap-1 transition-transform active:scale-90"
+                      onClick={() => handleItemClick(item, frameKey)}
                       style={{
+                        position: 'relative',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: 4,
+                        overflow: 'visible',
+                        background: 'none',
+                        border: 'none',
+                        padding: 0,
+                        cursor: 'pointer',
                         filter: isActive ? 'none' : 'grayscale(100%) brightness(0.65)',
                         opacity: isPending ? 0.6 : 1,
+                        transition: 'transform 0.1s',
                       }}
                     >
-                      {/* BEST badge – top-right corner */}
+                      {/* BEST badge – top-right of item */}
                       {isBest && isActive && (
-                        <span className="absolute -top-3 -right-1 z-10 bg-green-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded-full leading-none">
+                        <span
+                          style={{
+                            position: 'absolute',
+                            top: -10,
+                            right: -4,
+                            zIndex: 10,
+                            background: '#22c55e',
+                            color: '#fff',
+                            fontSize: 8,
+                            fontWeight: 900,
+                            padding: '2px 5px',
+                            borderRadius: 99,
+                            lineHeight: 1,
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
                           BEST
                         </span>
                       )}
                       {/* Pending indicator */}
                       {isPending && (
-                        <span className="absolute -top-3 -left-2 text-xs z-10">⏳</span>
+                        <span style={{ position: 'absolute', top: -10, left: -6, fontSize: 12, zIndex: 10 }}>
+                          ⏳
+                        </span>
                       )}
 
-                      {/* 3D clay-style item image from sprite sheet */}
+                      {/* Item sprite — no clipping so tall items show fully */}
                       <SpriteImage
                         sheet={MARKET_ITEMS}
                         frame={frameKey}
-                        height={68}
+                        height={80}
                         clipRotated={false}
                       />
 
-                      {/* Price badge: white pill with coin icon */}
-                      <div className="flex items-center gap-0.5 bg-white rounded-full px-2 py-0.5 shadow-sm border border-gray-100">
-                        <SpriteImage sheet={ICONS} frame="credit" width={12} clipRotated={false} />
-                        <span className="text-[10px] font-black text-gray-700">
+                      {/* Price badge: white pill + coin icon */}
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 2,
+                          background: '#fff',
+                          borderRadius: 99,
+                          padding: '2px 8px',
+                          boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                          border: '1px solid #f0f0f0',
+                        }}
+                      >
+                        <SpriteImage sheet={ICONS} frame="credit" width={13} clipRotated={false} />
+                        <span style={{ fontSize: 10, fontWeight: 900, color: '#444' }}>
                           {item.credit_price.toLocaleString()}
                         </span>
                       </div>
@@ -197,9 +249,9 @@ export default function MarketTab({ childId, items, requests, credits, level }: 
                   )
                 })}
 
-                {/* Empty slot spacers so the layout stays balanced */}
+                {/* Empty slot spacers */}
                 {Array.from({ length: 3 - row.length }).map((_, i) => (
-                  <div key={`empty-${i}`} style={{ width: 64 }} />
+                  <div key={`empty-${i}`} style={{ width: 80 }} />
                 ))}
               </div>
             ))}
@@ -239,71 +291,77 @@ export default function MarketTab({ childId, items, requests, credits, level }: 
         </section>
       )}
 
-      {/* ── Purchase popup ── */}
-      {selectedItem && (
+      {/* ── Purchase popup (center modal, above dock) ── */}
+      {selected && (
         <div
-          className="fixed inset-0 z-40 flex items-end bg-black/40"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setSelectedItem(null)
-          }}
+          className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 px-6"
+          onClick={(e) => { if (e.target === e.currentTarget) setSelected(null) }}
         >
           <div
-            className="w-full max-w-md mx-auto rounded-t-3xl overflow-hidden shadow-2xl"
+            className="w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden"
             style={{ background: '#FFF8F0' }}
           >
-            {/* Animated characters row */}
-            <div className="flex items-end justify-between px-5 pt-6 h-48">
-              {/* Left: cash register slides in from the left */}
+            {/* Item image + name */}
+            <div className="flex flex-col items-center pt-7 pb-3 px-6">
+              {/* Selected item sprite */}
+              <div
+                className="rounded-2xl bg-white/70 flex items-center justify-center mb-3 shadow-inner"
+                style={{ width: 100, height: 100, overflow: 'visible' }}
+              >
+                <SpriteImage
+                  sheet={MARKET_ITEMS}
+                  frame={selected.frame}
+                  height={82}
+                  clipRotated={false}
+                />
+              </div>
+              <p className="text-base font-black text-brand-text text-center">
+                {selected.item.name}
+              </p>
+              {selected.item.description && (
+                <p className="text-xs text-gray-400 text-center mt-0.5">
+                  {selected.item.description}
+                </p>
+              )}
+            </div>
+
+            {/* Animated row: calculator | credit deduction | paying hand */}
+            <div className="flex items-end justify-between px-4 pb-2" style={{ height: 130 }}>
+              {/* Cash register */}
               <div className="market-pop-left self-end">
-                <SpriteImage sheet={SHOP_ANIMATIONS} frame="calculating" width={132} />
+                <SpriteImage sheet={SHOP_ANIMATIONS} frame="calculating" width={108} />
               </div>
 
-              {/* Right: credit deduction card + paying hand slides in from right */}
-              <div className="market-pop-right flex flex-col items-center gap-1 self-end">
-                <div className="bg-white rounded-2xl px-4 py-2.5 shadow-md text-center min-w-[112px]">
+              {/* Credit deduction card */}
+              <div className="flex flex-col items-center self-center">
+                <div className="bg-white rounded-2xl px-4 py-2.5 shadow-md text-center min-w-[100px]">
                   <div className="flex items-center justify-center gap-1 mb-1">
-                    <SpriteImage sheet={ICONS} frame="credits" width={14} />
-                    <span className="text-[11px] text-gray-400">잔액</span>
+                    <SpriteImage sheet={ICONS} frame="credits" width={13} />
+                    <span className="text-[10px] text-gray-400">잔액</span>
                   </div>
-                  <p className="text-xl font-black text-brand-blue leading-none">
+                  <p className="text-lg font-black text-brand-blue leading-none">
                     {currentCredits.toLocaleString()}
                   </p>
                   <p className="text-xs font-bold text-red-400 mt-1">
-                    ― {selectedItem.credit_price.toLocaleString()}
+                    ― {selected.item.credit_price.toLocaleString()}
                   </p>
                   <div className="h-px bg-gray-100 my-1.5" />
-                  <p className="text-lg font-black text-green-600">
-                    {(currentCredits - selectedItem.credit_price).toLocaleString()}
+                  <p className="text-base font-black text-green-600">
+                    {(currentCredits - selected.item.credit_price).toLocaleString()}
                   </p>
                 </div>
-                <SpriteImage sheet={SHOP_ANIMATIONS} frame="paying" width={110} />
+              </div>
+
+              {/* Paying hand */}
+              <div className="market-pop-right self-end">
+                <SpriteImage sheet={SHOP_ANIMATIONS} frame="paying" width={96} />
               </div>
             </div>
 
-            {/* Item name + optional message */}
-            <div className="px-6 pt-3 pb-2">
-              <p className="text-base font-black text-brand-text text-center">
-                {selectedItem.name}
-              </p>
-              {selectedItem.description && (
-                <p className="text-xs text-gray-400 text-center mt-0.5">
-                  {selectedItem.description}
-                </p>
-              )}
-              <textarea
-                className="w-full mt-3 border border-gray-200 rounded-xl px-4 py-3 text-sm placeholder:text-gray-300 focus:outline-none focus:ring-2 focus:ring-brand-blue/40 resize-none bg-white"
-                rows={2}
-                maxLength={100}
-                placeholder="부모님께 하고 싶은 말 (선택)"
-                value={messageInput}
-                onChange={(e) => setMessageInput(e.target.value)}
-              />
-            </div>
-
-            {/* Action buttons */}
-            <div className="flex gap-3 px-6 pb-8 pt-2">
+            {/* Buttons */}
+            <div className="flex gap-3 px-5 pt-2 pb-6">
               <button
-                onClick={() => setSelectedItem(null)}
+                onClick={() => setSelected(null)}
                 className="flex-1 py-3 rounded-2xl border border-gray-200 bg-white text-sm font-bold text-gray-500"
               >
                 취소
@@ -312,7 +370,7 @@ export default function MarketTab({ childId, items, requests, credits, level }: 
                 onClick={submitRequest}
                 className="flex-1 py-3 rounded-2xl bg-brand-blue text-white text-sm font-bold shadow-md active:scale-95"
               >
-                구매 요청 ({selectedItem.credit_price} 크레딧)
+                구매 요청
               </button>
             </div>
           </div>
