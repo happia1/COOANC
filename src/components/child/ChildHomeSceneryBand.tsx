@@ -23,8 +23,8 @@ type Props = {
    */
   backgroundImageClassName?: string
   /**
-   * true: 부모 flex 안에서 남는 높이만 씀(홈·미션 한 화면 맞춤).
-   * false: 고정 `60dvh`(다른 탭에서 쓸 때).
+   * true: 부모 안에서 위쪽 **6** 몫 — 아래 패널 **4** 몫과 합쳐 6:4(60%:40%) 한 화면.
+   * false: 고정 `60dvh`(옛 비율; 스크롤이 생길 수 있음).
    */
   flexFill?: boolean
 }
@@ -32,7 +32,7 @@ type Props = {
 /**
  * 자녀 앱 상단 풍경 밴드 — 홈·미션 동일
  *
- * - 높이: `flexFill` 이면 `flex-1 min-h-0`, 아니면 `h-[60dvh]` + `min-h-[220px]`
+ * - 높이: `flexFill` 이면 `flex-[6] min-h-0`(아래 패널은 `flex-[4]`), 아니면 `h-[60dvh]` + `min-h-[220px]`
  * - 배경: `object-cover object-center`, 기본 `CHILD_HOME_SCENERY_BG_LIFT_CLASS`
  */
 export default function ChildHomeSceneryBand({
@@ -43,7 +43,7 @@ export default function ChildHomeSceneryBand({
   flexFill = false,
 }: Props) {
   const heightClass = flexFill
-    ? 'min-h-0 flex-1 basis-0'
+    ? 'min-h-0 flex-[6] basis-0'
     : 'h-[60dvh] min-h-[220px] shrink-0'
 
   return (

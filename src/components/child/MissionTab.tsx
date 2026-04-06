@@ -14,53 +14,10 @@ import { isSpecialSectionMission } from '@/lib/specialMissionChips'
 import { parseAlarmFromMissionDescription } from '@/lib/missionAlarmDescription'
 import { scaledMissionRewards } from '@/lib/missionRewardMultiplier'
 import { mergePraiseStickerGrantsFromServer } from '@/lib/mergePraiseStickerGrantsFromServer'
-import confetti from 'canvas-confetti'
-
-/** 미션 완료 직후 한 번 터뜨리고, 1초 뒤에 애니메이션·캔버스를 정리합니다 */
-function playMissionCompleteConfetti() {
-  if (typeof window === 'undefined') return
-  try {
-    void confetti({
-      particleCount: 80,
-      spread: 70,
-      origin: { y: 0.6 },
-      colors: ['#FFD700', '#FF6B9D', '#A78BFA', '#34D399', '#FB923C'],
-    })
-  } catch {
-    /* canvas-confetti 실패 시에도 미션 완료 흐름은 유지 */
-  }
-  window.setTimeout(() => {
-    confetti.reset()
-  }, 1000)
-}
-
-const DIFFICULTY_LABEL: Record<string, string> = {
-  easy: '쉬움',
-  normal: '보통',
-  hard: '어려움',
-  special: '특별',
-}
-const DIFFICULTY_COLOR: Record<string, string> = {
-  easy: 'bg-green-100 text-green-700',
-  normal: 'bg-blue-100 text-blue-700',
-  hard: 'bg-orange-100 text-orange-700',
-  special: 'bg-purple-100 text-purple-700',
-}
-const BLOCK_LABEL: Record<string, string> = {
-  morning: '아침',
-  afternoon: '오후',
-  evening: '저녁',
-  bedtime: '잠자리',
-}
-
-function formatTime(t: string | null | undefined): string {
-  if (!t) return ''
-  const [hStr, mStr] = t.split(':')
-  const h = parseInt(hStr, 10)
-  const period = h < 12 ? '오전' : '오후'
-  const h12 = h % 12 === 0 ? 12 : h % 12
-  return `${period} ${h12}:${mStr ?? '00'}`
-}
+import MissionSleepMorningLayer from '@/components/child/MissionSleepMorningLayer'
+import SpriteImage from '@/components/common/SpriteImage'
+import { MISSION_ROUTINES_ATLAS } from '@/constants/missionRoutineAtlas'
+import { missionRoutineIconFrame } from '@/lib/missionRoutineIconFrame'
 
 type Props = {
   childId: string
@@ -108,11 +65,9 @@ function isRedoMissionPayload(v: unknown): v is { missionLogId: string; dailyMis
 
 /**
  * 미션 탭
- * - 상단: `ChildHomeSceneryBand`(60dvh, 배경만 리프트) + 알약 + 지피뱅크 섬 — 홈과 동일
- * - 하단 카드 위 한 줄: 왼쪽 「오늘의 미션」·오른쪽 EXP(날짜 없음)
- * - 하단: `-mt-20`(sm: `-mt-24`) 로 풍경·섬에 붙임 · 가로 스냅 카드
- * - 부모 승인 탭에서 보낸 Realtime 브로드캐스트로 「다시 하기」 안내 팝업을 띄우고, 확인 시 DB 롤백
- * - 완료 버튼: 낙관적 UI(즉시 콘페티 + 카드 슬라이더에서 제거), API 실패 시 되돌림·토스트
+ * - **6:4**: 상단 풍경 `flex-[6]` + 하단 카드 `flex-[4]` — 세로 스크롤 없음, 카드는 가로 스크롤
+ * - 카드 썸네일: `public/.../routines_01.png` 아틀라스(`missionRoutineIconFrame`)
+ * - 부모 Realtime 「다시 하기」·`MissionSleepMorningLayer` 연출 동일
  */
 export default function MissionTab({
   childId,
@@ -356,9 +311,8 @@ export default function MissionTab({
   function handleComplete(dm: DailyMissionWithTemplate) {
     if (done.has(dm.id)) return
 
-    /** 낙관적: API 기다리지 않고 콘페티 + 카드 제거(슬라이더에서 숨김) */
+    /** 낙관적: API 기다리지 않고 카드 제거(슬라이더에서 숨김). 콘페티는 전부 완료될 때만 별도 레이어에서 연출 */
     setDone((prev) => new Set([...prev, dm.id]))
-    playMissionCompleteConfetti()
 
     void (async () => {
       try {
@@ -473,10 +427,10 @@ export default function MissionTab({
     </div>
   )
 
-  /** 상단 60dvh — `ChildHomeIslandStage scene="gippybank"` 로 홈과 섬 위치·박스 동일, 이미지만 지피뱅크 */
+  /** 상단 풍경: `flexFill` 로 레이아웃이 주는 높이만 씀(고정 dvh 아님) */
   const heroBand = (
-    <ChildHomeSceneryBand ariaLabel="미션 배경">
-      <div className="flex w-full shrink-0 items-center justify-between gap-1.5">
+    <ChildHomeSceneryBand flexFill ariaLabel="미션 배경">
+      <div className="relative z-20 flex w-full shrink-0 items-center justify-between gap-1.5">
         <StatPill label="연속" value={`${streak}일`} className="shrink-0" />
         <div className="flex shrink-0 items-center gap-1.5">
           <MapActionPill onClick={() => setMapOpen(true)} />
@@ -489,10 +443,10 @@ export default function MissionTab({
         <StatPill label="크레딧" value={credits.toLocaleString()} highlight className="shrink-0" />
       </div>
 
-      {/* 미션: 무대 래퍼는 내리지 않음 — 섬만 ChildHomeIslandStage 안에서 올림 */}
+      {/** `flex-1 min-h-0`: 홈과 같이 섬 무대가 풍경 밴드 안 남는 공간에 맞춰 줄어듦 */}
       <div className="flex min-h-0 flex-1 flex-col justify-end">
-        <div className="relative mx-auto flex w-full max-w-sm flex-col items-center">
-          <ChildHomeIslandStage scene="gippybank" missionPiggy={islandPiggyProgress} />
+        <div className="relative mx-auto flex min-h-0 w-full max-w-sm flex-1 flex-col items-center justify-end -mt-6 sm:-mt-8">
+          <ChildHomeIslandStage scene="gippybank" missionPiggy={islandPiggyProgress} density="flex" />
         </div>
       </div>
     </ChildHomeSceneryBand>
@@ -500,7 +454,7 @@ export default function MissionTab({
 
   const bottomPanel = (
     <section
-      className="-mt-20 relative z-10 flex min-h-[40dvh] flex-1 flex-col gap-1 px-1 pb-1.5 pt-1 sm:-mt-24"
+      className="relative z-10 -mt-8 flex min-h-0 flex-[4] basis-0 flex-col gap-1 overflow-hidden px-1 pb-1.5 pt-1 sm:-mt-10"
       aria-label="오늘의 미션 카드"
     >
       {missionTitleAboveCards}
@@ -516,7 +470,7 @@ export default function MissionTab({
         </div>
       ) : (
         <div
-          className="-mx-1 flex min-h-0 flex-1 items-start gap-1 overflow-x-auto overflow-y-hidden px-2 pb-1 pt-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden snap-x snap-mandatory"
+          className="-mx-1 flex min-h-0 flex-1 items-stretch gap-1.5 overflow-x-auto overflow-y-hidden px-2 pb-0.5 pt-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden snap-x snap-mandatory"
           style={{ WebkitOverflowScrolling: 'touch' }}
         >
           {incompleteOrdered.map((dm) => {
@@ -524,63 +478,43 @@ export default function MissionTab({
             if (!m) return null
             const rewards = scaledMissionRewards(m)
             const special = isSpecialSectionMission(m)
-            const timeLabel = formatTime(dm.scheduled_time)
             const sub = cardSubtitle(m.description)
-            const block = m.block ? BLOCK_LABEL[m.block] : null
+            const routineFrame = missionRoutineIconFrame(m.title, m.description)
             return (
               <article
                 key={dm.id}
                 className={[
-                  'snap-center shrink-0 flex w-[min(39vw,140px)] flex-col rounded-xl border-2 px-1 pt-1 pb-0 shadow-sm transition-all',
+                  'snap-center flex h-full min-h-0 w-[min(42vw,158px)] shrink-0 flex-col rounded-xl border-2 px-1.5 pb-1 pt-1.5 shadow-sm transition-all',
                   special
                     ? 'border-amber-300/90 bg-gradient-to-b from-amber-50 to-yellow-50 shadow-amber-200/40'
                     : 'border-amber-100/90 bg-amber-50/80',
                 ].join(' ')}
               >
-                <div className="relative flex flex-col items-center pt-1.5">
-                  <div
-                    className="absolute -top-0.5 left-1/2 z-[1] flex h-4 w-4 -translate-x-1/2 items-center justify-center rounded-full bg-gray-300 text-[8px] font-black text-white shadow-sm"
-                    aria-hidden
-                  >
-                    ✓
-                  </div>
-                  <div
-                    className={[
-                      'flex h-10 w-full items-center justify-center rounded-lg text-2xl leading-none',
-                      special ? 'bg-gradient-to-br from-amber-100/80 to-yellow-100' : 'bg-white/70',
-                    ].join(' ')}
-                  >
-                    {m.icon_emoji?.trim() ? (
-                      <span aria-hidden>{m.icon_emoji.trim()}</span>
-                    ) : (
-                      <span className="text-base font-black text-gray-400">{m.title.slice(0, 1)}</span>
-                    )}
-                  </div>
+                {/**
+                 * `routines_01.png` 아틀라스 프레임 — 회전 프레임은 `clipRotated={false}` 로 잘림 완화.
+                 * 이미지 파일이 없으면 Next/Image 처럼 깨져 보일 수 있으니 `public/.../routines_01.png` 를 두어야 함.
+                 */}
+                <div
+                  className={[
+                    'flex min-h-[5.75rem] w-full flex-shrink-0 items-center justify-center overflow-visible rounded-xl',
+                    special ? 'bg-gradient-to-br from-amber-100/80 to-yellow-100' : 'bg-white/85',
+                  ].join(' ')}
+                >
+                  <SpriteImage
+                    sheet={MISSION_ROUTINES_ATLAS}
+                    frame={routineFrame}
+                    width={72}
+                    clipRotated={false}
+                    className="select-none drop-shadow-sm"
+                  />
                 </div>
 
-                <div className="mt-0.5 text-center">
-                  <p className="line-clamp-2 text-[10px] font-black leading-[1.15] text-brand-text">{m.title}</p>
-                  <div className="mt-px flex flex-wrap items-center justify-center gap-px">
-                    <span
-                      className={`rounded-full px-1 py-px text-[8px] font-bold leading-tight ${DIFFICULTY_COLOR[m.difficulty] ?? 'bg-gray-100 text-gray-500'}`}
-                    >
-                      {DIFFICULTY_LABEL[m.difficulty] ?? m.difficulty}
-                    </span>
-                    {block && (
-                      <span className="rounded-full bg-white/80 px-1 py-px text-[8px] font-bold leading-tight text-gray-500">
-                        {block}
-                      </span>
-                    )}
-                    {timeLabel && (
-                      <span className="rounded-full bg-sky-50 px-1 py-px text-[8px] font-bold leading-tight text-sky-600">
-                        {timeLabel}
-                      </span>
-                    )}
-                  </div>
-                  {sub && <p className="mt-px line-clamp-2 text-[7px] leading-tight text-gray-500">{sub}</p>}
+                <div className="mt-1 min-h-0 flex-1 text-center">
+                  <p className="line-clamp-2 text-[11px] font-black leading-[1.2] text-brand-text">{m.title}</p>
+                  {sub && <p className="mt-1 line-clamp-2 text-[8px] leading-tight text-gray-500">{sub}</p>}
                 </div>
 
-                <div className="mt-0.5 flex items-center justify-center gap-1 border-t border-white/50 pt-0.5 text-[9px] font-black leading-none text-gray-700">
+                <div className="mt-auto flex items-center justify-center gap-1 border-t border-white/50 pt-1 text-[9px] font-black leading-none text-gray-700">
                   <span className="flex items-center gap-0.5">
                     <span aria-hidden className="text-[9px]">
                       🪙
@@ -604,7 +538,7 @@ export default function MissionTab({
                   type="button"
                   onClick={() => handleComplete(dm)}
                   className={[
-                    'mt-0.5 w-full rounded-lg py-0.5 text-[10px] font-black leading-none transition-all active:scale-[0.98]',
+                    'mt-1 w-full rounded-lg py-1 text-[10px] font-black leading-none transition-all active:scale-[0.98]',
                     special
                       ? 'bg-gradient-to-r from-amber-500 to-yellow-500 text-white shadow-sm'
                       : 'bg-brand-blue text-white shadow-sm',
@@ -615,13 +549,6 @@ export default function MissionTab({
               </article>
             )
           })}
-        </div>
-      )}
-
-      {total > 0 && completedCount === total && (
-        <div className="mx-3 mb-2 rounded-2xl border-2 border-brand-yellow bg-brand-yellow/25 p-4 text-center">
-          <p className="text-[10px] font-black uppercase tracking-wide text-amber-800">축하해요</p>
-          <p className="font-black text-brand-text">오늘 미션 모두 완료!</p>
         </div>
       )}
     </section>
@@ -686,8 +613,15 @@ export default function MissionTab({
   if (isFullRestDay) {
     return (
       <div className="flex min-h-0 flex-1 flex-col">
+        <MissionSleepMorningLayer
+          childId={childId}
+          today={today}
+          isFullRestDay={isFullRestDay}
+          completedCount={completedCount}
+          totalMissions={total}
+        />
         {heroBand}
-        <section className="flex flex-1 flex-col items-center justify-center gap-4 bg-gradient-to-b from-lime-50/80 to-white px-6 py-10 text-center">
+        <section className="flex min-h-0 flex-[4] flex-col items-center justify-center gap-3 overflow-hidden bg-gradient-to-b from-lime-50/80 to-white px-6 py-4 text-center">
           <span className="text-sm font-black text-gray-400">휴식</span>
           <p className="text-xl font-black text-brand-text">오늘은 쉬는 날이에요!</p>
           <p className="text-sm text-gray-400">푹 쉬고 내일 또 열심히 해봐요.</p>
@@ -701,6 +635,13 @@ export default function MissionTab({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
+      <MissionSleepMorningLayer
+        childId={childId}
+        today={today}
+        isFullRestDay={isFullRestDay}
+        completedCount={completedCount}
+        totalMissions={total}
+      />
       {redoPopupBlock}
       {popupBlock}
       {toast && (

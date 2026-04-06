@@ -12,6 +12,23 @@ module.exports = {
   ],
   theme: {
     extend: {
+      keyframes: {
+        /** 마켓 배달: 상품이 낙하산처럼 위에서 아래로 내려오는 연출 */
+        marketParachuteDrop: {
+          '0%': { transform: 'translateY(-55vh) translateX(-12px) scale(0.88)', opacity: '0' },
+          '12%': { opacity: '1' },
+          '100%': { transform: 'translateY(0) translateX(0) scale(1)', opacity: '1' },
+        },
+        /** 배달 오토바이 플로팅 아이콘: 살짝 위아래로 떠 있는 느낌 */
+        marketMotoBob: {
+          '0%, 100%': { transform: 'translateY(0)' },
+          '50%': { transform: 'translateY(-8px)' },
+        },
+      },
+      animation: {
+        'market-parachute': 'marketParachuteDrop 2.4s cubic-bezier(0.22, 1, 0.36, 1) forwards',
+        'market-moto': 'marketMotoBob 1.8s ease-in-out infinite',
+      },
       colors: {
         brand: {
           blue:   '#4A90E2',

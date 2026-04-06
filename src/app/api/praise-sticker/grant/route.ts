@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { PRAISE_ASSET_STICKER_KEYS } from '@/lib/praiseAssetStickers'
 import { PRAISE_STICKER_FRAME_KEYS } from '@/lib/shopAnimationsAtlas'
 import { PRAISE_UI_SPRITE_KEYS } from '@/lib/praiseStickerUi'
 
-const ALLOWED_SPRITE_KEYS = [...PRAISE_STICKER_FRAME_KEYS, ...PRAISE_UI_SPRITE_KEYS] as readonly string[]
+/** 부모가 보낼 수 있는 스티커 키(아틀라스 프레임 + UI 스프라이트 + PNG 에셋) */
+const ALLOWED_SPRITE_KEYS = [
+  ...PRAISE_STICKER_FRAME_KEYS,
+  ...PRAISE_UI_SPRITE_KEYS,
+  ...PRAISE_ASSET_STICKER_KEYS,
+] as readonly string[]
 
 /**
  * POST /api/praise-sticker/grant

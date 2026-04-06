@@ -37,3 +37,37 @@
     opacity: 0.85;
   }
 }
+
+/* 미션 탭: 전체 완료 시 이미지 컨페티 낙하 */
+@keyframes mission-confetti-fall {
+  0% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(110vh) rotate(720deg);
+    opacity: 0.85;
+  }
+}
+
+/* 미션 탭: 잘 자요 / 아침 알람 바텀시트 슬라이드 */
+@keyframes mission-sheet-slide-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+/* 미션 탭: 아침 해 일러스트가 아래에서 올라옴 */
+@keyframes mission-sun-slide-up {
+  from {
+    transform: translateY(120%);
+    opacity: 0.6;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}

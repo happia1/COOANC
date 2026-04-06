@@ -6,6 +6,7 @@ import ChildBottomSheetShell from '@/components/child/ChildBottomSheetShell'
 import SpriteFromAtlas from '@/components/child/SpriteFromAtlas'
 import { useShopAnimationsAtlas } from '@/components/child/useShopAnimationsAtlas'
 import PraiseUiIcon from '@/components/common/PraiseUiIcon'
+import { praiseAssetStickerUrl } from '@/lib/praiseAssetStickers'
 import { praiseUiKindFromSpriteKey } from '@/lib/praiseStickerUi'
 import { STICKER_BOARD_FRAME_KEY, type AnimationsAtlasFile } from '@/lib/shopAnimationsAtlas'
 import {
@@ -77,6 +78,21 @@ function GrantStickerThumb({
   /** UI 스티커일 때 배경 박스 없이 그림만 */
   plain?: boolean
 }) {
+  /** PNG 폴더 스티커(asset:…)는 스프라이트 시트가 아니라 단일 이미지로 그립니다 */
+  const assetSrc = praiseAssetStickerUrl(spriteKey)
+  if (assetSrc) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element -- 작은 썸네일, 동적 키 다수
+      <img
+        src={assetSrc}
+        alt=""
+        width={w}
+        height={w}
+        className={`object-contain ${plain ? '' : 'rounded-md bg-white/90 p-0.5 shadow-sm'}`}
+        style={{ width: w, height: w }}
+      />
+    )
+  }
   const ui = praiseUiKindFromSpriteKey(spriteKey)
   if (ui) return <PraiseUiIcon kind={ui} size={w} plain={plain} />
   return <SpriteFromAtlas atlas={atlas} frameKey={spriteKey} width={w} height={w} label={spriteKey} />

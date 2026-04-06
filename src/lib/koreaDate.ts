@@ -14,6 +14,22 @@ export function getSeoulDateString(d: Date = new Date()): string {
 }
 
 /**
+ * 서울 기준 현재 시각을 `HH:MM`(24시간)으로 돌려줍니다.
+ * 루틴 알람(기상 시각)과 문자열 비교할 때 사용합니다.
+ */
+export function getSeoulTimeHHMM(d: Date = new Date()): string {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Seoul',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(d)
+  const h = parts.find((p) => p.type === 'hour')?.value ?? '00'
+  const m = parts.find((p) => p.type === 'minute')?.value ?? '00'
+  return `${h.padStart(2, '0')}:${m.padStart(2, '0')}`
+}
+
+/**
  * YYYY-MM-DD 에 정수 일수를 더함 (UTC 달력 연산 후 다시 서울 날짜 문자열로 변환)
  * 스트릭용 "어제" 등에 사용
  */

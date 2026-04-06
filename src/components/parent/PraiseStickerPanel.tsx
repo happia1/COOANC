@@ -1,16 +1,7 @@
 'use client'
 
 import { useCallback, useState } from 'react'
-import PraiseUiIcon from '@/components/common/PraiseUiIcon'
-import type { PraiseUiKind } from '@/lib/praiseStickerUi'
-
-/** 화면에 보이는 순서: 하트얼굴 → 하트 → 날개별 → 별 */
-const STICKER_OPTIONS: { kind: PraiseUiKind; spriteKey: string; title: string }[] = [
-  { kind: 'heart_face', spriteKey: 'ui:heart_face', title: '하트 얼굴' },
-  { kind: 'heart', spriteKey: 'ui:heart', title: '하트' },
-  { kind: 'winged_star', spriteKey: 'ui:winged_star', title: '날개 별' },
-  { kind: 'star', spriteKey: 'ui:star', title: '별 스티커' },
-]
+import { PRAISE_ASSET_STICKER_OPTIONS, praiseAssetStickerUrl } from '@/lib/praiseAssetStickers'
 
 type Props = {
   childId: string | null
@@ -64,19 +55,29 @@ export default function PraiseStickerPanel({ childId, childName }: Props) {
         스티커를 클릭하면 자녀에게 스티커를 선물 할 수 있어요!
       </p>
 
-      <div className="flex flex-wrap items-center justify-center gap-3">
-        {STICKER_OPTIONS.map(({ kind, spriteKey, title }) => (
-          <button
-            key={spriteKey}
-            type="button"
-            disabled={loading}
-            onClick={() => setConfirmKey(spriteKey)}
-            className="flex flex-col items-center gap-1 rounded-2xl border-2 border-white/80 bg-white p-2 shadow-md transition active:scale-95 disabled:opacity-50"
-            title={title}
-          >
-            <PraiseUiIcon kind={kind} size={52} label={title} />
-          </button>
-        ))}
+      {/*
+        한 줄에 5개 × 3줄 = 15종 스티커.
+        버튼·이미지를 이전보다 작게 해서 좁은 화면에서도 한 줄에 다 들어가게 합니다.
+      */}
+      <div className="grid grid-cols-5 gap-x-1 gap-y-1.5">
+        {PRAISE_ASSET_STICKER_OPTIONS.map(({ spriteKey, title }) => {
+          const src = praiseAssetStickerUrl(spriteKey)
+          return (
+            <button
+              key={spriteKey}
+              type="button"
+              disabled={loading || !src}
+              onClick={() => setConfirmKey(spriteKey)}
+              className="flex aspect-square max-h-[52px] items-center justify-center rounded-xl border border-white/90 bg-white p-0.5 shadow-sm transition active:scale-95 disabled:opacity-50"
+              title={title}
+            >
+              {src ? (
+                // eslint-disable-next-line @next/next/no-img-element -- public 정적 PNG, next/image 크기 15종 고정보다 단순
+                <img src={src} alt="" className="h-8 w-8 object-contain" width={32} height={32} />
+              ) : null}
+            </button>
+          )
+        })}
       </div>
 
       {toast && (

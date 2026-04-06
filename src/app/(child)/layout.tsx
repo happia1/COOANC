@@ -29,14 +29,16 @@ export default async function ChildLayout({ children }: { children: ReactNode })
     childName = childProfile.name.trim()
   }
 
+  // `h-dvh` + `overflow-hidden`: 홈·미션 탭이 위아래 스크롤 없이 한 화면에 들어가도록 전체 높이를 기기 화면에 맞춤
   return (
-    <div className="relative flex min-h-screen flex-col bg-gradient-to-b from-sky-100/90 via-amber-50/50 to-green-50/80">
+    <div className="relative flex h-dvh max-h-dvh min-h-0 flex-col overflow-hidden bg-gradient-to-b from-sky-100/90 via-amber-50/50 to-green-50/80">
       <ChildTopBar childName={childName} isParentPreview={ctx.isParentPreview} />
       {/**
        * `min-h-0` + `flex` 로 자식이 뷰포트 높이를 넘지 않게 할 수 있음(홈·미션 한 화면).
        * 세로 스크롤이 필요한 탭(마켓·스티커)은 각 탭 루트에 `overflow-y-auto` 를 둠.
+       * `pb`: 하단 독 높이(60px) + 소량 여유 — 하단 패널과 독 사이 빈 화면을 줄임.
        */}
-      <main className="relative z-10 flex min-h-0 flex-1 flex-col overflow-hidden w-full max-w-md mx-auto px-4 pt-4 pb-24">
+      <main className="relative z-10 mx-auto flex min-h-0 w-full max-w-md flex-1 flex-col overflow-hidden px-4 pb-[calc(60px+0.35rem)] pt-4">
         {children}
       </main>
       <ChildNavBar />

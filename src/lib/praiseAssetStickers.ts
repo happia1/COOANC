@@ -1,0 +1,73 @@
+/**
+ * 칭찬 스티커 — public/assets/img/items/stickers/ 폴더의 PNG 파일을 씁니다.
+ *
+ * 왜 키(asset:sticker_01)를 따로 쓰나요?
+ * - DB(sprite_key)에는 공백·괄호가 없는 짧은 문자열만 두는 편이 안전합니다.
+ * - 실제 파일 이름(sticker (1).png 등)은 URL 인코딩으로만 연결합니다.
+ */
+
+/** 스티커 파일 이름(폴더 내 실제 파일과 동일해야 합니다) */
+const STICKER_PNG_FILES = [
+  'sticker (1).png',
+  'sticker (2).png',
+  'sticker (3).png',
+  'sticker (4).png',
+  'sticker (5).png',
+  'sticker (6).png',
+  'sticker (7).png',
+  'sticker (8).png',
+  'sticker (9).png',
+  'sticker (10).png',
+  'sticker (11).png',
+  'sticker (12).png',
+  'sticker (13).png',
+  'sticker (14).png',
+  'sticker (15).png',
+] as const
+
+/** 부모 패널·API 검증·DB 저장에 쓰는 고정 키 목록 */
+export const PRAISE_ASSET_STICKER_KEYS = [
+  'asset:sticker_01',
+  'asset:sticker_02',
+  'asset:sticker_03',
+  'asset:sticker_04',
+  'asset:sticker_05',
+  'asset:sticker_06',
+  'asset:sticker_07',
+  'asset:sticker_08',
+  'asset:sticker_09',
+  'asset:sticker_10',
+  'asset:sticker_11',
+  'asset:sticker_12',
+  'asset:sticker_13',
+  'asset:sticker_14',
+  'asset:sticker_15',
+] as const
+
+export type PraiseAssetStickerKey = (typeof PRAISE_ASSET_STICKER_KEYS)[number]
+
+/** 부모 화면 그리드에 쓰는 메타(순서 = 1번~15번 파일) */
+export const PRAISE_ASSET_STICKER_OPTIONS: readonly {
+  spriteKey: PraiseAssetStickerKey
+  title: string
+}[] = PRAISE_ASSET_STICKER_KEYS.map((spriteKey, i) => ({
+  spriteKey,
+  title: `칭찬 스티커 ${i + 1}`,
+}))
+
+/** 브라우저에서 불러올 경로(공백·괄호는 encodeURIComponent 로 처리) */
+export function praiseAssetStickerPublicUrl(fileName: string): string {
+  return `/assets/img/items/stickers/${encodeURIComponent(fileName)}`
+}
+
+/** DB 키 → 이미지 주소. 우리가 등록한 asset: 스티커가 아니면 null */
+export function praiseAssetStickerUrl(spriteKey: string): string | null {
+  const i = (PRAISE_ASSET_STICKER_KEYS as readonly string[]).indexOf(spriteKey)
+  if (i < 0) return null
+  return praiseAssetStickerPublicUrl(STICKER_PNG_FILES[i]!)
+}
+
+/** API에서 허용 목록을 만들 때 쓰는지 여부 */
+export function isPraiseAssetStickerKey(key: string): key is PraiseAssetStickerKey {
+  return (PRAISE_ASSET_STICKER_KEYS as readonly string[]).includes(key)
+}

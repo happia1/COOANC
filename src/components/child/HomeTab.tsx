@@ -23,10 +23,9 @@ type Props = {
 
 /**
  * 아이 앱 홈 탭
- * - 상단·하단 비율은 **미션 탭과 동일**: `ChildHomeSceneryBand` = 60dvh, 하단 = min 40dvh + flex-1 + 라임 그라데이션
- * - 풍경: `object-center` + 배경 레이어만 `CHILD_HOME_SCENERY_BG_LIFT_CLASS` 로 위로(알약·섬은 그대로)
- * - 토끼·섬만 `ChildHomeIslandStage` 래퍼: 이전 `-mt-10`/`12` 대비 **약 3배** 당김(`7.5rem` / `9rem`)
- * - EXP 바는 홈에서 숨김 · 꾸미기는 슬롯별 블록
+ * - **한 화면**: 상단 풍경·하단 꾸미기가 **6:4** 비율(`flex-[6]`/`flex-[4]`)로 나뉨
+ * - 섬 무대는 `ChildHomeIslandStage` 의 `density="flex"` 로 남는 세로 공간에 맞춤
+ * - 풍경: 배경 PNG 만 리프트, 알약·섬은 기존과 동일한 겹침(`-mt`)
  * - 부모가 칭찬 스티커를 내면 팝업 후 곰돌이 판에서 붙일 수 있음
  */
 export default function HomeTab({
@@ -173,20 +172,20 @@ export default function HomeTab({
   )
 
   /**
-   * 풍경에 붙여 올림(`-mt-*`). 배경 블록(그라데이션) 없이 레이아웃만.
-   * `-mt-*` 로 풍경·섬과 겹치며 꾸미기 블록을 위로 붙임(알약 행은 그대로).
+   * 하단 꾸미기 영역: 위 풍경과 **6:4**(`flex-[6]` / `flex-[4]`).
    */
-  const homeDecorPanelClass =
-    '-mt-20 relative z-10 flex min-h-[40dvh] flex-1 flex-col gap-2 overflow-y-auto px-1 pb-2 pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:-mt-24'
+  const homeBottomPanelClass =
+    'relative z-10 -mt-8 flex min-h-0 flex-[4] basis-0 flex-col gap-1 overflow-hidden px-1 pb-2 pt-1 sm:-mt-10'
 
   if (!stats) {
     return (
       <>
         <div className="flex min-h-0 flex-1 flex-col">
-          <ChildHomeSceneryBand ariaLabel="홈 배경">
+          <ChildHomeSceneryBand flexFill ariaLabel="홈 배경">
             <div className="shrink-0 space-y-2 py-1 text-center">
               <p className="text-sm text-gray-500">부모님이 미션을 만들어주실 거야.</p>
-              <div className="mt-1 flex w-full items-center justify-center gap-2">
+              {/** `z-20`: 아래 섬 무대(`-mt`·translate)가 위로 겹쳐도 지도·스티커 단추가 먼저 클릭되게 함 */}
+              <div className="relative z-20 mt-1 flex w-full items-center justify-center gap-2">
                 <MapActionPill onClick={() => setMapOpen(true)} />
                 <StickerActionPill
                   useCustomImage={clientReady && stickerFabImgOk}
@@ -195,14 +194,14 @@ export default function HomeTab({
                 />
               </div>
             </div>
-            {/** 스탯 없을 때도 섬·(없음) 무대만 위로 — 알약·문구는 그대로 */}
+            {/** `flex-1 min-h-0`: 풍경 밴드 안에서 섬이 남는 높이를 쓰고, 작은 화면에서도 잘리지 않게 줄어듦 */}
             <div className="flex min-h-0 flex-1 flex-col justify-end">
-              <div className="relative mx-auto flex w-full max-w-sm flex-col items-center -mt-[7.5rem] sm:-mt-[9rem]">
-                <ChildHomeIslandStage />
+              <div className="relative mx-auto flex min-h-0 w-full max-w-sm flex-1 flex-col items-center justify-end -mt-6 sm:-mt-8">
+                <ChildHomeIslandStage density="flex" />
               </div>
             </div>
           </ChildHomeSceneryBand>
-          <section className={homeDecorPanelClass} aria-label="내 캐릭터 꾸미기">
+          <section className={homeBottomPanelClass} aria-label="내 캐릭터 꾸미기">
             <CharacterDecorInventoryPlaceholder />
           </section>
         </div>
@@ -214,9 +213,10 @@ export default function HomeTab({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <ChildHomeSceneryBand ariaLabel="홈 배경">
+      <ChildHomeSceneryBand flexFill ariaLabel="홈 배경">
         {/** 상단 여백 거의 없음 — 부모 `pt-4` 만으로 알약과 가장자리 간격 유지 */}
-        <div className="mt-0 flex w-full shrink-0 items-center justify-between gap-1.5 sm:mt-1">
+        {/** `z-20`: 섬 무대가 음수 마진으로 위로 올라와도 연속·크레딧·지도·스티커가 클릭되게 함 */}
+        <div className="relative z-20 mt-0 flex w-full shrink-0 items-center justify-between gap-1.5 sm:mt-1">
           <StatPill label="연속" value={`${stats.streak_days}일`} className="shrink-0" />
           <div className="flex shrink-0 items-center gap-1.5">
             <MapActionPill onClick={() => setMapOpen(true)} />
@@ -236,8 +236,8 @@ export default function HomeTab({
 
         {/** 토끼·섬 무대만 `-mt` — 레벨업 배너는 아래 줄이라 같이 당겨지지 않음 */}
         <div className="flex min-h-0 flex-1 flex-col justify-end gap-1.5">
-          <div className="relative mx-auto flex w-full max-w-sm flex-col items-center -mt-[7.5rem] sm:-mt-[9rem]">
-            <ChildHomeIslandStage />
+          <div className="relative mx-auto flex min-h-0 w-full max-w-sm flex-1 flex-col items-center justify-end -mt-6 sm:-mt-8">
+            <ChildHomeIslandStage density="flex" />
           </div>
           {stats.promotion_pending && (
             <div className="flex items-center gap-2 rounded-xl border border-brand-yellow bg-brand-yellow/40 px-4 py-2">
@@ -247,7 +247,7 @@ export default function HomeTab({
         </div>
       </ChildHomeSceneryBand>
 
-      <section className={homeDecorPanelClass} aria-label="내 캐릭터 꾸미기">
+      <section className={homeBottomPanelClass} aria-label="내 캐릭터 꾸미기">
         <CharacterDecorInventoryPlaceholder />
       </section>
 
@@ -259,8 +259,9 @@ export default function HomeTab({
 
 /** 슬롯 한 칸 — 마켓 연동 시 썸네일로 교체 예정 */
 function DecorInventorySlot({ label = '비어 있음' }: { label?: string }) {
+  /** `flex-1` + `min-h`: 아래 40% 영역 높이를 2행이 나눠 써서 하단 빈 공간이 덜 보이게 함 */
   return (
-    <li className="flex aspect-square w-full items-center justify-center rounded-xl border border-amber-100/80 bg-[#f7f4eb] text-center text-[10px] font-medium text-gray-400 shadow-sm">
+    <li className="flex min-h-[44px] flex-1 basis-0 w-full items-center justify-center rounded-xl border border-amber-100/80 bg-[#f7f4eb] text-center text-[10px] font-medium text-gray-400 shadow-sm">
       {label}
     </li>
   )
@@ -274,23 +275,24 @@ function CharacterDecorInventoryPlaceholder() {
   const cols = 4
 
   return (
-    <div className="w-full pt-0.5" aria-labelledby="child-decor-heading">
+    /** 하단 패널 안에서 제목은 고정 높이, 슬롯 줄만 남는 세로 공간을 씀(세로 스크롤 없음). */
+    <div className="flex min-h-0 w-full flex-1 flex-col pt-0.5" aria-labelledby="child-decor-heading">
       {/** 제목·부제는 미션 「오늘의 미션」 줄과 같은 글자 크기·굵기 체계(`font-black`, `leading-tight`) */}
-      <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1">
+      <div className="mb-1 flex shrink-0 flex-wrap items-center gap-x-2 gap-y-1">
         <h2 id="child-decor-heading" className="text-base font-black leading-tight text-brand-text">
           내 캐릭터 꾸미기
         </h2>
         <p className="text-[11px] font-black leading-tight text-gray-500">나만의 캐릭터를 꾸며요! &gt;</p>
       </div>
       <div
-        className="-mx-1 overflow-x-auto overflow-y-hidden px-2 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden snap-x snap-mandatory"
+        className="-mx-1 min-h-0 flex-1 overflow-x-auto overflow-y-hidden px-2 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden snap-x snap-mandatory"
         style={{ WebkitOverflowScrolling: 'touch' }}
       >
-        <div className="flex w-max gap-1.5 pb-0.5" role="presentation">
+        <div className="flex h-full min-h-0 w-max gap-1.5" role="presentation">
           {Array.from({ length: cols }).map((_, c) => (
             <ul
               key={c}
-              className="flex w-[min(28vw,112px)] shrink-0 snap-center list-none flex-col gap-1.5 p-0"
+              className="flex h-full min-h-0 w-[min(28vw,112px)] shrink-0 snap-center list-none flex-col gap-1.5 p-0"
               aria-label={`꾸미기 슬롯 열 ${c + 1}`}
             >
               {[c, c + cols].map((idx) => (

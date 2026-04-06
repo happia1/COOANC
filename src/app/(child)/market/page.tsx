@@ -29,9 +29,9 @@ export default async function MarketPage() {
       .from('purchase_requests')
       .select('*')
       .eq('child_id', childId)
-      .in('status', ['pending', 'approved'])
+      .in('status', ['pending', 'approved', 'delivered'])
       .order('requested_at', { ascending: false })
-      .limit(10),
+      .limit(12),
   ])
 
   const level = statsRes.data?.current_level ?? 0

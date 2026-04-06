@@ -16,6 +16,9 @@ import ParentMarketMenuControl from '@/components/parent/ParentMarketMenuControl
 import PraiseStickerPanel from '@/components/parent/PraiseStickerPanel'
 import type { PurchaseRequest, StoreItem } from '@/types/database'
 import { createClient } from '@/lib/supabase/client'
+import SpriteImage from '@/components/common/SpriteImage'
+import { MARKET_ITEMS } from '@/constants/sprites'
+import { marketFrameKeyForItemId } from '@/lib/marketItemFrame'
 import { getSeoulDateString } from '@/lib/koreaDate'
 
 /** mission_logs 조회 시 부모 탭 목록과 동일한 필드(실시간 갱신용) */
@@ -156,7 +159,7 @@ export default function ApprovalTab({
     if (error || !data) return
     setLogs((prev) => {
       const rest = prev.filter((l) => l.child_id !== currentId)
-      return [...(data as MissionLog[]), ...rest]
+      return [...(data as unknown as MissionLog[]), ...rest]
     })
   }, [currentId])
 
@@ -217,7 +220,8 @@ export default function ApprovalTab({
     [currentId],
   )
 
-  async function handleApprove(requestId: string) {
+  /** 승인 / 바로 구매 둘 다 서버에서는 같은 「승인」처리 — 안내 문구만 다릅니다 */
+  async function handleApprove(requestId: string, mode: 'approve' | 'instant' = 'approve') {
     setLoading(requestId)
     try {
       const res = await fetch('/api/market/approve', {
@@ -232,7 +236,11 @@ export default function ApprovalTab({
         return
       }
       setRequests((prev) => prev.filter((r) => r.id !== requestId))
-      showToast('승인했어요. 자녀에게 전달됩니다.')
+      showToast(
+        mode === 'instant'
+          ? '바로 구매로 확정했어요. 자녀에게 배달이 시작됐다고 알려줘요.'
+          : '승인했어요. 자녀에게 전달됩니다.',
+      )
     } catch {
       showToast('네트워크 오류가 발생했어요', false)
     } finally {
@@ -314,7 +322,7 @@ export default function ApprovalTab({
         channel.subscribe((status) => {
           if (status === 'SUBSCRIBED') {
             void (async () => {
-              const { error: sendErr } = await channel.send({
+              const sendStatus = await channel.send({
                 type: 'broadcast',
                 event: 'redo_mission',
                 payload: {
@@ -327,8 +335,8 @@ export default function ApprovalTab({
               settled = true
               window.clearTimeout(timeout)
               void supabase.removeChannel(channel)
-              if (sendErr) reject(sendErr)
-              else resolve()
+              if (sendStatus === 'ok') resolve()
+              else reject(new Error(typeof sendStatus === 'string' ? sendStatus : 'send'))
             })()
             return
           }
@@ -451,46 +459,59 @@ export default function ApprovalTab({
           </div>
         ) : (
           <div className="flex flex-col gap-3">
-            {requestsForChild.map((req) => (
-              <div key={req.id} className="bg-white rounded-2xl p-4 shadow-sm border-l-4 border-amber-400">
-                <div className="flex items-start justify-between gap-2 mb-3">
-                  <div className="flex-1 min-w-0">
-                    <p className="font-bold text-brand-text">{req.item_name}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">{req.requested_at.slice(0, 10)}</p>
-                    {req.child_message && (
-                      <p className="text-xs text-gray-500 bg-gray-50 rounded-lg px-2 py-1 mt-2 italic">
-                        &ldquo;{req.child_message}&rdquo;
+            {requestsForChild.map((req) => {
+              const frame = marketFrameKeyForItemId(req.item_id, req.item_name)
+              return (
+                <div key={req.id} className="rounded-2xl border-l-4 border-amber-400 bg-white p-4 shadow-sm">
+                  <div className="mb-3 flex gap-3">
+                    {/* 자녀 마켓과 같은 스프라이트로 상품 그림을 보여 줍니다 */}
+                    <div className="flex h-[88px] w-[88px] shrink-0 items-end justify-center overflow-visible rounded-2xl bg-amber-50/80 ring-1 ring-amber-100">
+                      <SpriteImage sheet={MARKET_ITEMS} frame={frame} height={76} clipRotated={false} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-bold text-brand-text">{req.item_name}</p>
+                      <p className="mt-0.5 text-xs text-gray-400">{req.requested_at.slice(0, 10)}</p>
+                      <p className="mt-1 font-black tabular-nums text-brand-blue">
+                        {req.item_price.toLocaleString()} 크레딧
                       </p>
-                    )}
+                      <p className="text-[10px] text-gray-400">{req.item_type === 'digital' ? '디지털' : '실물'}</p>
+                      {req.child_message && (
+                        <p className="mt-2 rounded-lg bg-gray-50 px-2 py-1 text-xs italic text-gray-500">
+                          &ldquo;{req.child_message}&rdquo;
+                        </p>
+                      )}
+                    </div>
                   </div>
-                  <div className="text-right flex-shrink-0">
-                    <p className="font-black text-brand-blue text-lg tabular-nums">
-                      {req.item_price.toLocaleString()} 크레딧
-                    </p>
-                    <p className="text-[10px] text-gray-400">{req.item_type === 'digital' ? '디지털' : '실물'}</p>
-                  </div>
-                </div>
 
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setRejectModal({ requestId: req.id, itemName: req.item_name })}
-                    disabled={loading === req.id}
-                    className="flex-1 py-2.5 rounded-xl border border-red-200 text-red-500 text-sm font-bold transition-all active:scale-95 disabled:opacity-50"
-                  >
-                    반려
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleApprove(req.id)}
-                    disabled={loading === req.id}
-                    className="flex-1 py-2.5 rounded-xl bg-brand-blue text-white text-sm font-bold shadow-md transition-all active:scale-95 disabled:opacity-50"
-                  >
-                    {loading === req.id ? '처리 중...' : '승인'}
-                  </button>
+                  <div className="grid grid-cols-3 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setRejectModal({ requestId: req.id, itemName: req.item_name })}
+                      disabled={loading === req.id}
+                      className="rounded-xl border border-red-200 py-2.5 text-xs font-bold text-red-500 transition-all active:scale-95 disabled:opacity-50 sm:text-sm"
+                    >
+                      반려
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleApprove(req.id, 'approve')}
+                      disabled={loading === req.id}
+                      className="rounded-xl bg-brand-blue py-2.5 text-xs font-bold text-white shadow-md transition-all active:scale-95 disabled:opacity-50 sm:text-sm"
+                    >
+                      {loading === req.id ? '…' : '승인'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleApprove(req.id, 'instant')}
+                      disabled={loading === req.id}
+                      className="rounded-xl bg-emerald-600 py-2.5 text-xs font-bold text-white shadow-md transition-all active:scale-95 disabled:opacity-50 sm:text-sm"
+                    >
+                      바로 구매
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </section>
