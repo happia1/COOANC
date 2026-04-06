@@ -16,8 +16,10 @@ import { scaledMissionRewards } from '@/lib/missionRewardMultiplier'
 import { mergePraiseStickerGrantsFromServer } from '@/lib/mergePraiseStickerGrantsFromServer'
 import MissionSleepMorningLayer from '@/components/child/MissionSleepMorningLayer'
 import SpriteImage from '@/components/common/SpriteImage'
+import { ICONS } from '@/constants/sprites'
 import { MISSION_ROUTINES_ATLAS } from '@/constants/missionRoutineAtlas'
 import { missionRoutineIconFrame } from '@/lib/missionRoutineIconFrame'
+import MissionCreditToPiggyOverlay from '@/components/child/MissionCreditToPiggyOverlay'
 
 type Props = {
   childId: string
@@ -108,6 +110,11 @@ export default function MissionTab({
 
   /** 이미 SUBSCRIBED 인 채널에 바로 send — 매번 subscribe 하지 않아 부모 목록 갱신이 빨라집니다 */
   const parentLogBroadcastRef = useRef<RealtimeChannel | null>(null)
+
+  /** 미션 완료 시 돼지 저금통 위 크레딧 낙하 연출(토큰 증가 = 다시 재생) */
+  const [creditFxNonce, setCreditFxNonce] = useState(0)
+  const [creditFxOn, setCreditFxOn] = useState(false)
+  const endCreditFx = useCallback(() => setCreditFxOn(false), [])
 
   const ordered = useMemo(() => orderedMissionsForSlider(dailyMissions), [dailyMissions])
 
@@ -311,6 +318,11 @@ export default function MissionTab({
   function handleComplete(dm: DailyMissionWithTemplate) {
     if (done.has(dm.id)) return
 
+    if (!isFullRestDay) {
+      setCreditFxNonce((n) => n + 1)
+      setCreditFxOn(true)
+    }
+
     /** 낙관적: API 기다리지 않고 카드 제거(슬라이더에서 숨김). 콘페티는 전부 완료될 때만 별도 레이어에서 연출 */
     setDone((prev) => new Set([...prev, dm.id]))
 
@@ -358,7 +370,6 @@ export default function MissionTab({
   const exp = stats?.exp ?? 0
   const expToNext = Math.max(1, stats?.exp_to_next_level ?? 1)
   const promotionPending = Boolean(stats?.promotion_pending)
-  const currentLevel = stats?.current_level ?? 0
   const expPct = Math.min(100, (exp / expToNext) * 100)
 
   const completedCount = done.size
@@ -390,12 +401,17 @@ export default function MissionTab({
     </>
   )
 
-  /** 카드 바로 위 한 줄: 왼쪽 「오늘의 미션」·오른쪽 EXP(날짜 없음) */
+  /**
+   * 카드 바로 위 **한 행**: 왼쪽 제목 · 오른쪽 EXP.
+   * - 제목: `flex-[0_1_auto] min-w-0` → 공간이 부족하면 잘리기만 하고 줄바꿈 없음
+   * - EXP 블록: `flex-1 min-w-0` → **남는 가로 전부** 쓰므로 넓을수록 막대가 길어짐
+   * - 막대: `flex-1` + `min-w`/`max-w` 로 아주 좁을 때·넓을 때 끝값만 클램프
+   */
   const missionTitleAboveCards = (
     <div className="shrink-0 px-3 pb-0.5 pt-0">
-      <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-2 gap-y-1">
-        <div className="flex min-w-0 items-center gap-2">
-          <h2 className="text-base font-black leading-tight text-brand-text">오늘의 미션</h2>
+      <div className="flex min-w-0 flex-nowrap items-center gap-2">
+        <div className="flex min-w-0 flex-[0_1_auto] items-center gap-2 overflow-hidden">
+          <h2 className="min-w-0 truncate text-base font-black leading-tight text-brand-text">오늘의 미션</h2>
           {promotionPending && (
             <span className="shrink-0 rounded-full bg-amber-300/95 px-2 py-0.5 text-[9px] font-black text-amber-950 shadow-sm">
               Level up
@@ -403,24 +419,22 @@ export default function MissionTab({
           )}
         </div>
         <div
-          className="flex min-w-0 flex-wrap items-center justify-end gap-2"
+          className="flex min-w-0 flex-1 flex-nowrap items-center justify-end gap-1"
           role="group"
-          aria-label="경험치"
+          aria-label={`경험치 ${exp}, 목표 ${expToNext}`}
         >
-          <div className="relative h-2.5 w-[min(38vw,132px)] max-w-full shrink-0 overflow-hidden rounded-full bg-white/50 shadow-inner ring-1 ring-pink-300/50">
+          <div className="relative h-[18px] min-w-[3.25rem] max-w-[18rem] flex-1 overflow-hidden rounded-full bg-white/50 shadow-inner ring-1 ring-pink-300/50">
             <div
-              className="h-full rounded-full bg-gradient-to-r from-pink-300 to-pink-500 transition-all duration-500"
+              className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-pink-300 to-pink-500 transition-all duration-500"
               style={{ width: `${expPct}%` }}
             />
-          </div>
-          <span className="flex shrink-0 items-center gap-0.5 text-[11px] font-black tabular-nums text-pink-700">
-            <span aria-hidden>♥</span>
-            <span>
-              {exp}/{expToNext}
+            <span className="absolute left-1.5 top-1/2 z-10 -translate-y-1/2 text-[10px] font-black tabular-nums leading-none text-pink-950 drop-shadow-[0_0_2px_rgba(255,255,255,0.95)]">
+              {exp}
             </span>
-          </span>
-          <span className="shrink-0 text-[9px] font-bold tabular-nums text-emerald-800">
-            Lv.{currentLevel}
+          </div>
+          <span className="flex shrink-0 items-center gap-0.5 text-[10px] font-black tabular-nums text-pink-700 sm:text-[11px]">
+            <span aria-hidden>♥</span>
+            <span>{expToNext}</span>
           </span>
         </div>
       </div>
@@ -429,23 +443,38 @@ export default function MissionTab({
 
   /** 상단 풍경: `flexFill` 로 레이아웃이 주는 높이만 씀(고정 dvh 아님) */
   const heroBand = (
-    <ChildHomeSceneryBand flexFill ariaLabel="미션 배경">
+    <ChildHomeSceneryBand
+      flexFill
+      ariaLabel="미션 배경"
+      overlay={
+        creditFxOn ? (
+          <MissionCreditToPiggyOverlay playId={creditFxNonce} onFinish={endCreditFx} />
+        ) : null
+      }
+    >
       <div className="relative z-20 flex w-full shrink-0 items-center justify-between gap-1.5">
         <StatPill label="연속" value={`${streak}일`} className="shrink-0" />
-        <div className="flex shrink-0 items-center gap-1.5">
-          <MapActionPill onClick={() => setMapOpen(true)} />
-          <StickerActionPill
-            useCustomImage={stickerFabImgOk}
-            onImageError={() => setStickerFabImgOk(false)}
-            onClick={() => setBearOpen(true)}
-          />
-        </div>
         <StatPill label="크레딧" value={credits.toLocaleString()} highlight className="shrink-0" />
       </div>
 
       {/** `flex-1 min-h-0`: 홈과 같이 섬 무대가 풍경 밴드 안 남는 공간에 맞춰 줄어듦 */}
       <div className="flex min-h-0 flex-1 flex-col justify-end">
         <div className="relative mx-auto flex min-h-0 w-full max-w-sm flex-1 flex-col items-center justify-end -mt-6 sm:-mt-8">
+          {/** 홈 탭과 동일: 지도는 무대 왼쪽, 스티커(곰)는 오른쪽 세로 중앙 */}
+          <div className="pointer-events-none absolute inset-y-0 left-0 z-20 flex items-center pl-0.5 sm:pl-1">
+            <div className="pointer-events-auto shrink-0">
+              <MapActionPill onClick={() => setMapOpen(true)} />
+            </div>
+          </div>
+          <div className="pointer-events-none absolute inset-y-0 right-0 z-20 flex items-center pr-0.5 sm:pr-1">
+            <div className="pointer-events-auto shrink-0">
+              <StickerActionPill
+                useCustomImage={stickerFabImgOk}
+                onImageError={() => setStickerFabImgOk(false)}
+                onClick={() => setBearOpen(true)}
+              />
+            </div>
+          </div>
           <ChildHomeIslandStage scene="gippybank" missionPiggy={islandPiggyProgress} density="flex" />
         </div>
       </div>
@@ -470,7 +499,7 @@ export default function MissionTab({
         </div>
       ) : (
         <div
-          className="-mx-1 flex min-h-0 flex-1 items-stretch gap-1.5 overflow-x-auto overflow-y-hidden px-2 pb-0.5 pt-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden snap-x snap-mandatory"
+          className="-mx-1 flex min-h-0 flex-1 items-start gap-2 overflow-x-auto overflow-y-hidden px-2 pb-0.5 pt-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden snap-x snap-mandatory"
           style={{ WebkitOverflowScrolling: 'touch' }}
         >
           {incompleteOrdered.map((dm) => {
@@ -481,72 +510,80 @@ export default function MissionTab({
             const sub = cardSubtitle(m.description)
             const routineFrame = missionRoutineIconFrame(m.title, m.description)
             return (
-              <article
+              <button
                 key={dm.id}
+                type="button"
+                onClick={() => handleComplete(dm)}
+                aria-label={`${m.title} 미션 완료하기`}
                 className={[
-                  'snap-center flex h-full min-h-0 w-[min(42vw,158px)] shrink-0 flex-col rounded-xl border-2 px-1.5 pb-1 pt-1.5 shadow-sm transition-all',
-                  special
-                    ? 'border-amber-300/90 bg-gradient-to-b from-amber-50 to-yellow-50 shadow-amber-200/40'
-                    : 'border-amber-100/90 bg-amber-50/80',
+                  'snap-center flex min-h-[13.5rem] w-[min(44vw,176px)] shrink-0 flex-col rounded-xl border bg-white p-2.5 text-left font-sans text-brand-text shadow-md transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue focus-visible:ring-offset-2 active:scale-[0.97]',
+                  special ? 'border-amber-300 ring-2 ring-amber-200/60' : 'border-gray-200/90',
                 ].join(' ')}
               >
                 {/**
-                 * `routines_01.png` 아틀라스 프레임 — 회전 프레임은 `clipRotated={false}` 로 잘림 완화.
-                 * 이미지 파일이 없으면 Next/Image 처럼 깨져 보일 수 있으니 `public/.../routines_01.png` 를 두어야 함.
+                 * 카드 전체 탭 = 완료. 일반 미션은 흰 카드, 특별만 앰버 테두리.
+                 * `routines_01.png` 아틀라스 — `clipRotated={false}` 로 회전 프레임 잘림 완화.
                  */}
-                <div
-                  className={[
-                    'flex min-h-[5.75rem] w-full flex-shrink-0 items-center justify-center overflow-visible rounded-xl',
-                    special ? 'bg-gradient-to-br from-amber-100/80 to-yellow-100' : 'bg-white/85',
-                  ].join(' ')}
-                >
+                {/** 배경색 없음 — 아틀라스 일러스트만 흰 카드 위에 표시 */}
+                <div className="flex min-h-[7.25rem] w-full shrink-0 items-center justify-center overflow-visible">
                   <SpriteImage
                     sheet={MISSION_ROUTINES_ATLAS}
                     frame={routineFrame}
-                    width={72}
+                    width={82}
                     clipRotated={false}
-                    className="select-none drop-shadow-sm"
+                    className="select-none drop-shadow-[0_2px_8px_rgba(0,0,0,0.08)]"
                   />
                 </div>
 
-                <div className="mt-1 min-h-0 flex-1 text-center">
-                  <p className="line-clamp-2 text-[11px] font-black leading-[1.2] text-brand-text">{m.title}</p>
-                  {sub && <p className="mt-1 line-clamp-2 text-[8px] leading-tight text-gray-500">{sub}</p>}
+                <div className="mt-1.5 space-y-0.5 text-center">
+                  <p className="line-clamp-2 text-[12px] font-black leading-tight text-brand-text">{m.title}</p>
+                  {sub ? (
+                    <p className="line-clamp-2 text-[9px] font-medium leading-snug text-gray-500">{sub}</p>
+                  ) : null}
                 </div>
 
-                <div className="mt-auto flex items-center justify-center gap-1 border-t border-white/50 pt-1 text-[9px] font-black leading-none text-gray-700">
-                  <span className="flex items-center gap-0.5">
-                    <span aria-hidden className="text-[9px]">
-                      🪙
+                {/**
+                 * 보상 줄: 실제 파일은 `public/assets/img/common/ui/icons.png` 이고,
+                 * 여기서는 `ICONS` 상수로 같은 PNG를 가리킵니다(`/assets/img/common/ui/icons.png`).
+                 * 시안과 동일하게 한 줄: [크레딧 아이콘+숫자] [하트 아이콘+숫자] — 오른쪽은 EXP(텍스트 없이 하트로 표현).
+                 */}
+                <div className="mt-2 flex justify-center">
+                  <div
+                    className={[
+                      'inline-flex max-w-full flex-nowrap items-center justify-center gap-x-3 rounded-full px-3 py-1.5 text-[12px] font-black tabular-nums text-gray-800 shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] ring-1 ring-black/[0.06]',
+                      special ? 'bg-amber-100/90' : 'bg-stone-100/95',
+                    ].join(' ')}
+                    role="group"
+                    aria-label={`미션 보상: 크레딧 ${rewards.credit}, 경험치 ${rewards.exp}`}
+                  >
+                    {/** 왼쪽: 크레딧(동전) */}
+                    <span className="inline-flex items-center gap-1">
+                      <SpriteImage
+                        sheet={ICONS}
+                        frame="credit"
+                        width={18}
+                        clipRotated={false}
+                        className="shrink-0 select-none"
+                      />
+                      <span>{rewards.credit}</span>
                     </span>
-                    {rewards.credit}
-                  </span>
-                  {rewards.heart > 0 && (
-                    <span className="flex items-center gap-0.5 text-pink-600">
-                      <span aria-hidden>♥</span>
-                      {rewards.heart}
+                    {/** 오른쪽: 경험치 — 하트 그림이 EXP를 뜻함 */}
+                    <span className="inline-flex items-center gap-1" title="경험치(EXP)">
+                      <SpriteImage
+                        sheet={ICONS}
+                        frame="heart"
+                        width={18}
+                        className="shrink-0 select-none"
+                      />
+                      <span>{rewards.exp}</span>
                     </span>
-                  )}
-                  <span className="text-[8px] font-bold text-gray-400">+{rewards.exp} EXP</span>
+                  </div>
                 </div>
 
-                {rewards.mult > 1 && (
-                  <p className="mt-px text-center text-[7px] font-bold leading-tight text-amber-800">보상 {rewards.mult}배</p>
-                )}
-
-                <button
-                  type="button"
-                  onClick={() => handleComplete(dm)}
-                  className={[
-                    'mt-1 w-full rounded-lg py-1 text-[10px] font-black leading-none transition-all active:scale-[0.98]',
-                    special
-                      ? 'bg-gradient-to-r from-amber-500 to-yellow-500 text-white shadow-sm'
-                      : 'bg-brand-blue text-white shadow-sm',
-                  ].join(' ')}
-                >
-                  완료
-                </button>
-              </article>
+                {rewards.mult > 1 ? (
+                  <p className="mt-1 text-center text-[10px] font-bold leading-tight text-amber-800">보상 {rewards.mult}배</p>
+                ) : null}
+              </button>
             )
           })}
         </div>

@@ -184,19 +184,28 @@ export default function HomeTab({
           <ChildHomeSceneryBand flexFill ariaLabel="홈 배경">
             <div className="shrink-0 space-y-2 py-1 text-center">
               <p className="text-sm text-gray-500">부모님이 미션을 만들어주실 거야.</p>
-              {/** `z-20`: 아래 섬 무대(`-mt`·translate)가 위로 겹쳐도 지도·스티커 단추가 먼저 클릭되게 함 */}
-              <div className="relative z-20 mt-1 flex w-full items-center justify-center gap-2">
-                <MapActionPill onClick={() => setMapOpen(true)} />
-                <StickerActionPill
-                  useCustomImage={clientReady && stickerFabImgOk}
-                  onImageError={() => setStickerFabImgOk(false)}
-                  onClick={openBearFromFab}
-                />
-              </div>
             </div>
             {/** `flex-1 min-h-0`: 풍경 밴드 안에서 섬이 남는 높이를 쓰고, 작은 화면에서도 잘리지 않게 줄어듦 */}
             <div className="flex min-h-0 flex-1 flex-col justify-end">
+              {/**
+               * 지도는 무대 **왼쪽**, 곰(스티커)은 **오른쪽** 세로 가운데.
+               * `pointer-events-none` 으로 빈 곳 탭은 통과하고 단추만 눌리게 함.
+               */}
               <div className="relative mx-auto flex min-h-0 w-full max-w-sm flex-1 flex-col items-center justify-end -mt-6 sm:-mt-8">
+                <div className="pointer-events-none absolute inset-y-0 left-0 z-20 flex items-center pl-0.5 sm:pl-1">
+                  <div className="pointer-events-auto shrink-0">
+                    <MapActionPill onClick={() => setMapOpen(true)} />
+                  </div>
+                </div>
+                <div className="pointer-events-none absolute inset-y-0 right-0 z-20 flex items-center pr-0.5 sm:pr-1">
+                  <div className="pointer-events-auto shrink-0">
+                    <StickerActionPill
+                      useCustomImage={clientReady && stickerFabImgOk}
+                      onImageError={() => setStickerFabImgOk(false)}
+                      onClick={openBearFromFab}
+                    />
+                  </div>
+                </div>
                 <ChildHomeIslandStage density="flex" />
               </div>
             </div>
@@ -215,17 +224,9 @@ export default function HomeTab({
     <div className="flex min-h-0 flex-1 flex-col">
       <ChildHomeSceneryBand flexFill ariaLabel="홈 배경">
         {/** 상단 여백 거의 없음 — 부모 `pt-4` 만으로 알약과 가장자리 간격 유지 */}
-        {/** `z-20`: 섬 무대가 음수 마진으로 위로 올라와도 연속·크레딧·지도·스티커가 클릭되게 함 */}
+        {/** `z-20`: 섬이 `-mt` 로 올라와도 연속·크레딧 알약이 먼저 눌리게 함 (지도·곰은 무대 좌·우) */}
         <div className="relative z-20 mt-0 flex w-full shrink-0 items-center justify-between gap-1.5 sm:mt-1">
           <StatPill label="연속" value={`${stats.streak_days}일`} className="shrink-0" />
-          <div className="flex shrink-0 items-center gap-1.5">
-            <MapActionPill onClick={() => setMapOpen(true)} />
-            <StickerActionPill
-              useCustomImage={clientReady && stickerFabImgOk}
-              onImageError={() => setStickerFabImgOk(false)}
-              onClick={openBearFromFab}
-            />
-          </div>
           <StatPill
             label="크레딧"
             value={stats.credits.toLocaleString('ko-KR')}
@@ -237,6 +238,20 @@ export default function HomeTab({
         {/** 토끼·섬 무대만 `-mt` — 레벨업 배너는 아래 줄이라 같이 당겨지지 않음 */}
         <div className="flex min-h-0 flex-1 flex-col justify-end gap-1.5">
           <div className="relative mx-auto flex min-h-0 w-full max-w-sm flex-1 flex-col items-center justify-end -mt-6 sm:-mt-8">
+            <div className="pointer-events-none absolute inset-y-0 left-0 z-20 flex items-center pl-0.5 sm:pl-1">
+              <div className="pointer-events-auto shrink-0">
+                <MapActionPill onClick={() => setMapOpen(true)} />
+              </div>
+            </div>
+            <div className="pointer-events-none absolute inset-y-0 right-0 z-20 flex items-center pr-0.5 sm:pr-1">
+              <div className="pointer-events-auto shrink-0">
+                <StickerActionPill
+                  useCustomImage={clientReady && stickerFabImgOk}
+                  onImageError={() => setStickerFabImgOk(false)}
+                  onClick={openBearFromFab}
+                />
+              </div>
+            </div>
             <ChildHomeIslandStage density="flex" />
           </div>
           {stats.promotion_pending && (

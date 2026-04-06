@@ -15,24 +15,25 @@ import { useState } from 'react'
 export function MapActionPill({ onClick }: { onClick: () => void }) {
   const [mapImgOk, setMapImgOk] = useState(true)
 
+  /** 아이콘을 키운 만큼 `p-1.5` 로 탭하기 좋은 영역을 유지합니다. */
   return (
     <button
       type="button"
       onClick={onClick}
-      className="flex shrink-0 items-center justify-center rounded-md bg-transparent p-1 shadow-none transition active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/35"
+      className="flex shrink-0 items-center justify-center rounded-md bg-transparent p-1.5 shadow-none transition active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/35"
       aria-label="성장 지도와 뱃지 열기"
     >
       {mapImgOk ? (
         <Image
           src="/assets/img/common/ui/map.png"
           alt=""
-          width={20}
-          height={20}
-          className="h-5 w-5 object-contain"
+          width={36}
+          height={36}
+          className="h-9 w-9 object-contain sm:h-10 sm:w-10"
           onError={() => setMapImgOk(false)}
         />
       ) : (
-        <svg className="h-5 w-5 text-emerald-600" viewBox="0 0 24 24" fill="none" aria-hidden>
+        <svg className="h-9 w-9 text-emerald-600 sm:h-10 sm:w-10" viewBox="0 0 24 24" fill="none" aria-hidden>
           <path
             d="M4 16.5 9 13l4 3 7-5v9H4v-5.5Z"
             stroke="currentColor"
@@ -66,24 +67,25 @@ export function StickerActionPill({
   useCustomImage: boolean
   onImageError: () => void
 }) {
+  /** 지도 단추와 동일한 크기·패딩으로 화면에서 짝을 맞춥니다. */
   return (
     <button
       type="button"
       onClick={onClick}
-      className="relative flex shrink-0 items-center justify-center rounded-md bg-transparent p-1 shadow-none transition active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/35"
+      className="relative flex shrink-0 items-center justify-center rounded-md bg-transparent p-1.5 shadow-none transition active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/35"
       aria-label="스티커 보관함과 곰돌이 판 열기"
     >
       {useCustomImage ? (
         <Image
           src="/assets/img/common/ui/sticker_icon.png"
           alt=""
-          width={20}
-          height={20}
-          className="h-5 w-5 object-contain"
+          width={36}
+          height={36}
+          className="h-9 w-9 object-contain sm:h-10 sm:w-10"
           onError={onImageError}
         />
       ) : (
-        <svg className="h-5 w-5 text-brand-blue" viewBox="0 0 24 24" fill="none" aria-hidden>
+        <svg className="h-9 w-9 text-brand-blue sm:h-10 sm:w-10" viewBox="0 0 24 24" fill="none" aria-hidden>
           <path
             d="M4 4.5h10.5a2.5 2.5 0 0 1 2.5 2.5v6a2 2 0 0 1-2 2H9l-3.5 3v-3H5a2 2 0 0 1-2-2v-6a2.5 2.5 0 0 1 2.5-2.5Z"
             stroke="currentColor"

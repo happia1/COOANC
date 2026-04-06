@@ -13,6 +13,11 @@ export const CHILD_HOME_SCENERY_BG_LIFT_CLASS = '-translate-y-[24%] scale-[1.1]'
 type Props = {
   /** 연속일·크레딧, 섬·캐릭터 등 */
   children: ReactNode
+  /**
+   * 배경 위·알약·섬보다 위(z)에 그리는 레이어(미션 완료 크레딧 낙하 등).
+   * `pointer-events-none` 을 넣어 두면 하단 버튼이 막히지 않음.
+   */
+  overlay?: ReactNode
   /** 접근성: 섹션 설명 (미션은 "미션 배경", 홈은 "홈 배경" 등) */
   ariaLabel?: string
   /** `<section>` 에 추가 클래스 */
@@ -37,6 +42,7 @@ type Props = {
  */
 export default function ChildHomeSceneryBand({
   children,
+  overlay = null,
   ariaLabel = '배경',
   className = '',
   backgroundImageClassName = CHILD_HOME_SCENERY_BG_LIFT_CLASS,
@@ -46,9 +52,12 @@ export default function ChildHomeSceneryBand({
     ? 'min-h-0 flex-[6] basis-0'
     : 'h-[60dvh] min-h-[220px] shrink-0'
 
+  /** 오버레이(크레딧 낙하 등)가 세로로 잘리지 않게 — 없을 때만 배경과 맞춰 `overflow-hidden` 유지 */
+  const overflowClass = overlay ? 'overflow-x-hidden overflow-y-visible' : 'overflow-hidden'
+
   return (
     <section
-      className={`relative isolate -mx-4 -mt-4 flex flex-col overflow-hidden ${heightClass} ${className}`.trim()}
+      className={`relative isolate -mx-4 -mt-4 flex flex-col ${overflowClass} ${heightClass} ${className}`.trim()}
       aria-label={ariaLabel}
     >
       <div
@@ -64,6 +73,8 @@ export default function ChildHomeSceneryBand({
           priority
         />
       </div>
+
+      {overlay}
 
       <div className="relative z-10 flex min-h-0 flex-1 flex-col px-4 pb-0 pt-4">{children}</div>
     </section>
