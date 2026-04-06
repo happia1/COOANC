@@ -1,14 +1,13 @@
 'use client'
 
-import Image from 'next/image'
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { ChildStats, DailyMissionWithTemplate, PraiseStickerGrant, PraiseStickerPlacement } from '@/types/database'
 import GrowthMapSheet, { type GrowthMapSheetData } from '@/components/child/GrowthMapSheet'
 import BearStickerSheet from '@/components/child/BearStickerSheet'
 import { MapActionPill, StatPill, StickerActionPill } from '@/components/child/ChildSceneryTopPills'
+import ChildHomeIslandStage from '@/components/child/ChildHomeIslandStage'
 import ChildHomeSceneryBand from '@/components/child/ChildHomeSceneryBand'
-import { formatDateDot } from '@/lib/koreaDate'
 import { parseSpecialMissionPopup } from '@/lib/specialMissionDescription'
 import { isSpecialSectionMission } from '@/lib/specialMissionChips'
 import { parseAlarmFromMissionDescription } from '@/lib/missionAlarmDescription'
@@ -76,9 +75,9 @@ function orderedMissionsForSlider(list: DailyMissionWithTemplate[]): DailyMissio
 
 /**
  * 미션 탭
- * - 상단: `ChildHomeSceneryBand`(60dvh) + 알약 줄 + 섬(지피뱅크) — 홈과 배경·비율 공통
- * - 잔디 구간: 오늘의 미션 제목과 EXP 막대
- * - 하단: min 40dvh + 가로 스냅 슬라이더
+ * - 상단: `ChildHomeSceneryBand`(60dvh, 배경만 리프트) + 알약 + 지피뱅크 섬 — 홈과 동일
+ * - 하단 카드 위 한 줄: 왼쪽 「오늘의 미션」·오른쪽 EXP(날짜 없음)
+ * - 하단: `-mt-12` 로 풍경에 붙임 · 라임 그라데이션 패널 없음 + 가로 스냅 카드
  */
 export default function MissionTab({
   childId,
@@ -252,20 +251,12 @@ export default function MissionTab({
     </>
   )
 
-  /**
-   * 잔디 위 헤더: 날짜 다음 줄에 **오늘의 미션** 과 **EXP 막대·수치·레벨** 을 같은 가로줄에 둡니다.
-   * (미션을 하면 EXP 가 오르므로 완료 n/m 이중 막대는 제거했습니다.)
-   */
-  const grassMissionHeader = (
-    <div className="relative z-[2] w-full px-3 pb-2 pt-1">
-      <p className="text-[10px] font-bold text-emerald-900/70 [text-shadow:0_1px_0_rgba(255,255,255,0.85)]">
-        {formatDateDot(today)}
-      </p>
-      <div className="mt-1 flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5">
+  /** 카드 바로 위 한 줄: 왼쪽 「오늘의 미션」·오른쪽 EXP(날짜 없음) */
+  const missionTitleAboveCards = (
+    <div className="shrink-0 px-3 pb-0.5 pt-0">
+      <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-2 gap-y-1">
         <div className="flex min-w-0 items-center gap-2">
-          <p className="text-base font-black leading-tight text-emerald-950 [text-shadow:0_1px_1px_rgba(255,255,255,0.9)]">
-            오늘의 미션
-          </p>
+          <h2 className="text-base font-black leading-tight text-brand-text">오늘의 미션</h2>
           {promotionPending && (
             <span className="shrink-0 rounded-full bg-amber-300/95 px-2 py-0.5 text-[9px] font-black text-amber-950 shadow-sm">
               Level up
@@ -273,7 +264,7 @@ export default function MissionTab({
           )}
         </div>
         <div
-          className="flex w-full min-w-0 flex-wrap items-center justify-end gap-2 sm:w-auto sm:flex-nowrap sm:shrink-0"
+          className="flex min-w-0 flex-wrap items-center justify-end gap-2"
           role="group"
           aria-label="경험치"
         >
@@ -283,13 +274,13 @@ export default function MissionTab({
               style={{ width: `${expPct}%` }}
             />
           </div>
-          <span className="flex shrink-0 items-center gap-0.5 text-[11px] font-black tabular-nums text-pink-700 [text-shadow:0_1px_0_rgba(255,255,255,0.9)]">
+          <span className="flex shrink-0 items-center gap-0.5 text-[11px] font-black tabular-nums text-pink-700">
             <span aria-hidden>♥</span>
             <span>
               {exp}/{expToNext}
             </span>
           </span>
-          <span className="shrink-0 text-[9px] font-bold tabular-nums text-emerald-900/80 [text-shadow:0_1px_0_rgba(255,255,255,0.85)]">
+          <span className="shrink-0 text-[9px] font-bold tabular-nums text-emerald-800">
             Lv.{currentLevel}
           </span>
         </div>
@@ -297,7 +288,7 @@ export default function MissionTab({
     </div>
   )
 
-  /** 상단 60dvh — `ChildHomeSceneryBand` 로 홈과 배경·비율 공통화, 섬만 지피뱅크 PNG */
+  /** 상단 60dvh — `ChildHomeIslandStage scene="gippybank"` 로 홈과 섬 위치·박스 동일, 이미지만 지피뱅크 */
   const heroBand = (
     <ChildHomeSceneryBand ariaLabel="미션 배경">
       <div className="flex w-full shrink-0 items-center justify-between gap-1.5">
@@ -315,29 +306,19 @@ export default function MissionTab({
 
       <div className="flex min-h-0 flex-1 flex-col justify-end">
         <div className="relative mx-auto flex w-full max-w-sm flex-col items-center">
-          <div className="relative mx-auto h-[min(46dvh,400px)] min-h-[280px] w-full max-w-[20rem]">
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 z-0 flex justify-center overflow-visible">
-              <Image
-                src="/assets/img/layouts/backgrounds/kids_background_island_gippybank.png"
-                alt=""
-                width={900}
-                height={420}
-                className="h-auto w-[118%] max-w-none select-none object-contain object-bottom [transform:translateY(4%)]"
-                priority
-              />
-            </div>
-          </div>
+          {/* 홈 `ChildHomeIslandStage` 와 동일 STAGE_OUTER_CLASS · translate — 섬만 gippybank PNG */}
+          <ChildHomeIslandStage scene="gippybank" />
         </div>
-        {!isFullRestDay ? grassMissionHeader : null}
       </div>
     </ChildHomeSceneryBand>
   )
 
   const bottomPanel = (
     <section
-      className="flex min-h-[40dvh] flex-1 flex-col gap-2 bg-gradient-to-b from-lime-50/80 via-amber-50/30 to-white px-1 pb-2 pt-2"
+      className="-mt-12 relative z-10 flex min-h-[40dvh] flex-1 flex-col gap-1 px-1 pb-1.5 pt-1 sm:-mt-14"
       aria-label="오늘의 미션 카드"
     >
+      {missionTitleAboveCards}
       {ordered.length === 0 ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 py-8 text-center">
           <p className="font-bold text-brand-text">아직 미션이 없어요</p>
@@ -345,7 +326,7 @@ export default function MissionTab({
         </div>
       ) : (
         <div
-          className="-mx-1 flex min-h-0 flex-1 gap-3 overflow-x-auto overflow-y-hidden px-3 pb-3 pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden snap-x snap-mandatory"
+          className="-mx-1 flex min-h-0 flex-1 items-start gap-1 overflow-x-auto overflow-y-hidden px-2 pb-1 pt-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden snap-x snap-mandatory"
           style={{ WebkitOverflowScrolling: 'touch' }}
         >
           {ordered.map((dm) => {
@@ -362,7 +343,7 @@ export default function MissionTab({
               <article
                 key={dm.id}
                 className={[
-                  'snap-center shrink-0 flex w-[min(78vw,280px)] flex-col rounded-3xl border-2 p-4 shadow-lg transition-all',
+                  'snap-center shrink-0 flex w-[min(39vw,140px)] flex-col rounded-xl border-2 px-1 pt-1 pb-0 shadow-sm transition-all',
                   special
                     ? isCompleted
                       ? 'border-amber-200/80 bg-amber-50/50 opacity-90'
@@ -372,10 +353,10 @@ export default function MissionTab({
                       : 'border-amber-100/90 bg-amber-50/80',
                 ].join(' ')}
               >
-                <div className="relative flex flex-col items-center pt-6">
+                <div className="relative flex flex-col items-center pt-1.5">
                   <div
                     className={[
-                      'absolute top-0 flex h-9 w-9 items-center justify-center rounded-full text-sm font-black text-white shadow-md',
+                      'absolute -top-0.5 left-1/2 z-[1] flex h-4 w-4 -translate-x-1/2 items-center justify-center rounded-full text-[8px] font-black text-white shadow-sm',
                       isCompleted ? 'bg-pink-400' : 'bg-gray-300',
                     ].join(' ')}
                     aria-hidden
@@ -384,60 +365,62 @@ export default function MissionTab({
                   </div>
                   <div
                     className={[
-                      'flex h-28 w-full items-center justify-center rounded-2xl text-5xl leading-none',
+                      'flex h-10 w-full items-center justify-center rounded-lg text-2xl leading-none',
                       special ? 'bg-gradient-to-br from-amber-100/80 to-yellow-100' : 'bg-white/70',
                     ].join(' ')}
                   >
                     {m.icon_emoji?.trim() ? (
                       <span aria-hidden>{m.icon_emoji.trim()}</span>
                     ) : (
-                      <span className="text-2xl font-black text-gray-400">{m.title.slice(0, 1)}</span>
+                      <span className="text-base font-black text-gray-400">{m.title.slice(0, 1)}</span>
                     )}
                   </div>
                 </div>
 
-                <div className="mt-3 min-h-0 flex-1 text-center">
+                <div className="mt-0.5 text-center">
                   <p
-                    className={`line-clamp-2 text-sm font-black ${isCompleted ? 'text-gray-400 line-through' : 'text-brand-text'}`}
+                    className={`line-clamp-2 text-[10px] font-black leading-[1.15] ${isCompleted ? 'text-gray-400 line-through' : 'text-brand-text'}`}
                   >
                     {m.title}
                   </p>
-                  <div className="mt-1 flex flex-wrap items-center justify-center gap-1">
+                  <div className="mt-px flex flex-wrap items-center justify-center gap-px">
                     <span
-                      className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold ${DIFFICULTY_COLOR[m.difficulty] ?? 'bg-gray-100 text-gray-500'}`}
+                      className={`rounded-full px-1 py-px text-[8px] font-bold leading-tight ${DIFFICULTY_COLOR[m.difficulty] ?? 'bg-gray-100 text-gray-500'}`}
                     >
                       {DIFFICULTY_LABEL[m.difficulty] ?? m.difficulty}
                     </span>
                     {block && (
-                      <span className="rounded-full bg-white/80 px-1.5 py-0.5 text-[9px] font-bold text-gray-500">
+                      <span className="rounded-full bg-white/80 px-1 py-px text-[8px] font-bold leading-tight text-gray-500">
                         {block}
                       </span>
                     )}
                     {timeLabel && (
-                      <span className="rounded-full bg-sky-50 px-1.5 py-0.5 text-[9px] font-bold text-sky-600">
+                      <span className="rounded-full bg-sky-50 px-1 py-px text-[8px] font-bold leading-tight text-sky-600">
                         {timeLabel}
                       </span>
                     )}
                   </div>
-                  {sub && <p className="mt-1 line-clamp-2 text-[10px] text-gray-500">{sub}</p>}
+                  {sub && <p className="mt-px line-clamp-2 text-[7px] leading-tight text-gray-500">{sub}</p>}
                 </div>
 
-                <div className="mt-3 flex items-center justify-center gap-3 border-t border-white/60 pt-3 text-xs font-black text-gray-700">
-                  <span className="flex items-center gap-1">
-                    <span aria-hidden>🪙</span>
+                <div className="mt-0.5 flex items-center justify-center gap-1 border-t border-white/50 pt-0.5 text-[9px] font-black leading-none text-gray-700">
+                  <span className="flex items-center gap-0.5">
+                    <span aria-hidden className="text-[9px]">
+                      🪙
+                    </span>
                     {rewards.credit}
                   </span>
                   {rewards.heart > 0 && (
-                    <span className="flex items-center gap-1 text-pink-600">
+                    <span className="flex items-center gap-0.5 text-pink-600">
                       <span aria-hidden>♥</span>
                       {rewards.heart}
                     </span>
                   )}
-                  <span className="text-[10px] font-bold text-gray-400">+{rewards.exp} EXP</span>
+                  <span className="text-[8px] font-bold text-gray-400">+{rewards.exp} EXP</span>
                 </div>
 
                 {rewards.mult > 1 && (
-                  <p className="mt-1 text-center text-[9px] font-bold text-amber-800">보상 {rewards.mult}배</p>
+                  <p className="mt-px text-center text-[7px] font-bold leading-tight text-amber-800">보상 {rewards.mult}배</p>
                 )}
 
                 <button
@@ -445,14 +428,14 @@ export default function MissionTab({
                   onClick={() => handleComplete(dm)}
                   disabled={isCompleted || isLoading}
                   className={[
-                    'mt-3 w-full rounded-2xl py-3 text-sm font-black transition-all active:scale-[0.98]',
+                    'mt-0.5 w-full rounded-lg py-0.5 text-[10px] font-black leading-none transition-all active:scale-[0.98]',
                     isCompleted
                       ? 'bg-gray-200/80 text-gray-500'
                       : isLoading
                         ? 'cursor-wait bg-gray-100 text-gray-400'
                         : special
-                          ? 'bg-gradient-to-r from-amber-500 to-yellow-500 text-white shadow-md'
-                          : 'bg-brand-blue text-white shadow-md',
+                          ? 'bg-gradient-to-r from-amber-500 to-yellow-500 text-white shadow-sm'
+                          : 'bg-brand-blue text-white shadow-sm',
                   ].join(' ')}
                 >
                   {isCompleted ? '완료!' : isLoading ? '…' : '완료'}
@@ -480,7 +463,7 @@ export default function MissionTab({
       aria-labelledby="sp-pop-title"
     >
       <button type="button" className="absolute inset-0 bg-black/50" aria-label="닫기" onClick={dismissSpecialPopup} />
-      <div className="relative z-[1] max-h-[min(85dvh,calc(100vh-2rem))] w-full max-w-sm overflow-y-auto rounded-2xl border-2 border-amber-400/80 bg-gradient-to-b from-amber-50 via-yellow-50 to-amber-100 p-5 shadow-xl shadow-amber-200/40">
+      <div className="relative z-[1] max-h-[min(85dvh,calc(100vh-2rem))] w-full max-w-sm overflow-y-auto rounded-2xl border-2 border-amber-400/80 bg-gradient-to-b from-amber-50 via-yellow-50 to-amber-100 p-5 shadow-xl shadow-amber-200/40 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <p id="sp-pop-title" className="text-center text-lg font-black text-amber-900">
           {specialPopup.headline}
         </p>

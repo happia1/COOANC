@@ -24,7 +24,7 @@ type Props = {
 /**
  * 아이 앱 홈 탭
  * - 상단·하단 비율은 **미션 탭과 동일**: `ChildHomeSceneryBand` = 60dvh, 하단 = min 40dvh + flex-1 + 라임 그라데이션
- * - 홈만 풍경 밴드에 `className` 으로 배경·알약·섬·토끼 묶음을 한꺼번에 살짝 위로
+ * - 풍경: `object-center` + 배경 레이어만 `CHILD_HOME_SCENERY_BG_LIFT_CLASS` 로 위로(알약·섬은 그대로)
  * - 섬 박스는 `ChildHomeIslandStage` 가 미션 섬과 같은 높이 + 홈용 추가 translate
  * - EXP 바는 홈에서 숨김 · 꾸미기는 슬롯별 블록
  * - 부모가 칭찬 스티커를 내면 팝업 후 곰돌이 판에서 붙일 수 있음
@@ -217,18 +217,17 @@ export default function HomeTab({
     <PraiseGiftArrivalModal open={arrivalOpen} onGoStickers={openBearFromGift} />
   )
 
-  /** 미션 `bottomPanel` 과 동일: 최소 40dvh + 남는 높이 흡수 + 배경 그라데이션 */
+  /**
+   * 풍경에 붙여 올림(`-mt-*`). 배경 블록(그라데이션) 없이 레이아웃만.
+   */
   const homeDecorPanelClass =
-    'flex min-h-[40dvh] flex-1 flex-col gap-2 overflow-y-auto bg-gradient-to-b from-lime-50/80 via-amber-50/30 to-white px-1 pb-2 pt-2'
-
-  /** 배경 이미지 + 상단 알약 + 섬·토끼 블록 전체를 조금 위로 (미션 탭은 className 미전달) */
-  const homeSceneryLiftClass = '-translate-y-7 sm:-translate-y-9'
+    '-mt-12 relative z-10 flex min-h-[40dvh] flex-1 flex-col gap-2 overflow-y-auto px-1 pb-2 pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:-mt-14'
 
   if (!stats) {
     return (
       <>
         <div className="flex min-h-0 flex-1 flex-col">
-          <ChildHomeSceneryBand ariaLabel="홈 배경" className={homeSceneryLiftClass}>
+          <ChildHomeSceneryBand ariaLabel="홈 배경">
             <div className="shrink-0 space-y-2 py-1 text-center">
               <p className="text-sm text-gray-500">부모님이 미션을 만들어주실 거야.</p>
               <div className="mt-8 flex w-full items-center justify-center gap-2">
@@ -258,7 +257,7 @@ export default function HomeTab({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <ChildHomeSceneryBand ariaLabel="홈 배경" className={homeSceneryLiftClass}>
+      <ChildHomeSceneryBand ariaLabel="홈 배경">
         <div className="mt-8 flex w-full shrink-0 items-center justify-between gap-1.5 sm:mt-10">
           <StatPill label="연속" value={`${stats.streak_days}일`} className="shrink-0" />
           <div className="flex shrink-0 items-center gap-1.5">
@@ -299,30 +298,48 @@ export default function HomeTab({
   )
 }
 
+/** 슬롯 한 칸 — 마켓 연동 시 썸네일로 교체 예정 */
+function DecorInventorySlot({ label = '비어 있음' }: { label?: string }) {
+  return (
+    <li className="flex aspect-square w-full items-center justify-center rounded-xl border border-amber-100/80 bg-[#f7f4eb] text-center text-[10px] font-medium text-gray-400 shadow-sm">
+      {label}
+    </li>
+  )
+}
+
 /**
- * 꾸미기 인벤토리 — 위에 제목·부제 한 줄, 아래는 슬롯마다 둥근 블록만.
- * (실제 아이템은 마켓 구매 후 썸네일로 채울 예정)
+ * 꾸미기 인벤토리 — 제목 아래 **2행 고정**, 열 방향으로 가로 스냅 스크롤(미션 카드와 유사).
+ * 8칸 = 4열(가로 스크롤) × 2행(고정): 열 c 는 인덱스 c(위)·c+4(아래).
  */
 function CharacterDecorInventoryPlaceholder() {
+  const cols = 4
+
   return (
     <div className="w-full pt-0.5" aria-labelledby="child-decor-heading">
-      {/* 메인 제목 옆에 회색 작은 설명(화살표는 더 보기 느낌용) */}
       <div className="mb-2 flex flex-wrap items-baseline gap-x-2 gap-y-1">
         <h2 id="child-decor-heading" className="text-base font-bold text-brand-text">
           내 캐릭터 꾸미기
         </h2>
         <p className="text-[11px] leading-tight text-gray-500">나만의 캐릭터를 꾸며요! &gt;</p>
       </div>
-      <ul className="grid w-full grid-cols-3 gap-2.5" aria-label="꾸미기 아이템 칸">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <li
-            key={i}
-            className="flex aspect-square items-center justify-center rounded-xl border border-amber-100/80 bg-[#f7f4eb] text-center text-[10px] font-medium text-gray-400 shadow-sm"
-          >
-            비어 있음
-          </li>
-        ))}
-      </ul>
+      <div
+        className="-mx-1 overflow-x-auto overflow-y-hidden px-2 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden snap-x snap-mandatory"
+        style={{ WebkitOverflowScrolling: 'touch' }}
+      >
+        <div className="flex w-max gap-1.5 pb-0.5" role="presentation">
+          {Array.from({ length: cols }).map((_, c) => (
+            <ul
+              key={c}
+              className="flex w-[min(28vw,112px)] shrink-0 snap-center list-none flex-col gap-1.5 p-0"
+              aria-label={`꾸미기 슬롯 열 ${c + 1}`}
+            >
+              {[c, c + cols].map((idx) => (
+                <DecorInventorySlot key={`decor-slot-${idx}`} />
+              ))}
+            </ul>
+          ))}
+        </div>
+      </div>
     </div>
   )
 }
