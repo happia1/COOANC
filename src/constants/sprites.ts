@@ -264,6 +264,7 @@ export const FARM_SHEEP: SpriteSheet = {
 
 // ─── items/piggy-bank ──────────────────────────────────────────────
 
+/** 510×255 아틀라스. 레이어 284 는 구 JSON w=127 이 이미지 폭(510)을 넘겨 w=124 로 맞춤 */
 export const PIGGY_BANK: SpriteSheet = {
   image: 'items/piggy-bank/piggy_bank.png',
   atlasW: 510,
@@ -274,7 +275,7 @@ export const PIGGY_BANK: SpriteSheet = {
     '레이어 281': { x: 3,   y: 136, w: 124, h: 116, rotated: false },
     '레이어 282': { x: 128, y: 3,   w: 126, h: 123, rotated: true  },
     '레이어 283': { x: 255, y: 3,   w: 127, h: 121, rotated: false },
-    '레이어 284': { x: 386, y: 3,   w: 127, h: 121, rotated: true  },
+    '레이어 284': { x: 386, y: 3,   w: 124, h: 121, rotated: true  },
     '레이어 285': { x: 3,   y: 3,   w: 129, h: 121, rotated: true  },
     '레이어 286': { x: 261, y: 128, w: 124, h: 117, rotated: true  },
   },

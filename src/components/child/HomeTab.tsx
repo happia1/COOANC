@@ -52,32 +52,7 @@ export default function HomeTab({
   }, [])
 
   useEffect(() => {
-    setGrants((prev) => {
-      const merged = mergePraiseStickerGrantsFromServer(initialPraiseGrants, prev)
-      const restoredDismiss = merged.filter(
-        (g) =>
-          g.popup_dismissed_at != null &&
-          initialPraiseGrants.find((s) => s.id === g.id)?.popup_dismissed_at == null,
-      ).length
-      // #region agent log
-      if (restoredDismiss > 0) {
-        fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'f7174a' },
-          body: JSON.stringify({
-            sessionId: 'f7174a',
-            location: 'HomeTab.tsx:grantsSync',
-            message: 'kept client popup_dismissed over stale server row',
-            data: { restoredDismiss },
-            timestamp: Date.now(),
-            runId: 'verify2',
-            hypothesisId: 'H4',
-          }),
-        }).catch(() => {})
-      }
-      // #endregion
-      return merged
-    })
+    setGrants((prev) => mergePraiseStickerGrantsFromServer(initialPraiseGrants, prev))
   }, [initialPraiseGrants])
 
   useEffect(() => {
@@ -148,31 +123,11 @@ export default function HomeTab({
     )
     setArrivalOpen(false)
     const supabase = createClient()
-    const { data: updatedRows, error } = await supabase
+    await supabase
       .from('praise_sticker_grants')
       .update({ popup_dismissed_at: now })
       .eq('child_id', childId)
       .is('popup_dismissed_at', null)
-      .select('id')
-    // #region agent log
-    fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'f7174a' },
-      body: JSON.stringify({
-        sessionId: 'f7174a',
-        location: 'HomeTab.tsx:dismissArrival',
-        message: 'popup_dismissed_at DB update',
-        data: {
-          hasError: Boolean(error),
-          err: error?.message ?? null,
-          updatedCount: Array.isArray(updatedRows) ? updatedRows.length : 0,
-        },
-        timestamp: Date.now(),
-        runId: 'verify2',
-        hypothesisId: 'H2',
-      }),
-    }).catch(() => {})
-    // #endregion
   }, [childId])
 
   const openBearFromFab = useCallback(() => {

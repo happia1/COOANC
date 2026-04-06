@@ -8,6 +8,11 @@ interface SpriteImageProps {
   width?: number
   /** Display height in px. If omitted, uses the frame's natural height. */
   height?: number
+  /**
+   * 회전(`rotated: true`) 프레임만 해당. false 이면 바깥 박스를 `overflow:visible` 로 해
+   * 안티앨리어싱 가장자리가 잘려 보이는 것을 줄임 (다른 스프라이트는 기본 true 유지).
+   */
+  clipRotated?: boolean
   className?: string
   style?: CSSProperties
 }
@@ -24,6 +29,7 @@ export default function SpriteImage({
   frame,
   width,
   height,
+  clipRotated = true,
   className,
   style,
 }: SpriteImageProps) {
@@ -45,8 +51,19 @@ export default function SpriteImage({
     // Atlas region: f.w × f.h (but visually the sprite is f.h wide, f.w tall)
     const naturalW = f.h  // visual width  (atlas height dimension)
     const naturalH = f.w  // visual height (atlas width  dimension)
-    const dW = width  ?? naturalW
-    const dH = height ?? naturalH
+    let dW = width ?? naturalW
+    let dH = height ?? naturalH
+    /**
+     * 한쪽만 지정하면 같은 비율로 맞춤 — 안 하면 가로·세로 배율이 달라지고,
+     * 회전 프레임은 바깥 `overflow:hidden` 에서 그림 한쪽(예: 오른쪽)이 잘린 것처럼 보일 수 있음.
+     */
+    if (width != null && height == null) {
+      const s = dW / naturalW
+      dH = Math.round(naturalH * s)
+    } else if (height != null && width == null) {
+      const s = dH / naturalH
+      dW = Math.round(naturalW * s)
+    }
 
     // Scale factors relative to the atlas
     // dW maps to naturalW (= f.h in atlas), dH maps to naturalH (= f.w in atlas)
@@ -71,7 +88,7 @@ export default function SpriteImage({
     const outerStyle: CSSProperties = {
       width: dW,
       height: dH,
-      overflow: 'hidden',
+      overflow: clipRotated ? 'hidden' : 'visible',
       position: 'relative',
       display: 'inline-block',
       flexShrink: 0,
@@ -88,8 +105,15 @@ export default function SpriteImage({
   // Non-rotated: straightforward background-position
   const naturalW = f.w
   const naturalH = f.h
-  const dW = width  ?? naturalW
-  const dH = height ?? naturalH
+  let dW = width ?? naturalW
+  let dH = height ?? naturalH
+  if (width != null && height == null) {
+    const s = dW / naturalW
+    dH = Math.round(naturalH * s)
+  } else if (height != null && width == null) {
+    const s = dH / naturalH
+    dW = Math.round(naturalW * s)
+  }
   const scaleX = dW / naturalW
   const scaleY = dH / naturalH
 

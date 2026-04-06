@@ -259,27 +259,6 @@ export default function BearStickerSheet({
         return
       }
       if (data) {
-        // #region agent log
-        fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'f7174a' },
-          body: JSON.stringify({
-            sessionId: 'f7174a',
-            location: 'BearStickerSheet.tsx:placeOnSlot',
-            message: 'sticker placed on slot',
-            data: {
-              slot,
-              gridCols: BEAR_GRID_COLS,
-              gridRows: BEAR_GRID_ROWS,
-              xRatio: c.x / 100,
-              yRatio: c.y / 100,
-            },
-            timestamp: Date.now(),
-            runId: 'verify',
-            hypothesisId: 'H1',
-          }),
-        }).catch(() => {})
-        // #endregion
         const wasOneAwayFromFull = occupiedSlots.size === SLOT_TOTAL - 1
         setPlacements((prev) => [...prev, data as PraiseStickerPlacement])
         setFloatPos((prev) => {

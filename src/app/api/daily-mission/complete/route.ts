@@ -52,8 +52,12 @@ export async function POST(req: NextRequest) {
     .eq('child_id', childId)
     .maybeSingle()
 
-  if (!dm) return NextResponse.json({ error: '미션을 찾을 수 없어요' }, { status: 404 })
-  if (dm.is_completed) return NextResponse.json({ error: '이미 완료한 미션이에요' }, { status: 409 })
+  if (!dm) {
+    return NextResponse.json({ error: '미션을 찾을 수 없어요' }, { status: 404 })
+  }
+  if (dm.is_completed) {
+    return NextResponse.json({ error: '이미 완료한 미션이에요' }, { status: 409 })
+  }
 
   /** reward_multiplier 는 028 마이그레이션 전 DB 에 없을 수 있어 select 에 넣지 않음(보상은 1배 기본) */
   const { data: mission } = await supabase
@@ -71,36 +75,43 @@ export async function POST(req: NextRequest) {
 
   const completedAt = new Date().toISOString()
 
-  await supabase
-    .from('daily_missions')
-    .update({ is_completed: true, completed_at: completedAt })
-    .eq('id', dailyMissionId)
-
-  const { data: existingLog } = await supabase
-    .from('mission_logs')
-    .select('id, is_completed')
-    .eq('child_id', childId)
-    .eq('mission_id', dm.mission_template_id)
-    .eq('assigned_date', today)
-    .maybeSingle()
+  /** daily_missions.date 와 동일한 배정일을 써야 승인 탭 「오늘 완료」 필터·부모 목록과 일치합니다 */
+  const assignedDate = dm.date
 
   const logData = {
     child_id: childId,
     mission_id: dm.mission_template_id,
-    assigned_date: today,
+    assigned_date: assignedDate,
     is_completed: true,
     completed_at: completedAt,
     credit_earned: creditEarned,
     heart_earned: heartEarned,
     exp_earned: expEarned,
   }
-  if (existingLog) {
-    await supabase.from('mission_logs').update(logData).eq('id', existingLog.id)
-  } else {
-    await supabase.from('mission_logs').insert(logData)
+
+  const [, existingLogResult, statsPeek] = await Promise.all([
+    supabase.from('daily_missions').update({ is_completed: true, completed_at: completedAt }).eq('id', dailyMissionId),
+    supabase
+      .from('mission_logs')
+      .select('id, is_completed')
+      .eq('child_id', childId)
+      .eq('mission_id', dm.mission_template_id)
+      .eq('assigned_date', assignedDate)
+      .maybeSingle(),
+    supabase.from('child_stats').select('*').eq('child_id', childId).maybeSingle(),
+  ])
+
+  const existingLog = existingLogResult.data
+  const logWrite = existingLog
+    ? supabase.from('mission_logs').update(logData).eq('id', existingLog.id)
+    : supabase.from('mission_logs').insert(logData)
+
+  const [{ error: logErr }, statsRes] = await Promise.all([logWrite, Promise.resolve(statsPeek)])
+  if (logErr) {
+    return NextResponse.json({ error: '미션 기록을 저장하지 못했어요' }, { status: 500 })
   }
 
-  const { data: stats } = await supabase.from('child_stats').select('*').eq('child_id', childId).maybeSingle()
+  const { data: stats } = statsRes
 
   if (!stats) return NextResponse.json({ error: '스탯 정보를 찾을 수 없어요' }, { status: 404 })
 

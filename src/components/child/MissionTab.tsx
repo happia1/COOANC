@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
+import type { RealtimeChannel } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/client'
 import type { ChildStats, DailyMissionWithTemplate, PraiseStickerGrant, PraiseStickerPlacement } from '@/types/database'
 import GrowthMapSheet, { type GrowthMapSheetData } from '@/components/child/GrowthMapSheet'
@@ -13,6 +14,25 @@ import { isSpecialSectionMission } from '@/lib/specialMissionChips'
 import { parseAlarmFromMissionDescription } from '@/lib/missionAlarmDescription'
 import { scaledMissionRewards } from '@/lib/missionRewardMultiplier'
 import { mergePraiseStickerGrantsFromServer } from '@/lib/mergePraiseStickerGrantsFromServer'
+import confetti from 'canvas-confetti'
+
+/** 미션 완료 직후 한 번 터뜨리고, 1초 뒤에 애니메이션·캔버스를 정리합니다 */
+function playMissionCompleteConfetti() {
+  if (typeof window === 'undefined') return
+  try {
+    void confetti({
+      particleCount: 80,
+      spread: 70,
+      origin: { y: 0.6 },
+      colors: ['#FFD700', '#FF6B9D', '#A78BFA', '#34D399', '#FB923C'],
+    })
+  } catch {
+    /* canvas-confetti 실패 시에도 미션 완료 흐름은 유지 */
+  }
+  window.setTimeout(() => {
+    confetti.reset()
+  }, 1000)
+}
 
 const DIFFICULTY_LABEL: Record<string, string> = {
   easy: '쉬움',
@@ -74,10 +94,25 @@ function orderedMissionsForSlider(list: DailyMissionWithTemplate[]): DailyMissio
 }
 
 /**
+ * 부모 「다시하기」 브로드캐스트 페이로드 형식 검사 — 잘못된 메시지는 무시합니다.
+ */
+function isRedoMissionPayload(v: unknown): v is { missionLogId: string; dailyMissionId: string; title: string } {
+  if (!v || typeof v !== 'object') return false
+  const o = v as Record<string, unknown>
+  return (
+    typeof o.missionLogId === 'string' &&
+    typeof o.dailyMissionId === 'string' &&
+    typeof o.title === 'string'
+  )
+}
+
+/**
  * 미션 탭
  * - 상단: `ChildHomeSceneryBand`(60dvh, 배경만 리프트) + 알약 + 지피뱅크 섬 — 홈과 동일
  * - 하단 카드 위 한 줄: 왼쪽 「오늘의 미션」·오른쪽 EXP(날짜 없음)
  * - 하단: `-mt-20`(sm: `-mt-24`) 로 풍경·섬에 붙임 · 가로 스냅 카드
+ * - 부모 승인 탭에서 보낸 Realtime 브로드캐스트로 「다시 하기」 안내 팝업을 띄우고, 확인 시 DB 롤백
+ * - 완료 버튼: 낙관적 UI(즉시 콘페티 + 카드 슬라이더에서 제거), API 실패 시 되돌림·토스트
  */
 export default function MissionTab({
   childId,
@@ -100,7 +135,6 @@ export default function MissionTab({
   const [done, setDone] = useState<Set<string>>(
     new Set(dailyMissions.filter((dm) => dm.is_completed).map((dm) => dm.id)),
   )
-  const [loading, setLoading] = useState<string | null>(null)
   const [toast, setToast] = useState<string | null>(null)
   const [specialPopup, setSpecialPopup] = useState<{
     dailyMissionId: string
@@ -109,7 +143,21 @@ export default function MissionTab({
     message: string
   } | null>(null)
 
+  /** 부모가 「다시하기」를 눌렀을 때만 채워지는 미션 되돌리기 안내 */
+  const [redoPopup, setRedoPopup] = useState<{
+    missionLogId: string
+    dailyMissionId: string
+    title: string
+  } | null>(null)
+  const [redoBusy, setRedoBusy] = useState(false)
+
+  /** 이미 SUBSCRIBED 인 채널에 바로 send — 매번 subscribe 하지 않아 부모 목록 갱신이 빨라집니다 */
+  const parentLogBroadcastRef = useRef<RealtimeChannel | null>(null)
+
   const ordered = useMemo(() => orderedMissionsForSlider(dailyMissions), [dailyMissions])
+
+  /** 완료한 카드는 가로 슬라이더에서 제거해 바로 「사라진」 느낌을 줍니다 */
+  const incompleteOrdered = useMemo(() => ordered.filter((dm) => !done.has(dm.id)), [ordered, done])
 
   const growthPayload: GrowthMapSheetData = useMemo(
     () => ({
@@ -162,6 +210,35 @@ export default function MissionTab({
     }
   }, [childId])
 
+  /** 부모 앱과 같은 채널 이름으로 브로드캐스트를 구독해 「다시하기」 알림을 받습니다 */
+  useEffect(() => {
+    const supabase = createClient()
+    const refreshCh = supabase.channel(`parent_mission_log_refresh:${childId}`, {
+      config: { broadcast: { ack: false } },
+    })
+    refreshCh.subscribe((status) => {
+      if (status === 'SUBSCRIBED') parentLogBroadcastRef.current = refreshCh
+    })
+    return () => {
+      parentLogBroadcastRef.current = null
+      void supabase.removeChannel(refreshCh)
+    }
+  }, [childId])
+
+  useEffect(() => {
+    const supabase = createClient()
+    const channel = supabase
+      .channel(`mission_redo:${childId}`)
+      .on('broadcast', { event: 'redo_mission' }, (message) => {
+        const raw = (message as { payload?: unknown }).payload
+        if (isRedoMissionPayload(raw)) setRedoPopup(raw)
+      })
+      .subscribe()
+    return () => {
+      void supabase.removeChannel(channel)
+    }
+  }, [childId])
+
   const showToast = (msg: string) => {
     setToast(msg)
     setTimeout(() => setToast(null), 2500)
@@ -194,30 +271,132 @@ export default function MissionTab({
     setSpecialPopup(null)
   }
 
-  async function handleComplete(dm: DailyMissionWithTemplate) {
-    if (done.has(dm.id) || loading) return
-    setLoading(dm.id)
+  /**
+   * 팝업 「확인」: 오늘의 미션 행·로그·스탯을 부모용 롤백 API와 같은 방식으로 되돌립니다.
+   * (자녀 세션의 RLS 로 본인 행만 수정 가능)
+   */
+  async function confirmRedoFromParent() {
+    if (!redoPopup || redoBusy) return
+    setRedoBusy(true)
+    const supabase = createClient()
     try {
-      const res = await fetch('/api/daily-mission/complete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dailyMissionId: dm.id, today, childId }),
-      })
-      const text = await res.text()
-      const json = text ? JSON.parse(text) : {}
-      if (!res.ok) {
-        showToast(json.error ?? '오류가 발생했어요')
+      const { data: log, error: logErr } = await supabase
+        .from('mission_logs')
+        .select('id, is_completed, credit_earned, heart_earned, exp_earned')
+        .eq('id', redoPopup.missionLogId)
+        .eq('child_id', childId)
+        .maybeSingle()
+
+      if (logErr || !log?.is_completed) {
+        showToast('이미 되돌아간 미션이에요')
+        setRedoPopup(null)
         return
       }
-      setDone((prev) => new Set([...prev, dm.id]))
-      const cr = typeof json.creditReward === 'number' ? json.creditReward : scaledMissionRewards(dm.missions).credit
-      const er = typeof json.expReward === 'number' ? json.expReward : scaledMissionRewards(dm.missions).exp
-      showToast(`+${cr} 크레딧 · +${er} EXP`)
-    } catch {
-      showToast('네트워크 오류가 발생했어요')
+
+      const cr = typeof log.credit_earned === 'number' ? log.credit_earned : 0
+      const hr = typeof log.heart_earned === 'number' ? log.heart_earned : 0
+      const xr = typeof log.exp_earned === 'number' ? log.exp_earned : 0
+
+      const { data: stats, error: stErr } = await supabase.from('child_stats').select('*').eq('child_id', childId).maybeSingle()
+      if (stErr || !stats) {
+        showToast('정보를 불러오지 못했어요')
+        return
+      }
+
+      const newExp = Math.max(0, stats.exp - xr)
+      const newLevel = stats.current_level
+
+      const { error: dmErr } = await supabase
+        .from('daily_missions')
+        .update({ is_completed: false, completed_at: null })
+        .eq('id', redoPopup.dailyMissionId)
+        .eq('child_id', childId)
+
+      const { error: mlErr } = await supabase
+        .from('mission_logs')
+        .update({
+          is_completed: false,
+          completed_at: null,
+          credit_earned: 0,
+          heart_earned: 0,
+          exp_earned: 0,
+        })
+        .eq('id', redoPopup.missionLogId)
+        .eq('child_id', childId)
+
+      const { error: csErr } = await supabase
+        .from('child_stats')
+        .update({
+          credits: Math.max(0, stats.credits - cr),
+          hearts: Math.max(0, stats.hearts - hr),
+          total_credits_earned: Math.max(0, stats.total_credits_earned - cr),
+          exp: newExp,
+          current_level: newLevel,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('child_id', childId)
+
+      if (dmErr || mlErr || csErr) {
+        showToast('되돌리기에 실패했어요')
+        return
+      }
+
+      setDone((prev) => {
+        const next = new Set(prev)
+        next.delete(redoPopup.dailyMissionId)
+        return next
+      })
+      setRedoPopup(null)
+      showToast('미션을 다시 할 수 있어요')
     } finally {
-      setLoading(null)
+      setRedoBusy(false)
     }
+  }
+
+  function handleComplete(dm: DailyMissionWithTemplate) {
+    if (done.has(dm.id)) return
+
+    /** 낙관적: API 기다리지 않고 콘페티 + 카드 제거(슬라이더에서 숨김) */
+    setDone((prev) => new Set([...prev, dm.id]))
+    playMissionCompleteConfetti()
+
+    void (async () => {
+      try {
+        const res = await fetch('/api/daily-mission/complete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ dailyMissionId: dm.id, today, childId }),
+        })
+        const text = await res.text()
+        let json: Record<string, unknown> = {}
+        let parseErr: string | null = null
+        try {
+          json = text ? (JSON.parse(text) as Record<string, unknown>) : {}
+        } catch (pe) {
+          parseErr = String(pe)
+        }
+        if (parseErr || !res.ok) {
+          setDone((prev) => {
+            const next = new Set(prev)
+            next.delete(dm.id)
+            return next
+          })
+          showToast(typeof json.error === 'string' ? json.error : '미션 완료에 실패했어요')
+          return
+        }
+        const ch = parentLogBroadcastRef.current
+        if (ch) {
+          void ch.send({ type: 'broadcast', event: 'child_completed_mission', payload: { t: Date.now() } })
+        }
+      } catch {
+        setDone((prev) => {
+          const next = new Set(prev)
+          next.delete(dm.id)
+          return next
+        })
+        showToast('네트워크 오류가 발생했어요')
+      }
+    })()
   }
 
   const credits = stats?.credits ?? 0
@@ -230,6 +409,12 @@ export default function MissionTab({
 
   const completedCount = done.size
   const total = dailyMissions.length
+
+  /**
+   * 섬 위 저금통 그림: 휴식일이면 항상 「비어 있음」 단계만 보여 주고,
+   * 평일에는 「완료한 미션 수 ÷ 오늘 미션 전체」에 맞춰 아틀라스 프레임이 바뀝니다.
+   */
+  const islandPiggyProgress = isFullRestDay ? { completed: 0, total: 0 } : { completed: completedCount, total }
 
   const sheets = (
     <>
@@ -304,10 +489,10 @@ export default function MissionTab({
         <StatPill label="크레딧" value={credits.toLocaleString()} highlight className="shrink-0" />
       </div>
 
-      {/** 미션: 무대 래퍼는 내리지 않음 — 섬만 `ChildHomeIslandStage` 안에서 올림 */}
+      {/* 미션: 무대 래퍼는 내리지 않음 — 섬만 ChildHomeIslandStage 안에서 올림 */}
       <div className="flex min-h-0 flex-1 flex-col justify-end">
         <div className="relative mx-auto flex w-full max-w-sm flex-col items-center">
-          <ChildHomeIslandStage scene="gippybank" />
+          <ChildHomeIslandStage scene="gippybank" missionPiggy={islandPiggyProgress} />
         </div>
       </div>
     </ChildHomeSceneryBand>
@@ -324,16 +509,19 @@ export default function MissionTab({
           <p className="font-bold text-brand-text">아직 미션이 없어요</p>
           <p className="text-sm text-gray-400">부모님이 미션을 만들어주실 거예요!</p>
         </div>
+      ) : incompleteOrdered.length === 0 ? (
+        <div className="flex flex-1 flex-col items-center justify-center gap-1 px-6 py-6 text-center">
+          <p className="text-sm font-bold text-gray-500">남은 미션 카드가 없어요</p>
+          <p className="text-xs text-gray-400">아래에서 오늘의 결과를 확인해 보아요</p>
+        </div>
       ) : (
         <div
           className="-mx-1 flex min-h-0 flex-1 items-start gap-1 overflow-x-auto overflow-y-hidden px-2 pb-1 pt-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden snap-x snap-mandatory"
           style={{ WebkitOverflowScrolling: 'touch' }}
         >
-          {ordered.map((dm) => {
+          {incompleteOrdered.map((dm) => {
             const m = dm.missions
             if (!m) return null
-            const isCompleted = done.has(dm.id)
-            const isLoading = loading === dm.id
             const rewards = scaledMissionRewards(m)
             const special = isSpecialSectionMission(m)
             const timeLabel = formatTime(dm.scheduled_time)
@@ -345,20 +533,13 @@ export default function MissionTab({
                 className={[
                   'snap-center shrink-0 flex w-[min(39vw,140px)] flex-col rounded-xl border-2 px-1 pt-1 pb-0 shadow-sm transition-all',
                   special
-                    ? isCompleted
-                      ? 'border-amber-200/80 bg-amber-50/50 opacity-90'
-                      : 'border-amber-300/90 bg-gradient-to-b from-amber-50 to-yellow-50 shadow-amber-200/40'
-                    : isCompleted
-                      ? 'border-pink-200/90 bg-rose-50/90'
-                      : 'border-amber-100/90 bg-amber-50/80',
+                    ? 'border-amber-300/90 bg-gradient-to-b from-amber-50 to-yellow-50 shadow-amber-200/40'
+                    : 'border-amber-100/90 bg-amber-50/80',
                 ].join(' ')}
               >
                 <div className="relative flex flex-col items-center pt-1.5">
                   <div
-                    className={[
-                      'absolute -top-0.5 left-1/2 z-[1] flex h-4 w-4 -translate-x-1/2 items-center justify-center rounded-full text-[8px] font-black text-white shadow-sm',
-                      isCompleted ? 'bg-pink-400' : 'bg-gray-300',
-                    ].join(' ')}
+                    className="absolute -top-0.5 left-1/2 z-[1] flex h-4 w-4 -translate-x-1/2 items-center justify-center rounded-full bg-gray-300 text-[8px] font-black text-white shadow-sm"
                     aria-hidden
                   >
                     ✓
@@ -378,11 +559,7 @@ export default function MissionTab({
                 </div>
 
                 <div className="mt-0.5 text-center">
-                  <p
-                    className={`line-clamp-2 text-[10px] font-black leading-[1.15] ${isCompleted ? 'text-gray-400 line-through' : 'text-brand-text'}`}
-                  >
-                    {m.title}
-                  </p>
+                  <p className="line-clamp-2 text-[10px] font-black leading-[1.15] text-brand-text">{m.title}</p>
                   <div className="mt-px flex flex-wrap items-center justify-center gap-px">
                     <span
                       className={`rounded-full px-1 py-px text-[8px] font-bold leading-tight ${DIFFICULTY_COLOR[m.difficulty] ?? 'bg-gray-100 text-gray-500'}`}
@@ -426,19 +603,14 @@ export default function MissionTab({
                 <button
                   type="button"
                   onClick={() => handleComplete(dm)}
-                  disabled={isCompleted || isLoading}
                   className={[
                     'mt-0.5 w-full rounded-lg py-0.5 text-[10px] font-black leading-none transition-all active:scale-[0.98]',
-                    isCompleted
-                      ? 'bg-gray-200/80 text-gray-500'
-                      : isLoading
-                        ? 'cursor-wait bg-gray-100 text-gray-400'
-                        : special
-                          ? 'bg-gradient-to-r from-amber-500 to-yellow-500 text-white shadow-sm'
-                          : 'bg-brand-blue text-white shadow-sm',
+                    special
+                      ? 'bg-gradient-to-r from-amber-500 to-yellow-500 text-white shadow-sm'
+                      : 'bg-brand-blue text-white shadow-sm',
                   ].join(' ')}
                 >
-                  {isCompleted ? '완료!' : isLoading ? '…' : '완료'}
+                  완료
                 </button>
               </article>
             )
@@ -454,6 +626,37 @@ export default function MissionTab({
       )}
     </section>
   )
+
+  /** 부모가 요청한 「다시 하기」 — 확인 시에만 DB 가 바뀝니다 */
+  const redoPopupBlock = redoPopup ? (
+    <div
+      className="fixed inset-0 z-[102] flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="redo-pop-title"
+    >
+      <button
+        type="button"
+        className="absolute inset-0 bg-black/50"
+        aria-label="나중에 하기"
+        onClick={() => !redoBusy && setRedoPopup(null)}
+      />
+      <div className="relative z-[1] w-full max-w-sm rounded-2xl border-2 border-orange-200 bg-white p-5 shadow-xl">
+        <p id="redo-pop-title" className="text-center text-base font-black text-brand-text leading-snug">
+          <span className="text-orange-600">{redoPopup.title}</span> 미션을 다시 해야 해요!
+        </p>
+        <p className="mt-2 text-center text-xs text-gray-500">부모님이 다시 하라고 하셨어요. 확인을 누르면 완료가 취소돼요.</p>
+        <button
+          type="button"
+          onClick={() => void confirmRedoFromParent()}
+          disabled={redoBusy}
+          className="mt-5 w-full rounded-xl bg-brand-blue py-3 text-sm font-bold text-white disabled:opacity-50"
+        >
+          {redoBusy ? '처리 중…' : '확인'}
+        </button>
+      </div>
+    </div>
+  ) : null
 
   const popupBlock = specialPopup ? (
     <div
@@ -489,6 +692,7 @@ export default function MissionTab({
           <p className="text-xl font-black text-brand-text">오늘은 쉬는 날이에요!</p>
           <p className="text-sm text-gray-400">푹 쉬고 내일 또 열심히 해봐요.</p>
         </section>
+        {redoPopupBlock}
         {popupBlock}
         {sheets}
       </div>
@@ -497,6 +701,7 @@ export default function MissionTab({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
+      {redoPopupBlock}
       {popupBlock}
       {toast && (
         <div className="fixed top-6 left-1/2 z-50 -translate-x-1/2 animate-bounce rounded-full bg-brand-blue px-5 py-2.5 text-sm font-bold text-white shadow-lg">
