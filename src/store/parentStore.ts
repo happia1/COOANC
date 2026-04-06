@@ -11,7 +11,8 @@ export const useParentStore = create<ParentStore>((set, get) => ({
   selectedChildId: null,
   setSelectedChildId: (id) => set({ selectedChildId: id }),
   clearSelectionIfChildRemoved: (removedChildId) => {
-    if (get().selectedChildId === removedChildId) {
+    const st = get()
+    if (st.selectedChildId === removedChildId) {
       set({ selectedChildId: null })
     }
   },

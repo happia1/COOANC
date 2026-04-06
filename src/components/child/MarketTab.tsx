@@ -4,16 +4,16 @@ import { useState } from 'react'
 import type { StoreItem, PurchaseRequest } from '@/types/database'
 
 const CATEGORY_LABEL: Record<string, string> = {
-  food:       '음식 🍔',
-  toy:        '장난감 🧸',
-  activity:   '활동 🎯',
-  digital:    '디지털 🎮',
-  experience: '경험 🎪',
+  food: '음식',
+  toy: '장난감',
+  activity: '활동',
+  digital: '디지털',
+  experience: '경험',
 }
 
 const STATUS_LABEL: Record<string, { text: string; style: string }> = {
-  pending:  { text: '검토 중 ⏳', style: 'bg-amber-50 text-amber-600 border-amber-200' },
-  approved: { text: '승인됨 ✅', style: 'bg-green-50 text-green-600 border-green-200' },
+  pending: { text: '검토 중', style: 'bg-amber-50 text-amber-600 border-amber-200' },
+  approved: { text: '승인됨', style: 'bg-green-50 text-green-600 border-green-200' },
 }
 
 type Props = {
@@ -64,7 +64,7 @@ export default function MarketTab({ childId, items, requests, credits, level }: 
       if (json.request) {
         setMyRequests((prev) => [json.request as PurchaseRequest, ...prev])
       }
-      showToast(`🛒 부모님께 요청했어요!`)
+      showToast('부모님께 요청했어요!')
     } catch {
       showToast('네트워크 오류가 발생했어요', false)
     } finally {
@@ -89,7 +89,7 @@ export default function MarketTab({ childId, items, requests, credits, level }: 
         return (
           <div className="fixed inset-0 z-40 bg-black/40 flex items-end justify-center">
             <div className="w-full max-w-md bg-white rounded-t-3xl p-6 shadow-2xl">
-              <p className="font-black text-brand-text text-base mb-1">🛒 {item.name}</p>
+              <p className="mb-1 text-base font-black text-brand-text">{item.name}</p>
               <p className="text-xs text-gray-400 mb-4">부모님께 하고 싶은 말을 적어봐요 (선택)</p>
               <textarea
                 className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-brand-text placeholder:text-gray-300 focus:outline-none focus:ring-2 focus:ring-brand-blue/40 resize-none"
@@ -110,7 +110,7 @@ export default function MarketTab({ childId, items, requests, credits, level }: 
                   onClick={() => submitRequest(item, messageInput.text)}
                   className="flex-1 py-3 rounded-2xl bg-brand-blue text-white text-sm font-bold shadow-md active:scale-95"
                 >
-                  요청 보내기 ({item.credit_price}🪙)
+                  요청 보내기 ({item.credit_price} 크레딧)
                 </button>
               </div>
             </div>
@@ -122,9 +122,7 @@ export default function MarketTab({ childId, items, requests, credits, level }: 
       <div className="bg-white rounded-2xl p-4 shadow-sm flex items-center justify-between">
         <div>
           <p className="text-xs text-gray-400">내 크레딧</p>
-          <p className="text-2xl font-black text-brand-blue tabular-nums">
-            🪙 {currentCredits.toLocaleString()}
-          </p>
+          <p className="text-2xl font-black text-brand-blue tabular-nums">{currentCredits.toLocaleString()}</p>
         </div>
         <div className="text-right">
           <p className="text-xs text-gray-400">레벨</p>
@@ -135,7 +133,7 @@ export default function MarketTab({ childId, items, requests, credits, level }: 
       {/* 내 요청 현황 */}
       {myRequests.length > 0 && (
         <section>
-          <p className="text-sm font-bold text-brand-text mb-2 px-1">📋 내 요청 현황</p>
+          <p className="mb-2 px-1 text-sm font-bold text-brand-text">내 요청 현황</p>
           <div className="flex flex-col gap-2">
             {myRequests.map((r) => {
               const s = STATUS_LABEL[r.status] ?? STATUS_LABEL.pending
@@ -143,7 +141,9 @@ export default function MarketTab({ childId, items, requests, credits, level }: 
                 <div key={r.id} className={`flex items-center justify-between bg-white rounded-xl px-4 py-3 border ${s.style}`}>
                   <div>
                     <p className="text-sm font-bold text-brand-text">{r.item_name}</p>
-                    <p className="text-xs text-gray-400">{r.item_price}🪙 · {r.requested_at.slice(0, 10)}</p>
+                    <p className="text-xs text-gray-400">
+                      {r.item_price} 크레딧 · {r.requested_at.slice(0, 10)}
+                    </p>
                   </div>
                   <span className={`text-xs font-bold px-2 py-1 rounded-full border ${s.style}`}>
                     {s.text}
@@ -157,11 +157,11 @@ export default function MarketTab({ childId, items, requests, credits, level }: 
 
       {/* 상품 목록 */}
       <section>
-        <p className="text-sm font-bold text-brand-text mb-2 px-1">🛍️ 마켓</p>
+        <p className="mb-2 px-1 text-sm font-bold text-brand-text">마켓</p>
 
         {items.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 gap-4">
-            <span className="text-7xl">🏪</span>
+            <span className="sr-only">상품 없음</span>
             <div className="text-center space-y-1">
               <p className="font-bold text-brand-text">아직 상품이 없어요</p>
               <p className="text-sm text-gray-400">부모님이 상품을 추가해주실 거예요!</p>
@@ -190,8 +190,8 @@ export default function MarketTab({ childId, items, requests, credits, level }: 
 
                   {/* 아이콘 + 이름 */}
                   <div className="flex flex-col items-center gap-1 py-2">
-                    <span className="text-4xl">
-                      {item.item_type === 'digital' ? '🎮' : '🎁'}
+                    <span className="text-[10px] font-black text-gray-400">
+                      {item.item_type === 'digital' ? '디지털' : '실물'}
                     </span>
                     <p className="text-sm font-bold text-brand-text text-center line-clamp-2">
                       {item.name}
@@ -205,7 +205,7 @@ export default function MarketTab({ childId, items, requests, credits, level }: 
 
                   {/* 가격 */}
                   <p className="text-center font-black text-brand-blue text-base">
-                    🪙 {item.credit_price.toLocaleString()}
+                    {item.credit_price.toLocaleString()} 크레딧
                   </p>
 
                   {/* 버튼 */}

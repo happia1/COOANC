@@ -1,18 +1,16 @@
 /**
  * 아이 앱 스티커(뱃지) 탭 — 서버 컴포넌트
+ * - getActorChildContext 의 자녀 id 기준으로 뱃지·통계를 불러옵니다.
  */
-import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { getActorChildContext } from '@/lib/getActorChildContext'
 import StickerTab from '@/components/child/StickerTab'
 import type { BadgeRow } from '@/types/database'
 
 export default async function StickerPage() {
+  const ctx = await getActorChildContext()
   const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) redirect('/login')
+  const childId = ctx.actorChildId
 
   const [badgesRes, earnedRes, statsRes, profileRes] = await Promise.all([
     supabase
@@ -20,22 +18,15 @@ export default async function StickerPage() {
       .select('badge_id, name, description, icon_emoji, badge_type, condition')
       .order('badge_type', { ascending: true }),
 
-    supabase
-      .from('child_badges')
-      .select('badge_id, earned_at')
-      .eq('child_id', user.id),
+    supabase.from('child_badges').select('badge_id, earned_at').eq('child_id', childId),
 
     supabase
       .from('child_stats')
       .select('current_level, streak_days, longest_streak')
-      .eq('child_id', user.id)
+      .eq('child_id', childId)
       .maybeSingle(),
 
-    supabase
-      .from('profiles')
-      .select('name')
-      .eq('id', user.id)
-      .maybeSingle(),
+    supabase.from('profiles').select('name').eq('id', childId).maybeSingle(),
   ])
 
   const badges = (badgesRes.data ?? []) as BadgeRow[]

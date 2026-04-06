@@ -14,6 +14,10 @@ export type ChildProfileRow = {
   age: number | null
   avatar_url: string | null
   birth_date: string | null
+  /** 온보딩·설정에서 저장한 연령대 (없으면 null) */
+  age_group: string | null
+  /** 보육·통학 코드 home | daycare | kindergarten | school */
+  institution_type: string | null
 }
 
 /** Postgres undefined_column 또는 "column ... does not exist" 류 — 다른 오류(RLS 등)와 구분 */
@@ -37,11 +41,16 @@ function normalizeChildProfileRow(r: Record<string, unknown>): ChildProfileRow {
     age: typeof r.age === 'number' && !Number.isNaN(r.age) ? r.age : null,
     avatar_url: typeof r.avatar_url === 'string' ? r.avatar_url : null,
     birth_date: typeof r.birth_date === 'string' ? r.birth_date : null,
+    age_group: typeof r.age_group === 'string' ? r.age_group : null,
+    institution_type: typeof r.institution_type === 'string' ? r.institution_type : null,
   }
 }
 
-/** 부모 홈: 자녀 여러 명 */
+/** 부모 홈: 자녀 여러 명 — 컬럼이 없는 구형 DB 는 아래쪽 조합으로 자동 폴백 */
 const HOME_PROFILE_SELECTS = [
+  'id, name, age, avatar_url, birth_date, age_group, institution_type',
+  'id, name, age, avatar_url, birth_date, institution_type',
+  'id, name, age, avatar_url, birth_date, age_group',
   'id, name, age, avatar_url, birth_date',
   'id, name, age, avatar_url',
   'id, name, avatar_url, birth_date',
@@ -84,6 +93,8 @@ export type ChildProfileDetailRow = {
   birth_date: string | null
   avatar_url: string | null
   created_at: string
+  age_group: string | null
+  institution_type: string | null
 }
 
 function normalizeDetailRow(r: Record<string, unknown>): ChildProfileDetailRow {
@@ -95,10 +106,15 @@ function normalizeDetailRow(r: Record<string, unknown>): ChildProfileDetailRow {
     birth_date: typeof r.birth_date === 'string' ? r.birth_date : null,
     avatar_url: typeof r.avatar_url === 'string' ? r.avatar_url : null,
     created_at: typeof r.created_at === 'string' ? r.created_at : '',
+    age_group: typeof r.age_group === 'string' ? r.age_group : null,
+    institution_type: typeof r.institution_type === 'string' ? r.institution_type : null,
   }
 }
 
 const DETAIL_PROFILE_SELECTS = [
+  'id, name, role, age, birth_date, avatar_url, created_at, age_group, institution_type',
+  'id, name, role, age, birth_date, avatar_url, created_at, institution_type',
+  'id, name, role, age, birth_date, avatar_url, created_at, age_group',
   'id, name, role, age, birth_date, avatar_url, created_at',
   'id, name, role, age, avatar_url, created_at',
   'id, name, role, birth_date, avatar_url, created_at',

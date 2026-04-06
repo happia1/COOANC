@@ -2,11 +2,11 @@
 
 import type { BadgeRow } from '@/types/database'
 
-const BADGE_TYPE_LABEL: Record<string, { label: string; emoji: string }> = {
-  level:   { label: '레벨 뱃지',  emoji: '🌟' },
-  streak:  { label: '연속 뱃지',  emoji: '🔥' },
-  eq:      { label: 'EQ 뱃지',    emoji: '📊' },
-  special: { label: '특별 뱃지',  emoji: '🎀' },
+const BADGE_TYPE_LABEL: Record<string, { label: string }> = {
+  level: { label: '레벨 뱃지' },
+  streak: { label: '연속 뱃지' },
+  eq: { label: 'EQ 뱃지' },
+  special: { label: '특별 뱃지' },
 }
 
 type Props = {
@@ -38,7 +38,7 @@ export default function StickerTab({ badges, earnedMap, level, streak, longestSt
       <div className="bg-white rounded-2xl p-4 shadow-sm flex items-center justify-between">
         <div>
           <p className="text-xs text-gray-400">{childName}의 뱃지 컬렉션</p>
-          <p className="font-black text-brand-text text-lg">🎀 스티커 보관함</p>
+          <p className="text-lg font-black text-brand-text">스티커 보관함</p>
         </div>
         {total > 0 && (
           <div className="text-right">
@@ -50,9 +50,9 @@ export default function StickerTab({ badges, earnedMap, level, streak, longestSt
 
       {/* 내 스탯 요약 */}
       <div className="grid grid-cols-3 gap-2">
-        <StatCard emoji="🌱" label="현재 레벨" value={`Lv.${level}`} />
-        <StatCard emoji="🔥" label="현재 연속" value={`${streak}일`} />
-        <StatCard emoji="🏆" label="최장 연속" value={`${longestStreak}일`} />
+        <StatCard label="현재 레벨" value={`Lv.${level}`} />
+        <StatCard label="현재 연속" value={`${streak}일`} />
+        <StatCard label="최장 연속" value={`${longestStreak}일`} />
       </div>
 
       {/* 전체 획득 프로그레스 */}
@@ -73,9 +73,8 @@ export default function StickerTab({ badges, earnedMap, level, streak, longestSt
 
       {/* 뱃지 없음 */}
       {badges.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-20 gap-4">
-          <span className="text-7xl">🎀</span>
-          <div className="text-center space-y-1">
+        <div className="flex flex-col items-center justify-center gap-4 py-20">
+          <div className="space-y-1 text-center">
             <p className="font-bold text-brand-text">아직 뱃지가 없어요</p>
             <p className="text-sm text-gray-400">미션을 완료하면 뱃지를 받을 수 있어요!</p>
           </div>
@@ -86,12 +85,10 @@ export default function StickerTab({ badges, earnedMap, level, streak, longestSt
       {groupOrder.map((type) => {
         const list = groups[type]
         if (!list || list.length === 0) return null
-        const meta = BADGE_TYPE_LABEL[type] ?? { label: type, emoji: '🏅' }
+        const meta = BADGE_TYPE_LABEL[type] ?? { label: type }
         return (
           <section key={type}>
-            <p className="text-sm font-bold text-brand-text mb-2 px-1">
-              {meta.emoji} {meta.label}
-            </p>
+            <p className="mb-2 px-1 text-sm font-bold text-brand-text">{meta.label}</p>
             <div className="grid grid-cols-4 gap-2">
               {list.map((badge) => {
                 const isEarned = badge.badge_id in earnedMap
@@ -107,7 +104,9 @@ export default function StickerTab({ badges, earnedMap, level, streak, longestSt
                         : 'bg-gray-50 opacity-40 grayscale',
                     ].join(' ')}
                   >
-                    <span className="text-3xl leading-none">{badge.icon_emoji ?? '🏅'}</span>
+                    <span className="text-xs font-black text-gray-500">
+                      {(badge.icon_emoji?.trim() || badge.name.slice(0, 1))}
+                    </span>
                     <span className="text-[9px] font-bold text-center text-gray-600 leading-tight line-clamp-2 w-full">
                       {badge.name}
                     </span>
@@ -126,22 +125,21 @@ export default function StickerTab({ badges, earnedMap, level, streak, longestSt
 
       {/* 전체 획득 축하 */}
       {total > 0 && earnedCount === total && (
-        <div className="bg-brand-yellow/30 border-2 border-brand-yellow rounded-2xl p-5 text-center">
-          <p className="text-3xl mb-2">🏆</p>
+        <div className="rounded-2xl border-2 border-brand-yellow bg-brand-yellow/30 p-5 text-center">
+          <p className="mb-1 text-xs font-bold uppercase tracking-wide text-amber-800">완료</p>
           <p className="font-black text-brand-text">모든 뱃지 획득 완료!</p>
-          <p className="text-sm text-gray-500 mt-1">정말 대단해요, {childName}!</p>
+          <p className="mt-1 text-sm text-gray-500">정말 대단해요, {childName}!</p>
         </div>
       )}
     </div>
   )
 }
 
-function StatCard({ emoji, label, value }: { emoji: string; label: string; value: string }) {
+function StatCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="bg-white rounded-2xl p-3 shadow-sm text-center">
-      <p className="text-xl">{emoji}</p>
-      <p className="text-xs font-black text-brand-text mt-0.5 tabular-nums">{value}</p>
-      <p className="text-[9px] text-gray-400 mt-0.5">{label}</p>
+    <div className="rounded-2xl bg-white p-3 text-center shadow-sm">
+      <p className="text-xs font-black tabular-nums text-brand-text">{value}</p>
+      <p className="mt-0.5 text-[9px] text-gray-400">{label}</p>
     </div>
   )
 }

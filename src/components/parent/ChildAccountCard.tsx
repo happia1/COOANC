@@ -9,11 +9,11 @@ type Props = {
 
 /**
  * 부모 홈에서 자녀 한 명을 나타내는 카드입니다.
- * - `<a href>` 로 두어 브라우저 기본 이동을 씁니다. (일부 환경에서 next/link 만으로는 터치가 먹지 않는 경우가 있어 분리)
- * - 모바일 탭 지연을 줄이기 위해 touch-manipulation 을 씁니다.
+ * - 누르면 자녀용 앱(/home)으로 들어가도록 enter-child-ui API 로 연결합니다.
+ * - `<a href>` 로 두어 브라우저 기본 이동을 씁니다.
  */
 export function ChildAccountCard({ childId, name, level, streakDays, credits }: Props) {
-  const href = `/parent/child/${encodeURIComponent(childId)}`
+  const href = `/api/parent/enter-child-ui?childId=${encodeURIComponent(childId)}`
 
   return (
     <a
@@ -21,13 +21,16 @@ export function ChildAccountCard({ childId, name, level, streakDays, credits }: 
       className="flex w-full min-h-[56px] cursor-pointer items-center justify-between rounded-3xl bg-white px-5 py-4 shadow-md transition hover:shadow-lg active:scale-[0.99] focus:outline-none focus:ring-2 focus:ring-brand-blue/30 touch-manipulation no-underline text-inherit"
     >
       <div className="flex min-w-0 flex-1 items-center gap-3">
-        <span className="shrink-0 text-4xl" aria-hidden>
-          🐣
-        </span>
+        <div
+          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-sky-100 text-sm font-black text-sky-700"
+          aria-hidden
+        >
+          {name.slice(0, 1)}
+        </div>
         <div className="min-w-0">
           <p className="font-bold text-brand-text">{name}</p>
           <p className="text-xs text-gray-400">
-            Lv.{level} · 🔥 {streakDays}일
+            Lv.{level} · 연속 {streakDays}일
           </p>
         </div>
       </div>

@@ -2,6 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createServiceRoleClient } from '@/lib/supabase/admin'
 
+/** Postgres 42703·PostgREST PGRST204 등 「스키마에 컬럼이 없다」류면 짧은 payload로 재시도 */
+function isMissingColumnOrSchemaCacheError(err: { code?: string; message?: string } | null | undefined): boolean {
+  if (!err) return false
+  if (err.code === '42703' || err.code === 'PGRST204') return true
+  const m = String(err.message ?? '')
+  return m.includes('Could not find') && m.includes('schema cache')
+}
+
 /**
  * POST /api/mission/create
  * 부모가 새 미션 카드를 생성
@@ -102,7 +110,7 @@ export async function POST(req: NextRequest) {
   const service = createServiceRoleClient()
   const db = service ?? supabase
 
-  // DB 마이그레이션 단계별 호환: 없는 컬럼(42703)이면 더 짧은 payload 로 재시도 (중복 시도 제거)
+  // DB 마이그레이션 단계별 호환: 없는 컬럼(42703·PGRST204 등)이면 더 짧은 payload 로 재시도
   type InsertRow = Record<string, unknown>
   const attempts: InsertRow[] = []
   const seen = new Set<string>()
@@ -122,7 +130,7 @@ export async function POST(req: NextRequest) {
   addAttempt({ ...basePayload })
 
   let result = await db.from('missions').insert(attempts[0]).select().single()
-  for (let a = 1; a < attempts.length && result.error?.code === '42703'; a++) {
+  for (let a = 1; a < attempts.length && isMissingColumnOrSchemaCacheError(result.error); a++) {
     result = await db.from('missions').insert(attempts[a]).select().single()
   }
 
@@ -139,6 +147,21 @@ export async function POST(req: NextRequest) {
         : undefined,
     })
     return NextResponse.json({ error: '미션 생성에 실패했어요. 다시 시도해 주세요.' }, { status: 500 })
+  }
+
+  /** 자녀 전용으로 요청했는데 DB에 linked_child_id 가 없으면 재시도로 공용 행만 생길 수 있음 → 되돌리고 안내 */
+  if (parsedLinkedChildId && result.data) {
+    const created = result.data as { id: string; linked_child_id?: string | null }
+    if (created.linked_child_id !== parsedLinkedChildId) {
+      await db.from('missions').delete().eq('id', created.id)
+      return NextResponse.json(
+        {
+          error:
+            '자녀별 루틴 미션을 저장하려면 DB에 missions.linked_child_id 컬럼이 필요해요. Supabase SQL에 supabase/migrations/025_missions_linked_child_cascade.sql 을 적용한 뒤 다시 시도해 주세요.',
+        },
+        { status: 503 },
+      )
+    }
   }
 
   return NextResponse.json({ mission: result.data }, { status: 201 })

@@ -33,6 +33,7 @@ const AM_CHIPS: ChipDef[] = [
   { id: 'am-wash', title: '세수', emoji: '', type: 'recommended', apiBlock: 'morning' },
   { id: 'am-brush', title: '양치', emoji: '', type: 'recommended', apiBlock: 'morning' },
   { id: 'am-meal', title: '아침식사', emoji: '', type: 'recommended', apiBlock: 'morning' },
+  { id: 'am-water', title: '물마시기', emoji: '', type: 'recommended', apiBlock: 'morning' },
   { id: 'am-dress', title: '옷 갈아입기', emoji: '', type: 'recommended', apiBlock: 'morning' },
   { id: 'am-bag', title: '가방 챙기기', emoji: '', type: 'optional', apiBlock: 'morning' },
   { id: 'am-shoes', title: '신발신기', emoji: '', type: 'optional', apiBlock: 'morning' },
@@ -45,6 +46,7 @@ const AM_CHIPS: ChipDef[] = [
 const PM_CHIPS: ChipDef[] = [
   { id: 'pm-hands', title: '손씻기', emoji: '', type: 'recommended', apiBlock: 'afternoon' },
   { id: 'pm-snack', title: '간식먹기', emoji: '', type: 'recommended', apiBlock: 'afternoon' },
+  { id: 'pm-water', title: '물마시기', emoji: '', type: 'recommended', apiBlock: 'afternoon' },
   { id: 'pm-out', title: '야외놀이', emoji: '', type: 'optional', apiBlock: 'afternoon' },
   { id: 'pm-in', title: '실내놀이', emoji: '', type: 'optional', apiBlock: 'afternoon' },
   { id: 'pm-read', title: '독서활동', emoji: '', type: 'optional', apiBlock: 'afternoon' },
@@ -556,11 +558,29 @@ export default function RoutineOnboarding({ onComplete, linkedChildId }: Props) 
     setSubmitting(true)
     setError(null)
     try {
+      // 1단계에서 고른 연령대·보육 형태를 DB에 남겨 부모 홈/루틴 카드에 그대로 보이게 합니다.
+      if (linkedChildId) {
+        const res = await fetch('/api/child/update-profile', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            childId: linkedChildId,
+            ageGroup,
+            institutionType,
+          }),
+        })
+        const j = await res.json().catch(() => ({}))
+        if (!res.ok) {
+          throw new Error(typeof j.error === 'string' ? j.error : '연령·보육 정보 저장에 실패했어요.')
+        }
+      }
+
       await createMissionsFromIds(weekdayAm, weekdayPm, 'daily', { hasSchoolForAnchor: hasSchool, linkedChildId }, customAlarms)
       if (mode === 'withCustomHoliday') {
         await createMissionsFromIds(holidayAm, holidayPm, 'weekly', { hasSchoolForAnchor: false, linkedChildId }, [])
       }
       if (typeof window !== 'undefined') {
+        localStorage.setItem('cooanc_routine_has_school', hasSchool ? '1' : '0')
         localStorage.setItem('cooanc_notify_wake', notifyWake ? '1' : '0')
         localStorage.setItem('cooanc_notify_return', notifyReturn ? '1' : '0')
         localStorage.setItem('cooanc_notify_sleep', notifySleep ? '1' : '0')
@@ -570,7 +590,13 @@ export default function RoutineOnboarding({ onComplete, linkedChildId }: Props) 
             wake: soundWake,
             return: soundReturn,
             sleep: soundSleep,
+            wakeTime,
+            returnHomeTime,
+            sleepTime,
             custom: customAlarms,
+            wakeOnWeekend: true,
+            returnOnWeekend: true,
+            sleepOnWeekend: true,
           }),
         )
       }

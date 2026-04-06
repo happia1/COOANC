@@ -1,13 +1,14 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { AUTH_LOGO_SRC, TOPBAR_LOGO_CLASSNAME, TOPBAR_LOGO_HEIGHT, TOPBAR_LOGO_WIDTH } from '@/constants/branding'
+import ParentRoutineAlarmButton from '@/components/parent/ParentRoutineAlarmButton'
 
 type Props = { parentName: string }
 
 /**
  * 부모 앱 공통 상단바
  * - 좌: COOANC 로고
- * - 우: 부모 이름 퍼플 칩 + 설정 버튼
+ * - 우: 부모 이름 퍼플 칩 + 루틴 알람 + 설정 버튼
  */
 export default function ParentTopBar({ parentName }: Props) {
   return (
@@ -25,11 +26,12 @@ export default function ParentTopBar({ parentName }: Props) {
           <span className="bg-purple-100 text-purple-700 text-xs font-bold px-3 py-1.5 rounded-full">
             {parentName}
           </span>
+          <ParentRoutineAlarmButton />
           <Link
             href="/settings"
-            className="w-8 h-8 flex items-center justify-center rounded-xl bg-gray-100 text-gray-500 hover:bg-gray-200 transition-colors"
+            className="min-w-8 h-8 px-2 flex items-center justify-center rounded-xl bg-gray-100 text-[10px] font-bold text-gray-600 hover:bg-gray-200 transition-colors"
           >
-            <span className="text-base">⚙️</span>
+            설정
           </Link>
         </div>
       </div>

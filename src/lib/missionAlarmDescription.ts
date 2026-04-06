@@ -36,3 +36,17 @@ export function missionHasAlarmCue(m: {
   if (m.scheduled_time && /^\d{2}:\d{2}$/.test(m.scheduled_time)) return true
   return parseAlarmFromMissionDescription(m.description).alarmFile != null
 }
+
+/**
+ * 미션 scheduled_time(HH:MM)을 루틴 탭과 같은 한글 시각 문구로 바꿉니다.
+ * 유효하지 않거나 없으면 빈 문자열을 돌려줍니다.
+ */
+export function formatScheduleHHMMKo(t: string | null | undefined): string {
+  if (!t || !/^\d{2}:\d{2}$/.test(t)) return ''
+  const [hStr, mStr] = t.split(':')
+  const h = parseInt(hStr, 10)
+  const m = mStr ?? '00'
+  const period = h < 12 ? '오전' : '오후'
+  const h12 = h % 12 === 0 ? 12 : h % 12
+  return `${period} ${h12}:${m}`
+}

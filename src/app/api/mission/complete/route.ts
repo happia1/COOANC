@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { addSeoulCalendarDays } from '@/lib/koreaDate'
+import { scaledMissionRewards } from '@/lib/missionRewardMultiplier'
+import type { Mission } from '@/types/database'
 
 /**
  * POST /api/mission/complete
@@ -28,13 +30,16 @@ export async function POST(req: NextRequest) {
   // 미션 정보 조회
   const { data: mission } = await supabase
     .from('missions')
-    .select('credit_reward, heart_reward, exp_reward, is_active, level_required')
+    .select('credit_reward, heart_reward, exp_reward, reward_multiplier, is_active, level_required')
     .eq('id', missionId)
     .maybeSingle()
 
   if (!mission || !mission.is_active) {
     return NextResponse.json({ error: '미션을 찾을 수 없어요' }, { status: 404 })
   }
+
+  const { credit: creditEarned, heart: heartEarned, exp: expEarned, mult: rewardMultiplier } =
+    scaledMissionRewards(mission as Mission)
 
   // 오늘 이미 완료했는지 확인
   const { data: existing } = await supabase
@@ -56,9 +61,9 @@ export async function POST(req: NextRequest) {
     assigned_date: today,
     is_completed: true,
     completed_at: new Date().toISOString(),
-    credit_earned: mission.credit_reward,
-    heart_earned: mission.heart_reward,
-    exp_earned: mission.exp_reward,
+    credit_earned: creditEarned,
+    heart_earned: heartEarned,
+    exp_earned: expEarned,
   }
 
   if (existing) {
@@ -79,7 +84,7 @@ export async function POST(req: NextRequest) {
   }
 
   // EXP · 레벨 계산
-  let newExp = stats.exp + mission.exp_reward
+  let newExp = stats.exp + expEarned
   let newLevel = stats.current_level
   let newExpToNext = stats.exp_to_next_level
   let promotionPending = stats.promotion_pending
@@ -101,9 +106,9 @@ export async function POST(req: NextRequest) {
   await supabase
     .from('child_stats')
     .update({
-      credits: stats.credits + mission.credit_reward,
-      hearts: stats.hearts + mission.heart_reward,
-      total_credits_earned: stats.total_credits_earned + mission.credit_reward,
+      credits: stats.credits + creditEarned,
+      hearts: stats.hearts + heartEarned,
+      total_credits_earned: stats.total_credits_earned + creditEarned,
       exp: newExp,
       current_level: newLevel,
       exp_to_next_level: newExpToNext,
@@ -116,9 +121,10 @@ export async function POST(req: NextRequest) {
     .eq('child_id', user.id)
 
   return NextResponse.json({
-    creditReward: mission.credit_reward,
-    heartReward: mission.heart_reward,
-    expReward: mission.exp_reward,
+    creditReward: creditEarned,
+    heartReward: heartEarned,
+    expReward: expEarned,
+    rewardMultiplier,
     newLevel,
     newExp,
     newStreak,

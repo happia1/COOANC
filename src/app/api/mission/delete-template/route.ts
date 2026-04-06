@@ -1,0 +1,71 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
+import { createServiceRoleClient } from '@/lib/supabase/admin'
+import { isSpecialSectionMission } from '@/lib/specialMissionChips'
+
+/**
+ * POST /api/mission/delete-template
+ * 부모가 자녀 전용 미션 템플릿 한 줄을 삭제합니다(스페셜 시트에서 칩 해제 시).
+ */
+
+const uuidOk = (s: string) =>
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(s)
+
+export async function POST(req: NextRequest) {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: '인증이 필요해요' }, { status: 401 })
+
+  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle()
+  if (profile?.role !== 'parent') {
+    return NextResponse.json({ error: '부모 계정만 삭제할 수 있어요' }, { status: 403 })
+  }
+
+  let missionId: string
+  try {
+    const b = await req.json()
+    missionId = String(b.missionId ?? '').trim()
+  } catch {
+    return NextResponse.json({ error: '요청 형식이 올바르지 않아요' }, { status: 400 })
+  }
+
+  if (!uuidOk(missionId)) {
+    return NextResponse.json({ error: 'missionId가 올바르지 않아요' }, { status: 400 })
+  }
+
+  const { data: mission, error: mErr } = await supabase.from('missions').select('*').eq('id', missionId).maybeSingle()
+  if (mErr || !mission) {
+    return NextResponse.json({ error: '미션을 찾을 수 없어요' }, { status: 404 })
+  }
+
+  const childId = mission.linked_child_id as string | null
+  if (!childId || !uuidOk(childId)) {
+    return NextResponse.json({ error: '자녀 전용 템플릿만 지울 수 있어요' }, { status: 403 })
+  }
+
+  if (!isSpecialSectionMission(mission)) {
+    return NextResponse.json({ error: '스페셜 템플릿만 이 경로로 지울 수 있어요' }, { status: 400 })
+  }
+
+  const { data: link } = await supabase
+    .from('family_links')
+    .select('id')
+    .eq('parent_id', user.id)
+    .eq('child_id', childId)
+    .maybeSingle()
+  if (!link) {
+    return NextResponse.json({ error: '권한이 없어요' }, { status: 403 })
+  }
+
+  const service = createServiceRoleClient()
+  const db = service ?? supabase
+  const { error } = await db.from('missions').delete().eq('id', missionId)
+  if (error) {
+    console.error('[mission/delete-template]', error)
+    return NextResponse.json({ error: '삭제하지 못했어요' }, { status: 500 })
+  }
+
+  return NextResponse.json({ ok: true }, { status: 200 })
+}

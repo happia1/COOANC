@@ -13,9 +13,9 @@ import { createClient } from '@/lib/supabase/client'
 /** 최종 단계에서 입력해야 하는 고정 문구(실수 방지) */
 const CONFIRM_PHRASE = '탈퇴'
 
-/** 1단계 팝업에 표시하는 안내 문구 */
+/** 1단계 팝업에 표시하는 안내 문구 — 계정 삭제 전에 꼭 읽을 내용 */
 const WITHDRAW_INFO =
-  '부모 계정과 가족 연결이 삭제되며 복구할 수 없어요. 연결돼 있던 자녀 계정·미션·포인트는 그대로 남습니다(자녀 앱 로그인 가능). 아이 데이터까지 없애려면 탈퇴 전 설정에서 「자녀 프로필 삭제」로 각 자녀를 먼저 삭제하세요.'
+  '계정을 삭제하면 부모 로그인 정보와 가족 연결 정보가 영구적으로 사라지며, 되돌릴 수 없습니다. 연결되어 있던 자녀 계정·미션·크레딧 데이터는 그대로 남아 자녀 앱에서 계속 이용할 수 있어요. 자녀 데이터까지 모두 없애려면, 삭제하기 전에 설정의 자녀 프로필에서 휴지통 아이콘으로 각 자녀를 먼저 삭제해 주세요.'
 
 type ModalStep = 'closed' | 'intro' | 'confirm'
 
@@ -67,9 +67,9 @@ export default function DeleteParentAccountSection() {
             setConfirmText('')
             setError(null)
           }}
-          className="text-[10px] text-gray-400 underline-offset-2 hover:underline active:opacity-70"
+          className="text-[11px] font-medium text-gray-400 underline-offset-2 hover:text-gray-500 hover:underline active:opacity-70"
         >
-          계정 탈퇴
+          계정삭제
         </button>
       </div>
 
@@ -83,7 +83,7 @@ export default function DeleteParentAccountSection() {
           <button type="button" aria-label="닫기" className="absolute inset-0 cursor-default" onClick={closeModal} />
           <div className="relative z-10 w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl">
             <h3 id="withdraw-intro-title" className="text-center text-sm font-black text-gray-800">
-              계정 탈퇴
+              계정 삭제
             </h3>
             <p className="mt-3 text-left text-xs leading-relaxed text-gray-600">{WITHDRAW_INFO}</p>
             <p className="mt-4 text-center text-xs font-bold text-gray-700">정말 탈퇴하시겠어요?</p>

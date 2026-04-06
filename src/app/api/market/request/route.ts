@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { resolveApiActorChildId } from '@/lib/resolveApiActorChildId'
 
 /**
  * POST /api/market/request
- * 구매 요청: 크레딧 차감 + purchase_requests 생성
+ * body: { itemId, childMessage?, childId? }
+ * - 자녀 본인: childId 생략 시 본인 계정으로 처리
+ * - 부모가 자녀 마켓을 볼 때: childId 로 연결된 자녀만 차감·요청 생성
  */
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
@@ -13,9 +16,14 @@ export async function POST(req: NextRequest) {
 
   if (!user) return NextResponse.json({ error: '인증이 필요해요' }, { status: 401 })
 
-  let itemId: string, childMessage: string | null
+  let itemId: string
+  let childMessage: string | null
+  let bodyChildId: unknown
   try {
-    ;({ itemId, childMessage = null } = await req.json())
+    const body = await req.json()
+    itemId = body.itemId
+    childMessage = body.childMessage ?? null
+    bodyChildId = body.childId
   } catch {
     return NextResponse.json({ error: '요청 형식이 올바르지 않아요' }, { status: 400 })
   }
@@ -23,6 +31,12 @@ export async function POST(req: NextRequest) {
   if (!itemId) {
     return NextResponse.json({ error: '상품 정보가 누락됐어요' }, { status: 400 })
   }
+
+  const resolved = await resolveApiActorChildId(supabase, user, bodyChildId)
+  if (resolved.ok === false) {
+    return resolved.response
+  }
+  const childId = resolved.childId
 
   // 상품 조회
   const { data: item } = await supabase
@@ -40,7 +54,7 @@ export async function POST(req: NextRequest) {
   const { data: stats } = await supabase
     .from('child_stats')
     .select('credits, current_level')
-    .eq('child_id', user.id)
+    .eq('child_id', childId)
     .maybeSingle()
 
   if (!stats) {
@@ -59,7 +73,7 @@ export async function POST(req: NextRequest) {
   const { data: existing } = await supabase
     .from('purchase_requests')
     .select('id')
-    .eq('child_id', user.id)
+    .eq('child_id', childId)
     .eq('item_id', itemId)
     .eq('status', 'pending')
     .maybeSingle()
@@ -75,7 +89,7 @@ export async function POST(req: NextRequest) {
       credits: stats.credits - item.credit_price,
       updated_at: new Date().toISOString(),
     })
-    .eq('child_id', user.id)
+    .eq('child_id', childId)
 
   if (deductErr) {
     return NextResponse.json({ error: '크레딧 차감에 실패했어요' }, { status: 500 })
@@ -85,7 +99,7 @@ export async function POST(req: NextRequest) {
   const { data: request, error: insertErr } = await supabase
     .from('purchase_requests')
     .insert({
-      child_id: user.id,
+      child_id: childId,
       item_id: itemId,
       item_name: item.name,
       item_price: item.credit_price,
@@ -102,7 +116,7 @@ export async function POST(req: NextRequest) {
     await supabase
       .from('child_stats')
       .update({ credits: stats.credits })
-      .eq('child_id', user.id)
+      .eq('child_id', childId)
     return NextResponse.json({ error: '요청 생성에 실패했어요. 다시 시도해 주세요.' }, { status: 500 })
   }
 

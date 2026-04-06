@@ -59,34 +59,34 @@ function buildMissions(s: SurveyState): MissionTemplate[] {
   const bed  = s.bedTime  || '21:00'
 
   const base: MissionTemplate[] = [
-    { title: '기상',     icon_emoji: '☀️', scheduled_time: wake,               credit_reward: 5,  exp_reward: 5,  difficulty: 'easy' },
-    { title: '세수하기', icon_emoji: '🪥', scheduled_time: addMinutes(wake, 10), credit_reward: 5,  exp_reward: 5,  difficulty: 'easy' },
-    { title: '아침 식사',icon_emoji: '🍳', scheduled_time: addMinutes(wake, 20), credit_reward: 10, exp_reward: 10, difficulty: 'easy' },
+    { title: '기상', icon_emoji: '', scheduled_time: wake, credit_reward: 5, exp_reward: 5, difficulty: 'easy' },
+    { title: '세수하기', icon_emoji: '', scheduled_time: addMinutes(wake, 10), credit_reward: 5, exp_reward: 5, difficulty: 'easy' },
+    { title: '아침 식사', icon_emoji: '', scheduled_time: addMinutes(wake, 20), credit_reward: 10, exp_reward: 10, difficulty: 'easy' },
   ]
 
   if (s.ageGroup === 'preschool') {
     if (s.daycare === 'home') {
       return [
         ...base,
-        { title: '장난감 정리',  icon_emoji: '🧸', scheduled_time: '18:00', credit_reward: 10, exp_reward: 10, difficulty: 'easy' },
-        { title: '취침 준비',    icon_emoji: '🌙', scheduled_time: bed,     credit_reward: 5,  exp_reward: 5,  difficulty: 'easy' },
+        { title: '장난감 정리', icon_emoji: '', scheduled_time: '18:00', credit_reward: 10, exp_reward: 10, difficulty: 'easy' },
+        { title: '취침 준비', icon_emoji: '', scheduled_time: bed, credit_reward: 5, exp_reward: 5, difficulty: 'easy' },
       ]
     } else {
       // 등원
       return [
         ...base,
-        { title: '가방 챙기기',      icon_emoji: '🎒', scheduled_time: addMinutes(wake, 40), credit_reward: 10, exp_reward: 10, difficulty: 'easy' },
-        { title: '귀가 후 손 씻기',  icon_emoji: '🧼', scheduled_time: '16:00',              credit_reward: 10, exp_reward: 10, difficulty: 'easy' },
-        { title: '취침 준비',        icon_emoji: '🌙', scheduled_time: bed,                  credit_reward: 5,  exp_reward: 5,  difficulty: 'easy' },
+        { title: '가방 챙기기', icon_emoji: '', scheduled_time: addMinutes(wake, 40), credit_reward: 10, exp_reward: 10, difficulty: 'easy' },
+        { title: '귀가 후 손 씻기', icon_emoji: '', scheduled_time: '16:00', credit_reward: 10, exp_reward: 10, difficulty: 'easy' },
+        { title: '취침 준비', icon_emoji: '', scheduled_time: bed, credit_reward: 5, exp_reward: 5, difficulty: 'easy' },
       ]
     }
   } else {
     // 학령기
     return [
       ...base,
-      { title: '가방 챙기기', icon_emoji: '🎒', scheduled_time: addMinutes(wake, 40), credit_reward: 10, exp_reward: 10, difficulty: 'easy' },
-      { title: '숙제하기',   icon_emoji: '📚', scheduled_time: '15:30',              credit_reward: 20, exp_reward: 20, difficulty: 'normal' },
-      { title: '취침 준비',  icon_emoji: '🌙', scheduled_time: bed,                  credit_reward: 5,  exp_reward: 5,  difficulty: 'easy' },
+      { title: '가방 챙기기', icon_emoji: '', scheduled_time: addMinutes(wake, 40), credit_reward: 10, exp_reward: 10, difficulty: 'easy' },
+      { title: '숙제하기', icon_emoji: '', scheduled_time: '15:30', credit_reward: 20, exp_reward: 20, difficulty: 'normal' },
+      { title: '취침 준비', icon_emoji: '', scheduled_time: bed, credit_reward: 5, exp_reward: 5, difficulty: 'easy' },
     ]
   }
 }
@@ -157,7 +157,10 @@ export default function ChildOnboardingSurvey({ childName, onComplete }: Props) 
     return (
       <SurveyShell step={5} total={5}>
         <div className="flex flex-col items-center gap-4 py-8">
-          <span className="text-6xl animate-spin">⚙️</span>
+          <div
+            className="h-12 w-12 animate-spin rounded-full border-2 border-brand-blue border-t-transparent"
+            aria-hidden
+          />
           <p className="font-bold text-brand-text">미션을 만들고 있어요…</p>
           {error && <p className="text-xs text-red-500 bg-red-50 rounded-lg px-3 py-2 text-center">{error}</p>}
         </div>
@@ -169,16 +172,10 @@ export default function ChildOnboardingSurvey({ childName, onComplete }: Props) 
   if (step === 1) {
     return (
       <SurveyShell step={1} total={5} title="자녀 연령대를 알려주세요">
-        <p className="text-sm text-gray-400 mb-6 text-center">{childName}에게 맞는 루틴을 추천해 드릴게요 🌱</p>
+        <p className="text-sm text-gray-400 mb-6 text-center">{childName}에게 맞는 루틴을 추천해 드릴게요.</p>
         <div className="flex flex-col gap-3">
-          <OptionButton
-            emoji="🐣" label="미취학 아동" sub="7세 미만"
-            onClick={() => nextFromStep1('preschool')}
-          />
-          <OptionButton
-            emoji="🎒" label="학령기 아동" sub="초등학생 이상"
-            onClick={() => nextFromStep1('school')}
-          />
+          <OptionButton label="미취학 아동" sub="7세 미만" onClick={() => nextFromStep1('preschool')} />
+          <OptionButton label="학령기 아동" sub="초등학생 이상" onClick={() => nextFromStep1('school')} />
         </div>
       </SurveyShell>
     )
@@ -190,12 +187,20 @@ export default function ChildOnboardingSurvey({ childName, onComplete }: Props) 
       <SurveyShell step={2} total={5} title="어린이집·유치원에 가나요?" onBack={() => setStep(1)}>
         <div className="flex flex-col gap-3 mt-4">
           <OptionButton
-            emoji="🏠" label="가정 보육"  sub="집에서 지내요"
-            onClick={() => { setSurvey(s => ({ ...s, daycare: 'home' }));    setStep(3) }}
+            label="가정 보육"
+            sub="집에서 지내요"
+            onClick={() => {
+              setSurvey((s) => ({ ...s, daycare: 'home' }))
+              setStep(3)
+            }}
           />
           <OptionButton
-            emoji="🏫" label="어린이집 / 유치원"  sub="등원해요"
-            onClick={() => { setSurvey(s => ({ ...s, daycare: 'daycare' })); setStep(3) }}
+            label="어린이집 / 유치원"
+            sub="등원해요"
+            onClick={() => {
+              setSurvey((s) => ({ ...s, daycare: 'daycare' }))
+              setStep(3)
+            }}
           />
         </div>
       </SurveyShell>
@@ -255,14 +260,8 @@ export default function ChildOnboardingSurvey({ childName, onComplete }: Props) 
     <SurveyShell step={5} total={5} title="자녀 기기에 알람을 설정할까요?" onBack={() => setStep(4)}>
       <p className="text-sm text-gray-400 mb-6 text-center">미션 시간에 맞춰 알림을 받을 수 있어요</p>
       <div className="flex flex-col gap-3">
-        <OptionButton
-          emoji="⏰" label="설정할게요"  sub="기기 알람을 켜 주세요"
-          onClick={() => handleFinish(true)}
-        />
-        <OptionButton
-          emoji="🕐" label="나중에 할게요" sub="지금은 건너뛰어요"
-          onClick={() => handleFinish(false)}
-        />
+        <OptionButton label="설정할게요" sub="기기 알람을 켜 주세요" onClick={() => handleFinish(true)} />
+        <OptionButton label="나중에 할게요" sub="지금은 건너뛰어요" onClick={() => handleFinish(false)} />
       </div>
     </SurveyShell>
   )
@@ -301,20 +300,19 @@ function SurveyShell({
   )
 }
 
-function OptionButton({
-  emoji, label, sub, onClick,
-}: {
-  emoji: string; label: string; sub?: string; onClick: () => void
-}) {
+function OptionButton({ label, sub, onClick }: { label: string; sub?: string; onClick: () => void }) {
   return (
     <button
+      type="button"
       onClick={onClick}
-      className="w-full flex items-center gap-4 bg-white rounded-2xl px-5 py-4 shadow-sm border-2 border-transparent hover:border-brand-blue/40 active:scale-[0.98] transition-all text-left"
+      className="flex w-full items-center gap-4 rounded-2xl border-2 border-transparent bg-white px-5 py-4 text-left shadow-sm transition-all hover:border-brand-blue/40 active:scale-[0.98]"
     >
-      <span className="text-3xl flex-shrink-0">{emoji}</span>
+      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-blue/10 text-sm font-black text-brand-blue">
+        {label.slice(0, 1)}
+      </span>
       <div>
         <p className="font-bold text-brand-text">{label}</p>
-        {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
+        {sub && <p className="mt-0.5 text-xs text-gray-400">{sub}</p>}
       </div>
     </button>
   )

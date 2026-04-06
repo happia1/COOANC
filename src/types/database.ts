@@ -13,6 +13,10 @@ export type Profile = {
   age: number | null
   /** 자녀 생년월일 YYYY-MM-DD (만 나이 계산의 기준) */
   birth_date: string | null
+  /** 미취학(preschool) / 학령기(school) — 온보딩·설정에서 저장(구 DB 는 없을 수 있음) */
+  age_group?: 'preschool' | 'school' | null
+  /** 가정보육·어린이집·유치원·학교 코드 — 루틴·알림과 카드 표시에 사용 */
+  institution_type?: 'home' | 'daycare' | 'kindergarten' | 'school' | null
   avatar_url: string | null
   created_at: string
   updated_at: string
@@ -56,6 +60,8 @@ export type Mission = {
   credit_reward: number
   heart_reward: number
   exp_reward: number
+  /** 완료 시 보상 배율(1·2·3). 스페셜 미션만 부모가 변경 — 구 DB 는 1로 간주 */
+  reward_multiplier?: number | null
   concept_tag: '미션' | '교환' | '저축' | '나눔' | '투자' | '도전' | '학습' | '기여' | '건강' | '습관' | null
   difficulty: 'easy' | 'normal' | 'hard' | 'special'
   repeat_type: 'daily' | 'weekly' | 'monthly' | 'event'
@@ -83,7 +89,19 @@ export type DailyMission = {
 
 /** daily_missions + missions 조인 결과 */
 export type DailyMissionWithTemplate = DailyMission & {
-  missions: Pick<Mission, 'title' | 'icon_emoji' | 'description' | 'credit_reward' | 'heart_reward' | 'exp_reward' | 'difficulty' | 'block'>
+  missions: Pick<
+    Mission,
+    | 'title'
+    | 'icon_emoji'
+    | 'description'
+    | 'credit_reward'
+    | 'heart_reward'
+    | 'exp_reward'
+    | 'reward_multiplier'
+    | 'difficulty'
+    | 'block'
+    | 'repeat_type'
+  >
 }
 
 export type CalendarEvent = {
@@ -93,7 +111,7 @@ export type CalendarEvent = {
   title: string
   start_date: string    // YYYY-MM-DD
   end_date: string      // YYYY-MM-DD
-  event_type: 'holiday' | 'vacation' | 'special'
+  event_type: 'holiday' | 'vacation' | 'special' | 'other'
   routine_override: 'weekend' | 'none'
   created_at: string
 }
@@ -103,9 +121,11 @@ export type LocalCalendarEvent = {
   id: string
   childId: string | null  // null = 모든 자녀에 적용
   title: string
+  /** 일정에 대한 짧은 메모(구버전 데이터에는 없을 수 있음) */
+  description?: string
   startDate: string       // YYYY-MM-DD
   endDate: string         // YYYY-MM-DD
-  eventType: 'holiday' | 'vacation' | 'special'
+  eventType: 'holiday' | 'vacation' | 'special' | 'other'
   routineOverride: 'weekend' | 'none'
 }
 

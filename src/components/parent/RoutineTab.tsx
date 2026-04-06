@@ -3,20 +3,30 @@
 /**
  * 부모 앱 — 루틴 관리 탭
  * - 표시: 현재 자녀에만 연결된 미션(linked_child_id 일치)만 목록에 둡니다. 시스템 풀(공용 행)은 「추가」 시트에서만 고릅니다.
- * - 주간(daily 등) / 주말·휴일(weekly) 구역은 접기 가능
- * - 미션 카드는 제목·시각·알람·활성 토글 위주로 단순화
+ * - 일상 미션은 기상→취침 순으로 정렬하고, 주간/주말 각각 한 카드 안에 오전·오후를 접을 수 있게 두며,
+ *   펼친 목록은 스페셜 미션과 같이 가로 슬라이드(칩형 카드)로 표시합니다.
+ * - 일상 미션 카드는 이모지·제목·시각만 표시합니다. 활성/비활성은 상단 연필(키워드 시트)에서 한 번에 설정합니다.
+ * - 알람은 온보딩·상단 「루틴 알람」에서만 설정해 충돌을 막습니다.
  */
 
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useLayoutEffect, useMemo, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { useParentStore } from '@/store/parentStore'
 import ChildProfileNav, { type ChildTab } from '@/components/parent/ChildProfileNav'
+import { CompactChildProfileCard } from '@/components/parent/CompactChildProfileCard'
 import CalendarSection from '@/components/parent/CalendarSection'
-import MissionSuggestCard from '@/components/settings/MissionSuggestCard'
+import RoutineKeywordBuilderSheet from '@/components/parent/RoutineKeywordBuilderSheet'
+import SpecialMissionAddSheet from '@/components/parent/SpecialMissionAddSheet'
+import SpecialMissionBonusSheet from '@/components/parent/SpecialMissionBonusSheet'
 import type { Mission } from '@/types/database'
+import { ROUTINE_HAS_SCHOOL_KEY } from '@/lib/routineAlarmLocalPrefs'
+import { normalizeRewardMultiplier } from '@/lib/missionRewardMultiplier'
 import {
-  missionHasAlarmCue,
-  parseAlarmFromMissionDescription,
-} from '@/lib/missionAlarmDescription'
+  displaySpecialMissionTitle,
+  isRoutineSectionMission,
+  isSpecialSectionMission,
+} from '@/lib/specialMissionChips'
+import { sortMissionsByRoutineFlow } from '@/lib/routineChips'
 
 /** HH:MM → "오전/오후 H:MM" */
 function formatTime(t: string | null | undefined): string {
@@ -38,16 +48,285 @@ function sortByTime(missions: Mission[]): Mission[] {
   })
 }
 
-/** 주말/휴일 온보딩 구간은 weekly 로 저장됨 */
+/**
+ * 이미 기상→취침 순으로 정렬된 목록을 오전(morning)·오후(그 외 블록)로 나눕니다.
+ * block 이 없으면 scheduled_time 시각(12시 미만=오전)으로 추정합니다.
+ */
+function splitMissionsAmPm(sortedList: Mission[]): { am: Mission[]; pm: Mission[] } {
+  const am: Mission[] = []
+  const pm: Mission[] = []
+  for (const m of sortedList) {
+    if (m.block === 'morning') {
+      am.push(m)
+    } else if (m.block === 'afternoon' || m.block === 'evening' || m.block === 'bedtime') {
+      pm.push(m)
+    } else if (m.scheduled_time && /^\d{2}:\d{2}$/.test(m.scheduled_time)) {
+      const h = parseInt(m.scheduled_time.slice(0, 2), 10)
+      if (h < 12) am.push(m)
+      else pm.push(m)
+    } else {
+      pm.push(m)
+    }
+  }
+  return { am, pm }
+}
+
+/** 펼침 시 화살표 위쪽(접기), 접힘 시 아래쪽(펼치기) */
+function ChevronToggleIcon({ open, className }: { open: boolean; className?: string }) {
+  return (
+    <svg
+      className={`${className ?? ''} h-4 w-4 shrink-0 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      aria-hidden
+    >
+      <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+/** 일상·스페셜 공통: 접기 헤더 아래 가로 슬라이드 카드 영역(동일 여백) */
+const SLIDE_SECTION_WITH_CARDS = 'border-t border-gray-100 pt-2 pb-2'
+
+/**
+ * 일상 미션용 가로 슬라이드 카드(스페셜 SpecialMissionRow 와 같은 폭·스크롤 패턴)
+ */
+function RoutineMissionSlideCard({ mission: m }: { mission: Mission }) {
+  const timeLabel = formatTime(m.scheduled_time)
+
+  return (
+    <div
+      className={`flex h-full min-h-[4.25rem] flex-col items-center justify-center gap-1 rounded-xl bg-white px-1.5 py-2 text-center shadow-sm ring-1 ${
+        m.is_active ? 'ring-gray-200' : 'ring-gray-100 opacity-80'
+      }`}
+    >
+      {/* 아이콘(있으면 DB 값) 또는 제목 첫 글자 — ON/OFF는 키워드 시트에서 */}
+      <span
+        className="flex h-9 w-9 shrink-0 items-center justify-center text-lg font-black leading-none text-gray-600"
+        aria-hidden
+      >
+        {m.icon_emoji?.trim() ? m.icon_emoji : m.title.slice(0, 1)}
+      </span>
+      <div className="w-full min-w-0 px-0.5">
+        <p className="line-clamp-2 text-[11px] font-bold leading-tight text-gray-800">{m.title}</p>
+        {timeLabel ? (
+          <p className="mt-0.5 text-[9px] font-medium tabular-nums text-gray-500">{timeLabel}</p>
+        ) : null}
+      </div>
+    </div>
+  )
+}
+
+function renderRoutineMissionStrip(list: Mission[], emptyHint: string) {
+  if (list.length === 0) {
+    return <p className="px-3 py-3 text-center text-[11px] text-gray-400">{emptyHint}</p>
+  }
+  return (
+    <div className="-mx-1 overflow-x-auto pb-0.5 [scrollbar-width:thin]">
+      <ul className="m-0 flex w-max min-w-full list-none snap-x snap-mandatory gap-2 px-2 pb-1 pt-1">
+        {list.map((m) => (
+          <li key={m.id} className="w-[min(26vw,92px)] shrink-0 snap-start py-px">
+            <RoutineMissionSlideCard mission={m} />
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+/**
+ * 오전·오후를 하나의 흰 카드에 넣고, 스페셜 미션과 같이 접기/펼치기 + 가로 슬라이드 목록으로 둡니다.
+ */
+function AmPmRoutineBlock({
+  am,
+  pm,
+  openAm,
+  openPm,
+  onToggleAm,
+  onTogglePm,
+  emptyAmHint,
+  emptyPmHint,
+}: {
+  am: Mission[]
+  pm: Mission[]
+  openAm: boolean
+  openPm: boolean
+  onToggleAm: () => void
+  onTogglePm: () => void
+  emptyAmHint: string
+  emptyPmHint: string
+}) {
+  return (
+    <div className="overflow-x-hidden rounded-xl border border-gray-100 bg-white shadow-sm">
+      <button
+        type="button"
+        onClick={onToggleAm}
+        aria-expanded={openAm}
+        className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left transition-colors hover:bg-gray-50"
+      >
+        <span className="text-xs font-bold text-gray-700">오전</span>
+        <ChevronToggleIcon open={openAm} className="text-gray-400" />
+      </button>
+      {openAm ? (
+        <div className={am.length === 0 ? 'border-t border-gray-100' : SLIDE_SECTION_WITH_CARDS}>
+          {renderRoutineMissionStrip(am, emptyAmHint)}
+        </div>
+      ) : null}
+      <button
+        type="button"
+        onClick={onTogglePm}
+        aria-expanded={openPm}
+        className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left transition-colors hover:bg-gray-50"
+      >
+        <span className="text-xs font-bold text-gray-700">오후</span>
+        <ChevronToggleIcon open={openPm} className="text-gray-400" />
+      </button>
+      {openPm ? (
+        <div className={pm.length === 0 ? 'border-t border-gray-100' : SLIDE_SECTION_WITH_CARDS}>
+          {renderRoutineMissionStrip(pm, emptyPmHint)}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+/**
+ * 스페셜 미션 — 매일(daily+special)과 오늘만(event)을 한 흰 카드 안에서 두 구역으로 나눔.
+ * 헤더~카드 간격·리스트 안쪽 여백은 두 구역 동일(SLIDE_SECTION_WITH_CARDS).
+ * 바깥은 overflow-x-hidden 만 써서 ring/그림자 상단이 overflow-hidden 에 잘리지 않게 함.
+ */
+/** 스페셜 가로 카드 구역 — 일상 슬라이드보다 위·아래 여백을 줄여 카드가 덜 벌어지게 함 */
+const SLIDE_SECTION_SPECIAL = 'border-t border-gray-100 pt-1 pb-1'
+
+function SpecialDailyEventBlock({
+  dailyMissions,
+  eventMissions,
+  openDaily,
+  openEvent,
+  onToggleDaily,
+  onToggleEvent,
+  assigningId,
+  onEventAssignClick,
+  onOpenBonus,
+}: {
+  dailyMissions: Mission[]
+  eventMissions: Mission[]
+  openDaily: boolean
+  openEvent: boolean
+  onToggleDaily: () => void
+  onToggleEvent: () => void
+  assigningId: string | null
+  /** 오늘 하루만(event) 카드 「일정 추가」— 보너스 안내 팝업으로 이어짐 */
+  onEventAssignClick: (m: Mission) => void
+  onOpenBonus: (m: Mission) => void
+}) {
+  const renderHorizontalCards = (list: Mission[], isEventList: boolean) => (
+    <div className="-mx-1 overflow-x-auto pb-0.5 [scrollbar-width:thin]">
+      <ul className="m-0 flex w-max min-w-full list-none snap-x snap-mandatory gap-2 px-2 pb-0.5 pt-0.5">
+        {list.map((m) => (
+          <li key={m.id} className="w-[min(26vw,92px)] shrink-0 snap-start py-px">
+            <SpecialMissionRow
+              mission={m}
+              assigning={isEventList && assigningId === m.id}
+              onAssignTodayClick={isEventList ? () => onEventAssignClick(m) : undefined}
+              onOpenBonus={() => onOpenBonus(m)}
+            />
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+
+  return (
+    <div className="overflow-x-hidden rounded-xl border border-gray-100 bg-white shadow-sm">
+      <button
+        type="button"
+        onClick={onToggleDaily}
+        aria-expanded={openDaily}
+        className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left transition-colors hover:bg-gray-50"
+      >
+        <span className="text-xs font-bold text-gray-700">매일 일정</span>
+        <ChevronToggleIcon open={openDaily} className="text-gray-400" />
+      </button>
+      {openDaily ? (
+        <div className={dailyMissions.length === 0 ? 'border-t border-gray-100' : SLIDE_SECTION_SPECIAL}>
+          {dailyMissions.length === 0 ? (
+            <p className="px-3 py-3 text-center text-[11px] text-gray-400">매일 스페셜 미션이 없어요</p>
+          ) : (
+            renderHorizontalCards(dailyMissions, false)
+          )}
+        </div>
+      ) : null}
+      <button
+        type="button"
+        onClick={onToggleEvent}
+        aria-expanded={openEvent}
+        className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left transition-colors hover:bg-gray-50"
+      >
+        <span className="text-xs font-bold text-gray-700">오늘 하루만</span>
+        <ChevronToggleIcon open={openEvent} className="text-gray-400" />
+      </button>
+      {openEvent ? (
+        <div className={eventMissions.length === 0 ? 'border-t border-gray-100' : SLIDE_SECTION_SPECIAL}>
+          {eventMissions.length === 0 ? (
+            <p className="px-3 py-3 text-center text-[11px] text-gray-400">
+              이벤트 스페셜이 없어요. 연필에서 추가한 뒤 카드의 「일정 추가」로 오늘만 자녀 화면에 넣을 수
+              있어요.
+            </p>
+          ) : (
+            renderHorizontalCards(eventMissions, true)
+          )}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+/** 주말/휴일 온보딩 구간은 weekly 로 저장됨 (일상 미션만) */
 function isWeekendOrHolidayMission(m: Mission): boolean {
   return m.repeat_type === 'weekly'
 }
 
-type ChildInfo = { id: string; name: string; level: number }
+/** 일상 미션 블록 — event·매일 스페셜 키워드(daily+special)는 스페셜 섹션으로만 갑니다 */
+function isRoutineMission(m: Mission): boolean {
+  return isRoutineSectionMission(m)
+}
+
+/** 스페셜 섹션 — event 템플릿 + 매일 자동 스페셜 키워드 */
+function isSpecialMission(m: Mission): boolean {
+  return isSpecialSectionMission(m)
+}
+
+/** 루틴 탭 프로필 카드(홈과 동일 컴포넌트)용 자녀 한 명 분 */
+type RoutineChildProfile = {
+  id: string
+  name: string
+  level: number
+  credits: number
+  hearts: number
+  streakDays: number
+  age: number | null
+  avatarUrl: string | null
+  /** 프로필 institution_type — 'home'이 아니면 등원·하원 칩을 씁니다 */
+  institutionType: string | null
+  /** 홈 탭과 같은 문구로 카드에 표시 */
+  ageGroupLabel: string
+  childcareLabel: string | null
+}
+
+/** 서버에서 넘긴 오늘(서울) daily_missions — 완료된 미션은 보너스·일정 추가 팝업 대신 안내 */
+type TodayDailyMissionRow = {
+  childId: string
+  missionTemplateId: string
+  isCompleted: boolean
+}
 
 type Props = {
   missions: Mission[]
-  children: ChildInfo[]
+  children: RoutineChildProfile[]
+  todayDailyMissions?: TodayDailyMissionRow[]
 }
 
 /** 루틴 탭 목록: 이 자녀 전용 행만 (시스템 공용 행은 추가 시트에서만 선택) */
@@ -56,17 +335,39 @@ function missionsLinkedToChild(list: Mission[], childId: string | null): Mission
   return list.filter((m) => m.linked_child_id === childId)
 }
 
-export default function RoutineTab({ missions: initial, children }: Props) {
+export default function RoutineTab({ missions: initial, children, todayDailyMissions = [] }: Props) {
   const { selectedChildId, setSelectedChildId } = useParentStore()
-  const [loading, setLoading] = useState<string | null>(null)
-  const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null)
-  const [addSheetOpen, setAddSheetOpen] = useState(false)
-  const [alarmMission, setAlarmMission] = useState<Mission | null>(null)
+  /** multiline: 긴 안내(예: API hint) — 줄바꿈·너비·표시 시간 확대 */
+  const [toast, setToast] = useState<{
+    msg: string
+    ok: boolean
+    multiline?: boolean
+  } | null>(null)
+  /** 키워드 칩으로 일상 미션 추가 */
+  const [keywordSheetOpen, setKeywordSheetOpen] = useState(false)
+  const [specialSheetOpen, setSpecialSheetOpen] = useState(false)
+  /** 스페셜 보너스(2·3배) 시트 — 매일·오늘하루 카드 공통 */
+  const [bonusMission, setBonusMission] = useState<Mission | null>(null)
+  /** 「일정 추가」 후 보너스 시트에서 저장하면 이어서 오늘 배정 API 호출 */
+  const [assignTodayAfterBonusMissionId, setAssignTodayAfterBonusMissionId] = useState<string | null>(null)
+  /** 오늘 하루만(event) 일정 추가 시 — 보너스 여부 중앙 팝업 */
+  const [eventAssignPromptMission, setEventAssignPromptMission] = useState<Mission | null>(null)
+  /** 오늘 일정에서 이미 완료된 미션에 보너스·일정 추가 시 */
+  const [alreadyCompletedModalOpen, setAlreadyCompletedModalOpen] = useState(false)
+  const [assigningId, setAssigningId] = useState<string | null>(null)
 
-  const [openWeekdayActive, setOpenWeekdayActive] = useState(true)
-  const [openWeekendActive, setOpenWeekendActive] = useState(true)
-  const [openWeekdayInactive, setOpenWeekdayInactive] = useState(true)
-  const [openWeekendInactive, setOpenWeekendInactive] = useState(true)
+  /** 오전/오후 접기 — 기본 접힘 */
+  const [openWeekdayAm, setOpenWeekdayAm] = useState(false)
+  const [openWeekdayPm, setOpenWeekdayPm] = useState(false)
+  const [openWeekendAm, setOpenWeekendAm] = useState(false)
+  const [openWeekendPm, setOpenWeekendPm] = useState(false)
+  const [openWeekdayInactiveAm, setOpenWeekdayInactiveAm] = useState(false)
+  const [openWeekdayInactivePm, setOpenWeekdayInactivePm] = useState(false)
+  const [openWeekendInactiveAm, setOpenWeekendInactiveAm] = useState(false)
+  const [openWeekendInactivePm, setOpenWeekendInactivePm] = useState(false)
+  /** 스페셜: 매일 포함 / 오늘만 넣기 — 일상 오전·오후와 같이 기본 접힘 */
+  const [openSpecialDaily, setOpenSpecialDaily] = useState(false)
+  const [openSpecialEvent, setOpenSpecialEvent] = useState(false)
 
   useEffect(() => {
     if (children.length === 0) {
@@ -82,6 +383,19 @@ export default function RoutineTab({ missions: initial, children }: Props) {
   const currentId = selectedChildId ?? children[0]?.id ?? null
   const currentChild = children.find((c) => c.id === currentId) ?? children[0]
   const childLevel = currentChild?.level ?? 0
+  /** 온보딩과 동일: 집 보육이 아니면 학교·기관 루틴으로 봅니다 */
+  const hasSchool =
+    Boolean(currentChild?.institutionType && currentChild.institutionType !== 'home')
+
+  /** 상단 알람 시트에서 하원·귀가 행 표시 여부(선택 중인 자녀 기준) */
+  useEffect(() => {
+    try {
+      localStorage.setItem(ROUTINE_HAS_SCHOOL_KEY, hasSchool ? '1' : '0')
+    } catch {
+      /* ignore */
+    }
+  }, [hasSchool])
+
   const tabs: ChildTab[] = children.map((c) => ({ id: c.id, name: c.name }))
 
   const scopedInitial = useMemo(() => missionsLinkedToChild(initial, currentId), [initial, currentId])
@@ -90,262 +404,345 @@ export default function RoutineTab({ missions: initial, children }: Props) {
     setMissions(scopedInitial)
   }, [scopedInitial])
 
-  /** 시스템 풀: linked_child_id 없음 */
-  const systemTemplates = useMemo(
-    () => initial.filter((m) => m.linked_child_id == null && m.level_required <= childLevel),
-    [initial, childLevel],
+  const routineOnly = useMemo(() => missions.filter(isRoutineMission), [missions])
+  const specialOnly = useMemo(() => missions.filter(isSpecialMission), [missions])
+
+  const filteredRoutine = useMemo(
+    () => sortMissionsByRoutineFlow(routineOnly.filter((m) => m.level_required <= childLevel)),
+    [routineOnly, childLevel],
+  )
+  const activeRoutine = filteredRoutine.filter((m) => m.is_active)
+  const inactiveRoutine = filteredRoutine.filter((m) => !m.is_active)
+
+  const weekdayActive = activeRoutine.filter((m) => !isWeekendOrHolidayMission(m))
+  const weekendActive = activeRoutine.filter((m) => isWeekendOrHolidayMission(m))
+  const weekdayInactive = inactiveRoutine.filter((m) => !isWeekendOrHolidayMission(m))
+  const weekendInactive = inactiveRoutine.filter((m) => isWeekendOrHolidayMission(m))
+
+  const weekdayActiveParts = useMemo(() => splitMissionsAmPm(weekdayActive), [weekdayActive])
+  const weekendActiveParts = useMemo(() => splitMissionsAmPm(weekendActive), [weekendActive])
+  const weekdayInactiveParts = useMemo(() => splitMissionsAmPm(weekdayInactive), [weekdayInactive])
+  const weekendInactiveParts = useMemo(() => splitMissionsAmPm(weekendInactive), [weekendInactive])
+
+  const filteredSpecial = sortByTime(specialOnly.filter((m) => m.level_required <= childLevel))
+  const activeSpecial = filteredSpecial.filter((m) => m.is_active)
+  const inactiveSpecial = filteredSpecial.filter((m) => !m.is_active)
+  /** 활성 먼저·비활성 뒤 — 매일(daily) / 이벤트(event) 로 나눔 */
+  const allSpecialOrdered = useMemo(
+    () => [...activeSpecial, ...inactiveSpecial],
+    [activeSpecial, inactiveSpecial],
+  )
+  const specialDailyList = useMemo(
+    () => allSpecialOrdered.filter((m) => m.repeat_type === 'daily'),
+    [allSpecialOrdered],
+  )
+  const specialEventList = useMemo(
+    () => allSpecialOrdered.filter((m) => m.repeat_type === 'event'),
+    [allSpecialOrdered],
   )
 
-  const childTitles = useMemo(() => new Set(missions.map((m) => m.title.trim())), [missions])
-
-  const addableTemplates = useMemo(
-    () => systemTemplates.filter((t) => !childTitles.has(t.title.trim())),
-    [systemTemplates, childTitles],
-  )
-
-  const filteredMissions = sortByTime(missions.filter((m) => m.level_required <= childLevel))
-  const activeMissions = filteredMissions.filter((m) => m.is_active)
-  const inactiveMissions = filteredMissions.filter((m) => !m.is_active)
-
-  const weekdayActive = activeMissions.filter((m) => !isWeekendOrHolidayMission(m))
-  const weekendActive = activeMissions.filter((m) => isWeekendOrHolidayMission(m))
-  const weekdayInactive = inactiveMissions.filter((m) => !isWeekendOrHolidayMission(m))
-  const weekendInactive = inactiveMissions.filter((m) => isWeekendOrHolidayMission(m))
-
-  const showToast = useCallback((msg: string, ok = true) => {
-    setToast({ msg, ok })
-    setTimeout(() => setToast(null), 2500)
+  const showToast = useCallback((msg: string, ok = true, multiline = false) => {
+    setToast({ msg, ok, multiline })
+    setTimeout(() => setToast(null), multiline ? 9000 : 2500)
   }, [])
 
-  async function handleToggle(mission: Mission) {
-    setLoading(mission.id)
-    try {
-      const res = await fetch('/api/mission/toggle', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ missionId: mission.id, isActive: !mission.is_active }),
-      })
-      const text = await res.text()
-      const json = text ? JSON.parse(text) : {}
-      if (!res.ok) {
-        showToast(json.error ?? '오류가 발생했어요', false)
-        return
-      }
-      setMissions((prev) => prev.map((m) => (m.id === mission.id ? { ...m, is_active: !m.is_active } : m)))
-    } catch {
-      showToast('네트워크 오류가 발생했어요', false)
-    } finally {
-      setLoading(null)
-    }
-  }
+  /** 선택 자녀 기준, 해당 템플릿이 오늘 daily_missions 에 있고 이미 완료됐는지 */
+  const isMissionCompletedToday = useCallback(
+    (missionTemplateId: string) => {
+      if (!currentId) return false
+      const row = todayDailyMissions.find(
+        (r) => r.childId === currentId && r.missionTemplateId === missionTemplateId,
+      )
+      return Boolean(row?.isCompleted)
+    },
+    [currentId, todayDailyMissions],
+  )
 
-  async function handleCloneTemplate(templateId: string) {
+  /** 스페셜 템플릿을 오늘 daily_missions 한 줄로 넣음 (자녀 앱 즉시 반영) */
+  async function handleAssignToday(templateId: string) {
     if (!currentId) return
-    setLoading('clone')
+    setAssigningId(templateId)
     try {
-      const res = await fetch('/api/mission/clone-template', {
+      const res = await fetch('/api/daily-mission/assign-today', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ templateId, childId: currentId }),
+        body: JSON.stringify({ childId: currentId, missionTemplateId: templateId }),
       })
       const json = await res.json().catch(() => ({}))
       if (!res.ok) {
-        showToast(typeof json.error === 'string' ? json.error : '추가에 실패했어요', false)
+        const base =
+          typeof json.error === 'string' ? json.error : '오늘 일정에 넣지 못했어요'
+        const hint = typeof json.hint === 'string' ? json.hint.trim() : ''
+        const combined = hint ? `${base}\n\n${hint}` : base
+        showToast(combined, false, Boolean(hint))
         return
       }
-      if (json.mission) {
-        setMissions((prev) => [json.mission as Mission, ...prev])
-        showToast('미션을 추가했어요')
-        setAddSheetOpen(false)
-      }
+      showToast(json.alreadyAssigned ? '이미 오늘 일정에 있어요' : '오늘 자녀 화면에 넣었어요')
     } catch {
       showToast('네트워크 오류가 발생했어요', false)
     } finally {
-      setLoading(null)
+      setAssigningId(null)
     }
   }
 
   function mergeMission(updated: Mission) {
-    setMissions((prev) => prev.map((m) => (m.id === updated.id ? updated : m)))
+    setMissions((prev) => prev.map((x) => (x.id === updated.id ? updated : x)))
   }
 
   return (
     <div className="flex flex-col gap-3">
       {toast && (
         <div
-          className={`fixed top-6 left-1/2 -translate-x-1/2 z-[60] font-bold text-sm px-5 py-2.5 rounded-full shadow-lg ${
+          className={`fixed top-6 left-1/2 -translate-x-1/2 z-[60] font-bold text-sm shadow-lg ${
             toast.ok ? 'bg-[#4A90E2] text-white' : 'bg-red-500 text-white'
+          } ${
+            toast.multiline
+              ? 'max-w-[min(92vw,22rem)] whitespace-pre-line px-4 py-3 rounded-2xl text-left leading-snug font-semibold'
+              : 'px-5 py-2.5 rounded-full text-center'
           }`}
         >
           {toast.msg}
         </div>
       )}
 
-      <div className="flex items-center justify-between gap-2">
-        <h1 className="text-base font-black text-gray-800">📋 루틴 관리</h1>
-      </div>
-
-      {/* 자녀 프로필 블록 — 이름·레벨 정렬, 다자녀는 슬라이드만 카드 하단에 */}
+      {/* 홈과 동일한 자녀 프로필 카드(미션 달성률 줄 없음) + 다자녀 전환 */}
       {currentChild && (
-        <div className="rounded-2xl border border-gray-200 bg-white px-3 py-2.5 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#4A90E2]/12 text-base font-black text-[#4A90E2]"
-              aria-hidden
-            >
-              {currentChild.name.slice(0, 1)}
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-black text-gray-900">{currentChild.name}</p>
-              <p className="text-[11px] text-gray-500">Lv.{childLevel} · 이 자녀 루틴만 표시</p>
-            </div>
-          </div>
+        <div className="flex flex-col gap-2">
+          <CompactChildProfileCard
+            name={currentChild.name}
+            age={currentChild.age}
+            avatarUrl={currentChild.avatarUrl}
+            level={childLevel}
+            credits={currentChild.credits}
+            hearts={currentChild.hearts}
+            streakDays={currentChild.streakDays}
+            ageGroupLabel={currentChild.ageGroupLabel}
+            childcareLabel={currentChild.childcareLabel}
+            mission={null}
+          />
           <ChildProfileNav tabs={tabs} compact />
         </div>
       )}
 
-      {/* 활성 미션 — 헤더와 + 동일 행 */}
+      {/* 활성 미션 — 헤더와 연필(키워드 시트) 동일 행 */}
       <section>
         <div className="mb-1.5 flex items-center justify-between gap-2">
-          <h2 className="text-sm font-bold text-gray-800">
-            🟢 활성 미션
-            <span className="ml-1 font-normal text-gray-400">({activeMissions.length})</span>
-          </h2>
+          <h2 className="text-sm font-bold text-gray-800">일상 미션</h2>
           <button
             type="button"
-            aria-label="미션 추가"
-            disabled={!currentId || loading === 'clone'}
-            onClick={() => setAddSheetOpen(true)}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#4A90E2] text-xl font-light leading-none text-white shadow-md transition-all active:scale-95 disabled:opacity-40"
+            aria-label="키워드로 일상 미션 추가·편집"
+            disabled={!currentId}
+            onClick={() => setKeywordSheetOpen(true)}
+            className="shrink-0 rounded-md p-0.5 text-gray-500 transition-opacity hover:text-gray-600 active:opacity-60 disabled:opacity-30"
           >
-            +
+            {/* 시각 라벨(~9px)과 비슷한 크기의 회색 연필 */}
+            <PencilIcon className="h-3.5 w-3.5" />
           </button>
         </div>
 
-        {activeMissions.length === 0 ? (
+        {activeRoutine.length === 0 ? (
           <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50/80 px-4 py-6 text-center">
-            <p className="text-xs text-gray-500">
-              아직 이 자녀 전용 미션이 없어요.
-              <br />
-              오른쪽 + 로 시스템 미션을 골라 추가해 주세요.
-            </p>
+            <button
+              type="button"
+              disabled={!currentId}
+              onClick={() => setKeywordSheetOpen(true)}
+              className="text-sm font-bold text-[#4A90E2] underline-offset-2 hover:underline disabled:opacity-30"
+            >
+              미션 추가하기
+            </button>
+            <p className="mt-2 text-[11px] text-gray-400">주중·주말 루틴을 칩으로 고르면 매일 그에 맞는 카드가 만들어져요.</p>
           </div>
         ) : (
-          <div className="flex flex-col gap-2">
-            <CollapsibleBlock
-              title="주간 미션"
-              count={weekdayActive.length}
-              open={openWeekdayActive}
-              onToggle={() => setOpenWeekdayActive((v) => !v)}
-            >
+          <div className="flex flex-col gap-3">
+            {/* 주중: 오전 / 오후 토글(기본 접힘), 순서는 기상→취침 */}
+            <div className="space-y-1.5">
+              <p className="px-0.5 text-[11px] font-black text-gray-500">주간</p>
               {weekdayActive.length === 0 ? (
-                <p className="py-2 text-center text-[11px] text-gray-400">주간 미션이 없어요</p>
+                <p className="rounded-xl border border-gray-100 bg-white py-3 text-center text-[11px] text-gray-400 shadow-sm">
+                  주간 미션이 없어요
+                </p>
               ) : (
-                weekdayActive.map((m) => (
-                  <MissionRow
-                    key={m.id}
-                    mission={m}
-                    loading={loading === m.id}
-                    onToggle={handleToggle}
-                    onAlarmClick={() => setAlarmMission(m)}
-                  />
-                ))
+                <AmPmRoutineBlock
+                  am={weekdayActiveParts.am}
+                  pm={weekdayActiveParts.pm}
+                  openAm={openWeekdayAm}
+                  openPm={openWeekdayPm}
+                  onToggleAm={() => setOpenWeekdayAm((v) => !v)}
+                  onTogglePm={() => setOpenWeekdayPm((v) => !v)}
+                  emptyAmHint="오전 미션이 없어요"
+                  emptyPmHint="오후 미션이 없어요"
+                />
               )}
-            </CollapsibleBlock>
+            </div>
 
-            <CollapsibleBlock
-              title="주말 · 휴일 미션"
-              count={weekendActive.length}
-              open={openWeekendActive}
-              onToggle={() => setOpenWeekendActive((v) => !v)}
-            >
+            <div className="space-y-1.5">
+              <p className="px-0.5 text-[11px] font-black text-gray-500">주말, 휴일</p>
               {weekendActive.length === 0 ? (
-                <p className="py-2 text-center text-[11px] text-gray-400">주말·휴일 미션이 없어요</p>
+                <p className="rounded-xl border border-gray-100 bg-white py-3 text-center text-[11px] text-gray-400 shadow-sm">
+                  주말, 휴일 미션이 없어요
+                </p>
               ) : (
-                weekendActive.map((m) => (
-                  <MissionRow
-                    key={m.id}
-                    mission={m}
-                    loading={loading === m.id}
-                    onToggle={handleToggle}
-                    onAlarmClick={() => setAlarmMission(m)}
-                  />
-                ))
+                <AmPmRoutineBlock
+                  am={weekendActiveParts.am}
+                  pm={weekendActiveParts.pm}
+                  openAm={openWeekendAm}
+                  openPm={openWeekendPm}
+                  onToggleAm={() => setOpenWeekendAm((v) => !v)}
+                  onTogglePm={() => setOpenWeekendPm((v) => !v)}
+                  emptyAmHint="오전 미션이 없어요"
+                  emptyPmHint="오후 미션이 없어요"
+                />
               )}
-            </CollapsibleBlock>
+            </div>
           </div>
         )}
       </section>
 
-      {inactiveMissions.length > 0 && (
+      {inactiveRoutine.length > 0 && (
         <section>
-          <h2 className="mb-1.5 text-sm font-bold text-gray-400">
-            ⚫ 비활성 미션
-            <span className="ml-1 font-normal">({inactiveMissions.length})</span>
-          </h2>
-          <div className="flex flex-col gap-2 opacity-90">
-            <CollapsibleBlock
-              title="주간"
-              count={weekdayInactive.length}
-              open={openWeekdayInactive}
-              onToggle={() => setOpenWeekdayInactive((v) => !v)}
-            >
-              {weekdayInactive.length === 0 ? (
-                <p className="py-2 text-center text-[11px] text-gray-400">없음</p>
-              ) : (
-                weekdayInactive.map((m) => (
-                  <MissionRow
-                    key={m.id}
-                    mission={m}
-                    loading={loading === m.id}
-                    onToggle={handleToggle}
-                    onAlarmClick={() => setAlarmMission(m)}
-                  />
-                ))
-              )}
-            </CollapsibleBlock>
-            <CollapsibleBlock
-              title="주말 · 휴일"
-              count={weekendInactive.length}
-              open={openWeekendInactive}
-              onToggle={() => setOpenWeekendInactive((v) => !v)}
-            >
-              {weekendInactive.length === 0 ? (
-                <p className="py-2 text-center text-[11px] text-gray-400">없음</p>
-              ) : (
-                weekendInactive.map((m) => (
-                  <MissionRow
-                    key={m.id}
-                    mission={m}
-                    loading={loading === m.id}
-                    onToggle={handleToggle}
-                    onAlarmClick={() => setAlarmMission(m)}
-                  />
-                ))
-              )}
-            </CollapsibleBlock>
+          <h2 className="mb-1.5 text-sm font-bold text-gray-400">비활성 미션 (일상)</h2>
+          <div className="flex flex-col gap-3 opacity-90">
+            <div className="space-y-1.5">
+              <p className="px-0.5 text-[11px] font-black text-gray-400">주간</p>
+              <AmPmRoutineBlock
+                am={weekdayInactiveParts.am}
+                pm={weekdayInactiveParts.pm}
+                openAm={openWeekdayInactiveAm}
+                openPm={openWeekdayInactivePm}
+                onToggleAm={() => setOpenWeekdayInactiveAm((v) => !v)}
+                onTogglePm={() => setOpenWeekdayInactivePm((v) => !v)}
+                emptyAmHint="없음"
+                emptyPmHint="없음"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <p className="px-0.5 text-[11px] font-black text-gray-400">주말, 휴일</p>
+              <AmPmRoutineBlock
+                am={weekendInactiveParts.am}
+                pm={weekendInactiveParts.pm}
+                openAm={openWeekendInactiveAm}
+                openPm={openWeekendInactivePm}
+                onToggleAm={() => setOpenWeekendInactiveAm((v) => !v)}
+                onTogglePm={() => setOpenWeekendInactivePm((v) => !v)}
+                emptyAmHint="없음"
+                emptyPmHint="없음"
+              />
+            </div>
           </div>
         </section>
       )}
 
-      <CalendarSection childId={currentId ?? null} />
-      <MissionSuggestCard />
+      {/* 스페셜: 매일 반복하지 않는 미션 — 자녀 앱에서 팝업·카드로 전달 (헤더·빈 상태는 일상 미션과 동일 패턴) */}
+      <section>
+        <div className="mb-1.5 flex items-center justify-between gap-2">
+          <h2 className="text-sm font-bold text-gray-800">스페셜 미션</h2>
+          {/* 일상 미션과 동일: 연필 아이콘으로 추가·편집 시트 열기 */}
+          <button
+            type="button"
+            aria-label="스페셜 미션 추가·편집"
+            disabled={!currentId}
+            onClick={() => setSpecialSheetOpen(true)}
+            className="shrink-0 rounded-md p-0.5 text-gray-500 transition-opacity hover:text-gray-600 active:opacity-60 disabled:opacity-30"
+          >
+            <PencilIcon className="h-3.5 w-3.5" />
+          </button>
+        </div>
+        {activeSpecial.length === 0 && inactiveSpecial.length === 0 ? (
+          /* 비어 있을 때: 일상 미션 블록과 같은 레이아웃(중앙 제목 버튼 + 회색 안내 문구) */
+          <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50/80 px-4 py-6 text-center">
+            <button
+              type="button"
+              disabled={!currentId}
+              onClick={() => setSpecialSheetOpen(true)}
+              className="text-sm font-bold text-[#4A90E2] underline-offset-2 hover:underline disabled:opacity-30"
+            >
+              스페셜 미션 추가하기
+            </button>
+            <p className="mt-2 text-[11px] text-gray-400">
+              운동하기, 설거지, 빨래 정리 등 특별한 날의 이벤트 미션
+            </p>
+          </div>
+        ) : (
+          <SpecialDailyEventBlock
+            dailyMissions={specialDailyList}
+            eventMissions={specialEventList}
+            openDaily={openSpecialDaily}
+            openEvent={openSpecialEvent}
+            onToggleDaily={() => setOpenSpecialDaily((v) => !v)}
+            onToggleEvent={() => setOpenSpecialEvent((v) => !v)}
+            assigningId={assigningId}
+            onEventAssignClick={(m) => {
+              if (isMissionCompletedToday(m.id)) {
+                setAlreadyCompletedModalOpen(true)
+                return
+              }
+              setEventAssignPromptMission(m)
+            }}
+            onOpenBonus={(m) => {
+              if (isMissionCompletedToday(m.id)) {
+                setAlreadyCompletedModalOpen(true)
+                return
+              }
+              setAssignTodayAfterBonusMissionId(null)
+              setBonusMission(m)
+            }}
+          />
+        )}
+      </section>
 
-      <AddMissionBottomSheet
-        open={addSheetOpen}
-        onClose={() => setAddSheetOpen(false)}
-        templates={addableTemplates}
-        loading={loading === 'clone'}
-        onPick={handleCloneTemplate}
+      <CalendarSection childId={currentId ?? null} />
+
+      {/* 키워드 시트: routineOnly로 주간/주말·활성 상태를 목록과 동일한 DB 스냅샷에서 복원 */}
+      <RoutineKeywordBuilderSheet
+        open={keywordSheetOpen}
+        onClose={() => setKeywordSheetOpen(false)}
+        linkedChildId={currentId}
+        hasSchool={hasSchool}
+        routineMissions={routineOnly}
       />
 
-      <AlarmEditBottomSheet
-        mission={alarmMission}
-        onClose={() => setAlarmMission(null)}
+      {/* 스페셜 시트: specialOnly 로 이미 붙어 있는 키워드·데일리 여부를 열 때 복원 */}
+      <SpecialMissionAddSheet
+        open={specialSheetOpen}
+        onClose={() => setSpecialSheetOpen(false)}
+        childId={currentId}
+        specialMissions={specialOnly}
+        onToast={showToast}
+      />
+
+      <RoutineSimpleAlertModal
+        open={alreadyCompletedModalOpen}
+        message="이미 완료된 미션이에요"
+        onClose={() => setAlreadyCompletedModalOpen(false)}
+      />
+
+      <EventAssignBonusPromptModal
+        mission={eventAssignPromptMission}
+        onClose={() => setEventAssignPromptMission(null)}
+        onSkipAssign={(m) => {
+          void handleAssignToday(m.id)
+          setEventAssignPromptMission(null)
+        }}
+        onOpenBonusSheet={(m) => {
+          setAssignTodayAfterBonusMissionId(m.id)
+          setBonusMission(m)
+          setEventAssignPromptMission(null)
+        }}
+      />
+
+      <SpecialMissionBonusSheet
+        mission={bonusMission}
+        onClose={() => {
+          setBonusMission(null)
+          setAssignTodayAfterBonusMissionId(null)
+        }}
         onSaved={(m) => {
           mergeMission(m)
-          setAlarmMission(null)
-          showToast('알림을 저장했어요')
+          const pending = assignTodayAfterBonusMissionId
+          if (pending === m.id) {
+            setAssignTodayAfterBonusMissionId(null)
+            void handleAssignToday(m.id)
+          }
         }}
         showToast={showToast}
       />
@@ -353,303 +750,178 @@ export default function RoutineTab({ missions: initial, children }: Props) {
   )
 }
 
-/** 접었다 펼치는 구역 */
-function CollapsibleBlock({
-  title,
-  count,
-  open,
-  onToggle,
-  children,
-}: {
-  title: string
-  count: number
-  open: boolean
-  onToggle: () => void
-  children: React.ReactNode
-}) {
+/** 섹션 헤더 — 키워드·스페셜 시트 열기용 연필 아이콘 */
+function PencilIcon({ className }: { className?: string }) {
   return (
-    <div className="rounded-xl border border-gray-100 bg-white shadow-sm overflow-hidden">
-      <button
-        type="button"
-        onClick={onToggle}
-        className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left transition-colors hover:bg-gray-50"
-      >
-        <span className="text-xs font-bold text-gray-700">
-          {title}
-          <span className="ml-1 font-normal text-gray-400">({count})</span>
-        </span>
-        <span className="text-gray-400 text-xs tabular-nums" aria-hidden>
-          {open ? '▼' : '▶'}
-        </span>
-      </button>
-      {open && <div className="flex flex-col gap-1.5 border-t border-gray-100 px-2 py-2">{children}</div>}
-    </div>
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <path
+        d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   )
 }
 
-function MissionRow({
+/** 스페셜 미션 카드 — 중앙 정렬·콤팩트; 이벤트만 「일정 추가」(팝업 경유) + 공통 「보너스 주기」 */
+function SpecialMissionRow({
   mission: m,
-  onToggle,
-  onAlarmClick,
-  loading,
+  assigning,
+  onAssignTodayClick,
+  onOpenBonus,
 }: {
   mission: Mission
-  onToggle: (m: Mission) => void
-  onAlarmClick: () => void
-  loading: boolean
+  assigning: boolean
+  /** 오늘 하루만(event) 전용 — 없으면 일정 추가 버튼 없음 */
+  onAssignTodayClick?: () => void
+  onOpenBonus: () => void
 }) {
   const timeLabel = formatTime(m.scheduled_time)
-  const alarmOn = missionHasAlarmCue(m)
-
+  const titleShort = displaySpecialMissionTitle(m.title)
+  const mult = normalizeRewardMultiplier(m.reward_multiplier)
   return (
-    <div className="flex items-center gap-2 rounded-lg bg-white px-2 py-2 shadow-sm ring-1 ring-gray-100">
-      <span className="text-2xl shrink-0" aria-hidden>
-        {m.icon_emoji || '⭐'}
+    <div
+      className={`flex flex-col items-center justify-center gap-0.5 rounded-xl bg-white px-1 py-1 text-center shadow-sm ring-1 ${
+        m.is_active ? 'ring-violet-100' : 'ring-gray-100 opacity-80'
+      }`}
+    >
+      <span
+        className="flex h-9 w-9 shrink-0 items-center justify-center text-sm font-black leading-none text-violet-800"
+        aria-hidden
+      >
+        {m.icon_emoji?.trim() ? m.icon_emoji : m.title.slice(0, 1)}
       </span>
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-bold text-gray-800">{m.title}</p>
-        {timeLabel ? <p className="text-[11px] text-gray-500">{timeLabel}</p> : null}
+      <div className="w-full min-w-0 px-0.5">
+        <p className="line-clamp-2 text-[11px] font-bold leading-tight text-gray-800">{titleShort}</p>
+        {timeLabel ? <p className="mt-px text-[9px] text-gray-500 tabular-nums">{timeLabel}</p> : null}
+        {mult > 1 ? (
+          <p className="mt-px text-[8px] font-black text-amber-700">보상 {mult}배</p>
+        ) : null}
       </div>
-      <button
-        type="button"
-        onClick={onAlarmClick}
-        aria-label={alarmOn ? '알림 켜짐, 눌러 수정' : '알림 끄기·설정'}
-        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border text-base transition-colors ${
-          alarmOn
-            ? 'border-amber-200 bg-amber-50 text-amber-600'
-            : 'border-gray-200 bg-gray-50 text-gray-400'
-        }`}
-      >
-        🔔
-      </button>
-      <button
-        type="button"
-        onClick={() => onToggle(m)}
-        disabled={loading}
-        aria-pressed={m.is_active}
-        className={`relative h-7 w-12 shrink-0 rounded-full transition-all disabled:opacity-50 ${
-          m.is_active ? 'bg-[#4A90E2]' : 'bg-gray-200'
-        }`}
-      >
-        <span
-          className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-all ${
-            m.is_active ? 'left-5' : 'left-0.5'
-          }`}
-        />
-      </button>
+      <div className="mt-px flex w-full flex-col gap-0.5">
+        {m.repeat_type === 'event' && onAssignTodayClick ? (
+          <button
+            type="button"
+            disabled={!m.is_active || assigning}
+            onClick={onAssignTodayClick}
+            className="w-full rounded-md border border-violet-200 bg-violet-50 py-0.5 text-[8px] font-bold leading-tight text-violet-800 disabled:opacity-40"
+          >
+            {assigning ? '넣는 중…' : '일정 추가'}
+          </button>
+        ) : null}
+        <button
+          type="button"
+          onClick={onOpenBonus}
+          aria-label="완료 보상 보너스 배율 설정"
+          className="w-full rounded-md border border-amber-200/90 bg-amber-50 py-0.5 text-[8px] font-bold leading-tight text-amber-900"
+        >
+          보너스 주기
+        </button>
+      </div>
     </div>
   )
 }
 
-type SoundItem = { id: string; label: string; url: string }
-
-function AddMissionBottomSheet({
+/** 짧은 안내 한 줄 + 확인 (완료된 미션 등) */
+function RoutineSimpleAlertModal({
   open,
+  message,
   onClose,
-  templates,
-  loading,
-  onPick,
 }: {
   open: boolean
+  message: string
   onClose: () => void
-  templates: Mission[]
-  loading: boolean
-  onPick: (templateId: string) => void
 }) {
-  if (!open) return null
+  const [portalReady, setPortalReady] = useState(false)
+  useLayoutEffect(() => {
+    setPortalReady(true)
+  }, [])
 
-  return (
-    <div className="fixed inset-0 z-[70] flex flex-col justify-end" role="dialog" aria-modal="true" aria-labelledby="add-mission-title">
+  if (!open || !portalReady) return null
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[85] flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="routine-simple-alert-msg"
+    >
       <button type="button" className="absolute inset-0 bg-black/45" aria-label="닫기" onClick={onClose} />
-      <div className="relative max-h-[78vh] flex flex-col rounded-t-2xl bg-white shadow-2xl transition-transform duration-300 ease-out">
-        <div className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-gray-200" aria-hidden />
-        <div className="border-b border-gray-100 px-4 pb-2 pt-3">
-          <p id="add-mission-title" className="text-center text-sm font-black text-gray-900">
-            시스템 미션에서 추가
-          </p>
-          <p className="mt-1 text-center text-[10px] leading-snug text-gray-500">
-            아직 이 자녀 루틴에 없는 항목만 보여요. 같은 이름은 중복 추가할 수 없어요.
-          </p>
-        </div>
-        <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-6 pt-2">
-          {templates.length === 0 ? (
-            <p className="py-8 text-center text-xs text-gray-400">추가할 수 있는 미션이 없어요</p>
-          ) : (
-            <ul className="flex flex-col gap-1.5">
-              {templates.map((t) => (
-                <li key={t.id}>
-                  <button
-                    type="button"
-                    disabled={loading}
-                    onClick={() => onPick(t.id)}
-                    className="flex w-full items-center gap-3 rounded-xl border border-gray-100 bg-gray-50/50 px-3 py-2.5 text-left transition-all active:scale-[0.99] hover:border-[#4A90E2]/40 disabled:opacity-50"
-                  >
-                    <span className="text-xl">{t.icon_emoji || '⭐'}</span>
-                    <span className="min-w-0 flex-1 truncate text-sm font-bold text-gray-800">{t.title}</span>
-                    <span className="text-xs text-[#4A90E2]">추가</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+      <div className="relative z-10 w-full max-w-[17rem] rounded-2xl bg-white px-4 py-4 shadow-xl">
+        <p id="routine-simple-alert-msg" className="text-center text-sm font-black text-gray-900">
+          {message}
+        </p>
+        <button
+          type="button"
+          onClick={onClose}
+          className="mt-4 w-full rounded-xl bg-[#4A90E2] py-2.5 text-[11px] font-bold text-white"
+        >
+          확인
+        </button>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
 
-function AlarmEditBottomSheet({
+/**
+ * 오늘 하루만 미션 「일정 추가」 직후 — 보너스 시트를 열지·바로 넣을지 묻는 중앙 팝업(z가 보너스 시트보다 위).
+ */
+function EventAssignBonusPromptModal({
   mission,
   onClose,
-  onSaved,
-  showToast,
+  onSkipAssign,
+  onOpenBonusSheet,
 }: {
   mission: Mission | null
   onClose: () => void
-  onSaved: (m: Mission) => void
-  showToast: (msg: string, ok?: boolean) => void
+  /** 보너스 없이 바로 오늘 일정에 넣기 */
+  onSkipAssign: (m: Mission) => void
+  /** 보너스 설정 하단 시트로 이어짐 */
+  onOpenBonusSheet: (m: Mission) => void
 }) {
-  const [notify, setNotify] = useState(false)
-  const [time, setTime] = useState('07:00')
-  const [soundId, setSoundId] = useState('')
-  const [sounds, setSounds] = useState<SoundItem[]>([])
-  const [saving, setSaving] = useState(false)
+  const [portalReady, setPortalReady] = useState(false)
+  useLayoutEffect(() => {
+    setPortalReady(true)
+  }, [])
 
-  useEffect(() => {
-    if (!mission) return
-    const hasTime = Boolean(mission.scheduled_time && /^\d{2}:\d{2}$/.test(mission.scheduled_time))
-    setNotify(hasTime || missionHasAlarmCue(mission))
-    setTime(hasTime ? (mission.scheduled_time as string) : '07:00')
-    const f = parseAlarmFromMissionDescription(mission.description).alarmFile
-    setSoundId(f ?? '')
+  if (!mission || !portalReady) return null
 
-    let cancelled = false
-    fetch('/api/assets/alarm-sounds')
-      .then((r) => r.json())
-      .then((j: { sounds?: SoundItem[] }) => {
-        if (cancelled) return
-        const list = Array.isArray(j.sounds) ? j.sounds : []
-        setSounds(list)
-        const fromMission = parseAlarmFromMissionDescription(mission.description).alarmFile
-        setSoundId(fromMission || list[0]?.id || '')
-      })
-      .catch(() => {})
-    return () => {
-      cancelled = true
-    }
-  }, [mission])
-
-  async function save() {
-    if (!mission) return
-    setSaving(true)
-    try {
-      const res = await fetch('/api/mission/patch-schedule', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          missionId: mission.id,
-          scheduled_time: notify ? time : null,
-          alarmFile: notify ? (soundId || null) : null,
-        }),
-      })
-      const json = await res.json().catch(() => ({}))
-      if (!res.ok || !json.mission) {
-        showToast(typeof json.error === 'string' ? json.error : '저장에 실패했어요', false)
-        return
-      }
-      onSaved(json.mission as Mission)
-    } catch {
-      showToast('네트워크 오류가 발생했어요', false)
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  if (!mission) return null
-
-  return (
-    <div className="fixed inset-0 z-[80] flex flex-col justify-end" role="dialog" aria-modal="true" aria-labelledby="alarm-sheet-title">
+  const titleShort = displaySpecialMissionTitle(mission.title)
+  const overlay = (
+    <div
+      className="fixed inset-0 z-[85] flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="event-assign-bonus-title"
+    >
       <button type="button" className="absolute inset-0 bg-black/45" aria-label="닫기" onClick={onClose} />
-      <div className="relative max-h-[85vh] flex flex-col rounded-t-2xl bg-white shadow-2xl transition-transform duration-300 ease-out">
-        <div className="mx-auto mt-2 h-1 w-10 rounded-full bg-gray-200" aria-hidden />
-        <div className="border-b border-gray-100 px-4 py-3">
-          <p id="alarm-sheet-title" className="text-center text-sm font-black text-gray-900">
-            알림 설정
-          </p>
-          <p className="mt-0.5 truncate text-center text-xs text-gray-500">{mission.title}</p>
-        </div>
-        <div className="space-y-4 overflow-y-auto px-4 pb-4 pt-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-gray-700">알림 사용</span>
-            <button
-              type="button"
-              onClick={() => setNotify((n) => !n)}
-              className={`relative h-7 w-12 rounded-full transition-all ${notify ? 'bg-[#4A90E2]' : 'bg-gray-200'}`}
-              aria-pressed={notify}
-            >
-              <span
-                className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-all ${
-                  notify ? 'left-5' : 'left-0.5'
-                }`}
-              />
-            </button>
-          </div>
-          {notify && (
-            <>
-              <div>
-                <label className="mb-1 block text-[10px] font-bold text-gray-500">알림 시각</label>
-                <input
-                  type="time"
-                  value={time}
-                  onChange={(e) => setTime(e.target.value)}
-                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm font-bold text-gray-800"
-                />
-              </div>
-              <div>
-                <p className="mb-1 text-[10px] font-bold text-gray-500">알람 소리</p>
-                <div className="flex max-h-32 flex-wrap gap-1.5 overflow-y-auto">
-                  {sounds.length === 0 ? (
-                    <p className="text-[10px] text-gray-400">목록을 불러오는 중…</p>
-                  ) : (
-                    sounds.map((s) => {
-                      const on = soundId === s.id
-                      return (
-                        <button
-                          key={s.id}
-                          type="button"
-                          onClick={() => setSoundId(s.id)}
-                          className={`rounded-full border px-2.5 py-1 text-[10px] font-bold ${
-                            on ? 'border-[#4A90E2] bg-[#4A90E2] text-white' : 'border-gray-200 text-gray-600'
-                          }`}
-                        >
-                          {s.label}
-                        </button>
-                      )
-                    })
-                  )}
-                </div>
-              </div>
-            </>
-          )}
-        </div>
-        <div className="flex gap-2 border-t border-gray-100 px-4 py-3">
+      <div className="relative z-10 w-full max-w-[17rem] rounded-2xl bg-white px-4 py-4 shadow-xl">
+        <p
+          id="event-assign-bonus-title"
+          className="text-center text-sm font-black leading-snug text-gray-900"
+        >
+          「{titleShort}」의 보너스 리워드를 지급하시겠어요?
+        </p>
+        <div className="mt-4 flex gap-2">
           <button
             type="button"
-            onClick={onClose}
-            className="flex-1 rounded-xl bg-gray-100 py-2.5 text-xs font-bold text-gray-600"
+            onClick={() => onSkipAssign(mission)}
+            className="flex-1 rounded-xl border border-gray-200 py-2.5 text-[11px] font-bold text-gray-600"
           >
-            취소
+            아니오
           </button>
           <button
             type="button"
-            disabled={saving}
-            onClick={() => void save()}
-            className="flex-1 rounded-xl bg-[#4A90E2] py-2.5 text-xs font-bold text-white disabled:opacity-50"
+            onClick={() => onOpenBonusSheet(mission)}
+            className="flex-1 rounded-xl bg-[#4A90E2] py-2.5 text-[11px] font-bold text-white"
           >
-            {saving ? '저장 중…' : '저장'}
+            추가
           </button>
         </div>
       </div>
     </div>
   )
+
+  return createPortal(overlay, document.body)
 }

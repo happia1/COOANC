@@ -78,7 +78,7 @@ export default function ChildProfileNav({ tabs, compact }: Props) {
       }}
     >
       <button type="button" className={btnClass} aria-label="이전 자녀" onClick={() => goSibling(-1)}>
-        ‹
+        &lt;
       </button>
       {/* 이름은 아래 프로필 카드에 있으므로, 여기서는 몇 번째 자녀인지만 표시 */}
       <div className="min-w-0 flex-1 flex flex-col items-center justify-center px-1">
@@ -87,7 +87,7 @@ export default function ChildProfileNav({ tabs, compact }: Props) {
         </p>
       </div>
       <button type="button" className={btnClass} aria-label="다음 자녀" onClick={() => goSibling(1)}>
-        ›
+        &gt;
       </button>
     </div>
   )
