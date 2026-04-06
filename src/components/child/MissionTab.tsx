@@ -304,10 +304,9 @@ export default function MissionTab({
         <StatPill label="크레딧" value={credits.toLocaleString()} highlight className="shrink-0" />
       </div>
 
-      {/** 홈과 동일: 알약은 그대로, 섬 블록만 `-mt-3` 으로 위로 */}
-      <div className="-mt-3 flex min-h-0 flex-1 flex-col justify-end">
+      {/** 미션: 무대 래퍼는 내리지 않음 — 섬만 `ChildHomeIslandStage` 안에서 올림 */}
+      <div className="flex min-h-0 flex-1 flex-col justify-end">
         <div className="relative mx-auto flex w-full max-w-sm flex-col items-center">
-          {/* 홈 `ChildHomeIslandStage` 와 동일 STAGE_OUTER_CLASS · translate — 섬만 gippybank PNG */}
           <ChildHomeIslandStage scene="gippybank" />
         </div>
       </div>

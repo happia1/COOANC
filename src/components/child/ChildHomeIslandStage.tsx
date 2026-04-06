@@ -9,7 +9,7 @@ import { CharacterSprite } from '@/components/sprites/CharacterSprite'
  */
 const BUNNY_FRONT_FRAME = '레이어 19' as const
 
-const LIFT_CLASS = '-translate-y-[7.5rem] sm:-translate-y-[8.5rem]'
+const LIFT_CLASS = '-translate-y-[9rem] sm:-translate-y-[12rem]'
 
 /** 기본 무대 박스 — `viewportFit` 은 한 화면용으로만 낮춤(translate 동일). */
 const BOX_DEFAULT = 'h-[min(46dvh,400px)] min-h-[280px]'
@@ -38,9 +38,17 @@ export default function ChildHomeIslandStage({ scene = 'bunny', density = 'defau
   const src = ISLAND_IMAGE_SRC[scene]
   const box = density === 'viewportFit' ? BOX_VIEWPORT_FIT : BOX_DEFAULT
 
+  /**
+   * 미션(`gippybank`)은 알약·무대 박스는 그대로 두고 **섬 PNG 만** 살짝 위로(홈은 토끼+섬을 부모 `-mt` 로 통째로 올림).
+   */
+  const islandLayerClass =
+    scene === 'gippybank'
+      ? 'pointer-events-none absolute inset-x-0 bottom-0 z-0 flex justify-center overflow-visible -translate-y-2 sm:-translate-y-3'
+      : 'pointer-events-none absolute inset-x-0 bottom-0 z-0 flex justify-center overflow-visible'
+
   return (
     <div className={`relative mx-auto w-full max-w-[20rem] ${LIFT_CLASS} ${box}`.trim()}>
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-0 flex justify-center overflow-visible">
+      <div className={islandLayerClass}>
         <Image
           src={src}
           alt=""

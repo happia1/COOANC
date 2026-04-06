@@ -25,7 +25,7 @@ type Props = {
  * 아이 앱 홈 탭
  * - 상단·하단 비율은 **미션 탭과 동일**: `ChildHomeSceneryBand` = 60dvh, 하단 = min 40dvh + flex-1 + 라임 그라데이션
  * - 풍경: `object-center` + 배경 레이어만 `CHILD_HOME_SCENERY_BG_LIFT_CLASS` 로 위로(알약·섬은 그대로)
- * - 섬 박스는 `ChildHomeIslandStage` 가 미션 섬과 같은 높이 + 홈용 추가 translate
+ * - 토끼·섬만 `ChildHomeIslandStage` 래퍼: 이전 `-mt-10`/`12` 대비 **약 3배** 당김(`7.5rem` / `9rem`)
  * - EXP 바는 홈에서 숨김 · 꾸미기는 슬롯별 블록
  * - 부모가 칭찬 스티커를 내면 팝업 후 곰돌이 판에서 붙일 수 있음
  */
@@ -240,9 +240,9 @@ export default function HomeTab({
                 />
               </div>
             </div>
-            {/** `-mt-3`: 알약은 그대로 두고 섬·아래쪽만 위로 당김 */}
-            <div className="-mt-3 flex min-h-0 flex-1 flex-col justify-end">
-              <div className="relative mx-auto flex w-full max-w-sm flex-col items-center">
+            {/** 스탯 없을 때도 섬·(없음) 무대만 위로 — 알약·문구는 그대로 */}
+            <div className="flex min-h-0 flex-1 flex-col justify-end">
+              <div className="relative mx-auto flex w-full max-w-sm flex-col items-center -mt-[7.5rem] sm:-mt-[9rem]">
                 <ChildHomeIslandStage />
               </div>
             </div>
@@ -279,9 +279,9 @@ export default function HomeTab({
           />
         </div>
 
-        {/** 알약 아래 섬·레벨업 배너만 위로 — 알약 행 마진은 변경하지 않음 */}
-        <div className="-mt-3 flex min-h-0 flex-1 flex-col justify-end gap-1.5">
-          <div className="relative mx-auto flex w-full max-w-sm flex-col items-center">
+        {/** 토끼·섬 무대만 `-mt` — 레벨업 배너는 아래 줄이라 같이 당겨지지 않음 */}
+        <div className="flex min-h-0 flex-1 flex-col justify-end gap-1.5">
+          <div className="relative mx-auto flex w-full max-w-sm flex-col items-center -mt-[7.5rem] sm:-mt-[9rem]">
             <ChildHomeIslandStage />
           </div>
           {stats.promotion_pending && (
