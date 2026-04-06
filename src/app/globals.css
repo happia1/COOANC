@@ -15,6 +15,18 @@
   }
 }
 
+/* Market shelf popup – cash register slides in from left, hand from right */
+@keyframes market-from-left {
+  from { transform: translateX(-140%); opacity: 0; }
+  to   { transform: translateX(0);     opacity: 1; }
+}
+@keyframes market-from-right {
+  from { transform: translateX(140%);  opacity: 0; }
+  to   { transform: translateX(0);     opacity: 1; }
+}
+.market-pop-left  { animation: market-from-left  0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+.market-pop-right { animation: market-from-right 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+
 @keyframes praise-confetti-fall {
   0% {
     transform: translateY(0) rotate(0deg);
