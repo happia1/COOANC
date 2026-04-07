@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef, type MouseEvent } from 'react'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/client'
 import type { ChildStats, DailyMissionWithTemplate } from '@/types/database'
@@ -76,6 +76,15 @@ export default function MissionTab({
   today,
   isFullRestDay,
 }: Props) {
+  /** 미션 탭 전체에 깔리는 배경 이미지 스타일(사용자가 방금 전달한 이미지) */
+  const missionTabBackgroundStyle = {
+    /** 캐시 이슈를 피하기 위해 새 파일(v10)로 교체합니다. */
+    backgroundImage: "url('/assets/img/layouts/backgrounds/mission_tab_bg_v10.png')",
+    backgroundSize: 'cover',
+    backgroundPosition: 'center',
+    backgroundRepeat: 'no-repeat',
+  } as const
+
   const [stats, setStats] = useState<ChildStats | null>(initialStats)
   /** 지갑·저금통·섬 옮기기: 먼저 어떤 통을 눌렀는지(시트) → 종류 선택 후 수량 팝업 */
   const [creditSheetBucket, setCreditSheetBucket] = useState<'center' | 'wallet' | 'piggy' | null>(null)
@@ -110,6 +119,11 @@ export default function MissionTab({
   /** 미션 완료 시 돼지 저금통 위 크레딧 낙하 연출(토큰 증가 = 다시 재생) */
   const [creditFxNonce, setCreditFxNonce] = useState(0)
   const [creditFxOn, setCreditFxOn] = useState(false)
+  /** 카드 클릭 지점(뷰포트 좌표) — 동전이 카드에서 시작하도록 사용 */
+  const [creditFxStart, setCreditFxStart] = useState<{ x: number; y: number }>({
+    x: typeof window !== 'undefined' ? window.innerWidth * 0.5 : 180,
+    y: typeof window !== 'undefined' ? window.innerHeight * 0.72 : 520,
+  })
   const endCreditFx = useCallback(() => setCreditFxOn(false), [])
 
   const ordered = useMemo(() => orderedMissionsForSlider(dailyMissions), [dailyMissions])
@@ -288,10 +302,19 @@ export default function MissionTab({
     setRollbackPopup(null)
   }
 
-  function handleComplete(dm: DailyMissionWithTemplate) {
+  function handleComplete(dm: DailyMissionWithTemplate, ev: MouseEvent<HTMLButtonElement>) {
     if (done.has(dm.id)) return
 
     if (!isFullRestDay) {
+      /**
+       * 사용자가 누른 카드 중심 좌표를 시작점으로 저장해,
+       * 동전이 "카드에서 출발해 상단 크레딧으로 이동"하는 것처럼 보이게 합니다.
+       */
+      const rect = ev.currentTarget.getBoundingClientRect()
+      setCreditFxStart({
+        x: rect.left + rect.width * 0.5,
+        y: rect.top + rect.height * 0.5,
+      })
       setCreditFxNonce((n) => n + 1)
       setCreditFxOn(true)
     }
@@ -431,13 +454,9 @@ export default function MissionTab({
     <ChildHomeSceneryBand
       flexFill
       showBackground={false}
-      className="bg-white"
+      /** 상단 밴드가 흰색으로 배경을 덮지 않도록 투명 처리합니다. */
+      className="bg-transparent"
       ariaLabel="미션 상단"
-      overlay={
-        creditFxOn ? (
-          <MissionCreditToPiggyOverlay playId={creditFxNonce} onFinish={endCreditFx} />
-        ) : null
-      }
     >
       {/** 연속일 등 상단 StatPill 은 사용하지 않음 — 크레딧은 섬 가운데·지갑·저금통에서 확인 */}
       {/** `flex-1 min-h-0`: 홈과 같이 섬 무대가 풍경 밴드 안 남는 공간에 맞춰 줄어듦 */}
@@ -496,7 +515,7 @@ export default function MissionTab({
               <button
                 key={dm.id}
                 type="button"
-                onClick={() => handleComplete(dm)}
+                onClick={(ev) => handleComplete(dm, ev)}
                 aria-label={`${m.title} 미션 완료하기`}
                 className={[
                   // 카드 하단 빈 여백을 줄이기 위해 최소 높이를 더 낮춰 내용 높이에 가깝게 맞춤
@@ -565,10 +584,9 @@ export default function MissionTab({
                     </span>
                   </div>
                 </div>
-
-                {rewards.mult > 1 ? (
-                  <p className="mt-1 text-center text-[10px] font-bold leading-tight text-amber-800">보상 {rewards.mult}배</p>
-                ) : null}
+                {/**
+                 * 위 알약에 이미 배율이 곱해진 크레딧·EXP가 나오므로 「보상 N배」 중복 문구는 넣지 않습니다.
+                 */}
               </button>
             )
           })}
@@ -655,7 +673,10 @@ export default function MissionTab({
 
   if (isFullRestDay) {
     return (
-      <div className="flex min-h-0 flex-1 flex-col bg-white">
+      <div
+        className="relative -mx-4 -mb-[calc(60px+0.35rem)] -mt-4 flex min-h-0 flex-1 flex-col bg-transparent"
+        style={missionTabBackgroundStyle}
+      >
         <MissionSleepMorningLayer
           childId={childId}
           today={today}
@@ -664,8 +685,7 @@ export default function MissionTab({
           totalMissions={total}
         />
         {heroBand}
-        {/** 휴식 메시지 영역도 연한 잔디색(lime) 대신 흰 배경으로 통일 */}
-        <section className="flex min-h-0 flex-[4] flex-col items-center justify-center gap-3 overflow-hidden bg-white px-6 py-4 text-center">
+        <section className="flex min-h-0 flex-[4] flex-col items-center justify-center gap-3 overflow-hidden bg-transparent px-6 py-4 text-center">
           <span className="text-sm font-black text-gray-400">휴식</span>
           <p className="text-xl font-black text-brand-text">오늘은 쉬는 날이에요!</p>
           <p className="text-sm text-gray-400">푹 쉬고 내일 또 열심히 해봐요.</p>
@@ -697,7 +717,10 @@ export default function MissionTab({
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col bg-white">
+    <div
+      className="relative -mx-4 -mb-[calc(60px+0.35rem)] -mt-4 flex min-h-0 flex-1 flex-col bg-transparent"
+      style={missionTabBackgroundStyle}
+    >
       <MissionSleepMorningLayer
         childId={childId}
         today={today}
@@ -712,6 +735,14 @@ export default function MissionTab({
           {toast}
         </div>
       )}
+      {creditFxOn ? (
+        <MissionCreditToPiggyOverlay
+          playId={creditFxNonce}
+          onFinish={endCreditFx}
+          startX={creditFxStart.x}
+          startY={creditFxStart.y}
+        />
+      ) : null}
       {heroBand}
       {bottomPanel}
 

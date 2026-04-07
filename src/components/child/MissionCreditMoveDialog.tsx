@@ -115,25 +115,6 @@ export default function MissionCreditMoveDialog({
     setBusy(true)
     setErr(null)
     try {
-      // #region agent log
-      fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'b51341' },
-        body: JSON.stringify({
-          sessionId: 'b51341',
-          runId: 'post-schema-fix',
-          hypothesisId: 'H-C',
-          location: 'MissionCreditMoveDialog:submit:before-fetch',
-          message: 'transfer POST about to send',
-          data: {
-            childIdLen: typeof childId === 'string' ? childId.length : 0,
-            kind,
-            amount: n,
-          },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {})
-      // #endregion
       const res = await fetch('/api/child/credits/transfer', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

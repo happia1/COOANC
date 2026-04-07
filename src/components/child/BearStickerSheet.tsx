@@ -17,6 +17,7 @@ import {
 } from '@/lib/bearBoardLayout'
 import type { PraiseStickerGrant, PraiseStickerPlacement } from '@/types/database'
 import { mergePraiseStickerGrantsFromServer } from '@/lib/mergePraiseStickerGrantsFromServer'
+import { createClient } from '@/lib/supabase/client'
 import PraiseGiftConfetti from '@/components/child/PraiseGiftConfetti'
 import BearBoardCompleteModal from '@/components/child/BearBoardCompleteModal'
 
@@ -116,6 +117,11 @@ type Props = {
   initialGrants: PraiseStickerGrant[]
   initialPlacements: PraiseStickerPlacement[]
   onInventoryChange?: () => void
+  /**
+   * 서버에서 판을 비운 뒤 부모 `placements` 도 즉시 [] 로 맞춰야 합니다.
+   * 그렇지 않으면 `initialPlacements` 가 옛 데이터로 남아 effect 가 스티커를 다시 채웁니다.
+   */
+  onBoardCleared?: () => void
 }
 
 /**
@@ -131,6 +137,7 @@ export default function BearStickerSheet({
   initialGrants,
   initialPlacements,
   onInventoryChange,
+  onBoardCleared,
 }: Props) {
   const { atlas } = useShopAnimationsAtlas()
   const [grants, setGrants] = useState(initialGrants)
@@ -144,6 +151,20 @@ export default function BearStickerSheet({
   /** 닫힐 때 짧은 페이드아웃 후 언마운트(바텀시트 대신 중앙 팝업용) */
   const [overlayMounted, setOverlayMounted] = useState(false)
   const [overlayVisible, setOverlayVisible] = useState(false)
+  /**
+   * 판을 비운 시각(ISO 문자열). 이 시각 이전에 지급된 스티커는 종이 위 미배치 목록에서 숨깁니다.
+   * - 20칸 완주 후 자동으로 판을 비운 뒤에도 grant 행은 DB에 남으므로, 숨기지 않으면 종이에 예전 스티커가 다시 가득 보입니다.
+   * - 새로 부모가 지급한 스티커는 created_at 이 더 뒤라서 그대로 보입니다.
+   */
+  const [lastBoardClearedAt, setLastBoardClearedAt] = useState<string | null>(null)
+
+  /**
+   * 부모 앱 `parent_sticker_board:${childId}` 채널로 브로드캐스트를 보낼 때 씁니다.
+   * 미션 탭의 `parent_mission_log_refresh` 와 같은 패턴으로, 시트가 열린 뒤 구독이 완료되면 ref 가 채워집니다.
+   */
+  const parentStickerBoardBroadcastRef = useRef<ReturnType<ReturnType<typeof createClient>['channel']> | null>(
+    null,
+  )
 
   /** 드래그 중인 grant id (포인터는 window 에서 추적) */
   const dragRef = useRef<{
@@ -167,13 +188,30 @@ export default function BearStickerSheet({
     setPlacements(initialPlacements)
   }, [initialPlacements])
 
+  /** 시트를 열 때마다 sessionStorage 에서 "판 비움" 시각을 읽어, 새로고침 후에도 이전 사이클 스티커를 숨깁니다 */
+  useEffect(() => {
+    if (!open) return
+    try {
+      const k = `praise_board_cleared_at:${childId}`
+      const v = sessionStorage.getItem(k)
+      setLastBoardClearedAt(v)
+    } catch {
+      /* 비공개 모드 등에서 sessionStorage 가 막혀 있으면 무시 */
+    }
+  }, [open, childId])
+
   const placedGrantIds = useMemo(() => new Set(placements.map((p) => p.grant_id)), [placements])
-  /** grant 목록에 실제로 존재하는 id 집합(유령 배치 방어) */
+  /** grant 목록에 실제로 존재하는 id 집합 — 칸 썸네일용(고아 배치는 tag.png 로 표시) */
   const grantIdSet = useMemo(() => new Set(grants.map((g) => g.id)), [grants])
 
   const unplacedGrants = useMemo(
-    () => grants.filter((g) => !placedGrantIds.has(g.id)),
-    [grants, placedGrantIds],
+    () =>
+      grants.filter((g) => {
+        if (placedGrantIds.has(g.id)) return false
+        if (lastBoardClearedAt != null && g.created_at <= lastBoardClearedAt) return false
+        return true
+      }),
+    [grants, placedGrantIds, lastBoardClearedAt],
   )
 
   /**
@@ -194,14 +232,17 @@ export default function BearStickerSheet({
     return `${grantPart}#${placePart}`
   }, [unplacedGrants, placements])
 
+  /**
+   * DB 에 placement 행이 있으면 칸은 점유로 봅니다.
+   * 예전에 grant 행이 없어진 "고아" 배치만 빼면 클라는 빈 칸인데 서버는 유니크 제약으로 막혀 붙지 않는 현상이 납니다.
+   */
   const occupiedSlots = useMemo(() => {
     const s = new Set<number>()
     for (const p of placements) {
-      if (!grantIdSet.has(p.grant_id)) continue
       if (p.board_slot != null && p.board_slot >= 1 && p.board_slot <= SLOT_TOTAL) s.add(p.board_slot)
     }
     return s
-  }, [placements, grantIdSet])
+  }, [placements])
 
   const cw = BEAR_GRID_ZONE.width / BEAR_GRID_COLS
   const ch = BEAR_GRID_ZONE.height / BEAR_GRID_ROWS
@@ -234,11 +275,61 @@ export default function BearStickerSheet({
     }
   }, [open])
 
+  /**
+   * 판 비우기 직후 타임스탬프를 저장합니다. sessionStorage 에 넣어 같은 탭에서 시트를 다시 열어도 유지됩니다.
+   */
+  const bumpBoardCycle = useCallback(() => {
+    const ts = new Date().toISOString()
+    try {
+      sessionStorage.setItem(`praise_board_cleared_at:${childId}`, ts)
+    } catch {
+      /* noop */
+    }
+    setLastBoardClearedAt(ts)
+  }, [childId])
+
   useEffect(() => {
     if (!boardCompleteConfetti) return
     const t = window.setTimeout(() => setBoardCompleteConfetti(false), 5200)
     return () => window.clearTimeout(t)
   }, [boardCompleteConfetti])
+
+  /**
+   * 스티커 시트가 열려 있을 때만 부모 알림용 브로드캐스트 채널을 붙입니다.
+   * 닫으면 채널을 끊어 불필요한 연결을 줄입니다.
+   */
+  useEffect(() => {
+    if (!open) return
+    const supabase = createClient()
+    const ch = supabase.channel(`parent_sticker_board:${childId}`, { config: { broadcast: { ack: false } } })
+    ch.subscribe((status) => {
+      if (status === 'SUBSCRIBED') parentStickerBoardBroadcastRef.current = ch
+    })
+    return () => {
+      parentStickerBoardBroadcastRef.current = null
+      void supabase.removeChannel(ch)
+    }
+  }, [open, childId])
+
+  /**
+   * 「엄마에게 알려주기」: 같은 이름의 채널을 구독 중인 부모 화면에 이벤트를 쏩니다.
+   * 시트를 막 연 직후라 아직 `SUBSCRIBED` 가 안 됐을 수 있어, ref 가 비면 임시 채널로 한 번 더 보냅니다.
+   */
+  const notifyParentStickerBoardComplete = useCallback(() => {
+    const payload = { type: 'broadcast' as const, event: 'sticker_board_filled', payload: { t: Date.now() } }
+    const ch = parentStickerBoardBroadcastRef.current
+    if (ch) {
+      void ch.send(payload)
+      return
+    }
+    const supabase = createClient()
+    const once = supabase.channel(`parent_sticker_board:${childId}`, { config: { broadcast: { ack: false } } })
+    once.subscribe((status) => {
+      if (status !== 'SUBSCRIBED') return
+      void once.send(payload)
+      void supabase.removeChannel(once)
+    })
+  }, [childId])
 
   /**
    * 종이 위 미배치 스티커 시작 위치
@@ -394,7 +485,6 @@ export default function BearStickerSheet({
           delete n[grantId]
           return n
         })
-        onInventoryChange?.()
         if (wasOneAwayFromFull) {
           setBoardCompleteConfetti(true)
           setBoardCompleteModalOpen(true)
@@ -409,14 +499,21 @@ export default function BearStickerSheet({
               console.error('[bear sticker reset]', resetJson.error ?? resetRes.statusText)
             } else {
               setPlacements([])
+              /** 부모 state 를 먼저 비워야 `initialPlacements` effect 가 옛 행을 다시 넣지 않음 */
+              onBoardCleared?.()
+              /** 종이 위 예전 지급 스티커도 숨기고, sessionStorage 에 사이클 시각을 남깁니다 */
+              bumpBoardCycle()
+              /** 리셋 직후 Supabase 재조회는 가끔 삭제 전 스냅샷을 주어 덮어쓸 수 있어 호출하지 않음 */
             }
           } catch (e) {
             console.error('[bear sticker reset]', e instanceof Error ? e.message : String(e))
           }
+        } else {
+          onInventoryChange?.()
         }
       }
     },
-    [childId, occupiedSlots, placing, onInventoryChange],
+    [childId, occupiedSlots, placing, onBoardCleared, onInventoryChange, bumpBoardCycle],
   )
 
   // dragRef 는 state 가 아니라서 변경돼도 effect 가 다시 안 돕니다. 리스너는 항상 달고, 핸들러 안에서만 dragRef 를 검사합니다.
@@ -607,11 +704,11 @@ export default function BearStickerSheet({
             })}
 
             {placements.map((p) => {
-              if (!grantIdSet.has(p.grant_id)) return null
               if (p.board_slot == null) return null
               const c = slotCenterPercent(p.board_slot)
               if (!c) return null
-              const sk = grantSpriteKey(p.grant_id)
+              /** grant 가 목록에 없으면(고아 배치) 기본 아이콘으로라도 칸이 막혀 있음을 보여 줍니다 */
+              const sk = grantIdSet.has(p.grant_id) ? grantSpriteKey(p.grant_id) : 'tag.png'
               return (
                 <div
                   key={p.id}
@@ -658,7 +755,7 @@ export default function BearStickerSheet({
     <BearBoardCompleteModal
       open={boardCompleteModalOpen}
       onDismiss={() => setBoardCompleteModalOpen(false)}
-      onGoMarket={onClose}
+      onNotifyParent={notifyParentStickerBoardComplete}
     />
     </>
   )

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, type CSSProperties } from 'react'
 import SpriteImage from '@/components/common/SpriteImage'
 import { EFFECT_LIGHTS, EFFECT_TWINKLE, ICONS } from '@/constants/sprites'
 
@@ -9,6 +9,9 @@ type Props = {
   playId: number
   /** 연출 종료 후 호출 — 오버레이 언마운트용 */
   onFinish: () => void
+  /** 카드 클릭 지점(뷰포트 px) */
+  startX: number
+  startY: number
 }
 
 /** 트윙클 한 겹 — 코인 더미 주변을 도는 반짝임(`globals.css` 궤도 애니메이션) */
@@ -23,23 +26,36 @@ const TWINKLE_SPECS = [
 
 /**
  * 미션 카드 탭 완료 시 풍경 위에 잠깐 보이는 연출입니다.
- * - 동전 더미가 위에서 아래로 슬라이딩하며 섬 방향으로 내려옵니다.
- * - 내려오는 동안 라이트/트윙클 반짝임을 같이 붙여, "보상이 들어오는" 느낌을 살립니다.
+ * - 동전 **한 개**가 카드 영역 쪽(아래)에서 시작해, 상단 크레딧 더미가 있는 방향(위)으로 슬라이딩합니다.
+ * - 이동 중 라이트/트윙클을 같이 보여 "크레딧이 상단 더미로 흡수되는" 느낌을 살립니다.
  */
-export default function MissionCreditToPiggyOverlay({ playId, onFinish }: Props) {
+export default function MissionCreditToPiggyOverlay({ playId, onFinish, startX, startY }: Props) {
   useEffect(() => {
     const end = window.setTimeout(() => onFinish(), 1600)
     return () => window.clearTimeout(end)
   }, [playId, onFinish])
 
+  /**
+   * CSS 변수로 시작/도착 좌표를 전달합니다.
+   * - 시작: 클릭한 카드 중심
+   * - 도착: 상단 중앙 크레딧 더미 근처
+   */
+  const flightStyle = {
+    ['--fx-start-x' as string]: `${startX}px`,
+    ['--fx-start-y' as string]: `${startY}px`,
+    ['--fx-end-x' as string]: '50vw',
+    ['--fx-end-y' as string]: '31vh',
+    ['--fx-arc-x' as string]: startX < 240 ? '28px' : '-28px',
+    ['--fx-arc-y' as string]: '-58px',
+  } as CSSProperties
+
   return (
-    <div className="pointer-events-none absolute inset-0 z-[25] overflow-visible" aria-hidden>
+    <div className="pointer-events-none fixed inset-0 z-[120] overflow-visible" aria-hidden>
       {/**
-       * 시작점은 상단 쪽, 이동은 CSS `mission-credit-to-piggy-anim` 에서 담당합니다.
-       * 가로는 풍경 밴드 중앙으로 고정해, 다양한 해상도에서도 섬 중앙선과 어긋나지 않게 맞춥니다.
+       * 시작점/도착점은 CSS 변수로 전달하고,
+       * 실제 궤적(포물선)은 `mission-credit-to-piggy-anim` 키프레임에서 계산합니다.
        */}
-      <div className="absolute left-1/2 top-[20%] -translate-x-1/2">
-        <div key={playId} className="mission-credit-to-piggy-anim relative h-[108px] w-[108px]">
+      <div key={playId} className="mission-credit-to-piggy-anim absolute h-[96px] w-[96px]" style={flightStyle}>
           {/**
            * 반짝임·라이트 박스:
            * - 코인 더미 바로 위/주변에 두어 이동 중에도 함께 반짝이게 보이도록 고정합니다.
@@ -76,25 +92,18 @@ export default function MissionCreditToPiggyOverlay({ playId, onFinish }: Props)
             ))}
           </div>
 
-          {/** 동전 세 장이 짧은 간격으로 튀어 오르며 포개지는 느낌 */}
-          {[0, 1, 2].map((i) => (
-            <span
-              key={`${playId}-c-${i}`}
-              className="pointer-events-none absolute left-1/2 z-[6]"
-              style={{ bottom: `${3 + i * 12}px` }}
-            >
-              <span className={`mission-credit-stack-layer-${i} inline-block -translate-x-1/2`}>
-                <SpriteImage
-                  sheet={ICONS}
-                  frame="credits"
-                  width={48 - i * 4}
-                  clipRotated={false}
-                  className="select-none drop-shadow-[0_4px_14px_rgba(0,0,0,0.2)]"
-                />
-              </span>
+          {/** 요청 반영: 더미(credits) 대신 동전 한 개(credit)만 표시 */}
+          <span className="pointer-events-none absolute left-1/2 bottom-[10px] z-[6] -translate-x-1/2">
+            <span className="mission-credit-single-coin inline-block">
+              <SpriteImage
+                sheet={ICONS}
+                frame="credit"
+                width={42}
+                clipRotated={false}
+                className="select-none drop-shadow-[0_4px_14px_rgba(0,0,0,0.2)]"
+              />
             </span>
-          ))}
-        </div>
+          </span>
       </div>
     </div>
   )

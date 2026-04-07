@@ -4,6 +4,14 @@ import { createServiceRoleClient } from '@/lib/supabase/admin'
 import { isSpecialSectionMission } from '@/lib/specialMissionChips'
 import type { Mission } from '@/types/database'
 
+/** PostgREST 스키마 캐시에 컬럼이 없거나 DB 컬럼 자체가 없는 경우를 감지합니다. */
+function isMissingColumnOrSchemaCacheError(err: { code?: string; message?: string } | null | undefined): boolean {
+  if (!err) return false
+  if (err.code === '42703' || err.code === 'PGRST204') return true
+  const m = String(err.message ?? '')
+  return m.includes('Could not find') && m.includes('schema cache')
+}
+
 /**
  * PATCH /api/mission/patch-reward-multiplier
  * 연결된 자녀의 스페셜 미션 템플릿에만 보상 배율(1·2·3)을 저장합니다.
@@ -75,6 +83,15 @@ export async function PATCH(req: NextRequest) {
     .maybeSingle()
 
   if (upErr || !updated) {
+    if (isMissingColumnOrSchemaCacheError(upErr)) {
+      return NextResponse.json(
+        {
+          error:
+            '현재 DB에 보너스 배율 컬럼(reward_multiplier)이 아직 반영되지 않았어요. Supabase SQL에서 supabase/migrations/028_missions_reward_multiplier.sql 적용 후 다시 시도해 주세요.',
+        },
+        { status: 503 },
+      )
+    }
     return NextResponse.json(
       { error: upErr?.message ?? '저장에 실패했어요' },
       { status: 500 },

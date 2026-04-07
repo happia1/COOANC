@@ -59,10 +59,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: '이미 완료한 미션이에요' }, { status: 409 })
   }
 
-  /** reward_multiplier 는 028 마이그레이션 전 DB 에 없을 수 있어 select 에 넣지 않음(보상은 1배 기본) */
+  /** 보너스 배율(028) — 컬럼이 있으면 완료 보상에 곱합니다. */
   const { data: mission } = await supabase
     .from('missions')
-    .select('credit_reward, heart_reward, exp_reward, is_active, level_required, title, icon_emoji')
+    .select(
+      'credit_reward, heart_reward, exp_reward, reward_multiplier, is_active, level_required, title, icon_emoji',
+    )
     .eq('id', dm.mission_template_id)
     .maybeSingle()
 

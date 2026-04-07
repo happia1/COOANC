@@ -1,8 +1,10 @@
 'use client'
 
 /**
- * 스페셜 미션 카드의 「보너스 주기」— 완료 보상(크레딧·하트·EXP)에 1·2·3배를 곱해 저장합니다.
- * document.body 로 포털하여 스크롤 영역 밖에서 시트가 전체 화면을 덮도록 합니다.
+ * 스페셜 미션 보상 배율(1·2·3배)을 고르는 하단 시트입니다.
+ * - 부모가 「일정 추가」를 누른 뒤(오늘 하루만 미션) 또는 「보상 배율」을 눌렀을 때(매일 스페셜) 열립니다.
+ * - 저장하면 DB `missions.reward_multiplier` 가 갱신되고, 자녀가 미션을 완료할 때 그만큼 보상이 곱해집니다.
+ * - document.body 로 포털해 루틴 탭 스크롤 밖에서도 전체 화면을 덮습니다.
  */
 
 import { useEffect, useLayoutEffect, useState } from 'react'

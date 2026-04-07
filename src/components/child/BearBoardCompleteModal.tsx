@@ -1,18 +1,26 @@
 'use client'
 
-import Link from 'next/link'
+import SpriteImage from '@/components/common/SpriteImage'
+import { REWARD_CREDITS } from '@/constants/sprites'
 
 type Props = {
+  /** 팝업을 열지 닫지 */
   open: boolean
+  /** 닫기(「나중에」 등) */
   onDismiss: () => void
-  /** 상점 링크를 눌렀을 때 바텀시트 등을 닫을 때 사용 */
-  onGoMarket?: () => void
+  /**
+   * 「엄마에게 알려주기」를 눌렀을 때 호출됩니다.
+   * 같은 가족의 부모 앱이 구독 중인 Supabase 브로드캐스트 채널로 알림을 보냅니다.
+   */
+  onNotifyParent?: () => void
 }
 
 /**
- * 곰돌이 판 20칸을 모두 채웠을 때 — 선물 안내 + 마켓 이동
+ * 곰돌이 판 20칸을 모두 채웠을 때 뜨는 축하 팝업입니다.
+ * - 예전에는 마켓으로 가서 선물을 고르도록 했지만, 이제는 엄마가 골라 주는 선물(랜덤 박스) 흐름으로 바뀌었습니다.
+ * - 아이에게는 랜덤 박스 이미지를 보여 주고, 엄마에게 알림을 보낼 수 있게 합니다.
  */
-export default function BearBoardCompleteModal({ open, onDismiss, onGoMarket }: Props) {
+export default function BearBoardCompleteModal({ open, onDismiss, onNotifyParent }: Props) {
   if (!open) return null
 
   return (
@@ -23,34 +31,39 @@ export default function BearBoardCompleteModal({ open, onDismiss, onGoMarket }: 
       aria-labelledby="bear-board-complete-title"
     >
       <div className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl">
-        <h2 id="bear-board-complete-title" className="text-center text-lg font-black text-brand-text">
-          축하해요! 스티커판을 다 채웠어요!
+        {/* 제목: 한 줄 띄우고 두 번째 문장을 넣어 읽기 쉽게 했습니다 */}
+        <h2
+          id="bear-board-complete-title"
+          className="text-center text-lg font-black leading-snug text-brand-text whitespace-pre-line"
+        >
+          {`축하해요!\n스티커를 다 붙였어요.`}
         </h2>
-        <p className="mt-2 text-center text-sm leading-relaxed text-gray-600">
-          원하는 선물을 <span className="font-bold text-brand-blue">1개</span> 고를 수 있어요!
-        </p>
-        <div className="mt-4 flex justify-center">
-          {/* 요청 이미지 경로: public/assets/img/common/ui/icons.png */}
-          {/* eslint-disable-next-line @next/next/no-img-element -- 완료 팝업 고정 아이콘 */}
-          <img
-            src="/assets/img/common/ui/icons.png"
-            alt="상점 아이콘"
-            width={64}
-            height={64}
-            className="h-16 w-16 object-contain"
-          />
+
+        {/* 미션 홈과 같은 크레딧 보상 시트의 금색 상자 — 「랜덤 선물 박스」로 보여 줍니다 */}
+        <div className="mt-5 flex flex-col items-center gap-2">
+          <div className="relative flex h-[120px] w-full items-end justify-center">
+            <SpriteImage
+              sheet={REWARD_CREDITS}
+              frame="gold_box"
+              width={96}
+              clipRotated={false}
+              className="select-none drop-shadow-[0_6px_18px_rgba(0,0,0,0.2)]"
+            />
+          </div>
+          <p className="text-center text-sm font-bold text-brand-blue">랜덤박스</p>
         </div>
+
         <div className="mt-5 flex flex-col gap-2">
-          <Link
-            href="/market"
+          <button
+            type="button"
             onClick={() => {
+              onNotifyParent?.()
               onDismiss()
-              onGoMarket?.()
             }}
-            className="block w-full rounded-2xl bg-brand-blue py-3.5 text-center text-sm font-bold text-white shadow-md transition active:scale-[0.99]"
+            className="w-full rounded-2xl bg-brand-blue py-3.5 text-center text-sm font-bold text-white shadow-md transition active:scale-[0.99]"
           >
-            선물 고르러가기
-          </Link>
+            엄마에게 알려주기
+          </button>
           <button
             type="button"
             onClick={onDismiss}

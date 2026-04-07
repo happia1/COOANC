@@ -27,10 +27,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: '필수 항목이 누락됐어요' }, { status: 400 })
   }
 
-  // 미션 정보 조회 (reward_multiplier 컬럼은 028 이전 DB 에 없을 수 있음 → 생략 시 1배)
+  // 미션 정보 조회 — reward_multiplier 가 있으면 완료 보상에 반영합니다.
   const { data: mission } = await supabase
     .from('missions')
-    .select('credit_reward, heart_reward, exp_reward, is_active, level_required')
+    .select('credit_reward, heart_reward, exp_reward, reward_multiplier, is_active, level_required')
     .eq('id', missionId)
     .maybeSingle()
 

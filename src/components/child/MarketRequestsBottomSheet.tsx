@@ -4,7 +4,7 @@
  * 마켓 하단에서 올라오는 「내 요청 현황」시트
  * - 요청별 상태를 회색(대기)·파란(진행)·빨강(반려) 뱃지로 구분
  * - 서울 기준 **최근 3일** 안에 접수된 건만 표시 (`requested_at` 달력일)
- * - 목록은 **주문일 오름차순**(먼저 주문한 것이 위)
+ * - 목록은 **주문일 내림차순**(가장 최근 주문이 위)
  * - `delivered`(도착 완료)는 하단 **접기/펼치기** 블록에 모음(기본 접힘)
  */
 
@@ -28,7 +28,7 @@ type Props = {
 }
 
 /** 내 요청(진행/대기/반려) 기본 노출 개수 — 초과분은 「더보기」 */
-const ACTIVE_PREVIEW_COUNT = 5
+const ACTIVE_PREVIEW_COUNT = 3
 
 /** 서울 달력 기준 오늘 포함 이전 3일(오늘·어제·그제) 안에 주문된 건만 남깁니다 */
 function filterRequestsWithinLast3SeoulDays(list: PurchaseRequest[]): PurchaseRequest[] {
@@ -41,9 +41,9 @@ function filterRequestsWithinLast3SeoulDays(list: PurchaseRequest[]): PurchaseRe
   })
 }
 
-/** 주문 시각 기준 오름차순 — 위에서부터 시간 순서 */
-function sortByRequestedAtAsc(list: PurchaseRequest[]): PurchaseRequest[] {
-  return [...list].sort((a, b) => a.requested_at.localeCompare(b.requested_at))
+/** 주문 시각 기준 내림차순 — 최신 요청이 위 */
+function sortByRequestedAtDesc(list: PurchaseRequest[]): PurchaseRequest[] {
+  return [...list].sort((a, b) => b.requested_at.localeCompare(a.requested_at))
 }
 
 /** YYYY-MM-DD → MM.DD (예: 2026-04-07 → 04.07) */
@@ -125,8 +125,8 @@ export default function MarketRequestsBottomSheet({ open, onClose, requests, mar
     const active = inRange.filter((r) => r.status !== 'delivered')
     const delivered = inRange.filter((r) => r.status === 'delivered')
     return {
-      activeRows: sortByRequestedAtAsc(active),
-      deliveredRows: sortByRequestedAtAsc(delivered),
+      activeRows: sortByRequestedAtDesc(active),
+      deliveredRows: sortByRequestedAtDesc(delivered),
     }
   }, [requests])
 

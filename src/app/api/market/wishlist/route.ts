@@ -3,24 +3,6 @@ import { createClient } from '@/lib/supabase/server'
 import { resolveApiActorChildId } from '@/lib/resolveApiActorChildId'
 import { isCategoryExcludedFromMarket } from '@/lib/parentMarketMenuSections'
 
-function debugLog(runId: string, hypothesisId: string, location: string, message: string, data: Record<string, unknown>) {
-  // #region agent log
-  fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '9263e0' },
-    body: JSON.stringify({
-      sessionId: '9263e0',
-      runId,
-      hypothesisId,
-      location,
-      message,
-      data,
-      timestamp: Date.now(),
-    }),
-  }).catch(() => {})
-  // #endregion
-}
-
 /**
  * POST /api/market/wishlist — body:
  *   { action: 'add'|'remove', storeItemId, childId? }
@@ -43,6 +25,22 @@ export async function GET(req: NextRequest) {
     .select('store_item_id, quantity')
     .eq('child_id', resolved.childId)
     .order('created_at', { ascending: false })
+
+  if (error?.code === '42703') {
+    // quantity 컬럼이 아직 없는 구버전 스키마 호환: 수량은 모두 1로 간주
+    const { data: legacyRows, error: legacyErr } = await supabase
+      .from('market_wishlist_items')
+      .select('store_item_id')
+      .eq('child_id', resolved.childId)
+      .order('created_at', { ascending: false })
+    if (legacyErr) return NextResponse.json({ error: '목록을 불러오지 못했어요' }, { status: 500 })
+    return NextResponse.json({
+      items: (legacyRows ?? []).map((r: { store_item_id: string }) => ({
+        store_item_id: r.store_item_id,
+        quantity: 1,
+      })),
+    })
+  }
 
   if (error) return NextResponse.json({ error: '목록을 불러오지 못했어요' }, { status: 500 })
   return NextResponse.json({
@@ -84,13 +82,6 @@ export async function POST(req: NextRequest) {
   const resolved = await resolveApiActorChildId(supabase, user, bodyChildId)
   if (resolved.ok === false) return resolved.response
   const childId = resolved.childId
-  debugLog('pre-fix', 'H1-H5', 'wishlist.route.ts:POST:entry', 'wishlist POST received', {
-    action,
-    storeItemId: typeof storeItemId === 'string' ? storeItemId : 'invalid',
-    quantity: typeof quantity === 'number' ? quantity : null,
-    childId,
-  })
-
   if (action === 'set_quantity') {
     if (!Number.isInteger(quantity) || Number(quantity) < 1) {
       return NextResponse.json({ error: '수량은 1 이상 정수여야 해요' }, { status: 400 })
@@ -102,11 +93,13 @@ export async function POST(req: NextRequest) {
       .eq('child_id', childId)
       .eq('store_item_id', storeItemId)
 
+    if (updErr?.code === '42703' || updErr?.code === 'PGRST204') {
+      // 구버전 스키마에서는 수량 열이 없어 서버 저장은 불가.
+      // UX 오류를 막기 위해 하위호환 성공 응답으로 내려 클라이언트에서 수량 상태를 유지합니다.
+      return NextResponse.json({ ok: true, quantity: nextQty, degraded: true })
+    }
+
     if (updErr) {
-      debugLog('pre-fix', 'H2-H3', 'wishlist.route.ts:POST:set_quantity', 'set_quantity failed', {
-        code: updErr.code ?? null,
-        message: updErr.message ?? 'unknown',
-      })
       return NextResponse.json({ error: '수량 변경에 실패했어요' }, { status: 500 })
     }
     return NextResponse.json({ ok: true, quantity: nextQty })
@@ -132,11 +125,22 @@ export async function POST(req: NextRequest) {
       .eq('child_id', childId)
       .eq('store_item_id', storeItemId)
       .maybeSingle()
-    if (selErr) {
-      debugLog('pre-fix', 'H1-H2', 'wishlist.route.ts:POST:add:select', 'wishlist select failed', {
-        code: selErr.code ?? null,
-        message: selErr.message ?? 'unknown',
+    if (selErr?.code === '42703') {
+      // quantity 컬럼이 아직 없는 구버전 스키마 호환 경로
+      const { error: legacyInsertErr } = await supabase.from('market_wishlist_items').insert({
+        child_id: childId,
+        store_item_id: storeItemId,
       })
+      if (legacyInsertErr) {
+        if (legacyInsertErr.code === '23505') {
+          // 이미 담긴 상품이면 구버전에서는 수량 개념이 없으므로 성공으로 처리
+          return NextResponse.json({ ok: true, quantity: 1, duplicate: true })
+        }
+        return NextResponse.json({ error: '담기에 실패했어요' }, { status: 500 })
+      }
+      return NextResponse.json({ ok: true, quantity: 1 })
+    }
+    if (selErr) {
       return NextResponse.json({ error: '장바구니 조회에 실패했어요' }, { status: 500 })
     }
 
@@ -147,10 +151,6 @@ export async function POST(req: NextRequest) {
         .update({ quantity: nextQty })
         .eq('id', existing.id)
       if (updErr) {
-        debugLog('pre-fix', 'H2-H3', 'wishlist.route.ts:POST:add:update', 'quantity increment failed', {
-          code: updErr.code ?? null,
-          message: updErr.message ?? 'unknown',
-        })
         return NextResponse.json({ error: '수량 증가에 실패했어요' }, { status: 500 })
       }
       return NextResponse.json({ ok: true, quantity: nextQty })
@@ -162,13 +162,7 @@ export async function POST(req: NextRequest) {
       quantity: 1,
     })
 
-    if (error) {
-      debugLog('pre-fix', 'H1-H3', 'wishlist.route.ts:POST:add:insert', 'wishlist insert failed', {
-        code: error.code ?? null,
-        message: error.message ?? 'unknown',
-      })
-      return NextResponse.json({ error: '담기에 실패했어요' }, { status: 500 })
-    }
+    if (error) return NextResponse.json({ error: '담기에 실패했어요' }, { status: 500 })
     return NextResponse.json({ ok: true, quantity: 1 })
   }
 
@@ -178,12 +172,6 @@ export async function POST(req: NextRequest) {
     .eq('child_id', childId)
     .eq('store_item_id', storeItemId)
 
-  if (delErr) {
-    debugLog('pre-fix', 'H4', 'wishlist.route.ts:POST:remove', 'wishlist remove failed', {
-      code: delErr.code ?? null,
-      message: delErr.message ?? 'unknown',
-    })
-    return NextResponse.json({ error: '빼기에 실패했어요' }, { status: 500 })
-  }
+  if (delErr) return NextResponse.json({ error: '빼기에 실패했어요' }, { status: 500 })
   return NextResponse.json({ ok: true })
 }

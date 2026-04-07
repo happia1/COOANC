@@ -89,12 +89,9 @@ export default async function MissionPage() {
     }
   }
 
-  /**
-   * reward_multiplier 는 028 마이그레이션 이후 컬럼 — 없는 DB 에서 embed 시 PostgREST 가 전체 조회를 실패시킵니다.
-   * 생략 시 missionRewardMultiplier 가 1배로 동작합니다.
-   */
+  /** embed 에 템플릿 보상·배율을 넣어 자녀 카드 숫자와 완료 API가 맞춰집니다. */
   const missionJoin =
-    'title, icon_emoji, description, credit_reward, heart_reward, exp_reward, difficulty, block, repeat_type'
+    'title, icon_emoji, description, credit_reward, heart_reward, exp_reward, reward_multiplier, difficulty, block, repeat_type'
 
   /**
    * 미션 템플릿·일일행은 service_role 로 조회하면 RLS·embed 이슈 없이 부모 루틴 탭과 동일 스냅샷에 가깝습니다.

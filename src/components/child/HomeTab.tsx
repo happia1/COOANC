@@ -74,6 +74,11 @@ export default function HomeTab({
     if (data) setPlacements(data as PraiseStickerPlacement[])
   }, [childId])
 
+  /** 서버 reset-board 직후: 부모 placements 를 [] 로 두어 자식 effect 가 옛 배열로 되살리지 않게 함 */
+  const clearPraiseStickerBoard = useCallback(() => {
+    setPlacements([])
+  }, [])
+
   useEffect(() => {
     const pending = grants.some((x) => x.popup_dismissed_at == null)
     setArrivalOpen(pending)
@@ -176,6 +181,7 @@ export default function HomeTab({
         initialGrants={grants}
         initialPlacements={placements}
         onInventoryChange={() => void refreshStickerPlacementsOnly()}
+        onBoardCleared={clearPraiseStickerBoard}
       />
     </>
   )

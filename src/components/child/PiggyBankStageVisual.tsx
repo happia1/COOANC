@@ -50,6 +50,19 @@ export default function PiggyBankStageVisual({ stepIndex, displayWidth, classNam
 
   if (frameOrder.length > 0) {
     const frameName = frameOrder[idx] ?? frameOrder[0]
+    /**
+     * 실제로 "보이는 돼지 본체" 크기가 단계마다 비슷하게 보이도록 광학 보정 배율을 적용합니다.
+     * - 특히 0단계(레이어 336)가 크게, 1단계(레이어 337)가 작게 보이던 체감 차이를 우선 보정합니다.
+     * - 숫자는 UI에서 본체 시각 크기를 기준으로 맞춘 값이며, 필요 시 단계별로 더 미세 조정 가능합니다.
+     */
+    const OPTICAL_SCALE_BY_FRAME: Record<string, number> = {
+      '레이어 336': 0.9,
+      '레이어 337': 1.06,
+      '레이어 338': 1.03,
+      '레이어 339': 1.02,
+    }
+    const opticalScale = OPTICAL_SCALE_BY_FRAME[frameName] ?? 1
+    const normalizedWidth = Math.round(displayWidth * opticalScale)
     const spriteFrames = Object.fromEntries(
       GOLD_PIGGY_BANK_FRAMES.map((f) => [
         f.name,
@@ -65,8 +78,9 @@ export default function PiggyBankStageVisual({ stepIndex, displayWidth, classNam
           frames: spriteFrames,
         }}
         frame={frameName}
-        width={displayWidth}
-        clipRotated={false}
+        width={normalizedWidth}
+        /** 전환 중 다른 프레임이 스쳐 보이는 현상을 막기 위해 회전 프레임도 내부에서 클립합니다. */
+        clipRotated={true}
         className={['select-none object-contain', className].filter(Boolean).join(' ')}
       />
     )

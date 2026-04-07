@@ -49,8 +49,14 @@ type DeliveryOverlay = {
   phase: DeliveryPhase
 }
 
-/** `public/assets/img/layouts/backgrounds/market_roof.png` — 브라우저에서는 /public 기준 경로 */
-const ROOF_SRC = '/assets/img/layouts/backgrounds/market_roof.png'
+/**
+ * 마켓 상단 지붕 PNG(`public/.../market_roof.png`)를 **파일 이름은 그대로** 두고 내용만 바꿀 때,
+ * 브라우저·중간 캐시가 예전 그림을 계속 보여 줄 수 있어요. 그때마다 아래 숫자만 1 올리면
+ * 주소가 달라져서 새 이미지를 다시 받아옵니다.
+ */
+const MARKET_ROOF_CACHE_BUST = 2
+/** 실제 표시 URL — `/public` 기준 정적 경로 + 캐시 끊기용 쿼리 */
+const ROOF_SRC = `/assets/img/layouts/backgrounds/market_roof.png?v=${MARKET_ROOF_CACHE_BUST}`
 /** 요청사항: 물건이 담긴 장바구니 아이콘(공용 정적 이미지) */
 const BASKET_FILLED_SRC = '/assets/img/common/ui/basket_filled.png'
 
@@ -297,25 +303,6 @@ export default function MarketTab({
     async (storeItemId: string): Promise<boolean> => {
       if (wishBusy) return false
       setWishBusy(storeItemId)
-      // #region agent log
-      fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '9263e0' },
-        body: JSON.stringify({
-          sessionId: '9263e0',
-          runId: 'pre-fix',
-          hypothesisId: 'H4-H5',
-          location: 'MarketTab.tsx:addWishlistOne:beforeFetch',
-          message: 'add wishlist requested',
-          data: {
-            childId,
-            storeItemId,
-            localPrevQty: wishlistQuantities[storeItemId] ?? 0,
-          },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {})
-      // #endregion
       try {
         const res = await fetch('/api/market/wishlist', {
           method: 'POST',
@@ -324,27 +311,6 @@ export default function MarketTab({
         })
         const text = await res.text()
         const json = text ? JSON.parse(text) : {}
-        // #region agent log
-        fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '9263e0' },
-          body: JSON.stringify({
-            sessionId: '9263e0',
-            runId: 'pre-fix',
-            hypothesisId: 'H4-H5',
-            location: 'MarketTab.tsx:addWishlistOne:afterFetch',
-            message: 'add wishlist response',
-            data: {
-              ok: res.ok,
-              status: res.status,
-              responseError: typeof json.error === 'string' ? json.error : null,
-              responseQty: typeof json.quantity === 'number' ? json.quantity : null,
-              storeItemId,
-            },
-            timestamp: Date.now(),
-          }),
-        }).catch(() => {})
-        // #endregion
         if (!res.ok) {
           showToast(typeof json.error === 'string' ? json.error : '처리에 실패했어요', false)
           return false
@@ -355,28 +321,13 @@ export default function MarketTab({
         })
         return true
       } catch {
-        // #region agent log
-        fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '9263e0' },
-          body: JSON.stringify({
-            sessionId: '9263e0',
-            runId: 'pre-fix',
-            hypothesisId: 'H5',
-            location: 'MarketTab.tsx:addWishlistOne:catch',
-            message: 'add wishlist network/client exception',
-            data: { storeItemId },
-            timestamp: Date.now(),
-          }),
-        }).catch(() => {})
-        // #endregion
         showToast('네트워크 오류가 났어요', false)
         return false
       } finally {
         setWishBusy(null)
       }
     },
-    [childId, wishBusy, wishlistQuantities],
+    [childId, wishBusy],
   )
 
   /** 장바구니에서 상품 삭제(X) */
@@ -428,7 +379,15 @@ export default function MarketTab({
           showToast(typeof json.error === 'string' ? json.error : '수량 변경에 실패했어요', false)
           return false
         }
-        setWishlistQuantities((prev) => ({ ...prev, [storeItemId]: quantity }))
+        setWishlistQuantities((prev) => ({
+          ...prev,
+          [storeItemId]:
+            typeof json.quantity === 'number' && json.quantity > 0 ? json.quantity : quantity,
+        }))
+        if (json.degraded === true) {
+          // quantity 컬럼 없는 구버전 DB 에서는 현재 세션 기준 수량으로 동작함을 안내
+          showToast('수량이 반영됐어요')
+        }
         return true
       } catch {
         showToast('네트워크 오류가 났어요', false)

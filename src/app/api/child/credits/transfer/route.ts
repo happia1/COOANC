@@ -57,28 +57,6 @@ export async function POST(req: NextRequest) {
     .eq('child_id', childId)
     .maybeSingle()
 
-  // #region agent log
-  fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'b51341' },
-    body: JSON.stringify({
-      sessionId: 'b51341',
-      runId: 'post-schema-fix',
-      hypothesisId: 'H-A,H-B,H-E',
-      location: 'api/child/credits/transfer:after-child_stats-select',
-      message: 'child_stats query outcome',
-      data: {
-        hasStats: !!stats,
-        statsErrCode: statsErr?.code ?? null,
-        statsErrMessage: statsErr?.message ?? null,
-        childIdLen: typeof childId === 'string' ? childId.length : 0,
-        kind,
-      },
-      timestamp: Date.now(),
-    }),
-  }).catch(() => {})
-  // #endregion
-
   if (statsErr?.code === '42703') {
     return NextResponse.json(
       { error: '앱 업데이트가 필요해요. 관리자에게 데이터베이스 마이그레이션을 적용해 달라고 요청해 주세요.' },

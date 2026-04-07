@@ -1,12 +1,14 @@
 'use client'
 
 import Image from 'next/image'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import SpriteImage from '@/components/common/SpriteImage'
 import { CharacterSprite } from '@/components/sprites/CharacterSprite'
 import FloatingCreditsStackVisual from '@/components/child/FloatingCreditsStackVisual'
 import PiggyBankStageVisual from '@/components/child/PiggyBankStageVisual'
 import { piggyBankStageCount } from '@/constants/piggyBankStages'
-import { ICONS } from '@/constants/sprites'
+import { EFFECT_LIGHTS, ICONS } from '@/constants/sprites'
+type LightFx = { leftPct: number; topPct: number; size: number; delayMs: number; durationMs: number; opacity: number }
 
 /**
  * bunny.png 아틀라스에서 정면에 가까운 프레임.
@@ -77,6 +79,70 @@ export type MissionCreditIslandProps = {
   onPiggyTap: () => void
 }
 
+type SlotNumberProps = {
+  /** 목표 숫자(실제 크레딧 값) */
+  value: number
+  /** 숫자 색상 클래스 */
+  toneClass: string
+  /** 숫자 크기 클래스 */
+  sizeClass: string
+  className?: string
+}
+
+function SlotDigit({ digit, sizeClass }: { digit: string; sizeClass: string }) {
+  if (digit === ',') {
+    return <span className={`${sizeClass} leading-none`}>,</span>
+  }
+  const n = Number(digit)
+  return (
+    <span className={`relative inline-flex h-[1.15em] w-[0.78em] overflow-hidden ${sizeClass} leading-none`}>
+      <span
+        className="absolute left-0 top-0 flex flex-col transition-transform duration-200 ease-out"
+        style={{ transform: `translateY(-${n * 1.15}em)` }}
+      >
+        {Array.from({ length: 10 }).map((_, i) => (
+          <span key={`slot-${i}`} className="h-[1.15em] leading-[1.15em]">
+            {i}
+          </span>
+        ))}
+      </span>
+    </span>
+  )
+}
+
+/**
+ * 슬롯(릴) 숫자:
+ * - 목표값으로 바로 점프하지 않고, 짧은 간격으로 서서히 맞춰 갑니다.
+ * - 각 자리수는 세로 릴처럼 움직여 올라가거나 내려가는 느낌을 냅니다.
+ */
+function SlotNumber({ value, toneClass, sizeClass, className = '' }: SlotNumberProps) {
+  const target = Math.max(0, Math.floor(value))
+  const [displayed, setDisplayed] = useState(target)
+
+  useEffect(() => {
+    if (displayed === target) return
+    const tick = setInterval(() => {
+      setDisplayed((prev) => {
+        if (prev === target) return prev
+        const diff = target - prev
+        const step = Math.max(1, Math.floor(Math.abs(diff) / 8))
+        return prev + Math.sign(diff) * step
+      })
+    }, 45)
+    return () => clearInterval(tick)
+  }, [target, displayed])
+
+  const chars = useMemo(() => displayed.toLocaleString('ko-KR').split(''), [displayed])
+
+  return (
+    <span className={`${className} inline-flex items-end gap-[0.04em] font-black tabular-nums ${toneClass}`}>
+      {chars.map((ch, idx) => (
+        <SlotDigit key={`digit-${idx}-${ch}`} digit={ch} sizeClass={sizeClass} />
+      ))}
+    </span>
+  )
+}
+
 type Props = {
   /**
    * `bunny`: 홈 — 일반 섬 + 토끼.
@@ -130,6 +196,47 @@ export default function ChildHomeIslandStage({
       : scene === 'gippybank' && missionPiggy
         ? piggyBankFrameIndex(missionPiggy.completed, missionPiggy.total)
         : 0
+  const [animatedPiggyIdx, setAnimatedPiggyIdx] = useState(piggyIdx)
+  const animatedPiggyIdxRef = useRef(animatedPiggyIdx)
+  const [piggySparkleOn, setPiggySparkleOn] = useState(false)
+  const [piggyLightFx, setPiggyLightFx] = useState<LightFx[]>([])
+
+  useEffect(() => {
+    animatedPiggyIdxRef.current = animatedPiggyIdx
+  }, [animatedPiggyIdx])
+
+  useEffect(() => {
+    /** 저금통 단계가 올라갈 때만 3초 반짝임 */
+    if (piggyIdx > animatedPiggyIdxRef.current) {
+      /** 단계 상승 시 라이트 여러 개를 랜덤 좌표/속도로 배치합니다. */
+      setPiggyLightFx(
+        Array.from({ length: 4 }).map(() => ({
+          leftPct: 24 + Math.random() * 52,
+          topPct: Math.random() * 28,
+          size: 18 + Math.floor(Math.random() * 24),
+          delayMs: Math.floor(Math.random() * 560),
+          durationMs: 1200 + Math.floor(Math.random() * 1300),
+          opacity: 0.45 + Math.random() * 0.4,
+        })),
+      )
+      setPiggySparkleOn(true)
+      const off = setTimeout(() => setPiggySparkleOn(false), 3000)
+      return () => clearTimeout(off)
+    }
+    return
+  }, [piggyIdx])
+
+  useEffect(() => {
+    if (piggyIdx === animatedPiggyIdxRef.current) return
+    /** 목표 단계까지 한 칸씩 이동해 서서히 커지거나 작아지게 보이도록 처리 */
+    const tick = setInterval(() => {
+      setAnimatedPiggyIdx((prev) => {
+        if (prev === piggyIdx) return prev
+        return prev + (piggyIdx > prev ? 1 : -1)
+      })
+    }, 170)
+    return () => clearInterval(tick)
+  }, [piggyIdx])
 
   /** 섬·토끼·돼지 레이어 (flex / 비-flex 공통 JSX) */
   const stageLayers = (
@@ -216,9 +323,12 @@ export default function ChildHomeIslandStage({
                 />
               </div>
               {/** 요청 반영: 배경 블록 없이 숫자만 크게 표시합니다. */}
-              <span className="mt-0.5 text-xl font-black tabular-nums text-brand-blue sm:text-2xl">
-                {missionCredits.floating.toLocaleString('ko-KR')}
-              </span>
+              <SlotNumber
+                value={missionCredits.floating}
+                toneClass="text-brand-blue"
+                sizeClass="text-xl sm:text-2xl"
+                className="mt-0.5"
+              />
             </button>
           </div>
 
@@ -239,15 +349,44 @@ export default function ChildHomeIslandStage({
               {/** 큰 프레임(왕관/의자) 머리 잘림 방지를 위해 높이 여유 + overflow-visible 적용 */}
               <div className="flex h-[96px] w-[76px] items-end justify-center overflow-visible">
                 <PiggyBankStageVisual
-                  stepIndex={piggyIdx}
-                  displayWidth={70}
+                  stepIndex={animatedPiggyIdx}
+                  /** 요청 반영: 미션 탭 저금통 크기를 아주 조금만 축소 */
+                  displayWidth={64}
                   className="drop-shadow-[0_6px_14px_rgba(0,0,0,0.2)]"
                 />
               </div>
+              {piggySparkleOn ? (
+                <>
+                  {piggyLightFx.map((fx, i) => (
+                    <span
+                      key={`piggy-light-${i}`}
+                      className="pointer-events-none absolute -translate-x-1/2 animate-ping"
+                      style={{
+                        left: `${fx.leftPct}%`,
+                        top: `${fx.topPct}%`,
+                        animationDuration: `${fx.durationMs}ms`,
+                        animationDelay: `${fx.delayMs}ms`,
+                        animationIterationCount: 3,
+                      }}
+                    >
+                      <SpriteImage
+                        sheet={EFFECT_LIGHTS}
+                        frame="lights"
+                        width={fx.size}
+                        className="select-none"
+                        style={{ opacity: fx.opacity }}
+                      />
+                    </span>
+                  ))}
+                </>
+              ) : null}
               {/** 요청 반영: 배경 블록 없이 숫자만 크게 표시합니다. */}
-              <span className="mt-1 text-lg font-black tabular-nums text-sky-900 sm:text-xl">
-                {missionCredits.piggy.toLocaleString('ko-KR')}
-              </span>
+              <SlotNumber
+                value={missionCredits.piggy}
+                toneClass="text-sky-900"
+                sizeClass="text-lg sm:text-xl"
+                className="mt-1"
+              />
             </button>
           </div>
 
@@ -262,9 +401,12 @@ export default function ChildHomeIslandStage({
             >
               <SpriteImage sheet={ICONS} frame="wallet" width={56} clipRotated={false} className="drop-shadow-lg" />
               {/** 요청 반영: 배경 블록 없이 숫자만 크게 표시합니다. */}
-              <span className="mt-1 text-lg font-black tabular-nums text-amber-900 sm:text-xl">
-                {missionCredits.wallet.toLocaleString('ko-KR')}
-              </span>
+              <SlotNumber
+                value={missionCredits.wallet}
+                toneClass="text-amber-900"
+                sizeClass="text-lg sm:text-xl"
+                className="mt-1"
+              />
             </button>
           </div>
         </>

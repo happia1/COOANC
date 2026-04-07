@@ -58,8 +58,12 @@ export default function ChildHomeSceneryBand({
     ? 'min-h-0 flex-[6] basis-0'
     : 'h-[60dvh] min-h-[220px] shrink-0'
 
-  /** 오버레이(크레딧 낙하 등)가 세로로 잘리지 않게 — 없을 때만 배경과 맞춰 `overflow-hidden` 유지 */
-  const overflowClass = overlay ? 'overflow-x-hidden overflow-y-visible' : 'overflow-hidden'
+  /**
+   * 오버레이 유무에 따라 overflow 값을 바꾸면 컨테이너 크기 계산이 흔들려,
+   * 내부 무대(크레딧/지갑/저금통)가 순간적으로 축소·확대되는 현상이 생길 수 있습니다.
+   * 항상 같은 overflow 값을 유지해 레이아웃 스케일을 안정화합니다.
+   */
+  const overflowClass = 'overflow-x-hidden overflow-y-visible'
 
   return (
     <section

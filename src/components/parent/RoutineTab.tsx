@@ -7,6 +7,8 @@
  *   펼친 목록은 스페셜 미션과 같이 가로 슬라이드(칩형 카드)로 표시합니다.
  * - 일상 미션 카드는 이모지·제목·시각만 표시합니다. 활성/비활성은 상단 연필(키워드 시트)에서 한 번에 설정합니다.
  * - 알람은 온보딩·상단 「루틴 알람」에서만 설정해 충돌을 막습니다.
+ * - 스페셜 「오늘 하루만」미션은 「일정 추가」→ 보너스 배율 시트에서 저장한 뒤 오늘 일정에 넣습니다.
+ * - 매일 스페셜은 「보상 배율」로만 배율을 바꿉니다(카드에 「보상 N배」 문구는 넣지 않음).
  */
 
 import { useState, useEffect, useLayoutEffect, useMemo, useCallback } from 'react'
@@ -22,7 +24,6 @@ import SpecialMissionBonusSheet from '@/components/parent/SpecialMissionBonusShe
 import type { Mission } from '@/types/database'
 import { uuidStringsEqual } from '@/lib/normalizeUuid'
 import { ROUTINE_HAS_SCHOOL_KEY } from '@/lib/routineAlarmLocalPrefs'
-import { normalizeRewardMultiplier } from '@/lib/missionRewardMultiplier'
 import {
   displaySpecialMissionTitle,
   isRoutineSectionMission,
@@ -210,8 +211,8 @@ function SpecialDailyEventBlock({
   onToggleDaily,
   onToggleEvent,
   assigningId,
-  onEventAssignClick,
-  onOpenBonus,
+  onStartEventAssignWithBonus,
+  onOpenDailyBonusSettings,
 }: {
   dailyMissions: Mission[]
   eventMissions: Mission[]
@@ -220,9 +221,10 @@ function SpecialDailyEventBlock({
   onToggleDaily: () => void
   onToggleEvent: () => void
   assigningId: string | null
-  /** 오늘 하루만(event) 카드 「일정 추가」— 보너스 안내 팝업으로 이어짐 */
-  onEventAssignClick: (m: Mission) => void
-  onOpenBonus: (m: Mission) => void
+  /** 오늘 하루만(event) 「일정 추가」— 보너스 시트를 연 뒤 저장 시 오늘 배정 */
+  onStartEventAssignWithBonus: (m: Mission) => void
+  /** 매일(daily) 스페셜 — 보너스 배율만 설정(오늘 배정 API는 호출하지 않음) */
+  onOpenDailyBonusSettings: (m: Mission) => void
 }) {
   const renderHorizontalCards = (list: Mission[], isEventList: boolean) => (
     <div className="-mx-1 overflow-x-auto pb-0.5 [scrollbar-width:thin]">
@@ -232,8 +234,8 @@ function SpecialDailyEventBlock({
             <SpecialMissionRow
               mission={m}
               assigning={isEventList && assigningId === m.id}
-              onAssignTodayClick={isEventList ? () => onEventAssignClick(m) : undefined}
-              onOpenBonus={() => onOpenBonus(m)}
+              onStartEventAssignWithBonus={isEventList ? () => onStartEventAssignWithBonus(m) : undefined}
+              onOpenDailyBonusSettings={!isEventList ? () => onOpenDailyBonusSettings(m) : undefined}
             />
           </li>
         ))}
@@ -318,7 +320,7 @@ type RoutineChildProfile = {
   childcareLabel: string | null
 }
 
-/** 서버에서 넘긴 오늘(서울) daily_missions — 완료된 미션은 보너스·일정 추가 팝업 대신 안내 */
+/** 서버에서 넘긴 오늘(서울) daily_missions — 완료된 미션은 일정 추가·보상 배율 대신 안내 */
 type TodayDailyMissionRow = {
   childId: string
   missionTemplateId: string
@@ -349,12 +351,10 @@ export default function RoutineTab({ missions: initial, children, todayDailyMiss
   /** 키워드 칩으로 일상 미션 추가 */
   const [keywordSheetOpen, setKeywordSheetOpen] = useState(false)
   const [specialSheetOpen, setSpecialSheetOpen] = useState(false)
-  /** 스페셜 보너스(2·3배) 시트 — 매일·오늘하루 카드 공통 */
+  /** 스페셜 보너스(2·3배) 시트 — 매일 카드의 「보상 배율」·이벤트 카드의 「일정 추가」에서 열림 */
   const [bonusMission, setBonusMission] = useState<Mission | null>(null)
-  /** 「일정 추가」 후 보너스 시트에서 저장하면 이어서 오늘 배정 API 호출 */
+  /** 보너스 시트 저장 직후 이 미션을 오늘 daily_missions 에 넣을 때만 채움(이벤트형 스페셜) */
   const [assignTodayAfterBonusMissionId, setAssignTodayAfterBonusMissionId] = useState<string | null>(null)
-  /** 오늘 하루만(event) 일정 추가 시 — 보너스 여부 중앙 팝업 */
-  const [eventAssignPromptMission, setEventAssignPromptMission] = useState<Mission | null>(null)
   /** 오늘 일정에서 이미 완료된 미션에 보너스·일정 추가 시 */
   const [alreadyCompletedModalOpen, setAlreadyCompletedModalOpen] = useState(false)
   const [assigningId, setAssigningId] = useState<string | null>(null)
@@ -685,14 +685,15 @@ export default function RoutineTab({ missions: initial, children, todayDailyMiss
             onToggleDaily={() => setOpenSpecialDaily((v) => !v)}
             onToggleEvent={() => setOpenSpecialEvent((v) => !v)}
             assigningId={assigningId}
-            onEventAssignClick={(m) => {
+            onStartEventAssignWithBonus={(m) => {
               if (isMissionCompletedToday(m.id)) {
                 setAlreadyCompletedModalOpen(true)
                 return
               }
-              setEventAssignPromptMission(m)
+              setAssignTodayAfterBonusMissionId(m.id)
+              setBonusMission(m)
             }}
-            onOpenBonus={(m) => {
+            onOpenDailyBonusSettings={(m) => {
               if (isMissionCompletedToday(m.id)) {
                 setAlreadyCompletedModalOpen(true)
                 return
@@ -730,20 +731,6 @@ export default function RoutineTab({ missions: initial, children, todayDailyMiss
         onClose={() => setAlreadyCompletedModalOpen(false)}
       />
 
-      <EventAssignBonusPromptModal
-        mission={eventAssignPromptMission}
-        onClose={() => setEventAssignPromptMission(null)}
-        onSkipAssign={(m) => {
-          void handleAssignToday(m.id)
-          setEventAssignPromptMission(null)
-        }}
-        onOpenBonusSheet={(m) => {
-          setAssignTodayAfterBonusMissionId(m.id)
-          setBonusMission(m)
-          setEventAssignPromptMission(null)
-        }}
-      />
-
       <SpecialMissionBonusSheet
         mission={bonusMission}
         onClose={() => {
@@ -777,22 +764,26 @@ function PencilIcon({ className }: { className?: string }) {
   )
 }
 
-/** 스페셜 미션 카드 — 중앙 정렬·콤팩트; 이벤트만 「일정 추가」(팝업 경유) + 공통 「보너스 주기」 */
+/**
+ * 스페셜 미션 카드 — 이모지·제목·(선택) 시각만 표시.
+ * - event: 「일정 추가」→ 보너스 시트 후 오늘 넣기
+ * - daily: 「보상 배율」만(매일 자동 반영되므로 별도 일정 추가 없음)
+ */
 function SpecialMissionRow({
   mission: m,
   assigning,
-  onAssignTodayClick,
-  onOpenBonus,
+  onStartEventAssignWithBonus,
+  onOpenDailyBonusSettings,
 }: {
   mission: Mission
   assigning: boolean
-  /** 오늘 하루만(event) 전용 — 없으면 일정 추가 버튼 없음 */
-  onAssignTodayClick?: () => void
-  onOpenBonus: () => void
+  /** 오늘 하루만(event) — 보너스 적용 흐름으로 이어짐 */
+  onStartEventAssignWithBonus?: () => void
+  /** 매일(daily) 스페셜 — 배율만 편집 */
+  onOpenDailyBonusSettings?: () => void
 }) {
   const timeLabel = formatTime(m.scheduled_time)
   const titleShort = displaySpecialMissionTitle(m.title)
-  const mult = normalizeRewardMultiplier(m.reward_multiplier)
   return (
     <div
       className={`flex flex-col items-center justify-center gap-0.5 rounded-xl bg-white px-1 py-1 text-center shadow-sm ring-1 ${
@@ -808,29 +799,29 @@ function SpecialMissionRow({
       <div className="w-full min-w-0 px-0.5">
         <p className="line-clamp-2 text-[11px] font-bold leading-tight text-gray-800">{titleShort}</p>
         {timeLabel ? <p className="mt-px text-[9px] text-gray-500 tabular-nums">{timeLabel}</p> : null}
-        {mult > 1 ? (
-          <p className="mt-px text-[8px] font-black text-amber-700">보상 {mult}배</p>
-        ) : null}
       </div>
       <div className="mt-px flex w-full flex-col gap-0.5">
-        {m.repeat_type === 'event' && onAssignTodayClick ? (
+        {m.repeat_type === 'event' && onStartEventAssignWithBonus ? (
           <button
             type="button"
             disabled={!m.is_active || assigning}
-            onClick={onAssignTodayClick}
+            onClick={onStartEventAssignWithBonus}
             className="w-full rounded-md border border-violet-200 bg-violet-50 py-0.5 text-[8px] font-bold leading-tight text-violet-800 disabled:opacity-40"
           >
             {assigning ? '넣는 중…' : '일정 추가'}
           </button>
         ) : null}
-        <button
-          type="button"
-          onClick={onOpenBonus}
-          aria-label="완료 보상 보너스 배율 설정"
-          className="w-full rounded-md border border-amber-200/90 bg-amber-50 py-0.5 text-[8px] font-bold leading-tight text-amber-900"
-        >
-          보너스 주기
-        </button>
+        {m.repeat_type !== 'event' && onOpenDailyBonusSettings ? (
+          <button
+            type="button"
+            disabled={!m.is_active}
+            onClick={onOpenDailyBonusSettings}
+            aria-label="완료 보상 보너스 배율 설정"
+            className="w-full rounded-md border border-violet-200/80 bg-violet-50/60 py-0.5 text-[8px] font-bold leading-tight text-violet-900 disabled:opacity-40"
+          >
+            보상 배율
+          </button>
+        ) : null}
       </div>
     </div>
   )
@@ -878,64 +869,3 @@ function RoutineSimpleAlertModal({
   )
 }
 
-/**
- * 오늘 하루만 미션 「일정 추가」 직후 — 보너스 시트를 열지·바로 넣을지 묻는 중앙 팝업(z가 보너스 시트보다 위).
- */
-function EventAssignBonusPromptModal({
-  mission,
-  onClose,
-  onSkipAssign,
-  onOpenBonusSheet,
-}: {
-  mission: Mission | null
-  onClose: () => void
-  /** 보너스 없이 바로 오늘 일정에 넣기 */
-  onSkipAssign: (m: Mission) => void
-  /** 보너스 설정 하단 시트로 이어짐 */
-  onOpenBonusSheet: (m: Mission) => void
-}) {
-  const [portalReady, setPortalReady] = useState(false)
-  useLayoutEffect(() => {
-    setPortalReady(true)
-  }, [])
-
-  if (!mission || !portalReady) return null
-
-  const titleShort = displaySpecialMissionTitle(mission.title)
-  const overlay = (
-    <div
-      className="fixed inset-0 z-[85] flex items-center justify-center p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="event-assign-bonus-title"
-    >
-      <button type="button" className="absolute inset-0 bg-black/45" aria-label="닫기" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-[17rem] rounded-2xl bg-white px-4 py-4 shadow-xl">
-        <p
-          id="event-assign-bonus-title"
-          className="text-center text-sm font-black leading-snug text-gray-900"
-        >
-          「{titleShort}」의 보너스 리워드를 지급하시겠어요?
-        </p>
-        <div className="mt-4 flex gap-2">
-          <button
-            type="button"
-            onClick={() => onSkipAssign(mission)}
-            className="flex-1 rounded-xl border border-gray-200 py-2.5 text-[11px] font-bold text-gray-600"
-          >
-            아니오
-          </button>
-          <button
-            type="button"
-            onClick={() => onOpenBonusSheet(mission)}
-            className="flex-1 rounded-xl bg-[#4A90E2] py-2.5 text-[11px] font-bold text-white"
-          >
-            추가
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-
-  return createPortal(overlay, document.body)
-}

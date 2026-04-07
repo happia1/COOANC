@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import ParentNavBar from '@/components/parent/ParentNavBar'
 import ParentTopBar from '@/components/parent/ParentTopBar'
 import ParentNewPurchaseRequestModal from '@/components/parent/ParentNewPurchaseRequestModal'
+import ParentStickerBoardCompleteModal from '@/components/parent/ParentStickerBoardCompleteModal'
 
 export default async function ParentTabsLayout({ children }: { children: ReactNode }) {
   const supabase = await createClient()
@@ -25,6 +26,7 @@ export default async function ParentTabsLayout({ children }: { children: ReactNo
         {children}
       </main>
       <ParentNewPurchaseRequestModal />
+      <ParentStickerBoardCompleteModal />
       <ParentNavBar />
     </div>
   )

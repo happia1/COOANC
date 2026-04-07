@@ -25,7 +25,6 @@ export async function POST(req: NextRequest) {
   if (!requestId || !['approve', 'reject', 'parent_shop'].includes(action)) {
     return NextResponse.json({ error: '필수 항목이 누락됐어요' }, { status: 400 })
   }
-
   // 부모 확인
   const { data: profile } = await supabase
     .from('profiles')
@@ -103,34 +102,32 @@ export async function POST(req: NextRequest) {
     if (request.status !== 'pending' && request.status !== 'parent_buying') {
       return NextResponse.json({ error: '승인할 수 없는 상태예요' }, { status: 409 })
     }
-    // #region agent log
-    {
-      const { data: st } = await supabase
-        .from('child_stats')
-        .select('credits, credits_wallet')
-        .eq('child_id', request.child_id)
-        .maybeSingle()
-      fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '277560' },
-        body: JSON.stringify({
-          sessionId: '277560',
-          runId: 'pre-approve',
-          hypothesisId: 'A',
-          location: 'api/market/approve/route.ts:approve:before',
-          message: 'approve attempt context',
-          data: {
-            requestId,
-            prevStatus: request.status,
-            itemPrice: request.item_price,
-            childCredits: st?.credits ?? null,
-            childWallet: st?.credits_wallet ?? null,
-          },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {})
+    // 승인 트리거 전에 child_stats 분리값 제약을 먼저 보정합니다.
+    // 일부 구간에서 wallet+piggy > credits 인 데이터가 남아 있으면 승인 시 23514가 발생합니다.
+    const { data: preStats } = await supabase
+      .from('child_stats')
+      .select('credits, credits_wallet, credits_piggy')
+      .eq('child_id', request.child_id)
+      .maybeSingle()
+    if (preStats) {
+      const credits = typeof preStats.credits === 'number' ? preStats.credits : 0
+      const wallet = typeof preStats.credits_wallet === 'number' ? preStats.credits_wallet : 0
+      const piggy = typeof preStats.credits_piggy === 'number' ? preStats.credits_piggy : 0
+      const creditsAfterApprove = Math.max(0, credits - request.item_price)
+      // 승인 후 credits가 item_price만큼 줄어드는 경로를 기준으로 제약식을 미리 맞춥니다.
+      if (wallet + piggy > creditsAfterApprove) {
+        const nextPiggy = Math.min(Math.max(0, piggy), creditsAfterApprove)
+        const nextWallet = Math.max(0, creditsAfterApprove - nextPiggy)
+        await supabase
+          .from('child_stats')
+          .update({
+            credits_wallet: nextWallet,
+            credits_piggy: nextPiggy,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('child_id', request.child_id)
+      }
     }
-    // #endregion
     const { error: approveErr } = await supabase
       .from('purchase_requests')
       .update({
@@ -142,45 +139,8 @@ export async function POST(req: NextRequest) {
       .in('status', ['pending', 'parent_buying'])
 
     if (approveErr) {
-      // #region agent log
-      fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '277560' },
-        body: JSON.stringify({
-          sessionId: '277560',
-          runId: 'pre-approve',
-          hypothesisId: 'A',
-          location: 'api/market/approve/route.ts:approve:error',
-          message: 'purchase_requests update failed',
-          data: {
-            requestId,
-            message: approveErr.message,
-            code: approveErr.code,
-            details: approveErr.details,
-            hint: approveErr.hint,
-          },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {})
-      // #endregion
       return NextResponse.json({ error: '승인 처리에 실패했어요' }, { status: 500 })
     }
-
-    // #region agent log
-    fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '277560' },
-      body: JSON.stringify({
-        sessionId: '277560',
-        runId: 'pre-approve',
-        hypothesisId: 'C',
-        location: 'api/market/approve/route.ts:approve:ok',
-        message: 'purchase_requests approved',
-        data: { requestId },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {})
-    // #endregion
 
     return NextResponse.json({ status: 'approved' })
   }

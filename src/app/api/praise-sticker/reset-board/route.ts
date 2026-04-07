@@ -32,13 +32,21 @@ export async function POST(req: NextRequest) {
 
   const service = createServiceRoleClient()
   const db = service ?? supabase
+  const { data: beforeRows, error: beforeErr } = await db
+    .from('praise_sticker_placements')
+    .select('id, grant_id')
+    .eq('child_id', childId)
+  if (beforeErr) {
+    console.error('[praise-sticker/reset-board] before lookup', beforeErr.code, beforeErr.message)
+  }
+
   const { error } = await db.from('praise_sticker_placements').delete().eq('child_id', childId)
   if (error) {
     console.error('[praise-sticker/reset-board]', error.code, error.message)
     return NextResponse.json({ error: '스티커판 초기화에 실패했어요' }, { status: 500 })
   }
 
-  console.log('[praise-sticker/reset-board] success', { childId })
-  return NextResponse.json({ ok: true })
+  console.log('[praise-sticker/reset-board] success', { childId, deletedPlacementCount: beforeRows?.length ?? 0 })
+  return NextResponse.json({ ok: true, deletedPlacementCount: beforeRows?.length ?? 0 })
 }
 
