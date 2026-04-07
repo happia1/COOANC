@@ -1,3 +1,0 @@
-{"sessionId":"59d117","location":"MarketTab.tsx:completeDeliveryFlow:start","message":"받았어요 클릭 후 API 호출 직전","data":{"requestIdLen":36,"propsChildIdLen":36},"timestamp":1775490518511,"hypothesisId":"H2"}
-{"sessionId":"59d117","location":"MarketTab.tsx:completeDeliveryFlow:afterFetch","message":"API 응답 수신","data":{"status":403,"ok":false,"textLen":28,"textLooksJson":true},"timestamp":1775490518958,"hypothesisId":"H4"}
-{"sessionId":"59d117","location":"complete-delivery/route.ts:403","message":"역할이 child 아님 → 403","data":{"role":"parent"},"timestamp":1775490518953,"hypothesisId":"H1"}
