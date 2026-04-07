@@ -46,10 +46,6 @@ export async function POST(req: NextRequest) {
         ? body.scaleRatio
         : Number(body.scaleRatio)
 
-  // #region agent log
-  fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'7bf912'},body:JSON.stringify({sessionId:'7bf912',runId:'run1',hypothesisId:'H5',location:'api/praise-sticker/place/route.ts:49',message:'place api request parsed',data:{hasUser:Boolean(user),childId,grantId,boardSlot,xRatio,yRatio,scaleRatio},timestamp:Date.now()})}).catch(()=>{})
-  // #endregion
-
   if (!grantId) {
     return NextResponse.json({ error: '스티커 정보가 없어요' }, { status: 400 })
   }
@@ -95,9 +91,6 @@ export async function POST(req: NextRequest) {
     .single()
 
   if (error) {
-    // #region agent log
-    fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'7bf912'},body:JSON.stringify({sessionId:'7bf912',runId:'run1',hypothesisId:'H5',location:'api/praise-sticker/place/route.ts:98',message:'place api db error',data:{code:error.code,message:error.message,boardSlot,grantId},timestamp:Date.now()})}).catch(()=>{})
-    // #endregion
     console.error('[praise-sticker/place]', error.code, error.message, {
       usedServiceRole: Boolean(service),
     })
@@ -116,10 +109,6 @@ export async function POST(req: NextRequest) {
     }
     return NextResponse.json({ error: '판에 붙이지 못했어요' }, { status: 500 })
   }
-
-  // #region agent log
-  fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'7bf912'},body:JSON.stringify({sessionId:'7bf912',runId:'run1',hypothesisId:'H5',location:'api/praise-sticker/place/route.ts:118',message:'place api success',data:{placementId:data?.id ?? null,placementSlot:data?.board_slot ?? null,grantId:data?.grant_id ?? null},timestamp:Date.now()})}).catch(()=>{})
-  // #endregion
 
   return NextResponse.json({ placement: data }, { status: 201 })
 }

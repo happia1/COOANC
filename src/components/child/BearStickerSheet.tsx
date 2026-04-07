@@ -235,23 +235,6 @@ export default function BearStickerSheet({
   }, [open])
 
   useEffect(() => {
-    if (!open) return
-    const occupied = Array.from(occupiedSlots).sort((a, b) => a - b)
-    const missing = Array.from({ length: SLOT_TOTAL }, (_, i) => i + 1).filter((slot) => !occupiedSlots.has(slot))
-    // #region agent log
-    fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'7bf912'},body:JSON.stringify({sessionId:'7bf912',runId:'run1',hypothesisId:'H2',location:'BearStickerSheet.tsx:232',message:'board state on open/update',data:{occupied,missing,occupiedCount:occupied.length,placementsCount:placements.length,unplacedCount:unplacedGrants.length},timestamp:Date.now()})}).catch(()=>{})
-    // #endregion
-  }, [open, occupiedSlots, placements.length, unplacedGrants.length])
-
-  useEffect(() => {
-    if (!open) return
-    const c12 = slotCenterPercent(12)
-    // #region agent log
-    fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'7bf912'},body:JSON.stringify({sessionId:'7bf912',runId:'run1',hypothesisId:'H1',location:'BearStickerSheet.tsx:241',message:'slot 12 center and hit size',data:{slot12:c12,slotHitSize,gridCols:BEAR_GRID_COLS,gridRows:BEAR_GRID_ROWS},timestamp:Date.now()})}).catch(()=>{})
-    // #endregion
-  }, [open, slotHitSize])
-
-  useEffect(() => {
     if (!boardCompleteConfetti) return
     const t = window.setTimeout(() => setBoardCompleteConfetti(false), 5200)
     return () => window.clearTimeout(t)
@@ -377,12 +360,6 @@ export default function BearStickerSheet({
       if (occupiedSlots.has(slot) || placing) return
       const c = slotCenterPercent(slot)
       if (!c) return
-      // #region agent log
-      fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'7bf912'},body:JSON.stringify({sessionId:'7bf912',runId:'run1',hypothesisId:'H3',location:'BearStickerSheet.tsx:377',message:'placeOnSlot start',data:{grantId,slot,occupiedCount:occupiedSlots.size,placing},timestamp:Date.now()})}).catch(()=>{})
-      // #endregion
-      // #region agent log
-      console.log('[agent:H3] placeOnSlot start', { grantId, slot, occupiedCount: occupiedSlots.size, placing })
-      // #endregion
       setPlacing(true)
       let data: PraiseStickerPlacement | null = null
       try {
@@ -411,9 +388,6 @@ export default function BearStickerSheet({
       setPlacing(false)
       if (data) {
         const wasOneAwayFromFull = occupiedSlots.size === SLOT_TOTAL - 1
-        // #region agent log
-        fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'7bf912'},body:JSON.stringify({sessionId:'7bf912',runId:'run1',hypothesisId:'H4',location:'BearStickerSheet.tsx:401',message:'place success and completion check',data:{slot:data.board_slot,grantId:data.grant_id,occupiedCountBeforeAppend:occupiedSlots.size,wasOneAwayFromFull,total:SLOT_TOTAL},timestamp:Date.now()})}).catch(()=>{})
-        // #endregion
         setPlacements((prev) => [...prev, data as PraiseStickerPlacement])
         setFloatPos((prev) => {
           const n = { ...prev }
@@ -515,17 +489,6 @@ export default function BearStickerSheet({
         e.clientY,
         DROP_RADIUS_SCALE,
       )
-      // #region agent log
-      fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'7bf912'},body:JSON.stringify({sessionId:'7bf912',runId:'run1',hypothesisId:'H1',location:'BearStickerSheet.tsx:489',message:'drop decision',data:{grantId:d.grantId,pointer:{x:e.clientX,y:e.clientY},calculatedCenterPct:{x:cxPct,y:cyPct},pickedSlot:slot,magneticPreviewSlot},timestamp:Date.now()})}).catch(()=>{})
-      // #endregion
-      // #region agent log
-      console.log('[agent:H1] drop decision', {
-        grantId: d.grantId,
-        pickedSlot: slot,
-        magneticPreviewSlot,
-        centerPct: { x: cxPct, y: cyPct },
-      })
-      // #endregion
       if (slot != null) void placeOnSlot(d.grantId, slot)
       else
         setFloatPos((prev) => ({
@@ -543,13 +506,6 @@ export default function BearStickerSheet({
       window.removeEventListener('pointercancel', onUp)
     }
   }, [open, nearestFreeSlotAtPixels, placeOnSlot])
-
-  useEffect(() => {
-    if (!boardCompleteModalOpen) return
-    // #region agent log
-    fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'7bf912'},body:JSON.stringify({sessionId:'7bf912',runId:'run1',hypothesisId:'H4',location:'BearStickerSheet.tsx:537',message:'board complete modal opened',data:{occupiedCount:occupiedSlots.size,placementsCount:placements.length},timestamp:Date.now()})}).catch(()=>{})
-    // #endregion
-  }, [boardCompleteModalOpen, occupiedSlots.size, placements.length])
 
   const onStickerPointerDown = useCallback(
     (e: React.PointerEvent, grantId: string) => {

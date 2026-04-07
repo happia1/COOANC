@@ -71,9 +71,6 @@ export default function HomeTab({
   const refreshStickerPlacementsOnly = useCallback(async () => {
     const supabase = createClient()
     const { data } = await supabase.from('praise_sticker_placements').select('*').eq('child_id', childId)
-    // #region agent log
-    fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'7bf912'},body:JSON.stringify({sessionId:'7bf912',runId:'run1',hypothesisId:'H6',location:'HomeTab.tsx:74',message:'refresh placements fetched',data:{count:data?.length ?? 0,slots:(data ?? []).map((p)=>p.board_slot).filter((v)=>typeof v==='number').sort((a,b)=>a-b)},timestamp:Date.now()})}).catch(()=>{})
-    // #endregion
     if (data) setPlacements(data as PraiseStickerPlacement[])
   }, [childId])
 

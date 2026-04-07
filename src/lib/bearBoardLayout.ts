@@ -12,7 +12,15 @@ export const BEAR_BOARD_ASPECT = BEAR_BOARD_FRAME_W / BEAR_BOARD_FRAME_H
 export const BEAR_PAPER_ZONE = { left: 16, top: 30, width: 68, height: 18 } as const
 
 /** 보라 상자 위 숫자 원판 그리드 영역(512×730 프레임 기준 %) */
-export const BEAR_GRID_ZONE = { left: 16, top: 54, width: 68, height: 34 } as const
+export const BEAR_GRID_ZONE = {
+  left: 18.2,
+  /** 요청 반영: 현재 기준에서 2단계 아래로 이동 */
+  top: 52.7,
+  /** 요청 반영: 가로 간격을 약간만 줄이기 위해 폭을 소폭 축소 */
+  width: 63.6,
+  /** 요청 반영: 위아래 슬롯 간격을 넓히기 위해 세로 높이를 확대 */
+  height: 38,
+} as const
 
 /** 일러스트(sticker_board)는 한 줄에 1~5번이 가로로 5칸, 아래로 4줄(총 20칸) */
 export const BEAR_GRID_COLS = 5
@@ -24,10 +32,9 @@ export const BEAR_GRID_ROWS = 4
  */
 export const BEAR_GRID_NUDGE_X_PCT = -6.5
 /**
- * 세로: 일러스트의 숫자 원 한 줄 높이만큼 위로 당겨 격자 중심과 그림이 맞도록 함(피드백: 한 줄 아래로 밀려 있음).
- * 값 = -(그리드 구역 높이 ÷ 행 수) → 정확히 한 행 분량 이동
+ * 요청 반영: 현재 기준에서 세로 부착 중심을 2단계 아래로 이동
  */
-export const BEAR_GRID_NUDGE_Y_PCT = -(BEAR_GRID_ZONE.height / BEAR_GRID_ROWS)
+export const BEAR_GRID_NUDGE_Y_PCT = -7
 
 /** 슬롯 1~20 → 그리드 셀 중심 좌표(% of board) */
 export function slotCenterPercent(slot: number): { x: number; y: number } | null {
