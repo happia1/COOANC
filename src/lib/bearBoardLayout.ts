@@ -14,16 +14,20 @@ export const BEAR_PAPER_ZONE = { left: 16, top: 30, width: 68, height: 18 } as c
 /** 보라 상자 위 숫자 원판 그리드 영역(512×730 프레임 기준 %) */
 export const BEAR_GRID_ZONE = { left: 16, top: 54, width: 68, height: 34 } as const
 
+/** 일러스트(sticker_board)는 한 줄에 1~5번이 가로로 5칸, 아래로 4줄(총 20칸) */
+export const BEAR_GRID_COLS = 5
+export const BEAR_GRID_ROWS = 4
+
 /**
  * 아틀라스 % 격자와 실제 원 중심이 어긋날 때 보정(전체 보드 너비·높이 100% 기준).
  * (현장 피드백: 1번 칸이 6·7번 쪽으로 치우침 → 가로로 왼쪽으로 당김)
  */
 export const BEAR_GRID_NUDGE_X_PCT = -6.5
-export const BEAR_GRID_NUDGE_Y_PCT = 0
-
-/** 일러스트(sticker_board)는 한 줄에 1~5번이 가로로 5칸, 아래로 4줄(총 20칸) */
-export const BEAR_GRID_COLS = 5
-export const BEAR_GRID_ROWS = 4
+/**
+ * 세로: 일러스트의 숫자 원 한 줄 높이만큼 위로 당겨 격자 중심과 그림이 맞도록 함(피드백: 한 줄 아래로 밀려 있음).
+ * 값 = -(그리드 구역 높이 ÷ 행 수) → 정확히 한 행 분량 이동
+ */
+export const BEAR_GRID_NUDGE_Y_PCT = -(BEAR_GRID_ZONE.height / BEAR_GRID_ROWS)
 
 /** 슬롯 1~20 → 그리드 셀 중심 좌표(% of board) */
 export function slotCenterPercent(slot: number): { x: number; y: number } | null {

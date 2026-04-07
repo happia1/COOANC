@@ -37,7 +37,7 @@ export default async function ApprovalPage() {
   }
   const profiles = profileBundle.rows ?? []
 
-  const [statsRes, requestsRes, logsRes, storeRes, hiddenRes] = await Promise.all([
+  const [statsRes, requestsRes, historyRes, logsRes, storeRes, hiddenRes] = await Promise.all([
     childIds.length > 0
       ? supabase
           .from('child_stats')
@@ -50,8 +50,19 @@ export default async function ApprovalPage() {
           .from('purchase_requests')
           .select('*')
           .in('child_id', childIds)
-          .eq('status', 'pending')
+          .in('status', ['pending', 'parent_buying'])
           .order('requested_at', { ascending: true })
+      : Promise.resolve({ data: [], error: null }),
+
+    /** 승인 내역용: 승인·반려·도착 완료 건(최근 100건) — 구매 요청 블록 하단 */
+    childIds.length > 0
+      ? supabase
+          .from('purchase_requests')
+          .select('*')
+          .in('child_id', childIds)
+          .in('status', ['approved', 'rejected', 'delivered'])
+          .order('requested_at', { ascending: false })
+          .limit(100)
       : Promise.resolve({ data: [], error: null }),
 
     childIds.length > 0
@@ -123,10 +134,15 @@ export default async function ApprovalPage() {
 
   const storeItems = (storeRes.data ?? []) as StoreItem[]
 
+  if (historyRes.error) {
+    console.warn('[parent approval] purchase_requests history:', historyRes.error.message)
+  }
+
   return (
     <ApprovalTab
       childrenProfiles={childrenProfiles}
       pendingRequests={requestsRes.data ?? []}
+      requestHistory={historyRes.data ?? []}
       recentLogs={logsRes.data ?? []}
       storeItems={storeItems}
       linkByChild={linkByChild}

@@ -15,7 +15,11 @@ import {
   resolveProfileAgeGroup,
 } from '@/lib/childProfileDisplay'
 import { selectChildProfilesByIds } from '@/lib/supabase/childProfileSelect'
-import { addSeoulCalendarDays, getSeoulDateString } from '@/lib/koreaDate'
+import {
+  addSeoulCalendarDays,
+  getSeoulDateString,
+  getSeoulMondayOfWeekContaining,
+} from '@/lib/koreaDate'
 import { buildWeeklyRoutineDays, type DailyMissionCompletionRow } from '@/lib/childWeeklyRoutine'
 import HomeTab, { type ChildSummary } from '@/components/parent/HomeTab'
 
@@ -49,7 +53,8 @@ export default async function ParentHomePage() {
   }
 
   const today = getSeoulDateString()
-  const weekStart = addSeoulCalendarDays(today, -6)
+  const weekStart = getSeoulMondayOfWeekContaining(today)
+  const weekEnd = addSeoulCalendarDays(weekStart, 6)
 
   const { rows: profileRows, error: profilesFetchErr } = await selectChildProfilesByIds(supabase, childIds)
   if (profilesFetchErr) {
@@ -70,13 +75,13 @@ export default async function ParentHomePage() {
       .in('child_id', childIds)
       .eq('date', today),
 
-    // 경제 EQ 카드 — 요일별 막대용 최근 7일(서울) 배정 미션
+    // 경제 EQ 카드 — 이번 주 월~일(서울) 배정 미션
     supabase
       .from('daily_missions')
       .select('child_id, date, is_completed')
       .in('child_id', childIds)
       .gte('date', weekStart)
-      .lte('date', today),
+      .lte('date', weekEnd),
 
     supabase
       .from('mission_logs')
@@ -90,7 +95,7 @@ export default async function ParentHomePage() {
       .from('purchase_requests')
       .select('id', { count: 'exact', head: true })
       .in('child_id', childIds)
-      .eq('status', 'pending'),
+      .in('status', ['pending', 'parent_buying']),
   ])
   const statsMap = Object.fromEntries(
     ((statsRes.data ?? []) as { child_id: string; [key: string]: unknown }[]).map((s) => [s.child_id, s])
@@ -106,7 +111,7 @@ export default async function ParentHomePage() {
     if (row.is_completed) acc.completed += 1
   }
 
-  // 자녀별 최근 7일 daily_missions → 요일 막대 데이터
+  // 자녀별 이번 주 daily_missions → 월~일 막대 데이터
   const weekRowsByChild: Record<string, DailyMissionCompletionRow[]> = {}
   for (const cid of childIds) weekRowsByChild[cid] = []
   for (const row of (weekDailyRes.data ?? []) as {

@@ -37,7 +37,8 @@ export async function POST(req: NextRequest) {
   }
 
   const ct = req.headers.get('content-type') ?? ''
-  const ALLOWED_CATEGORY = new Set(['food', 'toy', 'activity', 'digital', 'experience'])
+  /** digital(캐릭터 꾸미기) 는 마켓 추가 대상에서 제외 — 홈 탭에서 구매 */
+  const ALLOWED_CATEGORY = new Set(['food', 'toy', 'activity', 'experience'])
 
   let childId: string
   let name: string
@@ -88,8 +89,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: '연결된 자녀에게만 상품을 추가할 수 있어요' }, { status: 403 })
   }
 
-  /** 캐릭터 꾸미기(digital) 는 디지털 보상, 나머지는 실물·체험 위주로 real */
-  const itemType: 'digital' | 'real' = category === 'digital' ? 'digital' : 'real'
+  /** 마켓에 올리는 상품은 모두 실물·체험류로 통일(real) */
+  const itemType: 'digital' | 'real' = 'real'
 
   let imageUrl: string | null = null
   if (imageFile) {

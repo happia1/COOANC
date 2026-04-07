@@ -1,11 +1,11 @@
 'use client'
 
 import Image from 'next/image'
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 
 /**
  * 홈·미션 등 풍경 배경 상단에 붙는 UI 묶음입니다.
- * - 연속 일수·크레딧 같은 알약(StatPill)
+ * - 스트릭(🔥)·크레딧(아이콘+숫자) 같은 알약(StatPill)
  * - 성장 지도를 여는 지도 단추(MapActionPill)
  * - 스티커 보관함을 여는 스티커 단추(StickerActionPill)
  * 지도·스티커 단추는 흰 배경 없이 아이콘만 보이게 했습니다(연속·크레딧 알약과 구분).
@@ -106,26 +106,40 @@ export function StickerActionPill({
   )
 }
 
+/**
+ * 상단 통계 알약 — `label` 생략 시 회색 작은 글씨 없이 `leadingVisual`·`value` 만 표시합니다.
+ * (스트릭은 🔥, 크레딧은 `icons.png` 의 `credits` 스프라이트 등)
+ */
 export function StatPill({
   label,
   value,
+  leadingVisual,
   highlight = false,
   className = '',
+  ariaLabel,
 }: {
-  label: string
+  /** 예: "연속" — 비우면 라벨 줄 자체를 숨깁니다 */
+  label?: string
   value: string
+  /** 알약 맨 앞에 붙는 이모지·스프라이트 등 */
+  leadingVisual?: ReactNode
   highlight?: boolean
   className?: string
+  /** 스크린 리더용 전체 설명(라벨을 뺐을 때 권장) */
+  ariaLabel?: string
 }) {
   return (
     <div
+      role={ariaLabel ? 'group' : undefined}
+      aria-label={ariaLabel}
       className={[
         'flex items-center gap-1.5 rounded-full px-3.5 py-1.5 shadow-sm',
         highlight ? 'bg-brand-yellow/30 ring-1 ring-brand-yellow' : 'bg-white/80',
         className,
       ].join(' ')}
     >
-      <span className="text-[10px] font-bold text-gray-500">{label}</span>
+      {label ? <span className="text-[10px] font-bold text-gray-500">{label}</span> : null}
+      {leadingVisual}
       <span className="text-sm font-bold tabular-nums text-brand-text">{value}</span>
     </div>
   )

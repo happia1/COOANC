@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { resolveApiActorChildId } from '@/lib/resolveApiActorChildId'
+import { isCategoryExcludedFromMarket } from '@/lib/parentMarketMenuSections'
 
 /**
  * POST /api/market/request
@@ -50,10 +51,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: '상품을 찾을 수 없어요' }, { status: 404 })
   }
 
-  // 스탯 조회
+  if (isCategoryExcludedFromMarket(item.category)) {
+    return NextResponse.json({ error: '이 상품은 마켓에서 요청할 수 없어요' }, { status: 400 })
+  }
+
+  // 스탯 조회 — 마켓 결제는 지갑(credits_wallet)에서만 차감합니다
   const { data: stats } = await supabase
     .from('child_stats')
-    .select('credits, current_level')
+    .select('credits, credits_wallet, credits_piggy, current_level')
     .eq('child_id', childId)
     .maybeSingle()
 
@@ -61,8 +66,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: '스탯 정보를 찾을 수 없어요' }, { status: 404 })
   }
 
-  if (stats.credits < item.credit_price) {
-    return NextResponse.json({ error: '크레딧이 부족해요' }, { status: 400 })
+  const wallet = typeof stats.credits_wallet === 'number' ? stats.credits_wallet : 0
+
+  if (wallet < item.credit_price) {
+    return NextResponse.json(
+      { error: '지갑 크레딧이 부족해요. 미션 탭에서 섬의 크레딧을 지갑으로 옮겨 주세요.' },
+      { status: 400 },
+    )
   }
 
   if (stats.current_level < item.level_required) {
@@ -82,11 +92,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: '이미 요청 중인 상품이에요' }, { status: 409 })
   }
 
-  // 크레딧 차감
+  const piggy = typeof stats.credits_piggy === 'number' ? stats.credits_piggy : 0
+  const nextWallet = wallet - item.credit_price
+  const nextCredits = stats.credits - item.credit_price
+
+  // 총액·지갑에서 동시 차감(섬·저금통에 둔 분량은 그대로)
   const { error: deductErr } = await supabase
     .from('child_stats')
     .update({
-      credits: stats.credits - item.credit_price,
+      credits: nextCredits,
+      credits_wallet: nextWallet,
+      credits_piggy: piggy,
       updated_at: new Date().toISOString(),
     })
     .eq('child_id', childId)
@@ -115,10 +131,19 @@ export async function POST(req: NextRequest) {
     // 삽입 실패 시 크레딧 환불
     await supabase
       .from('child_stats')
-      .update({ credits: stats.credits })
+      .update({
+        credits: stats.credits,
+        credits_wallet: wallet,
+        credits_piggy: piggy,
+      })
       .eq('child_id', childId)
     return NextResponse.json({ error: '요청 생성에 실패했어요. 다시 시도해 주세요.' }, { status: 500 })
   }
 
-  return NextResponse.json({ request }, { status: 201 })
+  return NextResponse.json({
+    request,
+    credits: nextCredits,
+    credits_wallet: nextWallet,
+    credits_piggy: piggy,
+  }, { status: 201 })
 }

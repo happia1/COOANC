@@ -32,13 +32,18 @@ type Props = {
    * false: 고정 `60dvh`(옛 비율; 스크롤이 생길 수 있음).
    */
   flexFill?: boolean
+  /**
+   * true(기본): 하늘·잔디가 그려진 큰 풍경 그림(`kids_background.png`)을 깔아요.
+   * false: 그 그림은 빼고, 앱 페이지의 기본 배경색만 보이게 해요(홈·미션에서 사용).
+   */
+  showBackground?: boolean
 }
 
 /**
  * 자녀 앱 상단 풍경 밴드 — 홈·미션 동일
  *
  * - 높이: `flexFill` 이면 `flex-[6] min-h-0`(아래 패널은 `flex-[4]`), 아니면 `h-[60dvh]` + `min-h-[220px]`
- * - 배경: `object-cover object-center`, 기본 `CHILD_HOME_SCENERY_BG_LIFT_CLASS`
+ * - 배경: `showBackground` 가 true 일 때만 `object-cover` 풍경 PNG + 기본 `CHILD_HOME_SCENERY_BG_LIFT_CLASS`
  */
 export default function ChildHomeSceneryBand({
   children,
@@ -47,6 +52,7 @@ export default function ChildHomeSceneryBand({
   className = '',
   backgroundImageClassName = CHILD_HOME_SCENERY_BG_LIFT_CLASS,
   flexFill = false,
+  showBackground = true,
 }: Props) {
   const heightClass = flexFill
     ? 'min-h-0 flex-[6] basis-0'
@@ -60,19 +66,21 @@ export default function ChildHomeSceneryBand({
       className={`relative isolate -mx-4 -mt-4 flex flex-col ${overflowClass} ${heightClass} ${className}`.trim()}
       aria-label={ariaLabel}
     >
-      <div
-        className={`pointer-events-none absolute inset-0 overflow-hidden ${backgroundImageClassName}`.trim()}
-        aria-hidden
-      >
-        <Image
-          src="/assets/img/layouts/backgrounds/kids_background.png"
-          alt=""
-          fill
-          className="object-cover object-center"
-          sizes="(max-width: 448px) 100vw, 448px"
-          priority
-        />
-      </div>
+      {showBackground ? (
+        <div
+          className={`pointer-events-none absolute inset-0 overflow-hidden ${backgroundImageClassName}`.trim()}
+          aria-hidden
+        >
+          <Image
+            src="/assets/img/layouts/backgrounds/kids_background.png"
+            alt=""
+            fill
+            className="object-cover object-center"
+            sizes="(max-width: 448px) 100vw, 448px"
+            priority
+          />
+        </div>
+      ) : null}
 
       {overlay}
 

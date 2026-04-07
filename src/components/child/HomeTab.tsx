@@ -8,8 +8,10 @@ import BearStickerSheet from '@/components/child/BearStickerSheet'
 import PraiseGiftArrivalModal from '@/components/child/PraiseGiftArrivalModal'
 import ChildHomeIslandStage from '@/components/child/ChildHomeIslandStage'
 import ChildHomeSceneryBand from '@/components/child/ChildHomeSceneryBand'
-import { MapActionPill, StatPill, StickerActionPill } from '@/components/child/ChildSceneryTopPills'
+import { MapActionPill, StickerActionPill } from '@/components/child/ChildSceneryTopPills'
+import TodayWeatherBadge from '@/components/child/TodayWeatherBadge'
 import { mergePraiseStickerGrantsFromServer } from '@/lib/mergePraiseStickerGrantsFromServer'
+import { mergeChildStatsPatch, normalizeChildStatsCreditsSplit } from '@/lib/childCreditsSplit'
 
 type Props = {
   childId: string
@@ -25,7 +27,8 @@ type Props = {
  * 아이 앱 홈 탭
  * - **한 화면**: 상단 풍경·하단 꾸미기가 **6:4** 비율(`flex-[6]`/`flex-[4]`)로 나뉨
  * - 섬 무대는 `ChildHomeIslandStage` 의 `density="flex"` 로 남는 세로 공간에 맞춤
- * - 풍경: 배경 PNG 만 리프트, 알약·섬은 기존과 동일한 겹침(`-mt`)
+ * - 상단: 풍경 PNG 는 끄고(`showBackground={false}`) 페이지 기본 배경만 사용. 연속일·크레딧 알약(StatPill)은 표시하지 않음.
+ * - 칭찬 스티커(곰)는 **화면 오른쪽 아래 플로팅**, 성장 지도는 무대 **왼쪽** 지도 단추로만 엽니다.
  * - 부모가 칭찬 스티커를 내면 팝업 후 곰돌이 판에서 붙일 수 있음
  */
 export default function HomeTab({
@@ -36,7 +39,9 @@ export default function HomeTab({
   initialPraiseGrants,
   initialPraisePlacements,
 }: Props) {
-  const [stats, setStats] = useState<ChildStats | null>(initialStats)
+  const [stats, setStats] = useState<ChildStats | null>(() =>
+    initialStats ? normalizeChildStatsCreditsSplit(initialStats) : null,
+  )
   const [mapOpen, setMapOpen] = useState(false)
   const [bearOpen, setBearOpen] = useState(false)
   const [grants, setGrants] = useState(initialPraiseGrants)
@@ -49,6 +54,10 @@ export default function HomeTab({
   useEffect(() => {
     setClientReady(true)
   }, [])
+
+  useEffect(() => {
+    setStats(initialStats ? normalizeChildStatsCreditsSplit(initialStats) : null)
+  }, [initialStats])
 
   useEffect(() => {
     setGrants((prev) => mergePraiseStickerGrantsFromServer(initialPraiseGrants, prev))
@@ -105,7 +114,11 @@ export default function HomeTab({
           filter: `child_id=eq.${childId}`,
         },
         (payload) => {
-          setStats(payload.new as ChildStats)
+          setStats((prev) =>
+            normalizeChildStatsCreditsSplit(
+              mergeChildStatsPatch(prev, payload.new as Record<string, unknown>),
+            ),
+          )
         },
       )
       .subscribe()
@@ -172,6 +185,25 @@ export default function HomeTab({
   )
 
   /**
+   * 곰 스티커 보관함 단추를 **화면 오른쪽 아래**에 고정합니다(예전 미션 탭과 같은 위치·스타일).
+   * - `fixed`: 아래로 스크롤해도 항상 같은 자리에서 열 수 있어요.
+   * - 하단 탭바(60px) + 안전 영역만큼 위로 띄워 탭과 겹치지 않게 해요.
+   * - 바깥은 `pointer-events-none`, 누르는 원만 `pointer-events-auto` 로 빈 화면 탭은 그대로 통과합니다.
+   * - `clientReady` 가 된 뒤에만 커스텀 곰 이미지를 써서 첫 페인트와 서버 HTML 이 어긋나지 않게 합니다.
+   */
+  const stickerFabFloating = (
+    <div className="pointer-events-none fixed bottom-[calc(60px+env(safe-area-inset-bottom,0px)+0.5rem)] right-3 z-40 sm:right-4">
+      <div className="pointer-events-auto rounded-full bg-white/92 p-1 shadow-[0_10px_34px_rgba(15,23,42,0.2)] ring-[1.5px] ring-white/90 backdrop-blur-sm transition-transform active:scale-[0.96] sm:p-1.5">
+        <StickerActionPill
+          useCustomImage={clientReady && stickerFabImgOk}
+          onImageError={() => setStickerFabImgOk(false)}
+          onClick={openBearFromFab}
+        />
+      </div>
+    </div>
+  )
+
+  /**
    * 하단 꾸미기 영역: 위 풍경과 **6:4**(`flex-[6]` / `flex-[4]`).
    */
   const homeBottomPanelClass =
@@ -181,30 +213,35 @@ export default function HomeTab({
     return (
       <>
         <div className="flex min-h-0 flex-1 flex-col">
-          <ChildHomeSceneryBand flexFill ariaLabel="홈 배경">
+          {/** `showBackground={false}`: 큰 풍경 그림 없이 깔끔한 상단 영역만 */}
+          <ChildHomeSceneryBand flexFill showBackground={false} ariaLabel="홈 상단">
             <div className="shrink-0 space-y-2 py-1 text-center">
               <p className="text-sm text-gray-500">부모님이 미션을 만들어주실 거야.</p>
             </div>
             {/** `flex-1 min-h-0`: 풍경 밴드 안에서 섬이 남는 높이를 쓰고, 작은 화면에서도 잘리지 않게 줄어듦 */}
             <div className="flex min-h-0 flex-1 flex-col justify-end">
               {/**
-               * 지도는 무대 **왼쪽**, 곰(스티커)은 **오른쪽** 세로 가운데.
-               * `pointer-events-none` 으로 빈 곳 탭은 통과하고 단추만 눌리게 함.
+               * 성장 지도 단추만 무대 **왼쪽** 세로 가운데 — 곰 스티커는 화면 오른쪽 아래 플로팅으로 옮겼습니다.
+               * `pointer-events-none` 으로 빈 곳 탭은 통과하고 지도 단추만 눌리게 합니다.
                */}
               <div className="relative mx-auto flex min-h-0 w-full max-w-sm flex-1 flex-col items-center justify-end -mt-6 sm:-mt-8">
-                <div className="pointer-events-none absolute inset-y-0 left-0 z-20 flex items-center pl-0.5 sm:pl-1">
+                {/**
+                 * 성장 지도(지도 아이콘) 단추 위치
+                 * - 요청사항: "왼쪽 상단" 배치
+                 * - `pointer-events-none` 으로 빈 영역 탭은 통과시키고, 버튼만 `pointer-events-auto` 로 눌리게 합니다.
+                 */}
+                <div className="pointer-events-none absolute left-0 top-0 z-20 flex items-start pl-0.5 pt-3 sm:pl-1 sm:pt-4">
                   <div className="pointer-events-auto shrink-0">
                     <MapActionPill onClick={() => setMapOpen(true)} />
                   </div>
                 </div>
-                <div className="pointer-events-none absolute inset-y-0 right-0 z-20 flex items-center pr-0.5 sm:pr-1">
-                  <div className="pointer-events-auto shrink-0">
-                    <StickerActionPill
-                      useCustomImage={clientReady && stickerFabImgOk}
-                      onImageError={() => setStickerFabImgOk(false)}
-                      onClick={openBearFromFab}
-                    />
-                  </div>
+                {/**
+                 * 오늘 날씨 배지 위치
+                 * - 요청사항: "캐릭터(토끼) 영역의 오른쪽 상단"
+                 * - 지도 버튼과 균형을 맞춰 무대 컨테이너 우상단에 고정합니다.
+                 */}
+                <div className="absolute right-0 top-0 z-20 pr-0.5 pt-3 sm:pr-1 sm:pt-4">
+                  <TodayWeatherBadge />
                 </div>
                 <ChildHomeIslandStage density="flex" />
               </div>
@@ -214,6 +251,7 @@ export default function HomeTab({
             <CharacterDecorInventoryPlaceholder />
           </section>
         </div>
+        {stickerFabFloating}
         {sheets}
         {arrivalModal}
       </>
@@ -222,35 +260,26 @@ export default function HomeTab({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <ChildHomeSceneryBand flexFill ariaLabel="홈 배경">
-        {/** 상단 여백 거의 없음 — 부모 `pt-4` 만으로 알약과 가장자리 간격 유지 */}
-        {/** `z-20`: 섬이 `-mt` 로 올라와도 연속·크레딧 알약이 먼저 눌리게 함 (지도·곰은 무대 좌·우) */}
-        <div className="relative z-20 mt-0 flex w-full shrink-0 items-center justify-between gap-1.5 sm:mt-1">
-          <StatPill label="연속" value={`${stats.streak_days}일`} className="shrink-0" />
-          <StatPill
-            label="크레딧"
-            value={stats.credits.toLocaleString('ko-KR')}
-            highlight
-            className="shrink-0"
-          />
-        </div>
-
+      <ChildHomeSceneryBand flexFill showBackground={false} ariaLabel="홈 상단">
         {/** 토끼·섬 무대만 `-mt` — 레벨업 배너는 아래 줄이라 같이 당겨지지 않음 */}
         <div className="flex min-h-0 flex-1 flex-col justify-end gap-1.5">
           <div className="relative mx-auto flex min-h-0 w-full max-w-sm flex-1 flex-col items-center justify-end -mt-6 sm:-mt-8">
-            <div className="pointer-events-none absolute inset-y-0 left-0 z-20 flex items-center pl-0.5 sm:pl-1">
+            {/**
+             * 성장 지도(지도 아이콘) 단추 위치
+             * - 요청사항: "왼쪽 상단" 배치
+             * - 로딩/정상 화면에서 동일한 좌표를 사용해 UX 를 일관되게 합니다.
+             */}
+            <div className="pointer-events-none absolute left-0 top-0 z-20 flex items-start pl-0.5 pt-3 sm:pl-1 sm:pt-4">
               <div className="pointer-events-auto shrink-0">
                 <MapActionPill onClick={() => setMapOpen(true)} />
               </div>
             </div>
-            <div className="pointer-events-none absolute inset-y-0 right-0 z-20 flex items-center pr-0.5 sm:pr-1">
-              <div className="pointer-events-auto shrink-0">
-                <StickerActionPill
-                  useCustomImage={clientReady && stickerFabImgOk}
-                  onImageError={() => setStickerFabImgOk(false)}
-                  onClick={openBearFromFab}
-                />
-              </div>
+            {/**
+             * 오늘 날씨 배지 위치(정상 화면)
+             * - 로딩 화면과 동일한 우상단 좌표를 사용해 사용자 경험을 맞춥니다.
+             */}
+            <div className="absolute right-0 top-0 z-20 pr-0.5 pt-3 sm:pr-1 sm:pt-4">
+              <TodayWeatherBadge />
             </div>
             <ChildHomeIslandStage density="flex" />
           </div>
@@ -266,6 +295,7 @@ export default function HomeTab({
         <CharacterDecorInventoryPlaceholder />
       </section>
 
+      {stickerFabFloating}
       {sheets}
       {arrivalModal}
     </div>

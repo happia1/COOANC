@@ -34,6 +34,10 @@ export type ChildStats = {
   id: string
   child_id: string
   credits: number
+  /** 마켓 등 지출에 쓰는 「지갑」분(마이그레이션 전 DB 는 없을 수 있음 → 전부 지갑으로 간주) */
+  credits_wallet?: number
+  /** 「저금통」에 넣어 둔 크레딧 */
+  credits_piggy?: number
   hearts: number
   total_credits_earned: number
   current_level: number         // 0~5
@@ -177,7 +181,8 @@ export type PurchaseRequest = {
   item_name: string
   item_price: number
   item_type: string
-  status: 'pending' | 'approved' | 'rejected' | 'delivered'
+  /** parent_buying: 부모가 외부 쇼핑몰에서 주문 중(자녀에게 별도 안내) */
+  status: 'pending' | 'approved' | 'rejected' | 'delivered' | 'parent_buying'
   child_message: string | null
   parent_note: string | null
   requested_at: string

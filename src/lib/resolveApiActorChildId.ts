@@ -33,8 +33,38 @@ export async function resolveApiActorChildId(
     if (!link) {
       return { ok: false as const, response: NextResponse.json({ error: '권한이 없어요' }, { status: 403 }) }
     }
+    // #region agent log
+    fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'b51341' },
+      body: JSON.stringify({
+        sessionId: 'b51341',
+        runId: 'post-schema-fix',
+        hypothesisId: 'H-C',
+        location: 'resolveApiActorChildId:parent-branch',
+        message: 'resolved child for parent session',
+        data: { childIdLen: cid.length, hasFamilyLink: !!link },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {})
+    // #endregion
     return { ok: true as const, childId: cid }
   }
 
+  // #region agent log
+  fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'b51341' },
+    body: JSON.stringify({
+      sessionId: 'b51341',
+      runId: 'post-schema-fix',
+      hypothesisId: 'H-D',
+      location: 'resolveApiActorChildId:child-branch',
+      message: 'resolved child as auth uid',
+      data: { profileRole: profile?.role ?? 'null', userIdLen: user.id.length },
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {})
+  // #endregion
   return { ok: true as const, childId: user.id }
 }

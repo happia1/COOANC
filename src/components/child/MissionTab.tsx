@@ -3,31 +3,32 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/client'
-import type { ChildStats, DailyMissionWithTemplate, PraiseStickerGrant, PraiseStickerPlacement } from '@/types/database'
-import GrowthMapSheet, { type GrowthMapSheetData } from '@/components/child/GrowthMapSheet'
-import BearStickerSheet from '@/components/child/BearStickerSheet'
-import { MapActionPill, StatPill, StickerActionPill } from '@/components/child/ChildSceneryTopPills'
+import type { ChildStats, DailyMissionWithTemplate } from '@/types/database'
 import ChildHomeIslandStage from '@/components/child/ChildHomeIslandStage'
 import ChildHomeSceneryBand from '@/components/child/ChildHomeSceneryBand'
 import { parseSpecialMissionPopup } from '@/lib/specialMissionDescription'
 import { isSpecialSectionMission } from '@/lib/specialMissionChips'
 import { parseAlarmFromMissionDescription } from '@/lib/missionAlarmDescription'
 import { scaledMissionRewards } from '@/lib/missionRewardMultiplier'
-import { mergePraiseStickerGrantsFromServer } from '@/lib/mergePraiseStickerGrantsFromServer'
 import MissionSleepMorningLayer from '@/components/child/MissionSleepMorningLayer'
 import SpriteImage from '@/components/common/SpriteImage'
 import { ICONS } from '@/constants/sprites'
 import { MISSION_ROUTINES_ATLAS } from '@/constants/missionRoutineAtlas'
 import { missionRoutineIconFrame } from '@/lib/missionRoutineIconFrame'
 import MissionCreditToPiggyOverlay from '@/components/child/MissionCreditToPiggyOverlay'
+import MissionCreditMoveDialog, {
+  MissionCreditActionSheet,
+  type CreditTransferKind,
+} from '@/components/child/MissionCreditMoveDialog'
+import {
+  creditsFloating,
+  mergeChildStatsPatch,
+  normalizeChildStatsCreditsSplit,
+} from '@/lib/childCreditsSplit'
 
 type Props = {
   childId: string
-  childName: string
   initialStats: ChildStats | null
-  growthMapData: GrowthMapSheetData
-  initialPraiseGrants: PraiseStickerGrant[]
-  initialPraisePlacements: PraiseStickerPlacement[]
   dailyMissions: DailyMissionWithTemplate[]
   today: string
   isFullRestDay: boolean
@@ -53,41 +54,32 @@ function orderedMissionsForSlider(list: DailyMissionWithTemplate[]): DailyMissio
 }
 
 /**
- * 부모 「다시하기」 브로드캐스트 페이로드 형식 검사 — 잘못된 메시지는 무시합니다.
+ * 부모 「다시하기」 후 서버 롤백이 끝난 뒤 오는 브로드캐스트 페이로드 검사 — 형식이 맞지 않으면 무시합니다.
  */
-function isRedoMissionPayload(v: unknown): v is { missionLogId: string; dailyMissionId: string; title: string } {
+function isMissionRolledBackPayload(v: unknown): v is { dailyMissionId: string; title: string } {
   if (!v || typeof v !== 'object') return false
   const o = v as Record<string, unknown>
-  return (
-    typeof o.missionLogId === 'string' &&
-    typeof o.dailyMissionId === 'string' &&
-    typeof o.title === 'string'
-  )
+  return typeof o.dailyMissionId === 'string' && typeof o.title === 'string'
 }
 
 /**
  * 미션 탭
  * - **6:4**: 상단 풍경 `flex-[6]` + 하단 카드 `flex-[4]` — 세로 스크롤 없음, 카드는 가로 스크롤
  * - 카드 썸네일: `public/.../routines_01.png` 아틀라스(`missionRoutineIconFrame`)
- * - 부모 Realtime 「다시 하기」·`MissionSleepMorningLayer` 연출 동일
+ * - 부모 Realtime 「다시 하기」: DB 는 서버에서 이미 되돌아가고, 여기서는 카드만 슬라이더에 다시 보이게 맞춥니다.
+ * - 칭찬 스티커(곰돌이) 단추는 **홈** 화면 플로팅 버튼으로만 엽니다.
  */
 export default function MissionTab({
   childId,
-  childName,
   initialStats,
-  growthMapData,
-  initialPraiseGrants,
-  initialPraisePlacements,
   dailyMissions,
   today,
   isFullRestDay,
 }: Props) {
   const [stats, setStats] = useState<ChildStats | null>(initialStats)
-  const [mapOpen, setMapOpen] = useState(false)
-  const [bearOpen, setBearOpen] = useState(false)
-  const [grants, setGrants] = useState(initialPraiseGrants)
-  const [placements, setPlacements] = useState(initialPraisePlacements)
-  const [stickerFabImgOk, setStickerFabImgOk] = useState(true)
+  /** 지갑·저금통·섬 옮기기: 먼저 어떤 통을 눌렀는지(시트) → 종류 선택 후 수량 팝업 */
+  const [creditSheetBucket, setCreditSheetBucket] = useState<'center' | 'wallet' | 'piggy' | null>(null)
+  const [creditMoveKind, setCreditMoveKind] = useState<CreditTransferKind | null>(null)
 
   const [done, setDone] = useState<Set<string>>(
     new Set(dailyMissions.filter((dm) => dm.is_completed).map((dm) => dm.id)),
@@ -100,13 +92,17 @@ export default function MissionTab({
     message: string
   } | null>(null)
 
-  /** 부모가 「다시하기」를 눌렀을 때만 채워지는 미션 되돌리기 안내 */
-  const [redoPopup, setRedoPopup] = useState<{
-    missionLogId: string
+  /** 부모 「다시하기」로 미션이 되돌아갔을 때 띄우는 알림 팝업(토스트와 별도) */
+  const [rollbackPopup, setRollbackPopup] = useState<{
     dailyMissionId: string
-    title: string
+    missionTitle: string
   } | null>(null)
-  const [redoBusy, setRedoBusy] = useState(false)
+
+  /**
+   * 브로드캐스트·DB 실시간 둘 다 올 때 팝업이 두 번 뜨지 않게, 같은 일일 미션 id 는 잠깐 동안 한 번만 안내합니다.
+   * 키: dailyMissionId, 값: 표시한 시각(ms)
+   */
+  const rollbackPopupDedupRef = useRef<Map<string, number>>(new Map())
 
   /** 이미 SUBSCRIBED 인 채널에 바로 send — 매번 subscribe 하지 않아 부모 목록 갱신이 빨라집니다 */
   const parentLogBroadcastRef = useRef<RealtimeChannel | null>(null)
@@ -121,34 +117,9 @@ export default function MissionTab({
   /** 완료한 카드는 가로 슬라이더에서 제거해 바로 「사라진」 느낌을 줍니다 */
   const incompleteOrdered = useMemo(() => ordered.filter((dm) => !done.has(dm.id)), [ordered, done])
 
-  const growthPayload: GrowthMapSheetData = useMemo(
-    () => ({
-      ...growthMapData,
-      level: stats?.current_level ?? growthMapData.level,
-      streak: stats?.streak_days ?? growthMapData.streak,
-      longestStreak: stats?.longest_streak ?? growthMapData.longestStreak,
-    }),
-    [growthMapData, stats],
-  )
-
   useEffect(() => {
-    setStats(initialStats)
+    setStats(initialStats ? normalizeChildStatsCreditsSplit(initialStats) : null)
   }, [initialStats])
-
-  useEffect(() => {
-    setGrants((prev) => mergePraiseStickerGrantsFromServer(initialPraiseGrants, prev))
-  }, [initialPraiseGrants])
-
-  useEffect(() => {
-    setPlacements(initialPraisePlacements)
-  }, [initialPraisePlacements])
-
-  /** 홈과 동일: 판에 붙인 뒤 grants 는 건드리지 않아 도착 팝업 상태가 꼬이지 않게 함 */
-  const refreshStickerPlacementsOnly = useCallback(async () => {
-    const supabase = createClient()
-    const { data } = await supabase.from('praise_sticker_placements').select('*').eq('child_id', childId)
-    if (data) setPlacements(data as PraiseStickerPlacement[])
-  }, [childId])
 
   useEffect(() => {
     const supabase = createClient()
@@ -163,7 +134,11 @@ export default function MissionTab({
           filter: `child_id=eq.${childId}`,
         },
         (payload) => {
-          setStats(payload.new as ChildStats)
+          setStats((prev) =>
+            normalizeChildStatsCreditsSplit(
+              mergeChildStatsPatch(prev, payload.new as Record<string, unknown>),
+            ),
+          )
         },
       )
       .subscribe()
@@ -187,24 +162,100 @@ export default function MissionTab({
     }
   }, [childId])
 
+  const showToast = (msg: string) => {
+    setToast(msg)
+    setTimeout(() => setToast(null), 2500)
+  }
+
+  /**
+   * 롤백 알림 팝업을 한 번만 띄웁니다(실시간·브로드캐스트 중복 방지).
+   */
+  const tryShowRollbackPopup = useCallback((dailyMissionId: string, missionTitle: string) => {
+    const now = Date.now()
+    const m = rollbackPopupDedupRef.current
+    for (const [id, t] of m) {
+      if (now - t > 8000) m.delete(id)
+    }
+    if (m.has(dailyMissionId)) return
+    m.set(dailyMissionId, now)
+    setRollbackPopup({ dailyMissionId, missionTitle })
+  }, [])
+
+  /**
+   * 부모 「다시하기」 직후: 슬라이더 완료 집합을 풀고, 팝업으로 롤백 사실을 알립니다.
+   */
   useEffect(() => {
     const supabase = createClient()
     const channel = supabase
       .channel(`mission_redo:${childId}`)
-      .on('broadcast', { event: 'redo_mission' }, (message) => {
+      .on('broadcast', { event: 'mission_rolled_back' }, (message) => {
         const raw = (message as { payload?: unknown }).payload
-        if (isRedoMissionPayload(raw)) setRedoPopup(raw)
+        if (!isMissionRolledBackPayload(raw)) return
+        setDone((prev) => {
+          const next = new Set(prev)
+          next.delete(raw.dailyMissionId)
+          return next
+        })
+        tryShowRollbackPopup(raw.dailyMissionId, raw.title)
       })
       .subscribe()
     return () => {
       void supabase.removeChannel(channel)
     }
-  }, [childId])
+  }, [childId, tryShowRollbackPopup])
 
-  const showToast = (msg: string) => {
-    setToast(msg)
-    setTimeout(() => setToast(null), 2500)
-  }
+  /**
+   * 브로드캐스트가 끊겨도 mission_logs 가 미완료로 바뀌는 순간 DB 와 슬라이더를 맞춥니다(Realtime 공개 테이블).
+   * 브로드캐스트를 못 받은 경우에만 여기서 제목을 조회해 같은 롤백 팝업을 띄웁니다.
+   */
+  useEffect(() => {
+    const supabase = createClient()
+    const channel = supabase
+      .channel(`mission_log_undo_sync:${childId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'mission_logs',
+          filter: `child_id=eq.${childId}`,
+        },
+        async (payload) => {
+          const row = payload.new as {
+            is_completed?: boolean
+            mission_id?: string
+            assigned_date?: string
+          }
+          if (row.is_completed !== false) return
+          const mid = row.mission_id
+          const ad =
+            typeof row.assigned_date === 'string'
+              ? row.assigned_date.slice(0, 10)
+              : String(row.assigned_date ?? '')
+          if (!mid || !ad) return
+          const { data: dm } = await supabase
+            .from('daily_missions')
+            .select('id, is_completed')
+            .eq('child_id', childId)
+            .eq('mission_template_id', mid)
+            .eq('date', ad)
+            .maybeSingle()
+          if (dm && dm.is_completed === false) {
+            setDone((prev) => {
+              const next = new Set(prev)
+              next.delete(dm.id)
+              return next
+            })
+            const { data: mt } = await supabase.from('missions').select('title').eq('id', mid).maybeSingle()
+            tryShowRollbackPopup(dm.id, typeof mt?.title === 'string' && mt.title.trim() ? mt.title : '미션')
+          }
+        },
+      )
+      .subscribe()
+    return () => {
+      void supabase.removeChannel(channel)
+    }
+  }, [childId, tryShowRollbackPopup])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -233,86 +284,8 @@ export default function MissionTab({
     setSpecialPopup(null)
   }
 
-  /**
-   * 팝업 「확인」: 오늘의 미션 행·로그·스탯을 부모용 롤백 API와 같은 방식으로 되돌립니다.
-   * (자녀 세션의 RLS 로 본인 행만 수정 가능)
-   */
-  async function confirmRedoFromParent() {
-    if (!redoPopup || redoBusy) return
-    setRedoBusy(true)
-    const supabase = createClient()
-    try {
-      const { data: log, error: logErr } = await supabase
-        .from('mission_logs')
-        .select('id, is_completed, credit_earned, heart_earned, exp_earned')
-        .eq('id', redoPopup.missionLogId)
-        .eq('child_id', childId)
-        .maybeSingle()
-
-      if (logErr || !log?.is_completed) {
-        showToast('이미 되돌아간 미션이에요')
-        setRedoPopup(null)
-        return
-      }
-
-      const cr = typeof log.credit_earned === 'number' ? log.credit_earned : 0
-      const hr = typeof log.heart_earned === 'number' ? log.heart_earned : 0
-      const xr = typeof log.exp_earned === 'number' ? log.exp_earned : 0
-
-      const { data: stats, error: stErr } = await supabase.from('child_stats').select('*').eq('child_id', childId).maybeSingle()
-      if (stErr || !stats) {
-        showToast('정보를 불러오지 못했어요')
-        return
-      }
-
-      const newExp = Math.max(0, stats.exp - xr)
-      const newLevel = stats.current_level
-
-      const { error: dmErr } = await supabase
-        .from('daily_missions')
-        .update({ is_completed: false, completed_at: null })
-        .eq('id', redoPopup.dailyMissionId)
-        .eq('child_id', childId)
-
-      const { error: mlErr } = await supabase
-        .from('mission_logs')
-        .update({
-          is_completed: false,
-          completed_at: null,
-          credit_earned: 0,
-          heart_earned: 0,
-          exp_earned: 0,
-        })
-        .eq('id', redoPopup.missionLogId)
-        .eq('child_id', childId)
-
-      const { error: csErr } = await supabase
-        .from('child_stats')
-        .update({
-          credits: Math.max(0, stats.credits - cr),
-          hearts: Math.max(0, stats.hearts - hr),
-          total_credits_earned: Math.max(0, stats.total_credits_earned - cr),
-          exp: newExp,
-          current_level: newLevel,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('child_id', childId)
-
-      if (dmErr || mlErr || csErr) {
-        showToast('되돌리기에 실패했어요')
-        return
-      }
-
-      setDone((prev) => {
-        const next = new Set(prev)
-        next.delete(redoPopup.dailyMissionId)
-        return next
-      })
-      setRedoPopup(null)
-      showToast('미션을 다시 할 수 있어요')
-    } finally {
-      setRedoBusy(false)
-    }
+  function dismissRollbackPopup() {
+    setRollbackPopup(null)
   }
 
   function handleComplete(dm: DailyMissionWithTemplate) {
@@ -365,8 +338,10 @@ export default function MissionTab({
     })()
   }
 
-  const credits = stats?.credits ?? 0
-  const streak = stats?.streak_days ?? 0
+  const stNorm = stats ? normalizeChildStatsCreditsSplit(stats) : null
+  const walletCredits = stNorm?.credits_wallet ?? 0
+  const piggyCredits = stNorm?.credits_piggy ?? 0
+  const floatingCredits = stNorm ? creditsFloating(stNorm) : 0
   const exp = stats?.exp ?? 0
   const expToNext = Math.max(1, stats?.exp_to_next_level ?? 1)
   const promotionPending = Boolean(stats?.promotion_pending)
@@ -375,37 +350,36 @@ export default function MissionTab({
   const completedCount = done.size
   const total = dailyMissions.length
 
-  /**
-   * 섬 위 저금통 그림: 휴식일이면 항상 「비어 있음」 단계만 보여 주고,
-   * 평일에는 「완료한 미션 수 ÷ 오늘 미션 전체」에 맞춰 아틀라스 프레임이 바뀝니다.
-   */
-  const islandPiggyProgress = isFullRestDay ? { completed: 0, total: 0 } : { completed: completedCount, total }
+  /** 크레딧 옮기기 팝업 제목만(본문 힌트는 레이아웃·겹침 이슈로 팝업에서 제거함) */
+  const transferCopy: Record<CreditTransferKind, { title: string }> = {
+    float_to_wallet: { title: '지갑으로 옮기기' },
+    float_to_piggy: { title: '저금통으로 옮기기' },
+    wallet_to_float: { title: '섬으로 꺼내기' },
+    piggy_to_float: { title: '섬으로 꺼내기' },
+    wallet_to_piggy: { title: '저금통으로 옮기기' },
+    piggy_to_wallet: { title: '지갑으로 옮기기' },
+  }
 
-  const sheets = (
-    <>
-      <GrowthMapSheet
-        open={mapOpen}
-        onClose={() => setMapOpen(false)}
-        childName={childName}
-        stats={stats}
-        data={growthPayload}
-      />
-      <BearStickerSheet
-        open={bearOpen}
-        onClose={() => setBearOpen(false)}
-        childId={childId}
-        initialGrants={grants}
-        initialPlacements={placements}
-        onInventoryChange={() => void refreshStickerPlacementsOnly()}
-      />
-    </>
-  )
+  function maxAmountForKind(kind: CreditTransferKind): number {
+    switch (kind) {
+      case 'float_to_wallet':
+      case 'float_to_piggy':
+        return floatingCredits
+      case 'wallet_to_float':
+      case 'wallet_to_piggy':
+        return walletCredits
+      case 'piggy_to_float':
+      case 'piggy_to_wallet':
+        return piggyCredits
+      default:
+        return 0
+    }
+  }
 
   /**
    * 카드 바로 위 **한 행**: 왼쪽 제목 · 오른쪽 EXP.
-   * - 제목: `flex-[0_1_auto] min-w-0` → 공간이 부족하면 잘리기만 하고 줄바꿈 없음
-   * - EXP 블록: `flex-1 min-w-0` → **남는 가로 전부** 쓰므로 넓을수록 막대가 길어짐
-   * - 막대: `flex-1` + `min-w`/`max-w` 로 아주 좁을 때·넓을 때 끝값만 클램프
+   * - EXP 영역: 왼쪽 **스페이서 `flex-1`** + 오른쪽 **막대·♥·숫자 `shrink-0`** → 묶음이 행 오른쪽에 붙음
+   * - 막대 너비는 `clamp`(뷰포트에 따라 길이 변함, 상한 `18rem`)
    */
   const missionTitleAboveCards = (
     <div className="shrink-0 px-3 pb-0.5 pt-0">
@@ -419,63 +393,72 @@ export default function MissionTab({
           )}
         </div>
         <div
-          className="flex min-w-0 flex-1 flex-nowrap items-center justify-end gap-1"
+          className="flex min-w-0 min-h-[18px] flex-1 flex-nowrap items-center gap-1"
           role="group"
           aria-label={`경험치 ${exp}, 목표 ${expToNext}`}
         >
-          <div className="relative h-[18px] min-w-[3.25rem] max-w-[18rem] flex-1 overflow-hidden rounded-full bg-white/50 shadow-inner ring-1 ring-pink-300/50">
-            <div
-              className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-pink-300 to-pink-500 transition-all duration-500"
-              style={{ width: `${expPct}%` }}
-            />
-            <span className="absolute left-1.5 top-1/2 z-10 -translate-y-1/2 text-[10px] font-black tabular-nums leading-none text-pink-950 drop-shadow-[0_0_2px_rgba(255,255,255,0.95)]">
-              {exp}
+          {/* 남는 가로를 여기서만 먹어서 막대·♥·숫자 묶음이 행의 오른쪽(패딩 안쪽)에 붙음 */}
+          <div className="min-h-0 min-w-0 flex-1 shrink" aria-hidden />
+          <div className="flex shrink-0 items-center gap-1">
+            {/**
+             * `clamp`: 좁은 화면은 최소 폭만, 넓어질수록 길어지다 `18rem` 에서 멈춤.
+             * 묶음은 `shrink-0` 이라 ♥·목표 숫자가 오른쪽 끝에 고정된 채 막대만 길이가 변함.
+             */}
+            <div className="relative h-[18px] min-w-[3.25rem] w-[clamp(3.25rem,32vw,18rem)] overflow-hidden rounded-full bg-white/50 shadow-inner ring-1 ring-pink-300/50 sm:w-[clamp(3.25rem,36vw,18rem)]">
+              <div
+                className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-pink-300 to-pink-500 transition-all duration-500"
+                style={{ width: `${expPct}%` }}
+              />
+              <span className="absolute left-1.5 top-1/2 z-10 -translate-y-1/2 text-[10px] font-black tabular-nums leading-none text-pink-950 drop-shadow-[0_0_2px_rgba(255,255,255,0.95)]">
+                {exp}
+              </span>
+            </div>
+            <span className="flex shrink-0 items-center gap-0.5 text-[10px] font-black tabular-nums text-pink-700 sm:text-[11px]">
+              <span aria-hidden>♥</span>
+              <span>{expToNext}</span>
             </span>
           </div>
-          <span className="flex shrink-0 items-center gap-0.5 text-[10px] font-black tabular-nums text-pink-700 sm:text-[11px]">
-            <span aria-hidden>♥</span>
-            <span>{expToNext}</span>
-          </span>
         </div>
       </div>
     </div>
   )
 
-  /** 상단 풍경: `flexFill` 로 레이아웃이 주는 높이만 씀(고정 dvh 아님) */
+  /**
+   * 상단 영역: `flexFill` 로 레이아웃이 주는 높이만 씀(고정 dvh 아님).
+   * 큰 풍경 PNG·섬 잔디 PNG 는 끄고, 레이아웃 녹색 그라데이션이 비치지 않게 `bg-white` 로 막음.
+   */
   const heroBand = (
     <ChildHomeSceneryBand
       flexFill
-      ariaLabel="미션 배경"
+      showBackground={false}
+      className="bg-white"
+      ariaLabel="미션 상단"
       overlay={
         creditFxOn ? (
           <MissionCreditToPiggyOverlay playId={creditFxNonce} onFinish={endCreditFx} />
         ) : null
       }
     >
-      <div className="relative z-20 flex w-full shrink-0 items-center justify-between gap-1.5">
-        <StatPill label="연속" value={`${streak}일`} className="shrink-0" />
-        <StatPill label="크레딧" value={credits.toLocaleString()} highlight className="shrink-0" />
-      </div>
-
+      {/** 연속일 등 상단 StatPill 은 사용하지 않음 — 크레딧은 섬 가운데·지갑·저금통에서 확인 */}
       {/** `flex-1 min-h-0`: 홈과 같이 섬 무대가 풍경 밴드 안 남는 공간에 맞춰 줄어듦 */}
       <div className="flex min-h-0 flex-1 flex-col justify-end">
-        <div className="relative mx-auto flex min-h-0 w-full max-w-sm flex-1 flex-col items-center justify-end -mt-6 sm:-mt-8">
-          {/** 홈 탭과 동일: 지도는 무대 왼쪽, 스티커(곰)는 오른쪽 세로 중앙 */}
-          <div className="pointer-events-none absolute inset-y-0 left-0 z-20 flex items-center pl-0.5 sm:pl-1">
-            <div className="pointer-events-auto shrink-0">
-              <MapActionPill onClick={() => setMapOpen(true)} />
-            </div>
-          </div>
-          <div className="pointer-events-none absolute inset-y-0 right-0 z-20 flex items-center pr-0.5 sm:pr-1">
-            <div className="pointer-events-auto shrink-0">
-              <StickerActionPill
-                useCustomImage={stickerFabImgOk}
-                onImageError={() => setStickerFabImgOk(false)}
-                onClick={() => setBearOpen(true)}
-              />
-            </div>
-          </div>
-          <ChildHomeIslandStage scene="gippybank" missionPiggy={islandPiggyProgress} density="flex" />
+        <div className="relative mx-auto flex min-h-0 w-full max-w-sm flex-1 flex-col items-center justify-end -mt-10 sm:-mt-12">
+          <ChildHomeIslandStage
+            scene="gippybank"
+            density="flex"
+            showIslandArt={false}
+            missionPiggy={{ completed: completedCount, total }}
+            missionCredits={{
+              floating: floatingCredits,
+              wallet: walletCredits,
+              piggy: piggyCredits,
+              onCenterTap: () => {
+                if (floatingCredits > 0) setCreditSheetBucket('center')
+              },
+              onWalletTap: () => setCreditSheetBucket('wallet'),
+              onPiggyTap: () => setCreditSheetBucket('piggy'),
+            }}
+          />
         </div>
       </div>
     </ChildHomeSceneryBand>
@@ -483,7 +466,7 @@ export default function MissionTab({
 
   const bottomPanel = (
     <section
-      className="relative z-10 -mt-8 flex min-h-0 flex-[4] basis-0 flex-col gap-1 overflow-hidden px-1 pb-1.5 pt-1 sm:-mt-10"
+      className="relative z-10 -mt-9 flex min-h-0 flex-[4.4] basis-0 flex-col gap-1 overflow-hidden px-1 pb-0 pt-0.5 sm:-mt-10"
       aria-label="오늘의 미션 카드"
     >
       {missionTitleAboveCards}
@@ -499,7 +482,7 @@ export default function MissionTab({
         </div>
       ) : (
         <div
-          className="-mx-1 flex min-h-0 flex-1 items-start gap-2 overflow-x-auto overflow-y-hidden px-2 pb-0.5 pt-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden snap-x snap-mandatory"
+          className="-mx-1 flex min-h-0 flex-1 items-start gap-1.5 overflow-x-auto overflow-y-hidden px-1.5 pb-0 pt-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden snap-x snap-mandatory"
           style={{ WebkitOverflowScrolling: 'touch' }}
         >
           {incompleteOrdered.map((dm) => {
@@ -516,7 +499,8 @@ export default function MissionTab({
                 onClick={() => handleComplete(dm)}
                 aria-label={`${m.title} 미션 완료하기`}
                 className={[
-                  'snap-center flex min-h-[13.5rem] w-[min(44vw,176px)] shrink-0 flex-col rounded-xl border bg-white p-2.5 text-left font-sans text-brand-text shadow-md transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue focus-visible:ring-offset-2 active:scale-[0.97]',
+                  // 카드 하단 빈 여백을 줄이기 위해 최소 높이를 더 낮춰 내용 높이에 가깝게 맞춤
+                  'snap-center flex min-h-[9 rem] w-[min(42vw,168px)] shrink-0 flex-col rounded-xl border bg-white p-2 text-left font-sans text-brand-text shadow-md transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue focus-visible:ring-offset-2 active:scale-[0.97]',
                   special ? 'border-amber-300 ring-2 ring-amber-200/60' : 'border-gray-200/90',
                 ].join(' ')}
               >
@@ -525,18 +509,19 @@ export default function MissionTab({
                  * `routines_01.png` 아틀라스 — `clipRotated={false}` 로 회전 프레임 잘림 완화.
                  */}
                 {/** 배경색 없음 — 아틀라스 일러스트만 흰 카드 위에 표시 */}
-                <div className="flex min-h-[7.25rem] w-full shrink-0 items-center justify-center overflow-visible">
+                <div className="flex min-h-[5.6rem] w-full shrink-0 items-center justify-center overflow-visible">
                   <SpriteImage
                     sheet={MISSION_ROUTINES_ATLAS}
                     frame={routineFrame}
-                    width={82}
+                    // 요청대로 이미지 크기를 소폭 축소
+                    width={52}
                     clipRotated={false}
                     className="select-none drop-shadow-[0_2px_8px_rgba(0,0,0,0.08)]"
                   />
                 </div>
 
-                <div className="mt-1.5 space-y-0.5 text-center">
-                  <p className="line-clamp-2 text-[12px] font-black leading-tight text-brand-text">{m.title}</p>
+                <div className="mt-0 space-y-0 text-center">
+                  <p className="line-clamp-2 text-[10px] font-black leading-tight text-brand-text">{m.title}</p>
                   {sub ? (
                     <p className="line-clamp-2 text-[9px] font-medium leading-snug text-gray-500">{sub}</p>
                   ) : null}
@@ -547,32 +532,33 @@ export default function MissionTab({
                  * 여기서는 `ICONS` 상수로 같은 PNG를 가리킵니다(`/assets/img/common/ui/icons.png`).
                  * 시안과 동일하게 한 줄: [크레딧 아이콘+숫자] [하트 아이콘+숫자] — 오른쪽은 EXP(텍스트 없이 하트로 표현).
                  */}
-                <div className="mt-2 flex justify-center">
+                <div className="mt-0 flex justify-center">
                   <div
                     className={[
-                      'inline-flex max-w-full flex-nowrap items-center justify-center gap-x-3 rounded-full px-3 py-1.5 text-[12px] font-black tabular-nums text-gray-800 shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] ring-1 ring-black/[0.06]',
+                      // 보상 숫자/아이콘이 알약 내부에서 안 잘리도록 간격과 패딩을 타이트하게 조정
+                      'inline-flex max-w-full flex-nowrap items-center justify-center gap-x-1 rounded-full px-2 py-1 text-[11px] font-black tabular-nums tracking-[-0.01em] text-gray-800 shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] ring-1 ring-black/[0.06]',
                       special ? 'bg-amber-100/90' : 'bg-stone-100/95',
                     ].join(' ')}
                     role="group"
                     aria-label={`미션 보상: 크레딧 ${rewards.credit}, 경험치 ${rewards.exp}`}
                   >
                     {/** 왼쪽: 크레딧(동전) */}
-                    <span className="inline-flex items-center gap-1">
+                    <span className="inline-flex items-center gap-[1px]">
                       <SpriteImage
                         sheet={ICONS}
                         frame="credit"
-                        width={18}
+                        width={16}
                         clipRotated={false}
                         className="shrink-0 select-none"
                       />
                       <span>{rewards.credit}</span>
                     </span>
                     {/** 오른쪽: 경험치 — 하트 그림이 EXP를 뜻함 */}
-                    <span className="inline-flex items-center gap-1" title="경험치(EXP)">
+                    <span className="inline-flex items-center gap-[1px]" title="경험치(EXP)">
                       <SpriteImage
                         sheet={ICONS}
                         frame="heart"
-                        width={18}
+                        width={16}
                         className="shrink-0 select-none"
                       />
                       <span>{rewards.exp}</span>
@@ -590,37 +576,6 @@ export default function MissionTab({
       )}
     </section>
   )
-
-  /** 부모가 요청한 「다시 하기」 — 확인 시에만 DB 가 바뀝니다 */
-  const redoPopupBlock = redoPopup ? (
-    <div
-      className="fixed inset-0 z-[102] flex items-center justify-center p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="redo-pop-title"
-    >
-      <button
-        type="button"
-        className="absolute inset-0 bg-black/50"
-        aria-label="나중에 하기"
-        onClick={() => !redoBusy && setRedoPopup(null)}
-      />
-      <div className="relative z-[1] w-full max-w-sm rounded-2xl border-2 border-orange-200 bg-white p-5 shadow-xl">
-        <p id="redo-pop-title" className="text-center text-base font-black text-brand-text leading-snug">
-          <span className="text-orange-600">{redoPopup.title}</span> 미션을 다시 해야 해요!
-        </p>
-        <p className="mt-2 text-center text-xs text-gray-500">부모님이 다시 하라고 하셨어요. 확인을 누르면 완료가 취소돼요.</p>
-        <button
-          type="button"
-          onClick={() => void confirmRedoFromParent()}
-          disabled={redoBusy}
-          className="mt-5 w-full rounded-xl bg-brand-blue py-3 text-sm font-bold text-white disabled:opacity-50"
-        >
-          {redoBusy ? '처리 중…' : '확인'}
-        </button>
-      </div>
-    </div>
-  ) : null
 
   const popupBlock = specialPopup ? (
     <div
@@ -647,9 +602,60 @@ export default function MissionTab({
     </div>
   ) : null
 
+  /**
+   * 롤백된 미션의 카드 일러스트를 같은 규칙으로 계산합니다.
+   * - dailyMissionId 로 오늘 카드 목록에서 찾기
+   * - 못 찾으면 payload 의 missionTitle 로 안전하게 계산
+   */
+  const rollbackMissionIconFrame = rollbackPopup
+    ? (() => {
+        const matched = ordered.find((dm) => dm.id === rollbackPopup.dailyMissionId)?.missions
+        const title = matched?.title ?? rollbackPopup.missionTitle
+        const description = matched?.description ?? null
+        return missionRoutineIconFrame(title, description)
+      })()
+    : null
+
+  /** 미션 롤백 안내 — 특별 미션 팝업보다 위에 두어 부모 알림이 가려지지 않게 합니다 */
+  const rollbackPopupBlock = rollbackPopup ? (
+    <div
+      className="fixed inset-0 z-[105] flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="rollback-pop-title"
+    >
+      <button type="button" className="absolute inset-0 bg-black/50" aria-label="닫기" onClick={dismissRollbackPopup} />
+      <div className="relative z-[1] w-full max-w-sm rounded-2xl border-2 border-orange-300 bg-white p-5 shadow-xl">
+        <p id="rollback-pop-title" className="text-center text-lg font-black text-brand-text">
+          미션 다시하기
+        </p>
+        <div className="mt-3 flex justify-center">
+          <SpriteImage
+            sheet={MISSION_ROUTINES_ATLAS}
+            frame={rollbackMissionIconFrame ?? missionRoutineIconFrame(rollbackPopup.missionTitle, null)}
+            width={92}
+            clipRotated={false}
+            className="select-none drop-shadow-[0_2px_8px_rgba(0,0,0,0.08)]"
+          />
+        </div>
+        <p className="mt-2 text-center text-sm font-bold text-orange-600">{rollbackPopup.missionTitle}</p>
+        <p className="mt-3 text-center text-xs font-medium leading-relaxed text-gray-600">
+          사유: 부모님이 이 미션을 다시 하기로 바꿨어요.
+        </p>
+        <button
+          type="button"
+          onClick={dismissRollbackPopup}
+          className="mt-5 w-full rounded-xl bg-brand-blue py-3 text-sm font-bold text-white"
+        >
+          알겠어요
+        </button>
+      </div>
+    </div>
+  ) : null
+
   if (isFullRestDay) {
     return (
-      <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex min-h-0 flex-1 flex-col bg-white">
         <MissionSleepMorningLayer
           childId={childId}
           today={today}
@@ -658,20 +664,40 @@ export default function MissionTab({
           totalMissions={total}
         />
         {heroBand}
-        <section className="flex min-h-0 flex-[4] flex-col items-center justify-center gap-3 overflow-hidden bg-gradient-to-b from-lime-50/80 to-white px-6 py-4 text-center">
+        {/** 휴식 메시지 영역도 연한 잔디색(lime) 대신 흰 배경으로 통일 */}
+        <section className="flex min-h-0 flex-[4] flex-col items-center justify-center gap-3 overflow-hidden bg-white px-6 py-4 text-center">
           <span className="text-sm font-black text-gray-400">휴식</span>
           <p className="text-xl font-black text-brand-text">오늘은 쉬는 날이에요!</p>
           <p className="text-sm text-gray-400">푹 쉬고 내일 또 열심히 해봐요.</p>
         </section>
-        {redoPopupBlock}
         {popupBlock}
-        {sheets}
+        {rollbackPopupBlock}
+
+        <MissionCreditActionSheet
+          open={creditSheetBucket !== null}
+          onClose={() => setCreditSheetBucket(null)}
+          bucket={creditSheetBucket ?? 'center'}
+          floating={floatingCredits}
+          wallet={walletCredits}
+          piggy={piggyCredits}
+          onPick={(kind) => setCreditMoveKind(kind)}
+        />
+
+        <MissionCreditMoveDialog
+          open={creditMoveKind !== null}
+          onClose={() => setCreditMoveKind(null)}
+          childId={childId}
+          kind={creditMoveKind}
+          maxAmount={creditMoveKind ? maxAmountForKind(creditMoveKind) : 0}
+          title={creditMoveKind ? transferCopy[creditMoveKind].title : ''}
+          onSuccess={() => {}}
+        />
       </div>
     )
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    <div className="flex min-h-0 flex-1 flex-col bg-white">
       <MissionSleepMorningLayer
         childId={childId}
         today={today}
@@ -679,16 +705,35 @@ export default function MissionTab({
         completedCount={completedCount}
         totalMissions={total}
       />
-      {redoPopupBlock}
       {popupBlock}
+      {rollbackPopupBlock}
       {toast && (
-        <div className="fixed top-6 left-1/2 z-50 -translate-x-1/2 animate-bounce rounded-full bg-brand-blue px-5 py-2.5 text-sm font-bold text-white shadow-lg">
+        <div className="fixed top-6 left-1/2 z-[110] -translate-x-1/2 animate-bounce rounded-full bg-brand-blue px-5 py-2.5 text-sm font-bold text-white shadow-lg">
           {toast}
         </div>
       )}
       {heroBand}
       {bottomPanel}
-      {sheets}
+
+      <MissionCreditActionSheet
+        open={creditSheetBucket !== null}
+        onClose={() => setCreditSheetBucket(null)}
+        bucket={creditSheetBucket ?? 'center'}
+        floating={floatingCredits}
+        wallet={walletCredits}
+        piggy={piggyCredits}
+        onPick={(kind) => setCreditMoveKind(kind)}
+      />
+
+      <MissionCreditMoveDialog
+        open={creditMoveKind !== null}
+        onClose={() => setCreditMoveKind(null)}
+        childId={childId}
+        kind={creditMoveKind}
+        maxAmount={creditMoveKind ? maxAmountForKind(creditMoveKind) : 0}
+        title={creditMoveKind ? transferCopy[creditMoveKind].title : ''}
+        onSuccess={() => {}}
+      />
     </div>
   )
 }

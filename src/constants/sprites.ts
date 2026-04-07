@@ -176,6 +176,26 @@ export const BALLOONS: SpriteSheet = {
   },
 }
 
+/** `games/effects/lights.png` 단일 이미지(56×53) — 미션 크레딧 연출용 반짝 슬라이드 */
+export const EFFECT_LIGHTS: SpriteSheet = {
+  image: 'games/effects/lights.png',
+  atlasW: 56,
+  atlasH: 53,
+  frames: {
+    lights: { x: 0, y: 0, w: 56, h: 53, rotated: false },
+  },
+}
+
+/** `games/effects/twinkle.png` 단일 이미지(19×20) — 크레딧 주변 트윙클 */
+export const EFFECT_TWINKLE: SpriteSheet = {
+  image: 'games/effects/twinkle.png',
+  atlasW: 19,
+  atlasH: 20,
+  frames: {
+    twinkle: { x: 0, y: 0, w: 19, h: 20, rotated: false },
+  },
+}
+
 // ─── games/farm ────────────────────────────────────────────────────
 
 export const FARM_CAT: SpriteSheet = {

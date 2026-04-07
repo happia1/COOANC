@@ -5,13 +5,18 @@
  * - 선택한 자녀에게 보일 store_items 만 토글로 켜고 끕니다.
  * - 「상품 추가하기」로 가족 전용 상품을 새로 넣을 수 있습니다(API).
  * - 추가 시트는 하단 독(z-50)보다 위(z-[60])에 두고, 내용이 길면 스크롤됩니다.
+ * - 사진이 없는 기본 상품은 `market_items.png` 스프라이트를 씁니다(자녀 마켓과 같은 규칙).
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import SpriteImage from '@/components/common/SpriteImage'
+import { MARKET_ITEMS } from '@/constants/sprites'
+import { marketFrameKeyForItemId } from '@/lib/marketItemFrame'
 import type { StoreItem } from '@/types/database'
 import {
   PARENT_ADD_ITEM_CATEGORY_OPTIONS,
   PARENT_MARKET_MENU_SECTIONS,
+  isCategoryExcludedFromMarket,
   parentMarketSectionIdForItem,
 } from '@/lib/parentMarketMenuSections'
 
@@ -49,13 +54,14 @@ function VisibilityToggle({
       aria-label={ariaLabel}
       disabled={disabled}
       onClick={onToggle}
-      className={`relative mx-auto h-6 w-11 shrink-0 rounded-full transition-colors ${
+      /** 요청사항: 온/오프 토글을 기존 대비 절반 크기로 축소 */
+      className={`relative mx-auto h-3 w-[22px] shrink-0 rounded-full transition-colors ${
         on ? 'bg-[#7ED321]' : 'bg-gray-300'
       } ${disabled ? 'opacity-40' : 'active:scale-95'}`}
     >
       <span
-        className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
-          on ? 'right-0.5' : 'left-0.5'
+        className={`absolute top-[1px] h-2.5 w-2.5 rounded-full bg-white shadow transition-transform ${
+          on ? 'right-[1px]' : 'left-[1px]'
         }`}
       />
     </button>
@@ -104,16 +110,21 @@ export default function ParentMarketMenuControl({
     }
   }, [addOpen])
 
-  /** 현재 자녀 마켓 설정에 해당하는 상품만(전체 공개 + 이 부모-자녀 전용) */
+  /**
+   * 현재 자녀 마켓에 둘 상품만(전체 공개 + 이 부모-자녀 전용).
+   * 캐릭터 꾸미기(digital) 는 홈 탭 구매용이라 메뉴 제어 목록에서 제외합니다.
+   */
   const itemsForChild = useMemo(() => {
     if (!childId) return []
     return storeItems.filter(
-      (it) => it.family_link_id == null || it.family_link_id === familyLinkIdForChild,
+      (it) =>
+        !isCategoryExcludedFromMarket(it.category) &&
+        (it.family_link_id == null || it.family_link_id === familyLinkIdForChild),
     )
   }, [storeItems, childId, familyLinkIdForChild])
 
   /**
-   * 간식 / 장난감 / 캐릭터 꾸미기 / 이벤트(활동+체험) / 기타 순으로 묶은 목록
+   * 간식 / 장난감 / 이벤트(활동+체험) / 기타 순으로 묶은 목록
    * — 비어 있는 구역은 제목 자체를 숨깁니다.
    */
   const menuSectionsToRender = useMemo(() => {
@@ -151,9 +162,14 @@ export default function ParentMarketMenuControl({
         const json = await res.json().catch(() => ({}))
         if (!res.ok) {
           onHiddenChange(previous)
-          const msg = typeof json.error === 'string' ? json.error : '저장하지 못했어요'
-          setToggleSaveErr(msg)
-          window.setTimeout(() => setToggleSaveErr(null), 4000)
+          // 서버가 내려준 Postgres/PostgREST 메시지·코드·details 를 붙여 원인 파악이 쉽게 합니다
+          const base = typeof json.error === 'string' ? json.error : '저장하지 못했어요'
+          const extra: string[] = []
+          if (typeof json.code === 'string' && json.code) extra.push(`[${json.code}]`)
+          if (typeof json.details === 'string' && json.details) extra.push(json.details)
+          if (typeof json.hint === 'string' && json.hint) extra.push(json.hint)
+          setToggleSaveErr(extra.length ? `${base} ${extra.join(' ')}` : base)
+          window.setTimeout(() => setToggleSaveErr(null), 8000)
         }
       } catch {
         onHiddenChange(previous)
@@ -254,16 +270,23 @@ export default function ParentMarketMenuControl({
                 {block.items.map((it) => {
                   const hidden = hiddenItemIds.has(it.id)
                   const visible = !hidden
+                  // 자녀 마켓(MarketTab)과 동일: id·이름으로 항상 같은 스프라이트 조각이 나오게 함
+                  const spriteFrame = marketFrameKeyForItemId(it.id, it.name)
                   return (
                     <div key={it.id} className="flex min-w-0 flex-col items-center gap-1.5">
                       <div className="flex h-14 w-full items-center justify-center overflow-hidden rounded-lg bg-gray-50 ring-1 ring-gray-100">
                         {it.image_url ? (
+                          // 가족 전용으로 올린 사진이 있으면 그걸 그대로 썸(자녀 화면도 같은 URL)
                           // eslint-disable-next-line @next/next/no-img-element
                           <img src={it.image_url} alt="" className="h-full w-full object-cover" />
                         ) : (
-                          <span className="truncate px-0.5 text-center text-[10px] font-black leading-tight text-gray-400">
-                            {it.name.slice(0, 3)}
-                          </span>
+                          // DB에 사진이 없으면 공용 아틀라스 `items/shop/market_items.png` 한 칸을 표시
+                          <SpriteImage
+                            sheet={MARKET_ITEMS}
+                            frame={spriteFrame}
+                            height={48}
+                            clipRotated={false}
+                          />
                         )}
                       </div>
                       <p

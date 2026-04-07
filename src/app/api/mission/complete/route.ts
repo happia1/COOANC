@@ -103,10 +103,15 @@ export async function POST(req: NextRequest) {
     newStreak = stats.last_mission_date === yesterday ? newStreak + 1 : 1
   }
 
+  const keepWallet = typeof stats.credits_wallet === 'number' ? stats.credits_wallet : 0
+  const keepPiggy = typeof stats.credits_piggy === 'number' ? stats.credits_piggy : 0
+
   await supabase
     .from('child_stats')
     .update({
       credits: stats.credits + creditEarned,
+      credits_wallet: keepWallet,
+      credits_piggy: keepPiggy,
       hearts: stats.hearts + heartEarned,
       total_credits_earned: stats.total_credits_earned + creditEarned,
       exp: newExp,

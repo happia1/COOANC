@@ -1,8 +1,6 @@
 'use client'
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
-import ChildBottomSheetShell from '@/components/child/ChildBottomSheetShell'
 import SpriteFromAtlas from '@/components/child/SpriteFromAtlas'
 import { useShopAnimationsAtlas } from '@/components/child/useShopAnimationsAtlas'
 import PraiseUiIcon from '@/components/common/PraiseUiIcon'
@@ -27,9 +25,22 @@ const SLOT_TOTAL = 20
 /** 드래그 중 빈 칸에 더 넓게 끌어당김(자석), 놓을 때는 좁은 값으로 확정 */
 const DROP_RADIUS_SCALE = 1
 const MAGNET_RADIUS_SCALE = 1.45
+/** 종이 위 스티커 두 개 중심이 이 값(보드 전체 기준 %)보다 가까우면 겹친다고 보고 다시 뽑습니다 */
+const MIN_FLOAT_STICKER_SEP_PCT = 9
+
+/**
+ * grant id 를 0~1 두 실수로 바꿉니다. 랜덤이 잘 안 될 때도 건마다 다른 대체 좌표를 쓰기 위함입니다.
+ */
+function spreadFromGrantId(id: string): { u: number; v: number } {
+  const hex = id.replace(/-/g, '')
+  const u = parseInt(hex.slice(0, 8), 16) / 0xffffffff
+  const v = parseInt(hex.slice(8, 16), 16) / 0xffffffff
+  return { u, v }
+}
 
 /**
  * 아틀라스의 sticker_board.png 한 장을 컨테이너에 맞게 꽉 채웁니다(캡처 PNG 대신 JSON 좌표로 파싱).
+ * 로딩 전에는 연한 회색만 깔아 두어, 예전처럼 하늘색 큰 카드가 보이지 않게 합니다.
  */
 function BearBoardFromAtlas({ atlas }: { atlas: AnimationsAtlasFile | null }) {
   const wrapRef = useRef<HTMLDivElement>(null)
@@ -60,7 +71,7 @@ function BearBoardFromAtlas({ atlas }: { atlas: AnimationsAtlasFile | null }) {
           label="곰돌이 스티커 판"
         />
       ) : (
-        <div className="h-full w-full bg-sky-200/50" aria-hidden />
+        <div className="h-full w-full bg-neutral-200/40" aria-hidden />
       )}
     </div>
   )
@@ -108,10 +119,10 @@ type Props = {
 }
 
 /**
- * 곰돌이 스티커 판 전체 팝업
- * - 상단 문구·탭 없음, 일러스트를 크게 표시
- * - 종이 구역에 받은 스티커가 떠 있고, 드래그해 숫자 칸(1~20)에 놓으면 저장
- * - 하단 「나가기」로 닫기
+ * 곰돌이 스티커 판 — 화면 중앙 팝업(바텀시트 아님)
+ * - 스티커 보드 일러스트만 두드러지게, 카드/진행바 등 추가 배경 최소화
+ * - 종이 구역에 받은 스티커를 드래그해 1~20번 칸에 놓으면 저장
+ * - 바깥 어둡게 한 영역 또는 우상단 × 로 닫기
  */
 export default function BearStickerSheet({
   open,
@@ -130,6 +141,9 @@ export default function BearStickerSheet({
   const [magneticPreviewSlot, setMagneticPreviewSlot] = useState<number | null>(null)
   const [boardCompleteModalOpen, setBoardCompleteModalOpen] = useState(false)
   const [boardCompleteConfetti, setBoardCompleteConfetti] = useState(false)
+  /** 닫힐 때 짧은 페이드아웃 후 언마운트(바텀시트 대신 중앙 팝업용) */
+  const [overlayMounted, setOverlayMounted] = useState(false)
+  const [overlayVisible, setOverlayVisible] = useState(false)
 
   /** 드래그 중인 grant id (포인터는 window 에서 추적) */
   const dragRef = useRef<{
@@ -160,6 +174,24 @@ export default function BearStickerSheet({
     [grants, placedGrantIds],
   )
 
+  /**
+   * 종이 위 좌표 effect 의존성은 항상 같은 개수·순서여야 합니다.
+   * 배열(unplacedGrants 등)을 그대로 deps 에 넣거나 실수로 스프레드하면 길이가 바뀌어 React 가 오류를 냅니다.
+   */
+  const paperFloatLayoutKey = useMemo(() => {
+    const grantPart = unplacedGrants
+      .map((g) => g.id)
+      .slice()
+      .sort()
+      .join(',')
+    const placePart = placements
+      .map((p) => `${p.grant_id}:${p.board_slot ?? 'n'}`)
+      .slice()
+      .sort()
+      .join(';')
+    return `${grantPart}#${placePart}`
+  }, [unplacedGrants, placements])
+
   const occupiedSlots = useMemo(() => {
     const s = new Set<number>()
     for (const p of placements) {
@@ -168,7 +200,25 @@ export default function BearStickerSheet({
     return s
   }, [placements])
 
-  const filledSlotCount = occupiedSlots.size
+  useEffect(() => {
+    if (open) {
+      setOverlayMounted(true)
+      const id = requestAnimationFrame(() => setOverlayVisible(true))
+      return () => cancelAnimationFrame(id)
+    }
+    setOverlayVisible(false)
+    const t = window.setTimeout(() => setOverlayMounted(false), 220)
+    return () => window.clearTimeout(t)
+  }, [open])
+
+  useEffect(() => {
+    if (!overlayMounted) return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = prev
+    }
+  }, [overlayMounted])
 
   useEffect(() => {
     if (!open) {
@@ -183,30 +233,75 @@ export default function BearStickerSheet({
     return () => window.clearTimeout(t)
   }, [boardCompleteConfetti])
 
-  /** 종이 안 기본 위치(미배치 스티커) */
+  /**
+   * 종이 위 미배치 스티커 시작 위치
+   * - 예전: unplaced 목록에서의 인덱스 i 로만 찍어서, 선물이 하나씩만 쌓일 때마다 i=0 → 항상 같은 점
+   * - 지금: BEAR_PAPER_ZONE 안에서 랜덤 + 이미 칸에 붙은 슬롯 중심·다른 플로팅 스티커와 최소 거리 유지
+   */
   useEffect(() => {
     if (!open) return
     setFloatPos((prev) => {
       const next: Record<string, { x: number; y: number }> = { ...prev }
-      unplacedGrants.forEach((g, i) => {
-        if (next[g.id] == null) {
-          const { left, top, width, height } = BEAR_PAPER_ZONE
-          const cols = 3
-          const col = i % cols
-          const row = Math.floor(i / cols)
-          // 종이 안 중앙~약간 아래에 겹치지 않게 배치
-          next[g.id] = {
-            x: left + width * (0.28 + col * 0.22),
-            y: top + height * (0.35 + row * 0.28),
-          }
-        }
-      })
       for (const id of Object.keys(next)) {
         if (!unplacedGrants.some((g) => g.id === id)) delete next[id]
       }
+
+      const slotCenters: { x: number; y: number }[] = []
+      for (const p of placements) {
+        if (p.board_slot == null) continue
+        const c = slotCenterPercent(p.board_slot)
+        if (c) slotCenters.push(c)
+      }
+
+      const { left, top, width, height } = BEAR_PAPER_ZONE
+      const padX = width * 0.1
+      const padY = height * 0.12
+      const xMin = left + padX
+      const yMin = top + padY
+      const xSpan = Math.max(width - 2 * padX, 0.02)
+      const ySpan = Math.max(height - 2 * padY, 0.02)
+
+      const farFromAll = (x: number, y: number, pts: { x: number; y: number }[]) =>
+        pts.every((p) => Math.hypot(x - p.x, y - p.y) >= MIN_FLOAT_STICKER_SEP_PCT)
+
+      /** 이미 판에 붙은 칸 + 종이 위에서 이미 자리 잡은 스티커 — 새 좌표는 이들과 떨어져야 함 */
+      let avoidPoints: { x: number; y: number }[] = [...slotCenters]
+
+      for (const g of unplacedGrants) {
+        const existing = next[g.id]
+        if (existing != null) {
+          avoidPoints.push(existing)
+          continue
+        }
+
+        let chosen: { x: number; y: number } | null = null
+        for (let attempt = 0; attempt < 56; attempt++) {
+          const x = xMin + Math.random() * xSpan
+          const y = yMin + Math.random() * ySpan
+          if (farFromAll(x, y, avoidPoints)) {
+            chosen = { x, y }
+            break
+          }
+        }
+
+        if (!chosen) {
+          const { u, v } = spreadFromGrantId(g.id)
+          chosen = { x: xMin + u * xSpan, y: yMin + v * ySpan }
+          for (let step = 0; step < 16 && !farFromAll(chosen.x, chosen.y, avoidPoints); step++) {
+            chosen = {
+              x: xMin + ((u + step * 0.09) % 1) * xSpan,
+              y: yMin + ((v + step * 0.13) % 1) * ySpan,
+            }
+          }
+        }
+
+        next[g.id] = chosen
+        avoidPoints.push(chosen)
+      }
+
       return next
     })
-  }, [open, unplacedGrants])
+  }, [open, paperFloatLayoutKey])
 
   const grantSpriteKey = useCallback(
     (grantId: string) => grants.find((g) => g.id === grantId)?.sprite_key ?? 'tag.png',
@@ -249,31 +344,41 @@ export default function BearStickerSheet({
     [occupiedSlots],
   )
 
+  /**
+   * 숫자 칸에 붙이기 — 브라우저에서 Supabase 직접 insert 시 부모 미리보기 세션은 RLS 에 걸립니다.
+   * 서버 API 가 family_links·지급 행을 검증한 뒤 service_role(또는 자녀 RLS)로 저장합니다.
+   */
   const placeOnSlot = useCallback(
     async (grantId: string, slot: number) => {
       if (occupiedSlots.has(slot) || placing) return
       const c = slotCenterPercent(slot)
       if (!c) return
       setPlacing(true)
-      const supabase = createClient()
-      const { data, error } = await supabase
-        .from('praise_sticker_placements')
-        .insert({
-          grant_id: grantId,
-          child_id: childId,
-          board_slot: slot,
-          x_ratio: c.x / 100,
-          y_ratio: c.y / 100,
-          scale_ratio: 1,
+      let data: PraiseStickerPlacement | null = null
+      try {
+        const res = await fetch('/api/praise-sticker/place', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            childId,
+            grantId,
+            boardSlot: slot,
+            xRatio: c.x / 100,
+            yRatio: c.y / 100,
+            scaleRatio: 1,
+          }),
         })
-        .select('id, grant_id, child_id, x_ratio, y_ratio, scale_ratio, board_slot, created_at')
-        .single()
-
-      setPlacing(false)
-      if (error) {
-        console.error('[bear sticker slot]', error.message)
-        return
+        const json = (await res.json()) as { placement?: PraiseStickerPlacement; error?: string }
+        if (!res.ok) {
+          console.error('[bear sticker slot]', json.error ?? res.statusText)
+          setPlacing(false)
+          return
+        }
+        if (json.placement) data = json.placement
+      } catch (e) {
+        console.error('[bear sticker slot]', e instanceof Error ? e.message : String(e))
       }
+      setPlacing(false)
       if (data) {
         const wasOneAwayFromFull = occupiedSlots.size === SLOT_TOTAL - 1
         setPlacements((prev) => [...prev, data as PraiseStickerPlacement])
@@ -413,21 +518,49 @@ export default function BearStickerSheet({
 
   return (
     <>
-    <ChildBottomSheetShell open={open} onClose={onClose} titleId={TITLE_ID} compact>
-      <div className="flex min-h-0 flex-1 flex-col px-2 pb-3 pt-1">
-        <h2 id={TITLE_ID} className="sr-only">
-          곰돌이 스티커 판
-        </h2>
+      {overlayMounted ? (
+      <div
+        className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-5"
+        role="dialog"
+        aria-modal
+        aria-labelledby={TITLE_ID}
+      >
+        {/* 반투명 딤: 스티커판만 돋보이게, 카드형 하늘 배경은 쓰지 않음 */}
+        <button
+          type="button"
+          className={`absolute inset-0 bg-black/45 transition-opacity duration-200 ease-out ${
+            overlayVisible ? 'opacity-100' : 'opacity-0'
+          }`}
+          onClick={onClose}
+          aria-label="닫기"
+        />
 
-        <div className="relative mx-auto w-full max-w-md flex-1 overflow-hidden rounded-2xl bg-sky-100/40">
+        <div
+          className={`relative z-10 w-full max-w-md transition-opacity duration-200 ease-out ${
+            overlayVisible ? 'opacity-100' : 'opacity-0'
+          }`}
+        >
+          <h2 id={TITLE_ID} className="sr-only">
+            곰돌이 스티커 판
+          </h2>
+          {/* 추가 패널 배경 없음 — 아틀라스 스티커판 이미지가 전부 */}
           <div
             ref={boardRef}
-            className="relative mx-auto w-full max-h-[78vh]"
+            className="relative mx-auto w-full max-h-[min(88vh,820px)] overflow-hidden rounded-2xl shadow-[0_12px_40px_rgba(0,0,0,0.2)]"
             style={{ aspectRatio: BEAR_BOARD_ASPECT }}
           >
+            {/* 보드 그림 위 우측 상단 닫기(별도 카드 없이 팝업만) */}
+            <button
+              type="button"
+              onClick={onClose}
+              className="absolute right-2 top-2 z-40 flex h-9 w-9 items-center justify-center rounded-full border border-white/50 bg-white/90 text-lg font-light leading-none text-gray-800 shadow-md backdrop-blur-[2px] transition hover:bg-white active:scale-95"
+              aria-label="닫기"
+            >
+              <span aria-hidden>×</span>
+            </button>
             <BearBoardFromAtlas atlas={atlas} />
 
-            {/* 1~20 드롭 영역(투명, 약한 테두리로 위치 가늠 — 터치는 넉넉한 원) */}
+            {/* 1~20 드롭 영역(투명, 약한 테두리 — 터치는 넉넉한 원) */}
             {Array.from({ length: SLOT_TOTAL }, (_, i) => i + 1).map((slot) => {
               const c = slotCenterPercent(slot)
               if (!c) return null
@@ -455,7 +588,6 @@ export default function BearStickerSheet({
               )
             })}
 
-            {/* 슬롯에 붙은 스티커 */}
             {placements.map((p) => {
               if (p.board_slot == null) return null
               const c = slotCenterPercent(p.board_slot)
@@ -476,7 +608,6 @@ export default function BearStickerSheet({
               )
             })}
 
-            {/* 종이 위 플로팅 스티커 */}
             {unplacedGrants.map((g) => {
               const pos = floatPos[g.id]
               if (!pos) return null
@@ -499,45 +630,8 @@ export default function BearStickerSheet({
             })}
           </div>
         </div>
-
-        <div
-          className="mt-2 flex flex-col gap-1 px-1"
-          aria-live="polite"
-          aria-atomic="true"
-        >
-          <div className="flex items-center justify-between text-xs font-bold text-gray-600">
-            <span>스티커 판 진행</span>
-            <span className="tabular-nums text-brand-blue">
-              {filledSlotCount}/{SLOT_TOTAL}
-            </span>
-          </div>
-          <div
-            className="h-2 w-full overflow-hidden rounded-full bg-white/60 ring-1 ring-gray-200/80"
-            role="progressbar"
-            aria-valuenow={filledSlotCount}
-            aria-valuemin={0}
-            aria-valuemax={SLOT_TOTAL}
-            aria-label={`숫자 칸에 붙인 스티커 ${filledSlotCount}개, 비어 있는 칸 ${SLOT_TOTAL - filledSlotCount}개`}
-          >
-            <div
-              className="h-full rounded-full bg-gradient-to-r from-sky-400 to-brand-blue transition-all duration-300"
-              style={{ width: `${(filledSlotCount / SLOT_TOTAL) * 100}%` }}
-            />
-          </div>
-          <p className="text-[10px] leading-tight text-gray-500">
-            1~{SLOT_TOTAL}번 빈 칸 위로 가져가면 자석처럼 붙어요. 이미 붙은 칸에는 놓을 수 없어요.
-          </p>
-        </div>
-
-        <button
-          type="button"
-          onClick={onClose}
-          className="mt-3 w-full shrink-0 rounded-2xl border-2 border-gray-200 bg-white py-3.5 text-sm font-bold text-gray-600 shadow-sm transition active:scale-[0.99]"
-        >
-          나가기
-        </button>
       </div>
-    </ChildBottomSheetShell>
+      ) : null}
 
     <PraiseGiftConfetti active={boardCompleteConfetti} />
     <BearBoardCompleteModal

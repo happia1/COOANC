@@ -14,6 +14,16 @@ export function getSeoulDateString(d: Date = new Date()): string {
 }
 
 /**
+ * DB에 저장된 완료 시각(ISO 문자열 등)을 **서울 달력 날짜** YYYY-MM-DD 로 바꿉니다.
+ * - 화면에 `completed_at.slice(0, 10)` 만 쓰면 UTC 날짜라, 한국 새벽·자정 직후에 어제 날짜로 보일 수 있습니다.
+ */
+export function getSeoulDateFromIsoTimestamp(iso: string): string | null {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return null
+  return getSeoulDateString(d)
+}
+
+/**
  * 서울 기준 현재 시각을 `HH:MM`(24시간)으로 돌려줍니다.
  * 루틴 알람(기상 시각)과 문자열 비교할 때 사용합니다.
  */
@@ -37,6 +47,18 @@ export function addSeoulCalendarDays(isoDate: string, deltaDays: number): string
   const [y, m, d] = isoDate.split('-').map(Number)
   const u = Date.UTC(y, m - 1, d + deltaDays)
   return getSeoulDateString(new Date(u))
+}
+
+/**
+ * 지금 시각부터 **서울 달력**이 다음 날 0시가 되기까지 남은 밀리초입니다.
+ * - 한국은 일광절약시간이 없어 `+09:00` 고정으로 다음날 자정을 잡습니다.
+ * - 탭을 밤새 켜 둔 경우 `setTimeout`으로 목록이 자정에 맞춰 비우도록 쓸 때 사용합니다.
+ */
+export function getMsUntilNextSeoulMidnight(now: Date = new Date()): number {
+  const todaySeoul = getSeoulDateString(now)
+  const nextDaySeoul = addSeoulCalendarDays(todaySeoul, 1)
+  const nextMidnightKst = new Date(`${nextDaySeoul}T00:00:00+09:00`)
+  return Math.max(0, nextMidnightKst.getTime() - now.getTime())
 }
 
 /** YYYY-MM-DD → 화면용 YYYY.MM.DD */
@@ -63,4 +85,22 @@ export function getSeoulWeekdayShort(isoDate: string): string {
   const utcNoonKst = Date.UTC(y, mo - 1, d, 3, 0, 0)
   const idx = new Date(utcNoonKst).getUTCDay()
   return KO_WEEKDAY_SHORT[idx]
+}
+
+/**
+ * 해당 서울 달력 날짜가 속한 주의 **월요일** 날짜(YYYY-MM-DD)를 돌려줍니다.
+ * - 한 주는 월요일~일요일로 잡습니다(부모 홈 루틴 막대와 동일).
+ * - JavaScript `getUTCDay()`는 일=0 … 토=6 이라, 월요일까지 거슬러 올라갈 일수는 `(요일+6)%7` 입니다.
+ */
+export function getSeoulMondayOfWeekContaining(isoDate: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(isoDate)
+  if (!m) return isoDate
+  const y = Number(m[1])
+  const mo = Number(m[2])
+  const d = Number(m[3])
+  if (!y || !mo || !d) return isoDate
+  const utcNoonKst = Date.UTC(y, mo - 1, d, 3, 0, 0)
+  const weekday = new Date(utcNoonKst).getUTCDay()
+  const daysSinceMonday = (weekday + 6) % 7
+  return addSeoulCalendarDays(isoDate, -daysSinceMonday)
 }

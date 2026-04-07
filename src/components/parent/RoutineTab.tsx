@@ -11,6 +11,7 @@
 
 import { useState, useEffect, useLayoutEffect, useMemo, useCallback } from 'react'
 import { createPortal } from 'react-dom'
+import { usePathname } from 'next/navigation'
 import { useParentStore } from '@/store/parentStore'
 import ChildProfileNav, { type ChildTab } from '@/components/parent/ChildProfileNav'
 import { CompactChildProfileCard } from '@/components/parent/CompactChildProfileCard'
@@ -337,6 +338,7 @@ function missionsLinkedToChild(list: Mission[], childId: string | null): Mission
 }
 
 export default function RoutineTab({ missions: initial, children, todayDailyMissions = [] }: Props) {
+  const pathname = usePathname()
   const { selectedChildId, setSelectedChildId } = useParentStore()
   /** multiline: 긴 안내(예: API hint) — 줄바꿈·너비·표시 시간 확대 */
   const [toast, setToast] = useState<{
@@ -396,6 +398,17 @@ export default function RoutineTab({ missions: initial, children, todayDailyMiss
       /* ignore */
     }
   }, [hasSchool])
+
+  /** 홈의 코칭 카드에서 `#parent-routine-special-missions` 로 올 때 스페셜 미션 블록이 보이도록 스크롤(Next 클라이언트 전환 대응) */
+  useEffect(() => {
+    if (pathname !== '/parent/routine') return
+    const id = 'parent-routine-special-missions'
+    if (typeof window === 'undefined' || window.location.hash !== `#${id}`) return
+    const t = window.setTimeout(() => {
+      document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 120)
+    return () => window.clearTimeout(t)
+  }, [pathname])
 
   const tabs: ChildTab[] = children.map((c) => ({ id: c.id, name: c.name }))
 
@@ -634,7 +647,7 @@ export default function RoutineTab({ missions: initial, children, todayDailyMiss
       )}
 
       {/* 스페셜: 매일 반복하지 않는 미션 — 자녀 앱에서 팝업·카드로 전달 (헤더·빈 상태는 일상 미션과 동일 패턴) */}
-      <section>
+      <section id="parent-routine-special-missions">
         <div className="mb-1.5 flex items-center justify-between gap-2">
           <h2 className="text-sm font-bold text-gray-800">스페셜 미션</h2>
           {/* 일상 미션과 동일: 연필 아이콘으로 추가·편집 시트 열기 */}

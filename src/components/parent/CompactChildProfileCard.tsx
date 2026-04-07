@@ -3,9 +3,18 @@
  * - 왼쪽: 아바타 + 이름 + 크레딧·하트·연속일 + (나이) — 오른쪽 레벨 블록과 비슷한 높이로 맞춤
  * - 오른쪽: Lv·단계 이름(이모지 없이 텍스트만)
  * - 홈에서만: 하단 전체 너비로 오늘 미션 달성률
+ *
+ * 통계 줄(크레딧·하트·연속)의 그림은 `public/assets/img/common/ui/icons.png` 한 장을 잘라 쓰는
+ * 스프라이트입니다. 자녀 홈 알약·미션 카드와 같은 자산을 써서 화면 전체 톤을 맞춥니다.
  */
 
+import SpriteImage from '@/components/common/SpriteImage'
+import { ICONS } from '@/constants/sprites'
+
 const LEVEL_NAMES = ['씨앗', '새싹', '교환사', '저축왕', '나눔이', '투자가']
+
+/** 프로필 한 줄에 맞게 아이콘만 살짝 작게(숫자 옆 데코용) */
+const STAT_ICON_PX = 18
 
 /** 홈 탭에서만 넘기면 카드 안에 오늘 미션 달성률 바가 붙습니다 */
 export type ProfileMissionSummary = {
@@ -80,18 +89,38 @@ export function CompactChildProfileCard({
               </p>
             )}
 
+            {/**
+             * 크레딧·하트·연속: 글자 대신 icons.png 안의 `credits`·`heart`·`timer` 조각을 보여 줍니다.
+             * (연속은 불 아이콘이 시트에 없어, ‘매일 이어짐’에 가깝게 타이머 프레임을 사용합니다.)
+             * 읽기 도구용 설명은 아래 `aria-label`에 그대로 한글로 남깁니다.
+             */}
             <div
               className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[11px] font-bold tabular-nums leading-tight sm:gap-x-3 sm:text-sm"
-              aria-label="크레딧, 하트, 연속 미션 일수"
+              aria-label={`크레딧 ${credits.toLocaleString()}, 하트 ${hearts}, 연속 미션 ${streakDays}일`}
             >
-              <span className="text-[#4A90E2]" title="크레딧">
-                크레딧 {credits.toLocaleString()}
+              <span className="inline-flex items-center gap-1 text-[#4A90E2]" title="크레딧">
+                <span className="inline-flex shrink-0" aria-hidden>
+                  <SpriteImage
+                    sheet={ICONS}
+                    frame="credits"
+                    width={STAT_ICON_PX}
+                    clipRotated={false}
+                    className="select-none"
+                  />
+                </span>
+                {credits.toLocaleString()}
               </span>
-              <span className="text-rose-500" title="하트">
-                하트 {hearts}
+              <span className="inline-flex items-center gap-1 text-rose-500" title="하트(경험치)">
+                <span className="inline-flex shrink-0" aria-hidden>
+                  <SpriteImage sheet={ICONS} frame="heart" width={STAT_ICON_PX} className="select-none" />
+                </span>
+                {hearts}
               </span>
-              <span className="text-amber-600" title="연속 미션 일수">
-                연속 {streakDays}일
+              <span className="inline-flex items-center gap-1 text-amber-600" title="연속 미션 일수">
+                <span className="inline-flex shrink-0" aria-hidden>
+                  <SpriteImage sheet={ICONS} frame="timer" width={STAT_ICON_PX} className="select-none" />
+                </span>
+                {streakDays}일
               </span>
             </div>
           </div>

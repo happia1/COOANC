@@ -3,14 +3,19 @@
 /**
  * 부모 앱 「홈」 탭 본문입니다.
  * - 위쪽에서 자녀를 바꾸면(◀▶ 또는 스와이프) 아래 카드·통계가 그 아이 기준으로 바뀝니다.
- * - 「우리아이 경제 EQ 지수」는 선택한 자녀 기준 차트·코칭 블록이며, 미션 완료 시 막대가 갱신됩니다.
+ * - 「우리아이 경제 EQ 지수」패널 안에서는 AI 피드백이 위, 차트·코칭이 아래 순서입니다. 미션 완료 시 막대가 갱신됩니다.
  * - 프로필 카드를 누르면 그 아이의 「자녀용 앱 화면」(미션·홈 등)으로 들어갑니다(쿠키 설정 후 /home).
+ * - 맨 아래 「최근 활동」은 처음엔 접혀 있고, 헤더를 누르면 목록이 펼쳐집니다(루틴 탭 접기와 같은 화살표 동작).
  */
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import { addSeoulCalendarDays, getSeoulDateString } from '@/lib/koreaDate'
+import {
+  addSeoulCalendarDays,
+  getSeoulDateString,
+  getSeoulMondayOfWeekContaining,
+} from '@/lib/koreaDate'
 import { buildWeeklyRoutineDays, type WeeklyRoutineDay } from '@/lib/childWeeklyRoutine'
 import { useParentStore } from '@/store/parentStore'
 import ChildProfileNav, { type ChildTab } from '@/components/parent/ChildProfileNav'
@@ -26,6 +31,24 @@ const LEVELS = [
   { level: 4, name: '나눔이' },
   { level: 5, name: '투자가' },
 ] as const
+
+/**
+ * 최근 활동 카드 헤더용: 펼침이면 화살표가 위(접기), 접힘이면 아래(펼치기) — RoutineTab 의 ChevronToggleIcon 과 동일 패턴입니다.
+ */
+function RecentActivityChevron({ open, className }: { open: boolean; className?: string }) {
+  return (
+    <svg
+      className={`${className ?? ''} h-4 w-4 shrink-0 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      aria-hidden
+    >
+      <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
 
 export type ChildSummary = {
   id: string
@@ -57,7 +80,7 @@ export type ChildSummary = {
     completedAt: string
     creditEarned: number
   }[]
-  /** 최근 7일 루틴 막대 — 서버에서 채우고, 클라이언트에서 미션 변경 시 다시 불러옵니다. */
+  /** 이번 주(월~일) 루틴 막대 — 서버에서 채우고 Realtime 으로 갱신합니다. */
   weeklyRoutine: WeeklyRoutineDay[]
 }
 
@@ -75,6 +98,9 @@ export default function HomeTab({ childrenData, pendingCount }: Props) {
 
   /** 선택 자녀가 바뀌면 서버에서 받은 주간 막대 데이터로 맞춘 뒤, Realtime 으로 최신화합니다. */
   const [weeklyRoutine, setWeeklyRoutine] = useState<WeeklyRoutineDay[]>(child?.weeklyRoutine ?? [])
+
+  /** 하단 「최근 활동」 목록 — 기본 접힘, 헤더 클릭으로만 펼침 */
+  const [recentActivityOpen, setRecentActivityOpen] = useState(false)
 
   // 자녀 목록이 바뀌면(삭제 등) 선택 id 가 없거나 목록에 없으면 첫 자녀로 맞춤
   useEffect(() => {
@@ -96,6 +122,11 @@ export default function HomeTab({ childrenData, pendingCount }: Props) {
     setWeeklyRoutine(child.weeklyRoutine)
   }, [child?.id, child?.weeklyRoutine])
 
+  // 다른 자녀로 바꾸면 최근 활동도 다시 접어 두어 화면이 덜 복잡해 보이게 함
+  useEffect(() => {
+    setRecentActivityOpen(false)
+  }, [child?.id])
+
   useEffect(() => {
     if (!child) return
 
@@ -103,13 +134,14 @@ export default function HomeTab({ childrenData, pendingCount }: Props) {
 
     const loadWeek = async () => {
       const today = getSeoulDateString()
-      const start = addSeoulCalendarDays(today, -6)
+      const weekStart = getSeoulMondayOfWeekContaining(today)
+      const weekEnd = addSeoulCalendarDays(weekStart, 6)
       const { data, error } = await supabase
         .from('daily_missions')
         .select('date, is_completed')
         .eq('child_id', child.id)
-        .gte('date', start)
-        .lte('date', today)
+        .gte('date', weekStart)
+        .lte('date', weekEnd)
 
       if (error) {
         console.error('[parent home] weekly routine:', error.message)
@@ -221,24 +253,40 @@ export default function HomeTab({ childrenData, pendingCount }: Props) {
             childName={child.name}
           />
 
-          {/* 최근 활동 로그 */}
+          {/* 최근 활동: 토글 헤더(기본 접힘) + 펼칠 때만 미션 완료 로그 목록 */}
           {child.recentActivity.length > 0 && (
-            <div className="bg-white rounded-2xl p-4 shadow-sm">
-              <p className="text-sm font-bold text-gray-700 mb-3">최근 활동</p>
-              <div className="flex flex-col gap-2">
-                {child.recentActivity.map((act, i) => (
-                  <div key={i} className="flex items-center gap-3">
-                    <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-gray-100 text-xs font-black text-gray-600">
-                      {act.missionTitle.slice(0, 1)}
-                    </span>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold text-gray-700 truncate">{act.missionTitle}</p>
-                      <p className="text-[10px] text-gray-400">{act.completedAt.slice(0, 10)}</p>
+            <div className="overflow-hidden rounded-2xl bg-white shadow-sm">
+              <button
+                type="button"
+                onClick={() => setRecentActivityOpen((o) => !o)}
+                aria-expanded={recentActivityOpen}
+                aria-label={recentActivityOpen ? '최근 활동 접기' : '최근 활동 펼치기'}
+                className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-gray-50 active:bg-gray-50/80"
+              >
+                <div className="flex min-w-0 flex-1 items-center gap-2">
+                  <span className="text-sm font-bold text-gray-700">최근 활동</span>
+                  <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-bold text-gray-500">
+                    {child.recentActivity.length}
+                  </span>
+                </div>
+                <RecentActivityChevron open={recentActivityOpen} className="text-gray-400" />
+              </button>
+              {recentActivityOpen ? (
+                <div className="flex flex-col gap-2 border-t border-gray-100 px-4 pb-4 pt-3">
+                  {child.recentActivity.map((act, i) => (
+                    <div key={i} className="flex items-center gap-3">
+                      <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-gray-100 text-xs font-black text-gray-600">
+                        {act.missionTitle.slice(0, 1)}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-bold text-gray-700">{act.missionTitle}</p>
+                        <p className="text-[10px] text-gray-400">{act.completedAt.slice(0, 10)}</p>
+                      </div>
+                      <span className="flex-shrink-0 text-xs font-bold text-[#4A90E2]">+{act.creditEarned}</span>
                     </div>
-                    <span className="text-xs font-bold text-[#4A90E2] flex-shrink-0">+{act.creditEarned}</span>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              ) : null}
             </div>
           )}
         </>

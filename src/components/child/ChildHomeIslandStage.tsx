@@ -3,7 +3,10 @@
 import Image from 'next/image'
 import SpriteImage from '@/components/common/SpriteImage'
 import { CharacterSprite } from '@/components/sprites/CharacterSprite'
-import { PIGGY_BANK } from '@/constants/sprites'
+import FloatingCreditsStackVisual from '@/components/child/FloatingCreditsStackVisual'
+import PiggyBankStageVisual from '@/components/child/PiggyBankStageVisual'
+import { piggyBankStageCount } from '@/constants/piggyBankStages'
+import { ICONS } from '@/constants/sprites'
 
 /**
  * bunny.png 아틀라스에서 정면에 가까운 프레임.
@@ -40,32 +43,36 @@ const ISLAND_IMAGE_SRC = {
 } as const
 
 /**
- * `public/assets/img/items/piggy-bank/piggy_bank.png` 510×255 아틀라스(레이어 284 폭은 코드·JSON 에서 124px 로 보정).
- * 앞이 더 비어 있고 뒤로 갈수록 차는 그림 순서입니다.
- */
-const PIGGY_BANK_FILL_FRAMES = [
-  '레이어 279',
-  '레이어 280',
-  '레이어 281',
-  '레이어 282',
-  '레이어 283',
-  '레이어 284',
-  '레이어 285',
-  '레이어 286',
-] as const
-
-/**
- * 오늘 미션 완료 개수와 전체 개수로, 위 배열 중 몇 번째 그림을 쓸지 정합니다.
+ * 오늘 미션 완료 개수와 전체 개수로, 단계 인덱스를 고릅니다.
  * - 미션 0개면 항상 가장 빈 그림(0번)
  * - 전부 완료면 가장 찬 그림(마지막)
  * - 그 사이는 비율로 중간 프레임을 고릅니다 (미션이 3개면 0→1→2→3 단계로 나뉨)
  */
 function piggyBankFrameIndex(completed: number, total: number): number {
-  const n = PIGGY_BANK_FILL_FRAMES.length
+  const n = piggyBankStageCount()
   if (n <= 1) return 0
   if (total <= 0) return 0
   const safeDone = Math.max(0, Math.min(completed, total))
   return Math.round((safeDone / total) * (n - 1))
+}
+
+/** 저금통에 넣은 비율로 그림이 차 보이게(미션 완료 수 대신 금액 기반) */
+function piggyBankFrameIndexFromPiggy(piggy: number, totalCredits: number): number {
+  const n = piggyBankStageCount()
+  if (n <= 1) return 0
+  const t = Math.max(1, totalCredits)
+  const ratio = Math.max(0, Math.min(1, piggy / t))
+  return Math.round(ratio * (n - 1))
+}
+
+/** 미션 섬: 저금통(왼쪽)·지갑(오른쪽)·가운데 크레딧(동전 더미 아이콘) — 탭하면 옮기기 시트가 뜹니다 */
+export type MissionCreditIslandProps = {
+  floating: number
+  wallet: number
+  piggy: number
+  onCenterTap: () => void
+  onWalletTap: () => void
+  onPiggyTap: () => void
 }
 
 type Props = {
@@ -78,9 +85,16 @@ type Props = {
   density?: 'default' | 'viewportFit' | 'flex'
   /**
    * 미션 탭 전용: 오늘 완료한 미션 수 / 오늘 전체 미션 수.
-   * 넘기면 섬 위에 저금통 스프라이트가 올라가고, 완료 비율에 맞춰 프레임이 바뀝니다.
+   * `missionCredits` 가 없을 때만 섬 위 단일 저금통(완료 비율)을 씁니다.
    */
   missionPiggy?: { completed: number; total: number }
+  /** 지갑·저금통·섬(가용) 분리 UI — 있으면 `missionPiggy` 단일 저금통은 숨깁니다 */
+  missionCredits?: MissionCreditIslandProps
+  /**
+   * false: 섬·바다·잔디가 그려진 큰 PNG(`kids_background_island*.png`)를 그리지 않습니다.
+   * 미션 탭처럼 잔디 느낌만 빼고 저금통·지갑·크레딧 UI 는 그대로 둘 때 씁니다.
+   */
+  showIslandArt?: boolean
 }
 
 /**
@@ -92,6 +106,8 @@ export default function ChildHomeIslandStage({
   scene = 'bunny',
   density = 'default',
   missionPiggy,
+  missionCredits,
+  showIslandArt = true,
 }: Props) {
   const src = ISLAND_IMAGE_SRC[scene]
   const box =
@@ -105,25 +121,31 @@ export default function ChildHomeIslandStage({
       ? 'pointer-events-none absolute inset-x-0 bottom-0 z-0 flex justify-center overflow-visible -translate-y-1 sm:-translate-y-2'
       : 'pointer-events-none absolute inset-x-0 bottom-0 z-0 flex justify-center overflow-visible'
 
+  const totalMissionCredits =
+    missionCredits != null
+      ? missionCredits.floating + missionCredits.wallet + missionCredits.piggy
+      : 0
   const piggyIdx =
     scene === 'gippybank' && missionPiggy
       ? piggyBankFrameIndex(missionPiggy.completed, missionPiggy.total)
-      : 0
-  const piggyFrame = PIGGY_BANK_FILL_FRAMES[piggyIdx]
-
+      : scene === 'gippybank' && missionCredits
+        ? piggyBankFrameIndexFromPiggy(missionCredits.piggy, totalMissionCredits)
+        : 0
   /** 섬·토끼·돼지 레이어 (flex / 비-flex 공통 JSX) */
   const stageLayers = (
     <>
-      <div className={islandLayerClass}>
-        <Image
-          src={src}
-          alt=""
-          width={900}
-          height={420}
-          className="h-auto w-[118%] max-w-none select-none object-contain object-bottom [transform:translateY(4%)]"
-          priority={scene === 'gippybank'}
-        />
-      </div>
+      {showIslandArt ? (
+        <div className={islandLayerClass}>
+          <Image
+            src={src}
+            alt=""
+            width={900}
+            height={420}
+            className="h-auto w-[118%] max-w-none select-none object-contain object-bottom [transform:translateY(4%)]"
+            priority={scene === 'gippybank'}
+          />
+        </div>
+      ) : null}
 
       {scene === 'bunny' ? (
         <div className="pointer-events-none absolute inset-x-0 bottom-[7%] z-[2] flex justify-center">
@@ -163,20 +185,99 @@ export default function ChildHomeIslandStage({
         </div>
       ) : null}
 
-      {scene === 'gippybank' && missionPiggy ? (
+      {scene === 'gippybank' && missionCredits ? (
+        <>
+          {/**
+           * 가운데: 아직 나누지 않은 크레딧 — `public/.../credits.png` 스프라이트에서
+           * 금액이 클수록 「더 많이 쌓인」 그림 칸을 골라 보여 줍니다.
+           * 금액이 0이면 흐리게만 표시하고, 탭해도 시트가 뜨지 않게 부모에서 막습니다.
+           */}
+          <div className="pointer-events-auto absolute bottom-[20%] left-1/2 z-[4] flex -translate-x-1/2 flex-col items-center sm:bottom-[22%]">
+            <button
+              type="button"
+              disabled={missionCredits.floating <= 0}
+              onClick={missionCredits.onCenterTap}
+              aria-label={
+                showIslandArt
+                  ? `섬에 쌓인 크레딧 ${missionCredits.floating}. 눌러서 지갑이나 저금통으로 옮기기`
+                  : `아직 나누지 않은 크레딧 ${missionCredits.floating}. 눌러서 지갑이나 저금통으로 옮기기`
+              }
+              className={`flex flex-col items-center rounded-2xl px-2 pb-1 pt-0.5 transition-transform active:scale-[0.97] ${
+                missionCredits.floating <= 0 ? 'opacity-45' : ''
+              }`}
+            >
+              <div className="flex h-[56px] w-[68px] items-end justify-center">
+                <FloatingCreditsStackVisual
+                  floating={missionCredits.floating}
+                  dimWhenEmpty={false}
+                  displayWidth={58}
+                  className="drop-shadow-[0_4px_12px_rgba(0,0,0,0.18)]"
+                />
+              </div>
+              <span className="mt-0.5 rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-black tabular-nums text-brand-blue shadow-sm ring-1 ring-black/5">
+                {missionCredits.floating.toLocaleString('ko-KR')}
+              </span>
+            </button>
+          </div>
+
+          {/** 왼쪽 아래: 저금통 (예전 오른쪽 위치를 좌측으로 옮김) */}
+          <div className="pointer-events-auto absolute bottom-[7%] left-[2%] z-[4] sm:bottom-[8%] sm:left-[4%]">
+            <button
+              type="button"
+              onClick={missionCredits.onPiggyTap}
+              aria-label={`저금통 크레딧 ${missionCredits.piggy}. 눌러서 옮기기`}
+              className="flex flex-col items-center rounded-2xl p-1 transition-transform active:scale-[0.97]"
+            >
+              {/** 표시 너비를 지갑(`wallet` 56px)과 같게 해 좌·우 아이콘 밸런스를 맞춤 */}
+              {/**
+               * 단계 그림은 `piggyBankStages.ts` 에서 URL 목록 또는 합성 PNG 의 픽셀 영역으로 정합니다.
+               * 규격 그리드(3x3) 가 아니어도 됩니다.
+               */}
+              <div className="flex h-[56px] w-[56px] items-end justify-center">
+                <PiggyBankStageVisual
+                  stepIndex={piggyIdx}
+                  displayWidth={56}
+                  className="drop-shadow-[0_6px_14px_rgba(0,0,0,0.2)]"
+                />
+              </div>
+              {/** 아이콘과 숫자가 겹치지 않게 위쪽 여백을 둡니다. */}
+              <span className="mt-1 rounded-full bg-sky-50 px-2 py-px text-[9px] font-black tabular-nums text-sky-900 shadow-sm ring-1 ring-sky-200/80">
+                {missionCredits.piggy.toLocaleString('ko-KR')}
+              </span>
+            </button>
+          </div>
+
+          {/** 오른쪽 아래: 지갑 (예전 왼쪽 위치를 우측으로 옮김) */}
+          <div className="pointer-events-auto absolute bottom-[8%] right-[4%] z-[4] sm:bottom-[9%] sm:right-[6%]">
+            <button
+              type="button"
+              onClick={missionCredits.onWalletTap}
+              aria-label={`지갑 크레딧 ${missionCredits.wallet}. 눌러서 옮기기`}
+              className="flex flex-col items-center rounded-2xl p-1 transition-transform active:scale-[0.97]"
+            >
+              <SpriteImage sheet={ICONS} frame="wallet" width={56} clipRotated={false} className="drop-shadow-lg" />
+              {/** 아이콘과 숫자가 겹치지 않게 위쪽 여백을 둡니다. */}
+              <span className="mt-1 rounded-full bg-amber-50 px-2 py-px text-[9px] font-black tabular-nums text-amber-900 shadow-sm ring-1 ring-amber-200/80">
+                {missionCredits.wallet.toLocaleString('ko-KR')}
+              </span>
+            </button>
+          </div>
+        </>
+      ) : scene === 'gippybank' && missionPiggy ? (
         <div className="pointer-events-none absolute inset-x-0 bottom-[11%] z-[2] flex justify-center overflow-visible sm:bottom-[12%]">
           <div
             role="img"
             aria-label={`오늘 미션 저금통 ${missionPiggy.completed}개 완료, 전체 ${missionPiggy.total}개`}
             className="origin-bottom translate-y-0.5 transition-transform duration-500 ease-out"
           >
-            <SpriteImage
-              sheet={PIGGY_BANK}
-              frame={piggyFrame}
-              width={118}
-              clipRotated={false}
-              className="select-none drop-shadow-[0_6px_14px_rgba(0,0,0,0.2)]"
-            />
+            {/** 단일 저금통 표시도 같은 단계 규칙(`piggyBankStages.ts`)을 씁니다. */}
+            <div className="flex h-[118px] w-[118px] items-end justify-center">
+              <PiggyBankStageVisual
+                stepIndex={piggyIdx}
+                displayWidth={118}
+                className="drop-shadow-[0_6px_14px_rgba(0,0,0,0.2)]"
+              />
+            </div>
           </div>
         </div>
       ) : null}

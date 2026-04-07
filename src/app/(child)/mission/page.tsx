@@ -16,14 +16,7 @@ import { getActorChildContext } from '@/lib/getActorChildContext'
 import MissionTab from '@/components/child/MissionTab'
 import { getSeoulDateString } from '@/lib/koreaDate'
 import { uuidStringsEqual } from '@/lib/normalizeUuid'
-import type {
-  BadgeRow,
-  ChildStats,
-  DailyMissionWithTemplate,
-  Mission,
-  PraiseStickerGrant,
-  PraiseStickerPlacement,
-} from '@/types/database'
+import type { ChildStats, DailyMissionWithTemplate, Mission } from '@/types/database'
 
 type RoutineType = 'weekday' | 'weekend' | 'holiday' | 'vacation'
 
@@ -68,50 +61,16 @@ export default async function MissionPage() {
   const ctx = await getActorChildContext()
   const supabase = await createClient()
   const childId = ctx.actorChildId
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
 
   const today = getSeoulDateString()
 
-  const [statsRes, familyRes, profileRes, earnedRes, allBadgesRes, grantsRes, placementsRes] =
-    await Promise.all([
-      supabase.from('child_stats').select('*').eq('child_id', childId).maybeSingle(),
-      supabase.from('family_links').select('parent_id').eq('child_id', childId).limit(1).maybeSingle(),
-      supabase.from('profiles').select('name, role').eq('id', childId).maybeSingle(),
-      supabase.from('child_badges').select('badge_id, earned_at').eq('child_id', childId),
-      supabase
-        .from('badges')
-        .select('badge_id, name, description, icon_emoji, badge_type, condition')
-        .order('badge_type', { ascending: true }),
-      supabase
-        .from('praise_sticker_grants')
-        .select('*')
-        .eq('child_id', childId)
-        .order('created_at', { ascending: false }),
-      supabase.from('praise_sticker_placements').select('*').eq('child_id', childId),
-    ])
+  const [statsRes, familyRes] = await Promise.all([
+    supabase.from('child_stats').select('*').eq('child_id', childId).maybeSingle(),
+    supabase.from('family_links').select('parent_id').eq('child_id', childId).limit(1).maybeSingle(),
+  ])
 
   const initialStats = (statsRes.data ?? null) as ChildStats | null
   const level = initialStats?.current_level ?? 0
-
-  const earnedMap: Record<string, string> = {}
-  for (const row of earnedRes.data ?? []) {
-    earnedMap[row.badge_id] = row.earned_at
-  }
-  const growthMapData = {
-    badges: (allBadgesRes.data ?? []) as BadgeRow[],
-    earnedMap,
-    level: initialStats?.current_level ?? 0,
-    streak: initialStats?.streak_days ?? 0,
-    longestStreak: initialStats?.longest_streak ?? 0,
-  }
-
-  const meta = user?.user_metadata as { name?: string } | undefined
-  const childName =
-    profileRes.data?.name?.trim() ||
-    (ctx.sessionUserId === childId && typeof meta?.name === 'string' ? meta.name.trim() : '') ||
-    '쿠앵이'
 
   const parentId = familyRes.data?.parent_id ?? null
 
@@ -200,11 +159,7 @@ export default async function MissionPage() {
   return (
     <MissionTab
       childId={childId}
-      childName={childName}
       initialStats={initialStats}
-      growthMapData={growthMapData}
-      initialPraiseGrants={(grantsRes.data ?? []) as PraiseStickerGrant[]}
-      initialPraisePlacements={(placementsRes.data ?? []) as PraiseStickerPlacement[]}
       dailyMissions={dailyMissions}
       today={today}
       isFullRestDay={fullRest}

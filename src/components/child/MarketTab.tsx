@@ -1,17 +1,35 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { StoreItem, PurchaseRequest } from '@/types/database'
 import SpriteImage from '@/components/common/SpriteImage'
 import { MARKET_ITEMS, SHOP_ANIMATIONS, ICONS } from '@/constants/sprites'
+import MarketPurchaseConfirmDialog from '@/components/child/MarketPurchaseConfirmDialog'
+import MarketPurchaseSuccessOverlay from '@/components/child/MarketPurchaseSuccessOverlay'
+import MarketRequestsBottomSheet from '@/components/child/MarketRequestsBottomSheet'
+import MarketWishlistBottomSheet from '@/components/child/MarketWishlistBottomSheet'
 import { createClient } from '@/lib/supabase/client'
 import { marketFrameKeyForItemId, type MarketItemFrameKey } from '@/lib/marketItemFrame'
+import {
+  PARENT_MARKET_MENU_SECTIONS,
+  parentMarketSectionIdForItem,
+  type ParentMarketSectionId,
+} from '@/lib/parentMarketMenuSections'
 
 type Props = {
   childId: string
-  items: StoreItem[]
+  /**
+   * 가족 기준으로 볼 수 있는 전체 마켓 상품(부모 숨김 적용 전).
+   * 숨김은 `initialHiddenStoreItemIds` + 실시간 DB 이벤트로 클라이언트에서 반영합니다.
+   */
+  marketEligibleItems: StoreItem[]
+  /** 서버에서 읽은 숨김 상품 id — 부모가 토글하면 Realtime 으로 이 목록이 갱신됩니다 */
+  initialHiddenStoreItemIds: string[]
   requests: PurchaseRequest[]
-  credits: number
+  /** 마켓 결제에 쓰는 지갑 크레딧(섬·저금통에 둔 것 제외) */
+  creditsWallet: number
+  /** 장바구니(서버 `market_wishlist_items`)에 담은 상품 id */
+  initialWishlistItemIds: string[]
   level: number
 }
 
@@ -26,20 +44,267 @@ type DeliveryPhase = 'shipping' | 'parachute'
 type DeliveryOverlay = {
   request: PurchaseRequest
   frame: MarketItemFrameKey
+  /** 같은 상품의 `store_items.image_url` — 있으면 연출에도 실제 사진을 씀 */
+  itemImageUrl: string | null
   phase: DeliveryPhase
 }
 
+/** `public/assets/img/layouts/backgrounds/market_roof.png` — 브라우저에서는 /public 기준 경로 */
 const ROOF_SRC = '/assets/img/layouts/backgrounds/market_roof.png'
 
-export default function MarketTab({ childId, items, requests, credits, level }: Props) {
-  const [currentCredits, setCurrentCredits] = useState(credits)
+/** 선반 3단을 한 화면에 넣기 위한 카드·썸네일 크기(가로 스크롤 행 안에서 사용) */
+const SHELF_IMG_AREA_PX = 52
+const SHELF_SPRITE_H = 44
+
+/**
+ * 배달 풀스크린 연출(「배달 시작」→「상품이 도착했어요」→「받았어요」)을 켜거나 끕니다.
+ * false 이면 연출·버튼이 안 뜹니다. 이미 `approved` 인 건은 목록에 「배송 중」으로만 보이며,
+ * 다시 true 로 켠 뒤에야 「받았어요」로 배송 완료 처리를 할 수 있습니다.
+ */
+const MARKET_DELIVERY_OVERLAY_ENABLED = false
+
+/** 구매 요청 시 부모 승인 탭 카드에 `child_message` 로 저장되는 안내 문구 */
+const MARKET_REQUEST_PARENT_NOTICE =
+  '마켓에서 크레딧으로 이 상품 구매를 요청했어요. 확인 후 승인 부탁드려요!'
+
+/** 선반에서 같은 상품을 중복 요청하지 못하게 막는 상태(진행 중인 요청이 있을 때) */
+const SHELF_BLOCK_STATUSES: PurchaseRequest['status'][] = ['pending', 'parent_buying', 'approved']
+
+export default function MarketTab({
+  childId,
+  marketEligibleItems,
+  initialHiddenStoreItemIds,
+  requests,
+  creditsWallet,
+  initialWishlistItemIds,
+  level,
+}: Props) {
+  const [currentWallet, setCurrentWallet] = useState(creditsWallet)
+  const [wishlistIds, setWishlistIds] = useState<string[]>(() => [...initialWishlistItemIds])
   const [myRequests, setMyRequests] = useState<PurchaseRequest[]>(requests)
-  const [pendingItems, setPendingItems] = useState<Set<string>>(
-    new Set(requests.filter((r) => r.status === 'pending' && r.item_id).map((r) => r.item_id!)),
+  /** 부모가 마켓에서 숨긴 상품 id — INSERT 되면 추가, DELETE 되면 제거(자녀 화면에 곧바로 반영) */
+  const [hiddenStoreItemIds, setHiddenStoreItemIds] = useState<string[]>(() =>
+    [...initialHiddenStoreItemIds].sort(),
   )
+  /** 서버가 다시 내려줄 때(탭 재진입 등) 숨김 목록을 초기값과 맞춤 — 내용 문자열만 비교 */
+  const hiddenBootstrapKey = useMemo(
+    () => `${childId}|${[...initialHiddenStoreItemIds].sort().join('|')}`,
+    [childId, initialHiddenStoreItemIds],
+  )
+  // 서버 스냅샷이 바뀐 경우에만(키 문자열로 구분) — 배열 참조만 다른 재렌더에서는 실시간 상태를 덮어쓰지 않음
+  useEffect(() => {
+    setHiddenStoreItemIds([...initialHiddenStoreItemIds].sort())
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- initialHiddenStoreItemIds 는 hiddenBootstrapKey 에 반영됨
+  }, [hiddenBootstrapKey])
+
+  const wishlistBootstrapKey = useMemo(
+    () => `${childId}|${[...initialWishlistItemIds].sort().join('|')}`,
+    [childId, initialWishlistItemIds],
+  )
+  useEffect(() => {
+    setWishlistIds([...initialWishlistItemIds])
+  }, [wishlistBootstrapKey, initialWishlistItemIds])
+
+  useEffect(() => {
+    setCurrentWallet(creditsWallet)
+  }, [creditsWallet])
+
+  /** 장바구니가 비면 열린 시트를 자동으로 닫아 빈 화면을 막음 */
+  useEffect(() => {
+    if (wishlistIds.length === 0) setWishlistSheetOpen(false)
+  }, [wishlistIds.length])
+
+  /** 미션·옮기기 등으로 child_stats 가 바뀌면 지갑 잔액을 맞춤 */
+  useEffect(() => {
+    const supabase = createClient()
+    const channel = supabase
+      .channel(`market_child_stats:${childId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'child_stats',
+          filter: `child_id=eq.${childId}`,
+        },
+        (payload) => {
+          const patch = payload.new as Record<string, unknown>
+          setCurrentWallet((w0) =>
+            typeof patch.credits_wallet === 'number' ? patch.credits_wallet : w0,
+          )
+        },
+      )
+      .subscribe()
+    return () => {
+      void supabase.removeChannel(channel)
+    }
+  }, [childId])
+
+  /** 숨김을 제외한 실제 선반에 올릴 상품 */
+  const visibleItems = useMemo(() => {
+    const hidden = new Set(hiddenStoreItemIds)
+    return marketEligibleItems.filter((item) => !hidden.has(item.id))
+  }, [marketEligibleItems, hiddenStoreItemIds])
+
+  /**
+   * 부모 「메뉴 제어」와 같은 순서(간식 → 장난감 → 이벤트 → 기타)로 구역을 나눕니다.
+   * digital(캐릭터 꾸미기) 상품은 페이지에서 걸러져 오지 않습니다.
+   */
+  const marketSectionsWithShelves = useMemo(() => {
+    const buckets: Record<ParentMarketSectionId, StoreItem[]> = {
+      snack: [],
+      toy: [],
+      event: [],
+      other: [],
+    }
+    for (const item of visibleItems) {
+      buckets[parentMarketSectionIdForItem(item.category)].push(item)
+    }
+    const sortInSection = (a: StoreItem, b: StoreItem) =>
+      a.credit_price !== b.credit_price
+        ? a.credit_price - b.credit_price
+        : a.name.localeCompare(b.name, 'ko')
+    for (const id of Object.keys(buckets) as ParentMarketSectionId[]) {
+      buckets[id].sort(sortInSection)
+    }
+    type Block = {
+      sectionKey: ParentMarketSectionId
+      title: string
+      items: StoreItem[]
+    }
+    const sections: Block[] = []
+    for (const sec of PARENT_MARKET_MENU_SECTIONS) {
+      const items = buckets[sec.id]
+      if (items.length === 0) continue
+      sections.push({
+        sectionKey: sec.id,
+        title: sec.title,
+        items,
+      })
+    }
+    if (buckets.other.length > 0) {
+      sections.push({
+        sectionKey: 'other',
+        title: '기타',
+        items: buckets.other,
+      })
+    }
+    return sections
+  }, [visibleItems])
+
+  /** 노출 중인 상품 중 크레딧이 가장 비싼 칸에 BEST 뱃지 */
+  const bestItemId = useMemo(
+    () =>
+      visibleItems.reduce<string | null>((best, item) => {
+        if (!best) return item.id
+        const bestItem = visibleItems.find((i) => i.id === best)!
+        return item.credit_price > bestItem.credit_price ? item.id : best
+      }, null),
+    [visibleItems],
+  )
+
+  const wishlistItemsResolved = useMemo(
+    () => marketEligibleItems.filter((i) => wishlistIds.includes(i.id)),
+    [marketEligibleItems, wishlistIds],
+  )
+  const wishlistTotalCredits = useMemo(
+    () => wishlistItemsResolved.reduce((acc, i) => acc + i.credit_price, 0),
+    [wishlistItemsResolved],
+  )
+  const wishlistShortage = Math.max(0, wishlistTotalCredits - currentWallet)
+
+  const shelfBlockedItemIds = useMemo(() => {
+    const s = new Set<string>()
+    for (const r of myRequests) {
+      if (r.item_id && SHELF_BLOCK_STATUSES.includes(r.status)) s.add(r.item_id)
+    }
+    return s
+  }, [myRequests])
+
+  /**
+   * [디버그] 마켓 선반 상태를 한 번에 기록합니다.
+   * - H1: 진행 중 요청 때문에 item_id 가 차단 집합에 들어갔는지
+   * - H2/H3: level vs level_required 로 회색 처리되는지, level_required 가 비정상인지
+   * - H4: 지갑 잔액 값
+   */
+  useEffect(() => {
+    const blockedIds = Array.from(shelfBlockedItemIds)
+    const blockingRequests = myRequests
+      .filter((r) => r.item_id && SHELF_BLOCK_STATUSES.includes(r.status))
+      .map((r) => ({
+        requestId: r.id,
+        item_id: r.item_id,
+        status: r.status,
+        item_name: r.item_name,
+      }))
+    const snackRows = visibleItems
+      .filter((i) => parentMarketSectionIdForItem(i.category) === 'snack')
+      .map((i) => {
+        const lr = i.level_required
+        const meetsLevel = level >= lr
+        return {
+          id: i.id,
+          name: i.name,
+          level_required: lr,
+          level_requiredIsFinite: Number.isFinite(lr),
+          childLevel: level,
+          meetsLevel,
+          isPendingBlocked: shelfBlockedItemIds.has(i.id),
+          canAfford: currentWallet >= i.credit_price,
+        }
+      })
+    // #region agent log
+    fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '9263e0' },
+      body: JSON.stringify({
+        sessionId: '9263e0',
+        runId: 'pre-fix',
+        hypothesisId: 'H1-H5',
+        location: 'MarketTab.tsx:shelfDebugEffect',
+        message: 'market shelf snapshot',
+        data: {
+          childId,
+          currentWallet,
+          blockedIds,
+          blockingRequests,
+          snackRows,
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {})
+    // #endregion
+  }, [
+    childId,
+    currentWallet,
+    level,
+    myRequests,
+    shelfBlockedItemIds,
+    visibleItems,
+  ])
+
+  /** 부모가 「상품 구매하기」를 눌렀을 때 — 외부 주문 안내 */
+  const [parentShopNoticeOpen, setParentShopNoticeOpen] = useState(false)
+  const [requestsSheetOpen, setRequestsSheetOpen] = useState(false)
+  /** 장바구니 요약·미션 이동은 플로팅 버튼 → 슬라이딩 시트로만 노출 */
+  const [wishlistSheetOpen, setWishlistSheetOpen] = useState(false)
+  const [purchaseCelebrationOpen, setPurchaseCelebrationOpen] = useState(false)
+
+  const dismissPurchaseCelebration = useCallback(() => setPurchaseCelebrationOpen(false), [])
+
+  const hasActiveRequestPipeline = useMemo(
+    () =>
+      myRequests.some((r) =>
+        r.status === 'pending' || r.status === 'parent_buying' || r.status === 'approved',
+      ),
+    [myRequests],
+  )
+
   const [loading, setLoading] = useState<string | null>(null)
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null)
   const [selected, setSelected] = useState<SelectedInfo | null>(null)
+  /** 선반 카드 탭 시 — 구매 / 장바구니 담기 를 고르는 하단 액션 시트 */
+  const [shelfActionFor, setShelfActionFor] = useState<SelectedInfo | null>(null)
   const [delivery, setDelivery] = useState<DeliveryOverlay | null>(null)
   /** 배달 연출이 끝난 뒤 「받았어요」 버튼을 잠깐 뒤에 보여 줍니다 */
   const [showReceiveBtn, setShowReceiveBtn] = useState(false)
@@ -51,21 +316,69 @@ export default function MarketTab({ childId, items, requests, credits, level }: 
     setTimeout(() => setToast(null), 2500)
   }
 
-  /** 다음 배달 연출을 꺼내거나, 대기 줄에 넣습니다 */
-  const offerDelivery = useCallback((req: PurchaseRequest) => {
-    if (req.status !== 'approved') return
-    setDelivery((cur) => {
-      if (!cur) {
-        return {
-          request: req,
-          frame: marketFrameKeyForItemId(req.item_id, req.item_name),
-          phase: 'shipping',
+  const dismissPurchaseDialog = useCallback(() => setSelected(null), [])
+
+  const [wishBusy, setWishBusy] = useState<string | null>(null)
+
+  /** 장바구니에 담기/빼기 — 성공 시 true (토스트는 호출 쪽에서 선택) */
+  const toggleWishlist = useCallback(
+    async (storeItemId: string): Promise<boolean> => {
+      if (wishBusy) return false
+      const inList = wishlistIds.includes(storeItemId)
+      setWishBusy(storeItemId)
+      try {
+        const res = await fetch('/api/market/wishlist', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: inList ? 'remove' : 'add', storeItemId, childId }),
+        })
+        const json = await res.json().catch(() => ({}))
+        if (!res.ok) {
+          showToast(typeof json.error === 'string' ? json.error : '처리에 실패했어요', false)
+          return false
         }
+        setWishlistIds((prev) =>
+          inList ? prev.filter((id) => id !== storeItemId) : [...prev, storeItemId],
+        )
+        return true
+      } catch {
+        showToast('네트워크 오류가 났어요', false)
+        return false
+      } finally {
+        setWishBusy(null)
       }
-      deliveryWaitRef.current.push(req)
-      return cur
-    })
+    },
+    [childId, wishBusy, wishlistIds],
+  )
+
+  /** API 성공 후 확인 팝업이 닫힌 뒤 축하 연출(콘페티·낙하산) */
+  const onPurchaseDialogSuccessDismiss = useCallback(() => {
+    setSelected(null)
+    setPurchaseCelebrationOpen(true)
   }, [])
+
+  /** 다음 배달 연출을 꺼내거나, 대기 줄에 넣습니다 */
+  const offerDelivery = useCallback(
+    (req: PurchaseRequest) => {
+      if (!MARKET_DELIVERY_OVERLAY_ENABLED) return
+      if (req.status !== 'approved') return
+      const linked = req.item_id ? marketEligibleItems.find((i) => i.id === req.item_id) : undefined
+      const itemImageUrl = linked?.image_url ?? null
+      setDelivery((cur) => {
+        if (!cur) {
+          return {
+            request: req,
+            frame: marketFrameKeyForItemId(req.item_id, req.item_name),
+            itemImageUrl,
+            phase: 'shipping',
+          }
+        }
+        deliveryWaitRef.current.push(req)
+        return cur
+      })
+    },
+    [marketEligibleItems],
+  )
 
   /** 연출 종료 후 대기 중인 다음 요청이 있으면 이어서 재생합니다 */
   const finishDeliveryAndDequeue = useCallback(() => {
@@ -79,23 +392,21 @@ export default function MarketTab({ childId, items, requests, credits, level }: 
     }
   }, [offerDelivery])
 
-  /** 부모가 승인하면 같은 상품은 더 이상 「요청 중」이 아님 */
-  const onRequestApproved = useCallback((req: PurchaseRequest) => {
-    if (req.item_id) {
-      setPendingItems((prev) => {
-        const n = new Set(prev)
-        n.delete(req.item_id!)
-        return n
-      })
-    }
-    offerDelivery(req)
-  }, [offerDelivery])
+  /** 부모가 승인하면 배달 연출 큐에 넣음(연출 플래그가 켜져 있을 때만) */
+  const onRequestApproved = useCallback(
+    (req: PurchaseRequest) => {
+      offerDelivery(req)
+    },
+    [offerDelivery],
+  )
 
   /**
    * 첫 진입 시 이미 「승인」된 요청이 있으면 순서대로 연출합니다.
    * 동시에 여러 건이 있으면 첫 건만 바로 재생하고 나머지는 대기 줄에 넣습니다(상태 배치 충돌 방지).
    */
   useEffect(() => {
+    if (!MARKET_DELIVERY_OVERLAY_ENABLED) return
+
     const approved = requests
       .filter((r) => r.status === 'approved')
       .sort((a, b) => (a.approved_at ?? '').localeCompare(b.approved_at ?? ''))
@@ -110,6 +421,31 @@ export default function MarketTab({ childId, items, requests, credits, level }: 
     const supabase = createClient()
     const channel = supabase
       .channel(`market_pr:${childId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'child_market_hidden_items',
+          filter: `child_id=eq.${childId}`,
+        },
+        (payload) => {
+          // 부모가 메뉴에서 숨김/표시를 바꾸면 여기서 즉시 선반 목록을 갱신합니다
+          if (payload.eventType === 'INSERT') {
+            const row = payload.new as { store_item_id?: string } | null
+            const sid = row?.store_item_id
+            if (sid) {
+              setHiddenStoreItemIds((prev) => (prev.includes(sid) ? prev : [...prev, sid]))
+            }
+          } else if (payload.eventType === 'DELETE') {
+            const oldRow = payload.old as { store_item_id?: string } | null
+            const sid = oldRow?.store_item_id
+            if (sid) {
+              setHiddenStoreItemIds((prev) => prev.filter((id) => id !== sid))
+            }
+          }
+        },
+      )
       .on(
         'postgres_changes',
         {
@@ -136,15 +472,14 @@ export default function MarketTab({ childId, items, requests, credits, level }: 
           if (row.status === 'approved' && old?.status === 'pending') {
             onRequestApproved(row)
           }
-          if (row.status === 'rejected' && old?.status === 'pending') {
-            if (row.item_id) {
-              setPendingItems((prev) => {
-                const n = new Set(prev)
-                n.delete(row.item_id!)
-                return n
-              })
-            }
-            setCurrentCredits((c) => c + row.item_price)
+          if (row.status === 'approved' && old?.status === 'parent_buying') {
+            onRequestApproved(row)
+          }
+          if (row.status === 'parent_buying' && old?.status === 'pending') {
+            setParentShopNoticeOpen(true)
+          }
+          if (row.status === 'rejected' && (old?.status === 'pending' || old?.status === 'parent_buying')) {
+            setCurrentWallet((w) => w + row.item_price)
           }
           if (row.status === 'delivered') {
             setMyRequests((prev) => prev.map((r) => (r.id === row.id ? row : r)))
@@ -158,8 +493,45 @@ export default function MarketTab({ childId, items, requests, credits, level }: 
     }
   }, [childId, onRequestApproved])
 
+  /**
+   * Realtime 퍼블리케이션(036)이 없거나 이벤트가 안 올 때도 부모 숨김이 반영되도록
+   * DB 에서 숨김 id 목록을 다시 읽습니다. (탭 포커스·주기 폴링)
+   */
+  useEffect(() => {
+    const supabase = createClient()
+    let cancelled = false
+
+    const pullHiddenIdsFromDb = async () => {
+      const { data, error } = await supabase
+        .from('child_market_hidden_items')
+        .select('store_item_id')
+        .eq('child_id', childId)
+      if (cancelled || error) return
+      const sorted = (data ?? []).map((r: { store_item_id: string }) => r.store_item_id).sort()
+      setHiddenStoreItemIds(sorted)
+    }
+
+    void pullHiddenIdsFromDb()
+    const intervalId = window.setInterval(() => {
+      if (document.visibilityState === 'visible') void pullHiddenIdsFromDb()
+    }, 5000)
+    const onVisibleOrFocus = () => {
+      if (document.visibilityState === 'visible') void pullHiddenIdsFromDb()
+    }
+    document.addEventListener('visibilitychange', onVisibleOrFocus)
+    window.addEventListener('focus', onVisibleOrFocus)
+
+    return () => {
+      cancelled = true
+      window.clearInterval(intervalId)
+      document.removeEventListener('visibilitychange', onVisibleOrFocus)
+      window.removeEventListener('focus', onVisibleOrFocus)
+    }
+  }, [childId])
+
   /** 「배송 중」단계가 잠시 지나면 낙하산 도착 단계로 넘깁니다 */
   useEffect(() => {
+    if (!MARKET_DELIVERY_OVERLAY_ENABLED) return
     if (!delivery || delivery.phase !== 'shipping') return
     const t = window.setTimeout(() => {
       setDelivery((d) => (d && d.request.id === delivery.request.id ? { ...d, phase: 'parachute' } : d))
@@ -169,6 +541,7 @@ export default function MarketTab({ childId, items, requests, credits, level }: 
 
   /** 낙하산 단계에서 버튼은 애니메이션이 거의 끝난 뒤에 표시합니다 */
   useEffect(() => {
+    if (!MARKET_DELIVERY_OVERLAY_ENABLED) return
     if (!delivery || delivery.phase !== 'parachute') {
       setShowReceiveBtn(false)
       return
@@ -177,35 +550,101 @@ export default function MarketTab({ childId, items, requests, credits, level }: 
     return () => window.clearTimeout(t)
   }, [delivery])
 
+  /** 카드 탭: 바로 구매 확인으로 가지 않고, 먼저 「구매 / 장바구니」액션 시트를 띄웁니다 */
   function handleItemClick(item: StoreItem, frame: MarketItemFrameKey) {
-    if (pendingItems.has(item.id) || loading) return
-    if (currentCredits < item.credit_price || level < item.level_required) return
-    setSelected({ item, frame })
+    const blocked = shelfBlockedItemIds.has(item.id)
+    if (blocked || loading) {
+      // #region agent log
+      fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '9263e0' },
+        body: JSON.stringify({
+          sessionId: '9263e0',
+          runId: 'pre-fix',
+          hypothesisId: 'H1',
+          location: 'MarketTab.tsx:handleItemClick',
+          message: blocked ? 'click ignored: shelf blocked' : 'click ignored: loading',
+          data: {
+            itemId: item.id,
+            itemName: item.name,
+            shelfBlocked: blocked,
+            loading: !!loading,
+          },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {})
+      // #endregion
+      return
+    }
+    setShelfActionFor({ item, frame })
   }
 
-  async function submitRequest() {
-    if (!selected) return
+  const dismissShelfAction = useCallback(() => setShelfActionFor(null), [])
+
+  /** 액션 시트에서 「구매」— 잔액·레벨이 될 때만 구매 확인 다이얼로그로 넘깁니다 */
+  const openPurchaseFromShelfAction = useCallback(() => {
+    if (!shelfActionFor) return
+    const { item, frame } = shelfActionFor
+    if (currentWallet < item.credit_price || level < item.level_required) return
+    setShelfActionFor(null)
+    setSelected({ item, frame })
+  }, [shelfActionFor, currentWallet, level])
+
+  /** 액션 시트에서 장바구니 담기/빼기 */
+  const cartFromShelfAction = useCallback(async () => {
+    if (!shelfActionFor) return
+    const id = shelfActionFor.item.id
+    const wasIn = wishlistIds.includes(id)
+    const ok = await toggleWishlist(id)
+    if (ok) {
+      showToast(wasIn ? '장바구니에서 뺐어요' : '장바구니에 담았어요')
+      dismissShelfAction()
+    }
+  }, [shelfActionFor, wishlistIds, toggleWishlist, dismissShelfAction])
+
+  /** 액션 시트에 쓰는 구매 가능 여부·안내 문구(카드 탭 시점의 상품 기준) */
+  const shelfActionBuyMeta = useMemo(() => {
+    if (!shelfActionFor) return null
+    const it = shelfActionFor.item
+    const levelOk = level >= it.level_required
+    const affordOk = currentWallet >= it.credit_price
+    return {
+      it,
+      canBuy: levelOk && affordOk,
+      levelOk,
+      affordOk,
+    }
+  }, [shelfActionFor, level, currentWallet])
+
+  /** 구매 요청 API — 성공 시 다이얼로그가 바로 닫힘 */
+  async function submitPurchaseRequest(): Promise<boolean> {
+    if (!selected) return false
     const { item } = selected
-    setSelected(null)
     setLoading(item.id)
     try {
       const res = await fetch('/api/market/request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ itemId: item.id, childId }),
+        body: JSON.stringify({
+          itemId: item.id,
+          childId,
+          childMessage: MARKET_REQUEST_PARENT_NOTICE,
+        }),
       })
       const text = await res.text()
       const json = text ? JSON.parse(text) : {}
       if (!res.ok) {
         showToast(json.error ?? '요청에 실패했어요', false)
-        return
+        return false
       }
-      setCurrentCredits((c) => c - item.credit_price)
-      setPendingItems((prev) => new Set([...prev, item.id]))
+      if (typeof json.credits_wallet === 'number') setCurrentWallet(json.credits_wallet)
+      else setCurrentWallet((w) => w - item.credit_price)
       if (json.request) setMyRequests((prev) => [json.request as PurchaseRequest, ...prev])
       showToast('부모님께 요청했어요!')
+      return true
     } catch {
       showToast('네트워크 오류가 발생했어요', false)
+      return false
     } finally {
       setLoading(null)
     }
@@ -215,50 +654,20 @@ export default function MarketTab({ childId, items, requests, credits, level }: 
     if (!delivery) return
     setLoading('delivery')
     try {
-      /* 임시: 「받았어요」 버그 원인 파악용 — 로컬 디버그 서버로만 전송, 배포 전 제거 예정 */
-      // #region agent log
-      fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '59d117' },
-        body: JSON.stringify({
-          sessionId: '59d117',
-          location: 'MarketTab.tsx:completeDeliveryFlow:start',
-          message: '받았어요 클릭 후 API 호출 직전',
-          data: {
-            requestIdLen: delivery.request.id?.length ?? 0,
-            propsChildIdLen: childId?.length ?? 0,
-          },
-          timestamp: Date.now(),
-          hypothesisId: 'H2',
-        }),
-      }).catch(() => {})
-      // #endregion
       const res = await fetch('/api/market/complete-delivery', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requestId: delivery.request.id }),
+        /** 부모 미리보기 시에도 완료 API가 올바른 자녀 행을 찾도록 페이지와 같은 childId 를 넘깁니다 */
+        body: JSON.stringify({ requestId: delivery.request.id, childId }),
       })
       const text = await res.text()
-      // #region agent log
-      fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '59d117' },
-        body: JSON.stringify({
-          sessionId: '59d117',
-          location: 'MarketTab.tsx:completeDeliveryFlow:afterFetch',
-          message: 'API 응답 수신',
-          data: {
-            status: res.status,
-            ok: res.ok,
-            textLen: text.length,
-            textLooksJson: text.trim().startsWith('{'),
-          },
-          timestamp: Date.now(),
-          hypothesisId: 'H4',
-        }),
-      }).catch(() => {})
-      // #endregion
-      const json = text ? JSON.parse(text) : {}
+      let json: { error?: string } = {}
+      try {
+        json = text ? JSON.parse(text) : {}
+      } catch {
+        showToast('네트워크 오류가 발생했어요', false)
+        return
+      }
       if (!res.ok) {
         showToast(json.error ?? '완료 처리에 실패했어요', false)
         return
@@ -272,39 +681,19 @@ export default function MarketTab({ childId, items, requests, credits, level }: 
       showToast('상품을 받았어요!')
       finishDeliveryAndDequeue()
     } catch {
-      // #region agent log
-      fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '59d117' },
-        body: JSON.stringify({
-          sessionId: '59d117',
-          location: 'MarketTab.tsx:completeDeliveryFlow:catch',
-          message: 'completeDeliveryFlow 예외',
-          data: {},
-          timestamp: Date.now(),
-          hypothesisId: 'H4',
-        }),
-      }).catch(() => {})
-      // #endregion
       showToast('네트워크 오류가 발생했어요', false)
     } finally {
       setLoading(null)
     }
   }
 
-  const shelfItems = items.slice(0, 9)
-  const bestItemId = shelfItems.reduce<string | null>((best, item) => {
-    if (!best) return item.id
-    const bestItem = shelfItems.find((i) => i.id === best)!
-    return item.credit_price > bestItem.credit_price ? item.id : best
-  }, null)
-
-  const rows = [shelfItems.slice(0, 3), shelfItems.slice(3, 6), shelfItems.slice(6, 9)]
-
-  // 레이아웃이 화면 높이 고정(`h-dvh`)이므로 마켓은 이 안에서만 세로 스크롤 (`min-h-0 flex-1` = 메인에 꽉 참)
+  /**
+   * 마켓 본문: 지붕은 고정(shrink-0), 선반은 세로 스크롤(flex-1), 크레딧은 하단 고정 바(지갑·동전·숫자).
+   * 스프라이트는 `public/assets/img/common/ui/icons.png`(상수 `ICONS`)를 사용합니다.
+   */
   return (
     <div
-      className="-mx-4 -mt-4 flex min-h-0 flex-1 flex-col overflow-y-auto pb-4"
+      className="-mx-4 -mt-4 flex min-h-0 flex-1 flex-col overflow-hidden pb-0"
       style={{ background: '#FAF5EF' }}
     >
 
@@ -318,13 +707,13 @@ export default function MarketTab({ childId, items, requests, credits, level }: 
         </div>
       )}
 
-      {/* 상단 줄무늬 지붕만 PNG 로 — 아래는 카드 진열 (배경 일러스트 제거) */}
-      <div className="w-full overflow-hidden leading-none">
-        {/* eslint-disable-next-line @next/next/no-img-element -- 정적 배너, 최적화 없이 경로만 표시 */}
+      {/* 가게 지붕: 높이 상한을 두어 그 아래 선반 3단이 한 뷰포트에 들어오기 쉽게 함 */}
+      <div className="shrink-0 w-full overflow-hidden leading-none">
+        {/* eslint-disable-next-line @next/next/no-img-element -- 정적 자산, public 경로 */}
         <img
           src={ROOF_SRC}
           alt=""
-          className="block w-full select-none"
+          className="block h-auto w-full max-h-[4.5rem] select-none object-cover object-bottom sm:max-h-[5rem]"
           draggable={false}
           onError={(e) => {
             e.currentTarget.style.display = 'none'
@@ -332,32 +721,37 @@ export default function MarketTab({ childId, items, requests, credits, level }: 
         />
       </div>
 
-      <div className="flex items-center justify-between px-5 pb-3 pt-4">
-        <div className="flex items-center gap-2">
-          <SpriteImage sheet={ICONS} frame="credits" width={28} />
-          <span className="text-2xl font-black tabular-nums text-brand-blue">{currentCredits.toLocaleString()}</span>
-          <span className="text-sm font-bold text-gray-400">크레딧</span>
-        </div>
-        <div className="rounded-full bg-white/90 px-3 py-1 text-sm font-black text-gray-500 shadow-sm">Lv.{level}</div>
-      </div>
-
-      {items.length === 0 ? (
-        <div className="flex flex-col items-center justify-center gap-3 py-24">
-          <SpriteImage sheet={ICONS} frame="market" width={64} />
+      {visibleItems.length === 0 ? (
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 py-8">
+          <SpriteImage sheet={ICONS} frame="market" width={56} />
           <p className="font-bold text-brand-text">아직 상품이 없어요</p>
           <p className="text-sm text-gray-400">부모님이 상품을 추가해주실 거예요!</p>
         </div>
       ) : (
-        <div className="px-3 pb-2">
-          {rows.map((row, rowIdx) => (
-            <div key={rowIdx} className="mb-1">
-              <div className="grid grid-cols-3 gap-2 sm:gap-3">
-                {row.map((item) => {
+        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-1 pb-2 [scrollbar-width:thin]">
+          {marketSectionsWithShelves.map((block) => (
+            <section key={block.sectionKey} className="shrink-0">
+              <h3 className="mb-1.5 flex items-center gap-1.5 border-b border-amber-900/10 px-2 pb-1 text-[11px] font-black tracking-tight text-amber-950/90">
+                {block.title}
+                <span className="ml-auto tabular-nums text-[9px] font-bold text-amber-900/40">
+                  {block.items.length}개
+                </span>
+              </h3>
+              {/*
+                한 줄에 최대 4칸(grid-cols-4). 5번째 상품부터는 다음 줄에 이어집니다.
+              */}
+              <div className="grid grid-cols-4 gap-1.5 px-1 py-0.5">
+                {block.items.map((item) => {
                   const frameKey = marketFrameKeyForItemId(item.id, item.name)
-                  const canAfford = currentCredits >= item.credit_price
+                  const canAfford = currentWallet >= item.credit_price
                   const meetsLevel = level >= item.level_required
-                  const isPending = pendingItems.has(item.id)
-                  const isActive = canAfford && meetsLevel
+                  const isPending = shelfBlockedItemIds.has(item.id)
+                  /**
+                   * 카드 흐림(비활성) 원인 분리:
+                   * - 기존: 잔액 부족/레벨 미달 모두 흐림
+                   * - 변경: 레벨 미달만 흐림 (잔액 부족은 구매 버튼에서만 안내)
+                   */
+                  const isDimmed = !meetsLevel
                   const isBest = item.id === bestItemId
 
                   return (
@@ -365,38 +759,48 @@ export default function MarketTab({ childId, items, requests, credits, level }: 
                       key={item.id}
                       type="button"
                       onClick={() => handleItemClick(item, frameKey)}
-                      className={`relative flex flex-col rounded-2xl bg-white/95 p-2 pt-3 shadow-md ring-1 ring-black/[0.06] transition-transform active:scale-[0.98] ${
-                        isActive ? '' : 'grayscale brightness-[0.72]'
+                      className={`relative flex min-w-0 w-full flex-col rounded-xl bg-white/95 p-1 pt-1.5 shadow-md ring-1 ring-black/[0.06] transition-transform active:scale-[0.98] ${
+                        isDimmed ? 'grayscale brightness-[0.72]' : ''
                       } ${isPending ? 'opacity-60' : ''}`}
                     >
-                      {isBest && isActive && (
-                        <span className="absolute right-1 top-1 z-10 rounded-full bg-green-500 px-1.5 py-0.5 text-[8px] font-black leading-none text-white">
+                      {isBest && !isDimmed && (
+                        <span className="absolute right-0.5 top-0.5 z-10 rounded-full bg-green-500 px-1 py-px text-[7px] font-black leading-none text-white">
                           BEST
                         </span>
                       )}
                       {isPending && (
-                        <span className="absolute left-1 top-1 z-10 text-xs" aria-hidden>
+                        <span className="absolute left-0.5 top-0.5 z-10 text-[10px]" aria-hidden>
                           ⏳
                         </span>
                       )}
 
-                      {/*
-                        고정 높이 안에서 그림을 아래쪽에 맞춤 → 아이스크림처럼 위로 긴 상품도 잘리지 않고 위로만 자랍니다.
-                        모든 카드의 이미지 영역 크기를 같게 해서 정렬이 맞습니다.
-                      */}
-                      <div className="relative flex h-[100px] w-full items-end justify-center overflow-visible">
-                        <div className="flex max-h-[96px] max-w-[96px] items-end justify-center">
-                          <SpriteImage sheet={MARKET_ITEMS} frame={frameKey} height={88} clipRotated={false} />
+                      <div
+                        className="relative flex w-full items-end justify-center overflow-visible"
+                        style={{ height: SHELF_IMG_AREA_PX }}
+                      >
+                        <div className="flex max-h-full max-w-full items-end justify-center">
+                          {item.image_url ? (
+                            // eslint-disable-next-line @next/next/no-img-element -- 외부/스토리지 URL, 동적
+                            <img
+                              src={item.image_url}
+                              alt=""
+                              className="max-h-full max-w-full object-contain object-bottom"
+                              style={{ maxHeight: SHELF_SPRITE_H }}
+                              draggable={false}
+                            />
+                          ) : (
+                            <SpriteImage sheet={MARKET_ITEMS} frame={frameKey} height={SHELF_SPRITE_H} clipRotated={false} />
+                          )}
                         </div>
                       </div>
 
-                      <div className="mt-1 flex justify-center">
+                      <div className="mt-0.5 flex flex-col items-center gap-0.5">
                         <div
-                          className="inline-flex items-center gap-1 rounded-full border border-gray-100 bg-white px-2 py-0.5 shadow-sm"
+                          className="inline-flex max-w-full items-center gap-0.5 rounded-full border border-gray-100 bg-white px-1 py-px shadow-sm"
                           style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.06)' }}
                         >
-                          <SpriteImage sheet={ICONS} frame="credit" width={13} clipRotated={false} />
-                          <span className="text-[11px] font-black text-gray-600 tabular-nums">
+                          <SpriteImage sheet={ICONS} frame="credit" width={11} clipRotated={false} />
+                          <span className="truncate text-[8px] font-black tabular-nums text-gray-600 sm:text-[9px]">
                             {item.credit_price.toLocaleString()}
                           </span>
                         </div>
@@ -404,121 +808,242 @@ export default function MarketTab({ childId, items, requests, credits, level }: 
                     </button>
                   )
                 })}
-                {Array.from({ length: 3 - row.length }).map((_, i) => (
-                  <div key={`empty-${i}`} />
-                ))}
               </div>
-
-              {/* 선반 느낌: 아래쪽에 그림자·라인으로 층을 구분 */}
-              {rowIdx < rows.length - 1 && (
-                <div
-                  className="mx-1 mt-3 h-2 rounded-full"
-                  style={{
-                    background: 'linear-gradient(to bottom, rgba(0,0,0,0.14), rgba(0,0,0,0))',
-                    boxShadow: '0 6px 12px rgba(101, 67, 33, 0.12)',
-                  }}
-                />
-              )}
-            </div>
+            </section>
           ))}
         </div>
       )}
 
-      {myRequests.length > 0 && (
-        <section className="mt-4 px-5">
-          <p className="mb-2 text-sm font-bold text-brand-text">내 요청 현황</p>
-          <div className="flex flex-col gap-2">
-            {myRequests.slice(0, 8).map((r) => {
-              const label =
-                r.status === 'pending'
-                  ? { text: '검토 중', cls: 'bg-amber-50 text-amber-700' }
-                  : r.status === 'approved'
-                    ? { text: '배송 중', cls: 'bg-sky-50 text-sky-700' }
-                    : r.status === 'delivered'
-                      ? { text: '도착 완료', cls: 'bg-green-50 text-green-700' }
-                      : { text: '반려됨', cls: 'bg-gray-100 text-gray-500' }
-              return (
-                <div key={r.id} className="flex items-center justify-between rounded-2xl bg-white px-4 py-3 shadow-sm">
-                  <div>
-                    <p className="text-sm font-bold text-brand-text">{r.item_name}</p>
-                    <p className="text-xs text-gray-400">
-                      {r.item_price.toLocaleString()} 크레딧 · {r.requested_at.slice(0, 10)}
-                    </p>
-                  </div>
-                  <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${label.cls}`}>{label.text}</span>
-                </div>
-              )
-            })}
+      {/*
+        하단 크레딧 바(마켓 전용):
+        마켓에서 쓸 수 있는 돈은 지갑(마켓) 잔액뿐이라, 저금통 등을 합친 '전체'는 보여주지 않습니다.
+      */}
+      <div
+        className={`flex shrink-0 flex-col gap-1 border-t border-amber-900/10 bg-[#F3EBE2]/95 px-3 py-2 shadow-[0_-4px_12px_rgba(0,0,0,0.04)] backdrop-blur-[6px] sm:px-4 sm:py-2.5 ${
+          myRequests.length > 0 || wishlistIds.length > 0 ? 'pr-[4.5rem]' : ''
+        }`}
+      >
+        <div className="flex items-center gap-2 sm:gap-2.5">
+          <span className="flex shrink-0 items-center" aria-hidden>
+            <SpriteImage sheet={ICONS} frame="wallet" height={34} clipRotated={false} />
+          </span>
+          <div className="flex min-w-0 flex-1 items-baseline gap-1.5 text-gray-700">
+            {/* 요청사항: '지갑(마켓)' 텍스트 대신 크레딧 아이콘으로 의미를 표시 */}
+            <SpriteImage sheet={ICONS} frame="credit" width={16} clipRotated={false} />
+            <span className="truncate text-lg font-black tabular-nums text-amber-800 sm:text-xl">
+              {currentWallet.toLocaleString()}
+            </span>
           </div>
-        </section>
-      )}
+        </div>
+      </div>
 
-      {selected && (
+      {/*
+        플로팅 버튼 스택(오른쪽 하단):
+        - 장바구니에 담긴 게 있으면 가방 아이콘을 배송(오토바이) 버튼 **위**에 둡니다.
+        - 원형 버튼·스프라이트는 작게 두고 `gap-3` 으로 간격을 넓혀, 두 개가 붙어 보이지 않게 합니다.
+        - `bottom` 은 독바(60px) + 여유 + safe-area 로 잡아 탭바에 가리지 않게 합니다.
+        - 부모는 `pointer-events-none`, 버튼만 `pointer-events-auto` 로 배경 탭이 막히지 않게 합니다.
+      */}
+      {(wishlistIds.length > 0 || myRequests.length > 0) && (
         <div
-          className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 px-6"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setSelected(null)
+          className="pointer-events-none fixed right-4 z-[55] flex flex-col gap-3 items-end sm:right-5"
+          style={{
+            bottom: 'max(1rem, calc(60px + 0.85rem + env(safe-area-inset-bottom, 0px)))',
           }}
         >
-          <div className="w-full max-w-sm overflow-hidden rounded-3xl shadow-2xl" style={{ background: '#FFF8F0' }}>
-            <div className="flex flex-col items-center px-6 pb-3 pt-7">
+          {wishlistIds.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setWishlistSheetOpen(true)}
+              className="pointer-events-auto relative flex h-11 w-11 items-center justify-center rounded-full bg-white shadow-md ring-2 ring-amber-200/90 transition-transform active:scale-95"
+              aria-label={`장바구니 열기, ${wishlistItemsResolved.length}개`}
+            >
+              <SpriteImage sheet={ICONS} frame="bag" width={28} clipRotated={false} />
+              <span className="absolute -right-0.5 -top-0.5 flex min-h-[1rem] min-w-[1rem] items-center justify-center rounded-full bg-brand-blue px-0.5 text-[9px] font-black tabular-nums text-white ring-2 ring-white">
+                {wishlistItemsResolved.length > 99 ? '99+' : wishlistItemsResolved.length}
+              </span>
+            </button>
+          )}
+          {myRequests.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setRequestsSheetOpen(true)}
+              className={`pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full bg-white shadow-md ring-2 transition-transform active:scale-95 ${
+                hasActiveRequestPipeline ? 'ring-brand-blue/50 animate-market-moto' : 'ring-gray-200 opacity-90'
+              }`}
+              aria-label="내 요청 현황 열기"
+            >
+              <SpriteImage sheet={SHOP_ANIMATIONS} frame="delivery" width={34} clipRotated={false} />
+            </button>
+          )}
+        </div>
+      )}
+
+      <MarketWishlistBottomSheet
+        open={wishlistSheetOpen}
+        onClose={() => setWishlistSheetOpen(false)}
+        wishlistCount={wishlistItemsResolved.length}
+        wishlistTotalCredits={wishlistTotalCredits}
+        currentWallet={currentWallet}
+        wishlistShortage={wishlistShortage}
+      />
+
+      <MarketRequestsBottomSheet
+        open={requestsSheetOpen}
+        onClose={() => setRequestsSheetOpen(false)}
+        requests={myRequests}
+        marketItems={marketEligibleItems}
+      />
+
+      <MarketPurchaseSuccessOverlay open={purchaseCelebrationOpen} onDismiss={dismissPurchaseCelebration} />
+
+      {/*
+        선반 카드 탭 후: 구매(바로 결제 플로우) vs 장바구니 담기/빼기
+      */}
+      {shelfActionFor && (
+        <div
+          className="fixed inset-0 z-[88] flex items-center justify-center bg-black/45 px-4 py-8"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="market-shelf-action-title"
+        >
+          <button
+            type="button"
+            className="absolute inset-0 cursor-default"
+            aria-label="닫기"
+            onClick={dismissShelfAction}
+          />
+          {/* 독바에 가리지 않도록 중앙 고정 + 이전보다 작은 크기(절반 수준)로 제한 */}
+          <div className="relative z-[1] mx-auto w-full max-w-[18rem] rounded-3xl bg-white p-4 shadow-2xl ring-1 ring-black/[0.06]">
+            <p id="market-shelf-action-title" className="text-center text-base font-black text-brand-text">
+              {shelfActionFor.item.name}
+            </p>
+            <div className="mt-2.5 flex justify-center">
               <div
-                className="mb-3 flex items-end justify-center overflow-visible rounded-2xl bg-white/70 shadow-inner"
-                style={{ width: 112, height: 112 }}
+                className="flex h-[4.25rem] w-[4.25rem] items-end justify-center overflow-hidden rounded-2xl bg-amber-50/90 ring-1 ring-amber-100"
+                aria-hidden
               >
-                <SpriteImage sheet={MARKET_ITEMS} frame={selected.frame} height={92} clipRotated={false} />
+                {shelfActionFor.item.image_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={shelfActionFor.item.image_url}
+                    alt=""
+                    className="max-h-[3.75rem] max-w-full object-contain object-bottom"
+                    draggable={false}
+                  />
+                ) : (
+                  <SpriteImage
+                    sheet={MARKET_ITEMS}
+                    frame={shelfActionFor.frame}
+                    height={60}
+                    clipRotated={false}
+                  />
+                )}
               </div>
-              <p className="text-center text-base font-black text-brand-text">{selected.item.name}</p>
-              {selected.item.description && (
-                <p className="mt-0.5 text-center text-xs text-gray-400">{selected.item.description}</p>
+            </div>
+            <p className="mt-2 text-center text-[11px] font-bold text-gray-500">
+              <SpriteImage sheet={ICONS} frame="credit" width={12} className="inline-block align-[-2px]" clipRotated={false} />{' '}
+              <span className="tabular-nums font-black text-gray-700">
+                {shelfActionFor.item.credit_price.toLocaleString('ko-KR')}
+              </span>
+              크레딧 · 레벨 {shelfActionFor.item.level_required}+
+            </p>
+
+            {/* 액션 버튼을 한 줄 2칸으로 배치해 선택지를 직관적으로 비교 */}
+            <div className="mt-4 flex flex-col gap-2">
+              {shelfActionBuyMeta && (
+                <>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      disabled={!shelfActionBuyMeta.canBuy}
+                      onClick={openPurchaseFromShelfAction}
+                      className="rounded-2xl bg-brand-blue px-2 py-3 text-sm font-black text-white shadow-md ring-1 ring-brand-blue/20 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-500 disabled:ring-0 active:scale-[0.99] disabled:active:scale-100"
+                    >
+                      🛍️ 구매하기
+                    </button>
+                    <button
+                      type="button"
+                      disabled={wishBusy === shelfActionBuyMeta.it.id}
+                      onClick={() => void cartFromShelfAction()}
+                      className="rounded-2xl border-2 border-sky-400/80 bg-sky-50 px-2 py-3 text-sm font-black text-sky-950 shadow-sm active:scale-[0.99] disabled:opacity-50"
+                    >
+                      {wishlistIds.includes(shelfActionBuyMeta.it.id) ? '🧺 빼기' : '🧺 담기'}
+                    </button>
+                  </div>
+                  {!shelfActionBuyMeta.canBuy && (
+                    <p className="text-center text-[10px] font-bold text-orange-700/90">
+                      {!shelfActionBuyMeta.levelOk
+                        ? `레벨 ${shelfActionBuyMeta.it.level_required} 이상일 때 살 수 있어요`
+                        : !shelfActionBuyMeta.affordOk
+                          ? '지갑 크레딧이 부족해요'
+                          : null}
+                    </p>
+                  )}
+                </>
               )}
             </div>
 
-            <div className="flex h-[130px] items-end justify-between px-4 pb-2">
-              <div className="market-pop-left self-end">
-                <SpriteImage sheet={SHOP_ANIMATIONS} frame="calculating" width={108} />
-              </div>
-              <div className="flex flex-col items-center self-center">
-                <div className="min-w-[100px] rounded-2xl bg-white px-4 py-2.5 text-center shadow-md">
-                  <div className="mb-1 flex items-center justify-center gap-1">
-                    <SpriteImage sheet={ICONS} frame="credits" width={13} />
-                    <span className="text-[10px] text-gray-400">잔액</span>
-                  </div>
-                  <p className="text-lg font-black leading-none text-brand-blue">{currentCredits.toLocaleString()}</p>
-                  <p className="mt-1 text-xs font-bold text-red-400">― {selected.item.credit_price.toLocaleString()}</p>
-                  <div className="my-1.5 h-px bg-gray-100" />
-                  <p className="text-base font-black text-green-600">
-                    {(currentCredits - selected.item.credit_price).toLocaleString()}
-                  </p>
-                </div>
-              </div>
-              <div className="market-pop-right self-end">
-                <SpriteImage sheet={SHOP_ANIMATIONS} frame="paying" width={96} />
-              </div>
-            </div>
-
-            <div className="flex gap-3 px-5 pb-6 pt-2">
-              <button
-                type="button"
-                onClick={() => setSelected(null)}
-                className="flex-1 rounded-2xl border border-gray-200 bg-white py-3 text-sm font-bold text-gray-500"
-              >
-                취소
-              </button>
-              <button
-                type="button"
-                onClick={submitRequest}
-                className="flex-1 rounded-2xl bg-brand-blue py-3 text-sm font-bold text-white shadow-md active:scale-95"
-              >
-                구매 요청
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={dismissShelfAction}
+              className="mt-2.5 w-full py-2 text-sm font-bold text-gray-500"
+            >
+              닫기
+            </button>
           </div>
         </div>
       )}
 
+      {parentShopNoticeOpen && (
+        <div
+          className="fixed inset-0 z-[95] flex items-center justify-center bg-black/45 px-5"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="parent-shop-notice-title"
+        >
+          <div className="w-full max-w-sm rounded-3xl bg-white px-6 py-7 text-center shadow-2xl">
+            <div className="mx-auto mb-4 flex justify-center drop-shadow-md">
+              <SpriteImage sheet={SHOP_ANIMATIONS} frame="delivery" width={100} clipRotated={false} />
+            </div>
+            <p id="parent-shop-notice-title" className="text-lg font-black leading-snug text-brand-text">
+              제품이 오고있어요!
+              <br />
+              조금만 기다려주세요.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                setParentShopNoticeOpen(false)
+                setRequestsSheetOpen(true)
+              }}
+              className="mt-6 w-full rounded-2xl bg-brand-blue py-3.5 text-sm font-black text-white shadow-md active:scale-[0.98]"
+            >
+              내 요청 현황 보기
+            </button>
+            <button
+              type="button"
+              onClick={() => setParentShopNoticeOpen(false)}
+              className="mt-2 w-full py-2.5 text-sm font-bold text-gray-500"
+            >
+              닫기
+            </button>
+          </div>
+        </div>
+      )}
+
+      {selected && (
+        <MarketPurchaseConfirmDialog
+          selected={selected}
+          balanceBefore={currentWallet}
+          onClose={dismissPurchaseDialog}
+          onSubmit={submitPurchaseRequest}
+          onSuccessDismiss={onPurchaseDialogSuccessDismiss}
+        />
+      )}
+
       {/* 배달 연출: 승인 직후 — 체크(allow)·선물(reward) + 오토바이(delivery) 플로팅 */}
-      {delivery && delivery.phase === 'shipping' && (
+      {MARKET_DELIVERY_OVERLAY_ENABLED && delivery && delivery.phase === 'shipping' && (
         <div className="fixed inset-0 z-[45] flex flex-col items-center justify-center bg-black/45 px-5">
           <p className="mb-4 text-center text-lg font-black leading-snug text-white drop-shadow-md">
             구매가 승인되어
@@ -540,7 +1065,7 @@ export default function MarketTab({ childId, items, requests, credits, level }: 
         </div>
       )}
 
-      {delivery && delivery.phase === 'parachute' && (
+      {MARKET_DELIVERY_OVERLAY_ENABLED && delivery && delivery.phase === 'parachute' && (
         <div className="fixed inset-0 z-[45] flex flex-col items-center justify-center bg-gradient-to-b from-sky-300/90 to-amber-50/95 px-5">
           <p className="mb-6 text-center text-lg font-black text-brand-text">상품이 도착했어요!</p>
 
@@ -556,7 +1081,17 @@ export default function MarketTab({ childId, items, requests, credits, level }: 
               🪂
             </span>
             <div className="-mt-1 flex items-end justify-center" style={{ filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.15))' }}>
-              <SpriteImage sheet={MARKET_ITEMS} frame={delivery.frame} height={96} clipRotated={false} />
+              {delivery.itemImageUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={delivery.itemImageUrl}
+                  alt=""
+                  className="max-h-[96px] max-w-[min(100vw-2rem,200px)] object-contain object-bottom"
+                  draggable={false}
+                />
+              ) : (
+                <SpriteImage sheet={MARKET_ITEMS} frame={delivery.frame} height={96} clipRotated={false} />
+              )}
             </div>
             <p className="mt-2 text-center text-sm font-bold text-gray-600">{delivery.request.item_name}</p>
           </div>

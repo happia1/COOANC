@@ -1,0 +1,443 @@
+'use client'
+
+import { useCallback, useEffect, useLayoutEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
+import SpriteImage from '@/components/common/SpriteImage'
+import { ICONS, PIGGY_BANK } from '@/constants/sprites'
+
+/** 시트·다이얼로그에서 보여 줄 고정 저금통 그림(실제 채움 단계와 달라도 「저금통」만 알아보면 됨) */
+const PIGGY_PREVIEW_FRAME = '레이어 282' as const
+
+export type CreditTransferKind =
+  | 'float_to_wallet'
+  | 'float_to_piggy'
+  | 'wallet_to_float'
+  | 'piggy_to_float'
+  | 'wallet_to_piggy'
+  | 'piggy_to_wallet'
+
+type Props = {
+  open: boolean
+  onClose: () => void
+  childId: string
+  kind: CreditTransferKind | null
+  maxAmount: number
+  /** 팝업 상단 제목(이동 방향 설명) */
+  title: string
+  onSuccess: () => void
+}
+
+/**
+ * 크레딧을 지갑·저금통·섬(가용) 사이로 옮길 때 뜨는 수량 입력 팝업입니다.
+ * - 확인 시 `/api/child/credits/transfer` 를 호출합니다.
+ */
+export default function MissionCreditMoveDialog({
+  open,
+  onClose,
+  childId,
+  kind,
+  maxAmount,
+  title,
+  onSuccess,
+}: Props) {
+  /** 화면에 보이는 숫자(문자열). 빈 문자열이면 아직 0·미입력 상태로 봅니다. */
+  const [amount, setAmount] = useState('1')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  /** `body`에 붙일 준비가 됐는지 — SSR·첫 페인트 직후에만 true (포털용) */
+  const [portalReady, setPortalReady] = useState(false)
+
+  useLayoutEffect(() => {
+    setPortalReady(true)
+  }, [])
+
+  useEffect(() => {
+    if (open) {
+      setAmount(maxAmount >= 1 ? String(Math.min(10, maxAmount)) : '1')
+      setErr(null)
+      setBusy(false)
+    }
+  }, [open, maxAmount])
+
+  /** 아래 숫자 패드에서 한 자리 누르면 이어 붙이고, 최댓값을 넘지 않게 자릅니다. */
+  const appendDigit = useCallback(
+    (digit: string) => {
+      if (!/^\d$/.test(digit)) return
+      setAmount((prev) => {
+        const digitsOnly = prev.replace(/\D/g, '')
+        const merged = digitsOnly + digit
+        const next = parseInt(merged, 10)
+        if (!Number.isFinite(next)) return prev
+        return String(Math.min(maxAmount, next))
+      })
+    },
+    [maxAmount],
+  )
+
+  /** 맨 끝 숫자 하나 지우기(잘못 입력했을 때 수정) */
+  const backspace = useCallback(() => {
+    setAmount((prev) => {
+      const digitsOnly = prev.replace(/\D/g, '')
+      if (digitsOnly.length <= 1) return ''
+      return digitsOnly.slice(0, -1)
+    })
+  }, [])
+
+  /** +1, +5, +10: 지금 숫자에 더합니다. 같은 버튼을 여러 번 눌러도 계속 더해집니다. */
+  const addQuick = useCallback(
+    (delta: number) => {
+      setAmount((prev) => {
+        const cur = Math.floor(parseInt(prev.replace(/\D/g, ''), 10) || 0)
+        const next = cur + delta
+        return String(Math.min(maxAmount, Math.max(1, next)))
+      })
+    },
+    [maxAmount],
+  )
+
+  /** 전부: 옮길 수 있는 최대치로 맞춤 */
+  const setAll = useCallback(() => {
+    setAmount(String(Math.max(1, maxAmount)))
+  }, [maxAmount])
+
+  if (!open || !kind) return null
+
+  /** 입력 문자열 → 정수(비어 있거나 잘못되면 0) */
+  const parsed = Math.floor(parseInt(amount.replace(/\D/g, ''), 10) || 0)
+  const n = parsed
+  const valid = n >= 1 && n <= maxAmount
+
+  async function submit() {
+    if (!valid || busy) return
+    setBusy(true)
+    setErr(null)
+    try {
+      // #region agent log
+      fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'b51341' },
+        body: JSON.stringify({
+          sessionId: 'b51341',
+          runId: 'post-schema-fix',
+          hypothesisId: 'H-C',
+          location: 'MissionCreditMoveDialog:submit:before-fetch',
+          message: 'transfer POST about to send',
+          data: {
+            childIdLen: typeof childId === 'string' ? childId.length : 0,
+            kind,
+            amount: n,
+          },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {})
+      // #endregion
+      const res = await fetch('/api/child/credits/transfer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ kind, amount: n, childId }),
+      })
+      const text = await res.text()
+      const json = text ? JSON.parse(text) : {}
+      if (!res.ok) {
+        setErr(typeof json.error === 'string' ? json.error : '옮기지 못했어요')
+        return
+      }
+      onSuccess()
+      onClose()
+    } catch {
+      setErr('네트워크 오류가 났어요')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  /**
+   * 아이 레이아웃의 `main`은 z-10, 독바는 z-50 이라 여기만 두면 키패드가 독바 «뒤»에 깔립니다.
+   * `document.body`로 옮겨 항상 독바보다 위에 그리도록 합니다.
+   */
+  const modal = (
+    <div
+      className="fixed inset-0 z-[120] flex items-center justify-center p-2 pt-[max(0.25rem,env(safe-area-inset-top,0px))] pb-[max(0.25rem,env(safe-area-inset-bottom,0px))] sm:p-3"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="credit-move-title"
+    >
+      <button type="button" className="absolute inset-0 bg-black/50" aria-label="닫기" onClick={onClose} />
+      {/**
+       * 한 화면에 맞추기: 세로 한도 + flex 열(스크롤 없음). 키패드·여백은 작은 화면에서 더 촘촘히 줄입니다.
+       */}
+      <div className="relative z-[1] flex max-h-[min(92dvh,calc(100dvh-0.75rem))] w-full max-w-sm flex-col overflow-hidden rounded-2xl border-2 border-sky-200 bg-white p-3 shadow-xl sm:max-h-[min(90dvh,34rem)] sm:p-3.5">
+        <div className="min-h-0 shrink-0">
+          <p id="credit-move-title" className="text-center text-base font-black leading-tight text-brand-text sm:text-[1.05rem]">
+            {title}
+          </p>
+
+          {/**
+           * 섬에서 옮길 때: 크레딧 → 선택한 통(지갑/저금통) 그림을 화살표로 이어 방향을 확인합니다.
+           * (긴 설명 문구는 빼서 작은 화면에서 키패드·빠른 버튼과 겹치지 않게 합니다.)
+           */}
+          {kind === 'float_to_wallet' || kind === 'float_to_piggy' ? (
+            <div className="mt-2 flex items-center justify-center gap-1.5">
+              <SpriteImage sheet={ICONS} frame="credit" width={28} clipRotated={false} className="opacity-95" />
+              <span className="text-base font-black text-sky-400" aria-hidden>
+                →
+              </span>
+              {kind === 'float_to_wallet' ? (
+                <SpriteImage sheet={ICONS} frame="wallet" width={36} clipRotated={false} className="drop-shadow-md" />
+              ) : (
+                <SpriteImage
+                  sheet={PIGGY_BANK}
+                  frame={PIGGY_PREVIEW_FRAME}
+                  width={44}
+                  clipRotated={false}
+                  className="select-none drop-shadow-md"
+                />
+              )}
+            </div>
+          ) : (
+            <div className="mt-2 flex justify-center">
+              <SpriteImage sheet={ICONS} frame="credit" width={30} clipRotated={false} className="opacity-90" />
+            </div>
+          )}
+
+          <label className="mt-2 block text-center text-[10px] font-bold text-gray-500" htmlFor="credit-move-display">
+            옮길 크레딧 (최대 {maxAmount.toLocaleString('ko-KR')})
+          </label>
+          {/*
+            숫자만 보여 주는 영역: 시스템 키보드 대신 아래 패드로만 바꿉니다.
+          */}
+          <div
+            id="credit-move-display"
+            className="mt-1 w-full rounded-lg border border-gray-200 bg-gray-50/80 px-2 py-2 text-center text-xl font-black tabular-nums text-brand-text sm:text-2xl sm:py-2.5"
+            role="status"
+            aria-live="polite"
+            aria-label={`옮길 크레딧 ${amount === '' ? '입력 전' : parsed.toLocaleString('ko-KR')}`}
+          >
+            {amount === '' ? <span className="text-gray-400">0</span> : parsed.toLocaleString('ko-KR')}
+          </div>
+
+          {/*
+            빠른 더하기: 1·5·10 은 «지금 값 + n». 전부는 최대 한도로 고정.
+          */}
+          <div className="mt-2 flex flex-wrap justify-center gap-1.5">
+            {([1, 5, 10] as const).map((delta) =>
+              maxAmount >= delta ? (
+                <button
+                  key={delta}
+                  type="button"
+                  onClick={() => addQuick(delta)}
+                  className="rounded-full bg-gray-100 px-2.5 py-1 text-[11px] font-bold text-gray-700 active:scale-[0.97]"
+                >
+                  {delta}
+                </button>
+              ) : null,
+            )}
+            {maxAmount >= 1 ? (
+              <button
+                type="button"
+                onClick={setAll}
+                className="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-bold text-amber-900 active:scale-[0.97]"
+              >
+                전부
+              </button>
+            ) : null}
+          </div>
+        </div>
+
+        {/*
+          숫자 키패드: 위 빠른 버튼(1·5·10·전부)과 겹치지 않도록 위쪽 여백을 넉넉히 둡니다.
+        */}
+        <div className="mt-3 flex min-h-0 flex-col gap-1 sm:mt-3.5" aria-label="숫자 입력">
+          <div className="grid grid-cols-3 gap-1 sm:gap-1.5">
+            {(['1', '2', '3', '4', '5', '6', '7', '8', '9'] as const).map((d) => (
+              <button
+                key={d}
+                type="button"
+                onClick={() => appendDigit(d)}
+                className="touch-manipulation rounded-md border border-gray-200 bg-white py-1.5 text-sm font-black tabular-nums text-brand-text shadow-sm active:scale-[0.98] sm:py-2 sm:text-base"
+              >
+                {d}
+              </button>
+            ))}
+          </div>
+          <div className="grid grid-cols-2 gap-1 sm:gap-1.5">
+            <button
+              type="button"
+              onClick={() => appendDigit('0')}
+              className="touch-manipulation rounded-md border border-gray-200 bg-white py-1.5 text-sm font-black tabular-nums text-brand-text shadow-sm active:scale-[0.98] sm:py-2 sm:text-base"
+            >
+              0
+            </button>
+            <button
+              type="button"
+              onClick={backspace}
+              className="touch-manipulation rounded-md border border-gray-200 bg-gray-100 py-1.5 text-[11px] font-black text-gray-600 active:scale-[0.98] sm:py-2 sm:text-xs"
+              aria-label="한 칸 지우기"
+            >
+              ⌫
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-2 shrink-0 space-y-1">
+          {err ? <p className="text-center text-[11px] font-bold leading-tight text-red-600">{err}</p> : null}
+          <button
+            type="button"
+            disabled={!valid || busy}
+            onClick={() => void submit()}
+            className="w-full rounded-xl bg-brand-blue py-2.5 text-sm font-black text-white disabled:opacity-50 sm:py-3"
+          >
+            {busy ? '옮기는 중…' : '확인'}
+          </button>
+          <button type="button" onClick={onClose} className="w-full py-1.5 text-xs font-bold text-gray-500 sm:text-sm sm:py-2">
+            취소
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+
+  if (!portalReady) return null
+  return createPortal(modal, document.body)
+}
+
+type SheetProps = {
+  open: boolean
+  onClose: () => void
+  bucket: 'center' | 'wallet' | 'piggy'
+  floating: number
+  wallet: number
+  piggy: number
+  onPick: (kind: CreditTransferKind) => void
+}
+
+/**
+ * 어느 통을 눌렀는지에 따라 「할 수 있는 옮기기」만 버튼으로 보여 줍니다.
+ */
+export function MissionCreditActionSheet({ open, onClose, bucket, floating, wallet, piggy, onPick }: SheetProps) {
+  /** 다이얼로그와 같이 독바(z-50) 위에 보이려면 body 포털이 필요합니다. */
+  const [portalReady, setPortalReady] = useState(false)
+  useLayoutEffect(() => {
+    setPortalReady(true)
+  }, [])
+
+  if (!open) return null
+
+  type Row = { kind: CreditTransferKind; label: string }
+  let rows: Row[] = []
+
+  if (bucket === 'center') {
+    if (floating > 0) {
+      rows = [
+        { kind: 'float_to_wallet', label: '지갑으로 옮기기 (마켓에서 쓸 돈)' },
+        { kind: 'float_to_piggy', label: '저금통으로 옮기기 (모아 두기)' },
+      ]
+    }
+  } else if (bucket === 'wallet') {
+    rows = []
+    if (wallet > 0) {
+      rows.push({ kind: 'wallet_to_float', label: '섬으로 꺼내기 (다시 모아 두기)' })
+      rows.push({ kind: 'wallet_to_piggy', label: '저금통으로 옮기기' })
+    }
+    if (floating > 0) {
+      rows.push({ kind: 'float_to_wallet', label: '섬에서 지갑으로 받기' })
+    }
+  } else {
+    if (piggy > 0) {
+      rows.push({ kind: 'piggy_to_float', label: '섬으로 꺼내기' })
+      rows.push({ kind: 'piggy_to_wallet', label: '지갑으로 옮기기 (쓸 준비)' })
+    }
+    if (floating > 0) {
+      rows.push({ kind: 'float_to_piggy', label: '섬에서 저금통으로 넣기' })
+    }
+  }
+
+  /** 섬 중앙 크레딧 전용: 글자 목록 대신 지갑·저금통 카드 두 장 */
+  const centerImagePick = bucket === 'center' && floating > 0 && rows.length === 2
+
+  const sheet = (
+    <div
+      className="fixed inset-0 z-[115] flex items-end justify-center pb-[max(0.5rem,env(safe-area-inset-bottom,0px))] sm:items-center sm:pb-0"
+      role="dialog"
+      aria-modal="true"
+    >
+      <button type="button" className="absolute inset-0 bg-black/45" aria-label="닫기" onClick={onClose} />
+      <div className="relative z-[1] w-full max-w-sm rounded-t-2xl bg-white p-4 shadow-2xl sm:rounded-2xl">
+        <p className="text-center text-sm font-black text-brand-text">
+          {bucket === 'center' ? '섬에 쌓인 크레딧' : bucket === 'wallet' ? '지갑' : '저금통'}
+        </p>
+        {bucket === 'center' && floating > 0 ? (
+          <p className="mt-0.5 text-center text-xs font-black tabular-nums text-brand-blue">
+            {floating.toLocaleString('ko-KR')} 크레딧
+          </p>
+        ) : null}
+        <p className="mt-1 text-center text-[11px] text-gray-500">
+          {centerImagePick ? '그림을 눌러 어디로 보낼지 골라요. 다음에 숫자를 정해요.' : '어디로 옮길까요?'}
+        </p>
+
+        <div className="mt-3 flex flex-col gap-2">
+          {rows.length === 0 ? (
+            <p className="py-4 text-center text-xs text-gray-500">지금은 옮길 크레딧이 없어요</p>
+          ) : centerImagePick ? (
+            <div className="grid grid-cols-2 gap-3 pt-1">
+              {/**
+               * 왼쪽: 지갑 — 마켓에서 쓸 돈으로 보냄.
+               * 오른쪽: 저금통 — 모아 두는 통으로 보냄.
+               */}
+              <button
+                type="button"
+                onClick={() => {
+                  onPick('float_to_wallet')
+                  onClose()
+                }}
+                className="flex flex-col items-center gap-2 rounded-2xl border-2 border-amber-200/90 bg-gradient-to-b from-amber-50/95 to-white px-2 py-4 shadow-sm transition-transform active:scale-[0.98]"
+              >
+                <SpriteImage sheet={ICONS} frame="wallet" width={72} clipRotated={false} className="drop-shadow-lg" />
+                <span className="text-center text-xs font-black leading-tight text-brand-text">지갑으로</span>
+                <span className="text-center text-[10px] font-medium leading-snug text-gray-500">마켓에서 쓸 돈</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onPick('float_to_piggy')
+                  onClose()
+                }}
+                className="flex flex-col items-center gap-2 rounded-2xl border-2 border-sky-200/90 bg-gradient-to-b from-sky-50/95 to-white px-2 py-4 shadow-sm transition-transform active:scale-[0.98]"
+              >
+                <SpriteImage
+                  sheet={PIGGY_BANK}
+                  frame={PIGGY_PREVIEW_FRAME}
+                  width={88}
+                  clipRotated={false}
+                  className="select-none drop-shadow-[0_6px_14px_rgba(0,0,0,0.15)]"
+                />
+                <span className="text-center text-xs font-black leading-tight text-brand-text">저금통으로</span>
+                <span className="text-center text-[10px] font-medium leading-snug text-gray-500">모아 두기</span>
+              </button>
+            </div>
+          ) : (
+            rows.map((r) => (
+              <button
+                key={r.kind}
+                type="button"
+                onClick={() => {
+                  onPick(r.kind)
+                  onClose()
+                }}
+                className="rounded-xl border border-gray-100 bg-sky-50/80 py-3 text-center text-sm font-bold text-brand-text active:scale-[0.99]"
+              >
+                {r.label}
+              </button>
+            ))
+          )}
+        </div>
+        <button type="button" onClick={onClose} className="mt-3 w-full py-2 text-sm font-bold text-gray-500">
+          닫기
+        </button>
+      </div>
+    </div>
+  )
+
+  if (!portalReady) return null
+  return createPortal(sheet, document.body)
+}

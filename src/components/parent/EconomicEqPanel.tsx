@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useId } from 'react'
 import type { ChildStats } from '@/types/database'
 import type { WeeklyRoutineDay } from '@/lib/childWeeklyRoutine'
@@ -16,7 +17,7 @@ export type EconomicEqStatsSlice = Pick<
 
 type Props = {
   stats: EconomicEqStatsSlice
-  /** 서버에서 미리 계산한 최근 7일 루틴 완주율(요일 라벨 포함) */
+  /** 서버에서 미리 계산한 이번 주(월~일) 루틴 완주율 */
   weeklyRoutine: WeeklyRoutineDay[]
   /** 성장 단계 한글 이름(씨앗, 새싹 …) */
   growthStageName: string
@@ -26,8 +27,10 @@ type Props = {
 /**
  * 부모 홈 「우리아이 경제 EQ 지수」 카드
  *
+ * - **순서**: 먼저 AI 데이터 피드백(그라데이션 박스), 그다음 차트 묶음(제목+반원·도넛·주간 막대), 마지막 코칭 가이드
  * - 만족 지연(반원) + 소비/저축(도넛)은 **한 줄 두 칸**, 그 아래 요일별 막대
  * - 만족 지연 지수만 수치 해석 한 줄(높을수록 좋음) 안내, 소비/저축 범례는 한 줄 가로 배치.
+ * - AI 인사이트는 분석 문구만 두고, **행동 유도 링크는 코칭 가이드 아래 2개**(스페셜 미션·마켓 보상)만 둡니다.
  */
 export default function EconomicEqPanel({
   stats,
@@ -58,6 +61,12 @@ export default function EconomicEqPanel({
 
   return (
     <section className="bg-white rounded-2xl p-4 shadow-sm space-y-4">
+      {/* AI가 숫자를 바탕으로 요약한 피드백 — 카드 상단에 두어 먼저 읽히게 함 */}
+      <div className="rounded-2xl border border-[#4A90E2]/15 bg-gradient-to-r from-[#4A90E2]/10 to-[#7ED321]/10 px-3.5 py-3">
+        <p className="text-[10px] font-bold text-[#4A90E2] mb-1">AI 인사이트 (데이터 피드백)</p>
+        <p className="text-xs text-gray-700 leading-relaxed whitespace-pre-wrap">{dataFeedback}</p>
+      </div>
+
       <p className="text-sm font-bold text-gray-700">우리아이 경제 EQ 지수</p>
 
       <div className="flex flex-col gap-5">
@@ -85,27 +94,46 @@ export default function EconomicEqPanel({
         </div>
 
         <div className="rounded-xl bg-gray-50/80 px-2 py-3">
-          <p className="text-[11px] font-bold text-gray-600 mb-2 text-center">일일 루틴 완주율 (최근 7일)</p>
+          <p className="text-[11px] font-bold text-gray-600 mb-2 text-center">일일 루틴 완주율 (이번 주)</p>
           <WeekdayRoutineBars days={weeklyRoutine} />
         </div>
-      </div>
-
-      <div className="rounded-2xl border border-[#4A90E2]/15 bg-gradient-to-r from-[#4A90E2]/10 to-[#7ED321]/10 px-3.5 py-3">
-        <p className="text-[10px] font-bold text-[#4A90E2] mb-1">AI 인사이트 (데이터 피드백)</p>
-        <p className="text-xs text-gray-700 leading-relaxed whitespace-pre-wrap">{dataFeedback}</p>
       </div>
 
       <div className="rounded-2xl border border-amber-200/60 bg-amber-50/50 px-3.5 py-3">
         <p className="text-[10px] font-bold text-amber-800 mb-1">경제 습관 코칭 가이드 (부모님용)</p>
         <p className="text-xs text-gray-700 leading-relaxed whitespace-pre-wrap">{coachingGuide}</p>
+
+        {/* 코칭 다음 행동: 한 줄짜리 문구만 두어 줄바꿈이 어색해지지 않게 함(탭 이동은 링크 목적지로 처리) */}
+        <div
+          className="mt-3 grid grid-cols-2 gap-2.5 border-t border-amber-200/50 pt-3"
+          role="group"
+          aria-label="코칭에 이어 실천하기"
+        >
+          <Link
+            href="/parent/routine#parent-routine-special-missions"
+            className="flex min-h-[3.5rem] items-center justify-center rounded-xl border border-amber-200 bg-white px-2 py-2.5 text-center text-[11px] font-bold leading-tight text-amber-950 shadow-sm ring-1 ring-amber-100/80 transition-colors active:scale-[0.99] hover:border-amber-300 hover:bg-amber-50/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4A90E2] focus-visible:ring-offset-2"
+          >
+            스페셜 미션 제안하기
+          </Link>
+          <Link
+            href="/parent/approval#parent-approval-market-rewards"
+            className="flex min-h-[3.5rem] items-center justify-center rounded-xl border border-amber-200 bg-white px-2 py-2.5 text-center text-[11px] font-bold leading-tight text-amber-950 shadow-sm ring-1 ring-amber-100/80 transition-colors active:scale-[0.99] hover:border-amber-300 hover:bg-amber-50/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4A90E2] focus-visible:ring-offset-2"
+          >
+            특별 보상 제안하기
+          </Link>
+        </div>
       </div>
     </section>
   )
 }
 
+/**
+ * 요일별 막대: 회색 트랙은 100% 높이, 파란 막대는 **아래에서 위로** 차오릅니다.
+ * (`flex-col-reverse`+`justify-end`는 막대가 위에 붙어 내려 채워지는 것처럼 보일 수 있어 `flex-col`+`justify-end`만 사용합니다.)
+ */
 function WeekdayRoutineBars({ days }: { days: WeeklyRoutineDay[] }) {
   return (
-    <div className="flex items-end justify-between gap-1.5 h-28 px-1">
+    <div className="flex items-end justify-between gap-1.5 min-h-[7.5rem] px-1">
       {days.map((d) => {
         const h = d.hasMissions ? d.ratePercent : 0
         const title = d.hasMissions
@@ -113,16 +141,20 @@ function WeekdayRoutineBars({ days }: { days: WeeklyRoutineDay[] }) {
           : `${d.date} (${d.weekdayShort}): 배정된 미션 없음`
         return (
           <div key={d.date} className="flex flex-1 flex-col items-center gap-1 min-w-0" title={title}>
-            <div className="w-full flex flex-col-reverse h-[72px] bg-gray-200/60 rounded-lg overflow-hidden justify-end">
+            {/* 트랙: 세로 알약 형태, 안쪽은 아래 정렬 후 높이 %만큼만 채움 */}
+            <div className="w-full flex flex-col justify-end h-[72px] bg-gray-200/60 rounded-full overflow-hidden">
               <div
                 className={[
-                  'w-full rounded-lg transition-all duration-500 min-h-[2px]',
-                  d.hasMissions ? 'bg-[#4A90E2]' : 'bg-transparent',
+                  'w-full rounded-full transition-all duration-500',
+                  d.hasMissions ? 'bg-[#4A90E2] min-h-[2px]' : 'bg-transparent h-0 min-h-0',
                 ].join(' ')}
-                style={{ height: d.hasMissions ? `${h}%` : '4px' }}
+                style={d.hasMissions ? { height: `${h}%` } : undefined}
               />
             </div>
-            <span className="text-[10px] font-bold text-gray-500 tabular-nums">{d.weekdayShort}</span>
+            <div className="flex flex-col items-center leading-tight">
+              <span className="text-[10px] font-bold text-gray-500 tabular-nums">{d.weekdayShort}</span>
+              <span className="text-[8px] text-gray-400 tabular-nums">{d.dateLabelShort}</span>
+            </div>
           </div>
         )
       })}

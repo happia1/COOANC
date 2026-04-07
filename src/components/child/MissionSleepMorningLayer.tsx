@@ -3,8 +3,8 @@
 /**
  * 미션 탭 전용: 「오늘 미션을 모두 완료했을 때」 연출 + 「아침 기상」 알람 팝업
  *
- * - 전체 완료: `public/assets/img/games/confetti` 이미지가 떨어지는 컨페티 → 박수(clap) → 최고(thumbs up) 순으로 잠깐 보였다 사라짐
- * - 그다음 수면 모드 안내(잘 자요) — `mode.png` 아틀라스의 sleep 영역 사용 (`mode.json` 과 같은 폴더)
+ * - 전체 완료: 컨페티가 떨어지다가 엄지 따봉이 나올 때까지 같은 컨페티를 유지하고, 따봉은 조금 더 오래 보인 뒤 사라짐 (박수 연출 없음)
+ * - 그다음 수면 모드 안내(잘 자요, 화면 중앙 팝업) — `mode.png` 아틀라스의 sleep 영역 사용 (`mode.json` 과 같은 폴더)
  * - 아침: 서울 시각이 기상 알람 시각 이후이고, 부모(또는 온보딩)에서 저장한 루틴 알람 설정이 있으면
  *   해 이미지가 아래에서 슬라이드되며 팝업 + 선택된 알람 소리 재생, 「알람 끄기」로 정지
  */
@@ -35,10 +35,17 @@ const CONFETTI_FILENAMES = [
   'confetti (9).png',
 ]
 
-const CLAP_SRC = '/assets/img/games/confetti/clap.png'
 const THUMBS_SRC = '/assets/img/games/confetti/thumsup.png'
 
-type CelebrationStep = 'idle' | 'confetti' | 'clap' | 'thumb'
+/**
+ * 전체 완료 축하 타이밍 (밀리초)
+ * - 따봉이 뜨기 전: 컨페티만
+ * - 따봉 구간: 컨페티는 그대로 두고 가운데에 따봉을 겹쳐 보여 줌
+ */
+const CELEBRATION_CONFETTI_SOLO_MS = 2000
+const CELEBRATION_THUMB_VISIBLE_MS = 3400
+
+type CelebrationStep = 'idle' | 'confetti' | 'thumb'
 
 type Props = {
   childId: string
@@ -118,7 +125,6 @@ export default function MissionSleepMorningLayer({
   const [celebrationStep, setCelebrationStep] = useState<CelebrationStep>('idle')
   const [sleepModalOpen, setSleepModalOpen] = useState(false)
   const [morningOpen, setMorningOpen] = useState(false)
-  const [morningSoundLabel, setMorningSoundLabel] = useState<string>('')
   /** 컨페티 조각의 무작위 배치를 연출마다 새로 뽑기 위한 카운터 */
   const [confettiKey, setConfettiKey] = useState(0)
 
@@ -149,13 +155,15 @@ export default function MissionSleepMorningLayer({
     setConfettiKey((k) => k + 1)
     setCelebrationStep('confetti')
 
+    const thumbAt = CELEBRATION_CONFETTI_SOLO_MS
+    const endAt = thumbAt + CELEBRATION_THUMB_VISIBLE_MS
+
     celebrationTimersRef.current.push(
-      window.setTimeout(() => setCelebrationStep('clap'), 1500) as number,
-      window.setTimeout(() => setCelebrationStep('thumb'), 2800) as number,
+      window.setTimeout(() => setCelebrationStep('thumb'), thumbAt) as number,
       window.setTimeout(() => {
         setCelebrationStep('idle')
         setSleepModalOpen(true)
-      }, 4100) as number,
+      }, endAt) as number,
     )
 
     return clearCelebrationTimers
@@ -183,17 +191,6 @@ export default function MissionSleepMorningLayer({
 
     /** 같은 날 두 번 뜨지 않도록 — 팝업을 연 직후 저장(탭 이동으로 effect가 여러 번 돌아도 1회) */
     localStorage.setItem(key, '1')
-
-    void (async () => {
-      try {
-        const res = await fetch('/api/assets/alarm-sounds')
-        const j = (await res.json()) as { sounds?: { id: string; label: string }[] }
-        const hit = j.sounds?.find((s) => s.id === prefs.soundWake)
-        setMorningSoundLabel(hit?.label ?? prefs.soundWake)
-      } catch {
-        setMorningSoundLabel(prefs.soundWake)
-      }
-    })()
 
     const url = `/assets/audio/alarm/${encodeURIComponent(prefs.soundWake)}`
     const a = new Audio(url)
@@ -249,7 +246,8 @@ export default function MissionSleepMorningLayer({
           role="presentation"
           aria-hidden
         >
-          {celebrationStep === 'confetti' && (
+          {/* 컨페티: 따봉 단계까지 계속 보임 (따봉과 동시에 겹쳐서 낙하 연출 유지) */}
+          {(celebrationStep === 'confetti' || celebrationStep === 'thumb') && (
             <div className="pointer-events-none absolute inset-0 overflow-hidden">
               {confettiPieces.map((p) => (
                 <ConfettiPiece key={p.key} src={p.src} delayMs={p.delay} />
@@ -257,22 +255,11 @@ export default function MissionSleepMorningLayer({
             </div>
           )}
 
-          {celebrationStep === 'clap' && (
-            <img
-              src={CLAP_SRC}
-              alt="박수"
-              className="max-h-[min(40dvh,220px)] w-auto animate-pulse drop-shadow-xl"
-              onError={(e) => {
-                e.currentTarget.style.display = 'none'
-              }}
-            />
-          )}
-
           {celebrationStep === 'thumb' && (
             <img
               src={THUMBS_SRC}
               alt="최고"
-              className="max-h-[min(40dvh,220px)] w-auto animate-bounce drop-shadow-xl"
+              className="relative z-[1] max-h-[min(40dvh,220px)] w-auto animate-bounce drop-shadow-xl"
               onError={(e) => {
                 e.currentTarget.style.display = 'none'
               }}
@@ -281,9 +268,10 @@ export default function MissionSleepMorningLayer({
         </div>
       )}
 
+      {/* 수면 안내 팝업: 하단 탭(독) 높이만큼 아래 여백을 두고, 그 안에서 세로 중앙 정렬 */}
       {sleepModalOpen && (
         <div
-          className="fixed inset-0 z-[106] flex items-end justify-center sm:items-center"
+          className="fixed inset-0 z-[106] flex items-center justify-center px-4 pt-4 pb-[max(1rem,calc(env(safe-area-inset-bottom)+5rem))] sm:px-6 sm:pt-6 sm:pb-[max(1rem,calc(env(safe-area-inset-bottom)+5rem))]"
           role="dialog"
           aria-modal="true"
           aria-labelledby="sleep-modal-title"
@@ -295,18 +283,21 @@ export default function MissionSleepMorningLayer({
             onClick={() => setSleepModalOpen(false)}
           />
           <div
-            className="relative z-[1] mb-[max(0.5rem,env(safe-area-inset-bottom))] w-full max-w-sm"
+            className="relative z-[1] w-full max-w-sm"
             style={{ animation: 'mission-sheet-slide-up 0.45s ease-out forwards' }}
           >
-            <div className="mx-3 rounded-3xl border-2 border-indigo-200 bg-gradient-to-b from-indigo-50 to-white p-6 shadow-2xl">
+            <div className="mx-auto rounded-3xl border-2 border-indigo-200 bg-gradient-to-b from-indigo-50 to-white p-6 shadow-2xl">
               <div className="flex flex-col items-center gap-4">
                 <ModeAtlasSprite frame="sleep" scale={1.15} alt="수면 모드" className="shrink-0" />
                 <div className="text-center">
                   <p id="sleep-modal-title" className="text-lg font-black text-indigo-950">
                     수면 모드 · 잘 자요
                   </p>
+                  {/* 본문: 첫 줄·둘째 줄을 나눠 읽기 쉽게 표시 */}
                   <p className="mt-2 text-sm font-bold leading-relaxed text-indigo-900/80">
-                    오늘 미션을 모두 마쳤어요. 푹 쉬고 내일 또 만나요!
+                    모든 미션을 마쳤어요
+                    <br />
+                    푹쉬고 내일 또 만나요!
                   </p>
                 </div>
                 <button
@@ -322,16 +313,17 @@ export default function MissionSleepMorningLayer({
         </div>
       )}
 
+      {/* 아침 알람: 하단 시트가 아니라 화면 중앙에 두어 하단 독(탭바)에 가리지 않게 함 */}
       {morningOpen && (
         <div
-          className="fixed inset-0 z-[107] flex items-end justify-center sm:items-center"
+          className="fixed inset-0 z-[107] flex items-center justify-center px-4 pt-4 pb-[max(1rem,calc(env(safe-area-inset-bottom)+5.5rem))] sm:px-6"
           role="dialog"
           aria-modal="true"
           aria-labelledby="morning-modal-title"
         >
           <button type="button" className="absolute inset-0 bg-black/45" aria-label="배경" onClick={stopMorningAlarm} />
           <div
-            className="relative z-[1] mb-0 w-full max-w-md overflow-hidden rounded-t-3xl border-2 border-amber-200 bg-gradient-to-b from-amber-50 via-white to-white shadow-2xl sm:mb-4 sm:rounded-3xl"
+            className="relative z-[1] w-full max-w-md max-h-[min(90dvh,640px)] overflow-y-auto overflow-x-hidden rounded-3xl border-2 border-amber-200 bg-gradient-to-b from-amber-50 via-white to-white shadow-2xl"
             style={{ animation: 'mission-sheet-slide-up 0.5s ease-out forwards' }}
           >
             <div
@@ -344,28 +336,13 @@ export default function MissionSleepMorningLayer({
               <p id="morning-modal-title" className="text-center text-xl font-black text-amber-950">
                 좋은 아침이에요!
               </p>
-              <p className="mt-2 text-center text-sm font-bold text-amber-900/85">
-                기상 알람이 울리고 있어요. 아래에서 끄거나, 오늘 알람 설정을 확인해 보세요.
-              </p>
 
-              {(() => {
-                const prefs = readRoutineAlarmPrefs()
-                return (
-                  <div className="mt-4 rounded-2xl border border-amber-100 bg-amber-50/80 p-4 text-center">
-                    <p className="text-[10px] font-black uppercase tracking-wide text-amber-800">알람 설정</p>
-                    <p className="mt-1 text-sm font-black text-brand-text">
-                      기상 시각{' '}
-                      <span className="tabular-nums text-amber-700">{prefs.wakeTime}</span>
-                    </p>
-                    <p className="mt-1 text-xs font-bold text-gray-600">
-                      소리: {morningSoundLabel || prefs.soundWake || '—'}
-                    </p>
-                    <p className="mt-2 text-[10px] leading-relaxed text-gray-500">
-                      시각·소리를 바꾸려면 부모님 앱의 「루틴 알람」에서 수정할 수 있어요.
-                    </p>
-                  </div>
-                )
-              })()}
+              {/* 노란 블록: 기상 시각(HH:MM)만 크게 — 라벨·소리·안내 문구는 제거 */}
+              <div className="mt-4 flex min-h-[5.5rem] items-center justify-center rounded-2xl border border-amber-100 bg-amber-50/80 px-4 py-6">
+                <p className="text-center text-4xl font-black tabular-nums tracking-tight text-amber-800 sm:text-5xl">
+                  {readRoutineAlarmPrefs().wakeTime}
+                </p>
+              </div>
 
               <button
                 type="button"
