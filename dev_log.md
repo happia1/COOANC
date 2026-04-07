@@ -178,6 +178,62 @@
 
 ---
 
+## [2026-04-06] - 마켓 3×3 선반 UI·데일리 미션·루틴·스티커·DB 대량 반영
+- **Status:** ✅ 완료
+- **Git 범위 (참고):** `8dc03a6^..a72f7f5` (당일 커밋 다수, 메시지에 로그인/회원가입 개선·마켓 선반 리디자인·선반 클리핑/팝업 수정 등)
+- **Files Created (대표):**
+  - `src/components/child/ChildHomeIslandStage.tsx`, `ChildHomeSceneryBand.tsx`, `ChildSceneryTopPills.tsx` — 홈 섬·상단 풍경 UI 골격
+  - `src/components/child/BearStickerSheet.tsx`, `BearBoardCompleteModal.tsx`, `src/lib/bearBoardLayout.ts` — 곰 스티커판·완주 모달
+  - `src/components/parent/EconomicEqPanel.tsx`, `src/lib/childEqAiPlaceholders.ts` — 경제 EQ 패널·AI 플레이스홀더
+  - `src/components/parent/ParentMarketMenuControl.tsx`, `RoutineAlarmSettingsSheet.tsx`, `RoutineKeywordBuilderSheet.tsx`, `SpecialMissionAddSheet.tsx`, `SpecialMissionBonusSheet.tsx` — 부모 루틴·마켓·특별 미션 UI
+  - `src/app/api/daily-mission/assign-today/route.ts`, `src/app/api/feedback/mission-suggest/route.ts`, `src/app/api/market/child-hidden-item/route.ts`, `src/app/api/market/parent-store-item/route.ts`, `src/app/api/parent/enter-child-ui/route.ts`, `src/app/api/praise-sticker/grant/route.ts` 등 API 라우트
+  - `supabase/migrations/022_`~`038_*.sql` 일대 — 미션 RLS·데일리 미션·보상 배수·숨김 마켓·스토리지·칭찬 스티커·슬롯·그랜트 등
+  - `public/assets/img/layouts/backgrounds/kids_background*.png`, `market_roof.png`, 알림/카운트다운 오디오 등 에셋
+- **Files Modified (대표):**
+  - `src/components/child/MarketTab.tsx` — **3×3 선반** 기반 마켓 화면 리디자인
+  - `src/components/child/MissionTab.tsx`, `src/app/(child)/mission/page.tsx`, `src/app/api/daily-mission/complete/route.ts` — 데일리 미션·완료 흐름 확장
+  - `src/components/parent/RoutineTab.tsx`, `CalendarSection.tsx`, `onboarding/RoutineOnboarding.tsx` — 루틴·캘린더·온보딩 대규모 수정
+  - `src/components/parent/ApprovalTab.tsx`, `src/app/parent/(tabs)/**` — 승인·홈·루틴 페이지 연동
+  - `src/app/login/page.tsx`, `src/app/signup/page.tsx`, `src/app/settings/page.tsx` — 로그인/회원가입·설정 UX·에러 처리 보강
+  - `next.config.mjs`, `package.json` — 설정·의존성 소폭
+- **Summary:**
+  - 자녀 마켓을 **3×3 선반** UI로 바꾸고 선반 클리핑·구매 팝업 위치를 다듬었으며, 로그인/회원가입 쪽은 에러 처리와 UI를 반복 개선한 커밋이 이어졌습니다.
+  - 데일리 미션 배정/완료, 부모 루틴(알람·키워드·특별 미션)·캘린더·온보딩, 칭찬 스티커·곰 스티커판, 자녀 홈 **섬·배경** 등 화면·API가 한꺼번에 들어왔고 Supabase 마이그레이션도 `022`~`038` 구간으로 크게 늘었습니다.
+  - 부모 자녀 UI 진입(`enter-child-ui`)·숨김 마켓·스토어 이미지 스토리지 등 백엔드·RLS를 미션·마켓 도메인에 맞춰 정렬했습니다.
+- **Next Steps:**
+  - 마켓·미션·루틴 통합 QA (기기별 레이아웃·권한)
+  - 마이그레이션 원격 적용 순서·롤백 계획 점검
+
+---
+
+## [2026-04-07] - 홈·미션 스케일 조정 + 마켓 보상·위시리스트·지갑·저금통 크레딧
+- **Status:** ✅ 완료
+- **Git 범위 (참고):** `a72f7f5..6aa5393` (`fix scale of home and mission tab`, `fix scales`, `revamp child market rewards and wishlist flow` 등)
+- **Files Created (대표):**
+  - `src/app/api/child/credits/transfer/route.ts` — 크레딧 이동(지갑↔저금통 등)
+  - `src/app/api/market/wishlist/route.ts`, `src/app/api/market/complete-delivery/route.ts` — 위시리스트·배송 완료
+  - `src/components/child/MarketPurchaseConfirmDialog.tsx`, `MarketPurchaseSuccessOverlay.tsx`, `MarketRequestsBottomSheet.tsx`, `MarketWishlistBottomSheet.tsx` — 구매 확인·성공·요청·위시리스트 시트
+  - `src/components/child/MissionCreditMoveDialog.tsx`, `MissionCreditToPiggyOverlay.tsx`, `MissionSleepMorningLayer.tsx` — 미션 탭 크레딧 이동·저금통·수면/아침 레이어
+  - `src/components/child/FloatingCreditsStackVisual.tsx`, `PiggyBankStageVisual.tsx`, `TodayWeatherBadge.tsx` — 크레딧 시각화·저금통 단계·날씨 뱃지
+  - `src/lib/childCreditsSplit.ts`, `marketItemFrame.ts`, `missionRoutineIconFrame.ts`, `constants/missionRoutineAtlas.ts`, `constants/piggyBankStages.ts` — 크레딧 분할·프레임·아틀라스
+  - `src/app/api/praise-sticker/place/route.ts`, `reset-board/route.ts` — 스티커 배치·보드 리셋 API
+  - `supabase/migrations/036_`~`041_*.sql` — 숨김 마켓 RPC·구매 요청·지갑/저금통/위시리스트·수량
+  - `public/assets/img/items/rewards/credits.*`, 스티커·컨페티·UI(바구니·지도 등) 에셋
+- **Files Modified (대표):**
+  - `src/components/child/MarketTab.tsx`, `src/app/(child)/market/page.tsx`, `src/app/api/market/approve/route.ts`, `request/route.ts` — 자녀 마켓 보상·승인·요청 플로우 전면 개편
+  - `src/components/child/ChildHomeIslandStage.tsx`, `HomeTab.tsx`, `MissionTab.tsx` — **홈·미션 탭 스케일/레이아웃** 조정
+  - `src/components/parent/ApprovalTab.tsx`, `ParentNewPurchaseRequestModal.tsx` — 부모 승인·신규 구매 요청 모달
+  - `src/app/globals.css`, `tailwind.config.js` — 스타일·토큰 확장
+- **Summary:**
+  - 홈·미션 탭의 **표시 스케일**을 맞추는 수정이 먼저 이어졌고, 이어 자녀 마켓을 **보상·위시리스트·구매 확인/성공** 흐름 중심으로 크게 갈아엎었습니다.
+  - 지갑·저금통·위시리스트를 DB·API(`040`~`041` 등)와 맞추고, 미션 탭에서 크레딧 이동 다이얼로그·저금통 오버레이·동전 시각화 컴포넌트를 추가했습니다.
+  - 칭찬 스티커 **배치·보드 리셋** API와 루틴 아이콘 아틀라스·에셋이 보강되었습니다.
+- **Next Steps:**
+  - 크레딧 이전·위시리스트·승인 시나리오 E2E 테스트
+  - 4/8 이후 UI(미션 섬 미세 조정·`042` EQ 트리거)와 함께 통합 검증
+
+---
+
 ## [2026-04-08] - 미션 섬 크레딧 UI·연출 + 저금통 자산·EQ 보강
 - **Status:** ✅ 완료
 - **Files Created:**
