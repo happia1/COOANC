@@ -37,13 +37,13 @@ export function buildPlaceholderEqDataFeedback(input: EqInsightInput): string {
 
   const delayHint =
     stats.eq_delay_score >= 60
-      ? `만족 지연 지수가 ${stats.eq_delay_score}%로, 원하는 것을 나눠서 기다리는 힘이 잘 자라고 있어요.`
-      : `만족 지연 지수는 ${stats.eq_delay_score}%예요. 「나중에 사기로 했어」를 칭찬해 주면 이 수치가 함께 자랄 수 있어요.`
+      ? `만족 지연 지수가 ${stats.eq_delay_score}%로, 총 크레딧 중 저금통에 모아 둔 비율이 높아요.`
+      : `만족 지연 지수는 ${stats.eq_delay_score}%예요. 미션 보상을 섬에만 두지 말고 저금통으로 옮기면 이 수치가 올라가요.`
 
   const saveHint =
     stats.eq_save_ratio >= 50
-      ? `저축 비중이 ${stats.eq_save_ratio}%로, 들어온 크레딧을 남겨 두는 연습이 잘 되고 있어요.`
-      : `저축 비중은 ${stats.eq_save_ratio}%예요. 목표 저금통이나 「다음에 살 것」 목록을 함께 정해 보면 도움이 됩니다.`
+      ? `저축 비중이 ${stats.eq_save_ratio}%로, 지갑과 저금통에 나눈 돈 중 저금통 쪽이 큽니다.`
+      : `저축 비중은 ${stats.eq_save_ratio}%예요. 지갑·저금통으로 나누기(섬에만 두지 않기)를 함께 연습해 보면 좋아요.`
 
   // 화면에서는 `whitespace-pre-wrap` 으로 줄바꿈이 보이도록 `\n` 으로 구간을 나눕니다.
   return [

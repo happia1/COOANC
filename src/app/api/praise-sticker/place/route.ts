@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
   }
 
   const resolved = await resolveApiActorChildId(supabase, user, body.childId)
-  if (!resolved.ok) {
+  if (resolved.ok === false) {
     return resolved.response
   }
   const childId = resolved.childId

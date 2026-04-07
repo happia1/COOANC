@@ -9,15 +9,36 @@ import {
   PIGGY_BANK_STAGE_FRAME_ORDER,
   PIGGY_BANK_STAGE_RECTS,
   PIGGY_BANK_STAGE_URLS,
+  piggyAtlasVisualSize,
   piggyBankStageCount,
+  type PiggyAtlasFrame,
 } from '@/constants/piggyBankStages'
 
 type Props = {
   /** 0 .. (단계 수 - 1) */
   stepIndex: number
-  /** 표시 가로 너비(px). 세로는 비율에 맞춤 */
+  /** 표시 가로 너비(px). 세로는 비율에 맞춤 — 단계가 올라갈수록 내부에서 추가로 키웁니다. */
   displayWidth: number
   className?: string
+}
+
+/** 핑크 돼지(336) 기준 아틀라스 가로 — 340~ 단계 bbox 가 넓을 때 작아 보이지 않게 보정할 때 사용 */
+function refPinkPigAtlasW(frames: ReadonlyArray<PiggyAtlasFrame>): number {
+  const f = frames.find((x) => x.name === '레이어 336')
+  return f ? piggyAtlasVisualSize(f).vw : 195
+}
+
+/**
+ * 저금통 단계가 높아질수록 그림도 함께 커 보이게 하는 배율.
+ * - 첫 단계(핑크 돼지)는 예전 0.66 배율 때문에 미션 섬 **지갑 아이콘(56px)** 보다 훨씬 작아 보였음 → 시작을 ~0.98 로 두어 지갑과 비슷한 체감 크기로 맞춤.
+ * - 마지막 단계는 조금 더 키워 성장감 유지.
+ */
+function piggyStageProgressScale(stepIndex: number, stageCount: number): number {
+  if (stageCount <= 1) return 1
+  const p = stepIndex / (stageCount - 1)
+  const min = 0.98
+  const max = 1.3
+  return min + p * (max - min)
 }
 
 /**
@@ -30,39 +51,42 @@ export default function PiggyBankStageVisual({ stepIndex, displayWidth, classNam
   const idx = Math.max(0, Math.min(stepIndex, n - 1))
 
   const urls = PIGGY_BANK_STAGE_URLS
+  const rects = PIGGY_BANK_STAGE_RECTS
+  const frameOrder = PIGGY_BANK_STAGE_FRAME_ORDER
+  const refPinkW = refPinkPigAtlasW(GOLD_PIGGY_BANK_FRAMES)
+  const stageMul = piggyStageProgressScale(idx, n)
+
   if (urls != null && urls.length > 0) {
+    const w = Math.round(displayWidth * stageMul)
     const src = urls[idx] ?? urls[0]
     return (
       <Image
         src={src}
         alt=""
-        width={displayWidth}
-        height={displayWidth}
+        width={w}
+        height={w}
         className={['h-auto w-full max-w-none select-none object-contain', className].filter(Boolean).join(' ')}
-        style={{ width: displayWidth, height: 'auto' }}
+        style={{ width: w, height: 'auto' }}
         draggable={false}
       />
     )
   }
 
-  const rects = PIGGY_BANK_STAGE_RECTS
-  const frameOrder = PIGGY_BANK_STAGE_FRAME_ORDER
-
   if (frameOrder.length > 0) {
-    const frameName = frameOrder[idx] ?? frameOrder[0]
-    /**
-     * 실제로 "보이는 돼지 본체" 크기가 단계마다 비슷하게 보이도록 광학 보정 배율을 적용합니다.
-     * - 특히 0단계(레이어 336)가 크게, 1단계(레이어 337)가 작게 보이던 체감 차이를 우선 보정합니다.
-     * - 숫자는 UI에서 본체 시각 크기를 기준으로 맞춘 값이며, 필요 시 단계별로 더 미세 조정 가능합니다.
-     */
+    const atlasFrame = GOLD_PIGGY_BANK_FRAMES[idx]
+    const frameName = atlasFrame?.name ?? frameOrder[idx] ?? frameOrder[0]
+    const vw = atlasFrame ? piggyAtlasVisualSize(atlasFrame).vw : refPinkW
+
     const OPTICAL_SCALE_BY_FRAME: Record<string, number> = {
       '레이어 336': 0.9,
       '레이어 337': 1.06,
       '레이어 338': 1.03,
       '레이어 339': 1.02,
     }
-    const opticalScale = OPTICAL_SCALE_BY_FRAME[frameName] ?? 1
-    const normalizedWidth = Math.round(displayWidth * opticalScale)
+    const manual = OPTICAL_SCALE_BY_FRAME[frameName] ?? 1
+    const lateStageBoost = idx >= 4 && vw > refPinkW ? vw / refPinkW : 1
+    const normalizedWidth = Math.round(displayWidth * manual * lateStageBoost * stageMul)
+
     const spriteFrames = Object.fromEntries(
       GOLD_PIGGY_BANK_FRAMES.map((f) => [
         f.name,
@@ -70,25 +94,27 @@ export default function PiggyBankStageVisual({ stepIndex, displayWidth, classNam
       ]),
     )
     return (
-      <SpriteImage
-        sheet={{
-          image: PIGGY_BANK_COMBINED_SRC.replace('/assets/img/', ''),
-          atlasW: PIGGY_BANK_ATLAS_SIZE.w,
-          atlasH: PIGGY_BANK_ATLAS_SIZE.h,
-          frames: spriteFrames,
-        }}
-        frame={frameName}
-        width={normalizedWidth}
-        /** 전환 중 다른 프레임이 스쳐 보이는 현상을 막기 위해 회전 프레임도 내부에서 클립합니다. */
-        clipRotated={true}
-        className={['select-none object-contain', className].filter(Boolean).join(' ')}
-      />
+      <div className="overflow-visible">
+        <SpriteImage
+          sheet={{
+            image: PIGGY_BANK_COMBINED_SRC.replace('/assets/img/', ''),
+            atlasW: PIGGY_BANK_ATLAS_SIZE.w,
+            atlasH: PIGGY_BANK_ATLAS_SIZE.h,
+            frames: spriteFrames,
+          }}
+          frame={frameName}
+          width={normalizedWidth}
+          clipRotated={false}
+          className={['select-none object-contain', className].filter(Boolean).join(' ')}
+        />
+      </div>
     )
   }
 
   if (rects.length > 0) {
     const r = rects[idx] ?? rects[0]
-    const scale = displayWidth / r.w
+    const w0 = displayWidth * stageMul
+    const scale = w0 / r.w
     const boxH = Math.max(1, Math.round(r.h * scale))
     const { w: aw, h: ah } = PIGGY_BANK_ATLAS_SIZE
     return (
@@ -96,7 +122,7 @@ export default function PiggyBankStageVisual({ stepIndex, displayWidth, classNam
         aria-hidden
         className={['shrink-0 bg-no-repeat', className].filter(Boolean).join(' ')}
         style={{
-          width: displayWidth,
+          width: Math.round(w0),
           height: boxH,
           backgroundImage: `url(${PIGGY_BANK_COMBINED_SRC})`,
           backgroundSize: `${aw * scale}px ${ah * scale}px`,
@@ -106,15 +132,15 @@ export default function PiggyBankStageVisual({ stepIndex, displayWidth, classNam
     )
   }
 
-  /** 단계 정보가 없을 때: 한 장 전체를 상자에 넣음(합성 썸네일처럼 보일 수 있음) */
+  const wFallback = Math.round(displayWidth * stageMul)
   return (
     <Image
       src={PIGGY_BANK_COMBINED_SRC}
       alt=""
-      width={displayWidth}
-      height={displayWidth}
+      width={wFallback}
+      height={wFallback}
       className={['h-auto w-full max-w-none select-none object-contain', className].filter(Boolean).join(' ')}
-      style={{ width: displayWidth, height: 'auto' }}
+      style={{ width: wFallback, height: 'auto' }}
       draggable={false}
     />
   )

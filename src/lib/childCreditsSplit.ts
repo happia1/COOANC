@@ -34,12 +34,13 @@ function num(v: unknown): number | undefined {
  */
 export function mergeChildStatsPatch(prev: ChildStats | null, patch: Record<string, unknown>): ChildStats {
   if (!prev) {
+    /** Realtime 첫 페이로드는 전체 행이 오는 경우가 많아 `patch` 를 `ChildStats` 로 취급 */
     return normalizeChildStatsCreditsSplit({
       ...(patch as Partial<ChildStats>),
       credits: num(patch.credits) ?? 0,
       credits_wallet: num(patch.credits_wallet),
       credits_piggy: num(patch.credits_piggy),
-    })
+    }) as ChildStats
   }
 
   const out: Record<string, unknown> = { ...prev }

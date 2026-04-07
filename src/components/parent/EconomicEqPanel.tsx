@@ -29,7 +29,8 @@ type Props = {
  *
  * - **순서**: 먼저 AI 데이터 피드백(그라데이션 박스), 그다음 차트 묶음(제목+반원·도넛·주간 막대), 마지막 코칭 가이드
  * - 만족 지연(반원) + 소비/저축(도넛)은 **한 줄 두 칸**, 그 아래 요일별 막대
- * - 만족 지연 지수만 수치 해석 한 줄(높을수록 좋음) 안내, 소비/저축 범례는 한 줄 가로 배치.
+ * - **데이터**: `eq_delay_score`·`eq_save_ratio` 는 DB 의 `recalculate_eq()` 가
+ *   `child_stats`(지갑·저금통·총액)와 `mission_logs` 로 채웁니다. 섬(가용)=총액−지갑−저금통 은 도넛 분모에 넣지 않습니다.
  * - AI 인사이트는 분석 문구만 두고, **행동 유도 링크는 코칭 가이드 아래 2개**(스페셜 미션·마켓 보상)만 둡니다.
  */
 export default function EconomicEqPanel({
@@ -56,6 +57,7 @@ export default function EconomicEqPanel({
   const dataFeedback = buildPlaceholderEqDataFeedback(insightInput)
   const coachingGuide = buildPlaceholderCoachingGuide(insightInput)
 
+  // eq_save_ratio: 지갑+저금통 중 저금통 비중(0~100). 소비(파랑)=지갑, 저축(노랑)=저금통.
   const savePct = Math.min(100, Math.max(0, stats.eq_save_ratio))
   const spendPct = 100 - savePct
 
@@ -81,7 +83,7 @@ export default function EconomicEqPanel({
               {stats.eq_delay_score}%
             </p>
             <p className="text-[8px] text-gray-400 text-center mt-1 leading-tight px-0.5">
-              자기조절력(기다림·참기·나누기)은 높을수록 좋아요
+              총 크레딧 중 저금통에 둔 비율이에요. 섬(가용)만 많으면 낮게 보일 수 있어요.
             </p>
           </div>
 
@@ -90,6 +92,9 @@ export default function EconomicEqPanel({
               소비 vs 저축 비중
             </p>
             <SaveSpendDonut savePercent={savePct} spendPercent={spendPct} compact />
+            <p className="text-[7px] text-gray-400 text-center mt-0.5 leading-tight px-0.5">
+              지갑·저금통으로 나눈 금액만 비교(섬·가용 제외)
+            </p>
           </div>
         </div>
 
@@ -162,6 +167,7 @@ function WeekdayRoutineBars({ days }: { days: WeeklyRoutineDay[] }) {
   )
 }
 
+/** 반원 게이지 — `eq_delay_score`(총액 대비 저금통 %) 를 시각화합니다. */
 function DelayHalfGauge({
   value,
   gradientId,
@@ -213,6 +219,9 @@ function DelayHalfGauge({
   )
 }
 
+/**
+ * 도넛: 노랑=저금통(저축), 파랑=지갑(소비). 퍼센트는 DB 가 지갑+저금통 합계를 분모로 계산합니다.
+ */
 function SaveSpendDonut({
   savePercent,
   spendPercent,

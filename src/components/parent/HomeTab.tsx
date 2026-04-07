@@ -3,12 +3,14 @@
 /**
  * 부모 앱 「홈」 탭 본문입니다.
  * - 위쪽에서 자녀를 바꾸면(◀▶ 또는 스와이프) 아래 카드·통계가 그 아이 기준으로 바뀝니다.
- * - 「우리아이 경제 EQ 지수」패널 안에서는 AI 피드백이 위, 차트·코칭이 아래 순서입니다. 미션 완료 시 막대가 갱신됩니다.
+ * - 「우리아이 경제 EQ 지수」패널은 child_stats 의 eq_* 필드를 쓰며, 지갑·저금통 이동 시 DB 가 recalculate_eq 로 갱신합니다.
+ * - Realtime 으로 child_stats 를 구독해 부모가 같은 화면에 있을 때 도넛·반원 수치가 바로 따라갑니다.
+ * - 미션 완료 시 막대는 daily_missions Realtime 과 동일 패턴입니다.
  * - 프로필 카드를 누르면 그 아이의 「자녀용 앱 화면」(미션·홈 등)으로 들어갑니다(쿠키 설정 후 /home).
  * - 맨 아래 「최근 활동」은 처음엔 접혀 있고, 헤더를 누르면 목록이 펼쳐집니다(루틴 탭 접기와 같은 화살표 동작).
  */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import {
@@ -94,7 +96,62 @@ export default function HomeTab({ childrenData, pendingCount }: Props) {
 
   const currentId = selectedChildId ?? childrenData[0]?.id
   const child = childrenData.find((c) => c.id === currentId) ?? childrenData[0]
-  const s = child?.stats
+
+  /**
+   * 서버에서 받은 stats 위에, 같은 탭을 보는 동안 자녀 앱에서 발생한 child_stats 변경을 Realtime 으로 얹습니다.
+   * (지갑↔저금통 이동 시 eq_save_ratio·eq_delay_score 가 갱신되면 도넛·반원이 바로 반영됩니다.)
+   */
+  const [statsFromRealtime, setStatsFromRealtime] = useState<
+    Partial<NonNullable<ChildSummary['stats']>>
+  >({})
+  useEffect(() => {
+    setStatsFromRealtime({})
+  }, [child?.id])
+
+  const s = useMemo(() => {
+    if (!child?.stats) return null
+    return { ...child.stats, ...statsFromRealtime }
+  }, [child?.stats, statsFromRealtime])
+
+  useEffect(() => {
+    if (!child?.id) return
+    const supabase = createClient()
+    const ch = supabase
+      .channel(`parent_home_cs:${child.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'child_stats',
+          filter: `child_id=eq.${child.id}`,
+        },
+        (payload) => {
+          const row = payload.new as Record<string, unknown>
+          const n = (key: string) => {
+            const v = row[key]
+            return typeof v === 'number' && Number.isFinite(v) ? v : undefined
+          }
+          setStatsFromRealtime((prev) => ({
+            ...prev,
+            ...(n('credits') !== undefined ? { credits: n('credits')! } : {}),
+            ...(n('hearts') !== undefined ? { hearts: n('hearts')! } : {}),
+            ...(n('current_level') !== undefined ? { current_level: n('current_level')! } : {}),
+            ...(n('exp') !== undefined ? { exp: n('exp')! } : {}),
+            ...(n('exp_to_next_level') !== undefined ? { exp_to_next_level: n('exp_to_next_level')! } : {}),
+            ...(n('streak_days') !== undefined ? { streak_days: n('streak_days')! } : {}),
+            ...(n('eq_delay_score') !== undefined ? { eq_delay_score: n('eq_delay_score')! } : {}),
+            ...(n('eq_routine_rate') !== undefined ? { eq_routine_rate: n('eq_routine_rate')! } : {}),
+            ...(n('eq_save_ratio') !== undefined ? { eq_save_ratio: n('eq_save_ratio')! } : {}),
+          }))
+        },
+      )
+      .subscribe()
+
+    return () => {
+      void supabase.removeChannel(ch)
+    }
+  }, [child?.id])
 
   /** 선택 자녀가 바뀌면 서버에서 받은 주간 막대 데이터로 맞춘 뒤, Realtime 으로 최신화합니다. */
   const [weeklyRoutine, setWeeklyRoutine] = useState<WeeklyRoutineDay[]>(child?.weeklyRoutine ?? [])

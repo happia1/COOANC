@@ -15,38 +15,83 @@ type Props = {
 }
 
 const MAX_CREDIT_STAGE = 500
-const CREDIT_STEP = 30
-type LightFx = { leftPct: number; topPct: number; sizeMul: number; delayMs: number; durationMs: number; opacity: number }
+
+/** 0~299: 동전 1개 → 동전 더미까지 (금괴 프레임 제외, 순수 크레딧 쌓임만) */
+const COIN_STACK_FRAMES: readonly string[] = [
+  'credit1',
+  'credit2',
+  'credit3',
+  'credit4',
+  'credit8',
+  'credit9',
+  'credit10',
+]
+
+/** 300~: 상자 옆에 다이아 1개만 표시(금액이 이 구간에 들어오면) */
+
+/** 왕관 단계 시작(상자+다이아 이후, 상자 위·크레딧 더미 위) */
+const CROWN_FROM = 328
+
+/** 금괴가 하나씩 붙기 시작 */
+const GOLDBAR_FROM = 358
+const GOLDBAR_EVERY = 16
+const MAX_GOLDBARS = 3
+
+/** 왕관+금괴+보석(다이아)+상자 풀 연출 강조 구간 */
+const FULL_TABLEAU_FROM = 430
+
+const GOLDBAR_FRAMES: readonly string[] = ['goldber1', 'goldbar2', 'goldbar5']
 
 /**
- * 크레딧 0~299 구간: `credit1`~`credit10` 프레임으로 단계 표시.
- * - 30 단위로 다음 단계로 넘어가며, 0도 1단계(`credit1`)로 보입니다.
+ * 상자 옆·위 장식(다이아·왕관·금괴)을 동전/숫자 쪽으로 더 내릴 때 쓰는 px.
+ * (`bottom` 값에서 빼면 화면 아래로 내려감)
  */
-function creditTierFrameName(floating: number): string {
-  const clamped = Math.max(0, Math.min(floating, 299))
-  const tier = Math.min(10, Math.floor(clamped / CREDIT_STEP) + 1)
-  /**
-   * 아틀라스 원본에 `credit5~7` 프레임이 없어,
-   * 중간 단계는 인접 프레임으로 자연스럽게 보간해 사용합니다.
-   */
-  const tierToFrame: Record<number, string> = {
-    1: 'credit1',
-    2: 'credit2',
-    3: 'credit3',
-    4: 'credit4',
-    5: 'credit4',
-    6: 'credit8',
-    7: 'credit8',
-    8: 'credit8',
-    9: 'credit9',
-    10: 'credit10',
-  }
-  return tierToFrame[tier] ?? 'credit1'
+const LUXURY_ORNAMENTS_EXTRA_DOWN_PX = 24
+
+/**
+ * 왕관만 다이아·금괴보다 더 아래로 (상자·동전 숫자 쪽으로).
+ * 다이아/금괴와 겹치지 않게 `bottom` 에서만 추가로 뺍니다.
+ */
+const CROWN_ONLY_EXTRA_DOWN_PX = 20
+
+type LightFx = {
+  leftPct: number
+  topPct: number
+  sizeMul: number
+  delayMs: number
+  durationMs: number
+  opacity: number
 }
 
 /**
- * 아이 미션 섬 가운데: 크레딧이 쌓일수록 동전 더미가 겹쳐 보이게 렌더링합니다.
- * - 기존 그리드 크롭 방식(잘림 이슈)을 제거해, 어떤 화면에서도 안정적으로 보입니다.
+ * 0~299: 금액에 따라 동전 단계(한 장 → 많이 쌓임).
+ * `clamped` 최대가 299이므로 분모는 **299**로 맞춰 0~8 인덱스가 정확히 끝까지 쓰이게 함.
+ */
+function coinStackFrame(floating: number): string {
+  const clamped = Math.max(0, Math.min(floating, 299))
+  if (clamped <= 0) return COIN_STACK_FRAMES[0]
+  const idx = Math.min(
+    COIN_STACK_FRAMES.length - 1,
+    Math.floor((clamped / 299) * (COIN_STACK_FRAMES.length - 1)),
+  )
+  return COIN_STACK_FRAMES[idx] ?? 'credit1'
+}
+
+/**
+ * 0~299: 한 개짜리 작은 동전에서 → 많이 쌓인 큰 더미로 **보이도록** 연속 배율(프레임과 별개로 크기가 점점 커짐).
+ */
+function coinStackSizeMul(floating: number): number {
+  const clamped = Math.max(0, Math.min(floating, 299))
+  if (clamped <= 0) return 0.52
+  const t = clamped / 299
+  return 0.52 + t * 0.88
+}
+
+/**
+ * 아이 미션 섬 가운데 가용 크레딧 시각:
+ * - 0~299: 동전 1개 → 여러 개 쌓인 더미
+ * - 300~499: 상자 → 옆에 큰 다이아 증가 → 왕관(큼) 상자 위 → 금괴 증가 → 마지막에 모두 풀
+ * - 500: 기존 `gold_and_crown` 단일 프레임
  */
 export default function FloatingCreditsStackVisual({
   floating,
@@ -54,22 +99,34 @@ export default function FloatingCreditsStackVisual({
   displayWidth = 58,
   className = '',
 }: Props) {
-  /** 요청사항: 크레딧 시각 단계 최대값은 500으로 제한합니다. */
-  const targetCredit = Math.max(0, Math.min(floating, MAX_CREDIT_STAGE))
+  /** 서버/부모가 준 **실제** 가용 크레딧(정수) */
+  const targetCredit = Math.max(0, Math.min(Math.floor(floating), MAX_CREDIT_STAGE))
+  /**
+   * 그림(동전·상자)에 쓰는 **표시** 크레딧 — 목표로 바로 점프하지 않고 숫자(`SlotNumber`)처럼
+   * 짧은 간격으로 한 단계씩 맞춰 가며, 티어·크기가 **여러 번** 바뀌어 보이게 함.
+   */
+  const [displayedCredit, setDisplayedCredit] = useState(targetCredit)
+
+  useEffect(() => {
+    if (displayedCredit === targetCredit) return
+    const tick = setInterval(() => {
+      setDisplayedCredit((prev) => {
+        if (prev === targetCredit) return prev
+        const diff = targetCredit - prev
+        const step = Math.max(1, Math.floor(Math.abs(diff) / 8))
+        return prev + Math.sign(diff) * step
+      })
+    }, 45)
+    return () => clearInterval(tick)
+  }, [targetCredit, displayedCredit])
+
   const prevCreditRef = useRef(targetCredit)
   const [sparkleOn, setSparkleOn] = useState(false)
   const [lightFx, setLightFx] = useState<LightFx[]>([])
   const [isMorphing, setIsMorphing] = useState(false)
 
   useEffect(() => {
-    /**
-     * 크레딧이 늘어나면 3초 동안만 반짝임을 켭니다.
-     * 줄어들 때는 반짝임 없이 단계만 부드럽게 내려갑니다.
-     */
     if (targetCredit > prevCreditRef.current) {
-      /**
-       * 매번 같은 자리에만 뜨지 않게, 증가 이벤트마다 라이트 위치/속도를 랜덤으로 다시 뽑습니다.
-       */
       setLightFx(
         Array.from({ length: 4 }).map(() => ({
           leftPct: 20 + Math.random() * 60,
@@ -89,40 +146,86 @@ export default function FloatingCreditsStackVisual({
     return
   }, [targetCredit])
 
-  const clamped = targetCredit
-  /**
-   * 크레딧이 늘수록 이미지가 커지게 하되,
-   * 0일 때는 "빈 상태"가 과하게 커 보이지 않도록 시작 배율을 더 작게 잡습니다.
-   * - 0크레딧: 약 0.68x
-   * - 500크레딧: 약 1.30x
-   */
-  const growthScale = 0.68 + (clamped / MAX_CREDIT_STAGE) * 0.62
+  /** 스프라이트·티어 계산은 **표시값** 기준(목표로 점프하지 않음) */
+  const clamped = Math.max(0, Math.min(displayedCredit, MAX_CREDIT_STAGE))
+  const MIN_GROW = 0.48
+  const MAX_GROW = 1.34
+  let growthScale = MIN_GROW + (clamped / MAX_CREDIT_STAGE) * (MAX_GROW - MIN_GROW)
+  if (clamped > 0 && clamped < 20) {
+    growthScale *= 0.88
+  }
   const grownWidth = Math.round(displayWidth * growthScale)
-  /**
-   * `credit2`처럼 회전 프레임은 세로 비율이 커서 기본 높이(0.92배)로는 상단이 잘릴 수 있습니다.
-   * 작은 화면에서도 잘리지 않게 표시 박스 높이를 넉넉히 잡습니다.
-   */
-  const displayHeight = Math.round(grownWidth * 1.8)
 
-  const opacityClass = floating <= 0 && dimWhenEmpty ? 'opacity-30' : 'opacity-100'
   const isFinal = clamped >= 500
   const isGoldBoxPhase = clamped >= 300 && clamped < 500
-  const showCrown = clamped >= 400 && clamped < 500
-  const diamondCount = isGoldBoxPhase ? Math.max(0, Math.floor((clamped - 300) / CREDIT_STEP)) : 0
-  const creditFrame = creditTierFrameName(clamped)
-  const visualKey = isFinal ? 'final' : isGoldBoxPhase ? `goldbox-${diamondCount}-${showCrown ? 'crown' : 'nocrown'}` : `credit-${creditFrame}`
+  const isCoinPhase = clamped < 300
+
+  /** 동전 단계: 베이스 × 쌓임 연출 배율 → 한 개는 작고, 299에 가까울수록 크게 */
+  const coinSizeMul = coinStackSizeMul(clamped)
+  const coinSpriteWidth = isCoinPhase
+    ? Math.max(26, Math.round(grownWidth * coinSizeMul))
+    : grownWidth
+
+  /** 금고·왕관·금괴 레이아웃은 가로가 넓어야 옆 다이아·금괴가 들어감 */
+  const layoutWidth = isGoldBoxPhase
+    ? Math.max(grownWidth, Math.round(grownWidth * 2.75))
+    : Math.max(grownWidth, Math.round(coinSpriteWidth * 1.05))
+  const displayHeight = isGoldBoxPhase
+    ? Math.round(grownWidth * 2.35)
+    : Math.round(Math.max(grownWidth, coinSpriteWidth) * 1.95)
+
+  const opacityClass = targetCredit <= 0 && dimWhenEmpty ? 'opacity-30' : 'opacity-100'
+
+  const creditFrame = coinStackFrame(clamped)
+  const r300 = clamped - 300
+  /** 상자 구간: 다이아는 1개만, 약간 기울인 연출 */
+  const showSingleDiamond = isGoldBoxPhase && r300 >= 0
+  const showCrown = isGoldBoxPhase && clamped >= CROWN_FROM
+  const goldBarCount =
+    isGoldBoxPhase && clamped >= GOLDBAR_FROM
+      ? Math.min(MAX_GOLDBARS, Math.floor((clamped - GOLDBAR_FROM) / GOLDBAR_EVERY) + 1)
+      : 0
+  const fullTableau = isGoldBoxPhase && clamped >= FULL_TABLEAU_FROM
+
+  /**
+   * React `key` 용도: **크레딧 숫자가 1씩 바뀔 때마다** 바뀌면 스프라이트가 통째로 **리마운트**되어
+   * `transition` 으로 크기가 부드럽게 커지는 연출이 사라짐. `clamped`·픽셀 크기는 넣지 않고
+   * **스프라이트 티어(프레임/왕관/금괴 단계)**만 바뀔 때만 키를 바꿈.
+   */
+  const visualKey = isFinal
+    ? 'final'
+    : isGoldBoxPhase
+      ? `lux-d1-${showCrown ? 1 : 0}-${goldBarCount}-f${fullTableau ? 1 : 0}`
+      : `coin-${creditFrame}`
 
   useEffect(() => {
-    /** 단계 이미지가 바뀔 때 바로 점프하지 않게 짧은 모핑(페이드+스케일)을 넣습니다. */
     setIsMorphing(true)
     const off = setTimeout(() => setIsMorphing(false), 240)
     return () => clearTimeout(off)
   }, [visualKey])
 
+  /** 상자 스프라이트 가로(화면 기준) */
+  const boxW = Math.max(42, Math.round(grownWidth * 1.02))
+  const boxHApprox = Math.round(boxW * (190 / 205))
+  /** 옆 다이아: 큰 사이즈 */
+  const diamondPx = Math.max(34, Math.round(grownWidth * 0.62))
+  /** 왕관: 예전 대비 약 3배 체감 (기존 ~0.3 → ~0.9) */
+  const crownPx = Math.max(56, Math.round(grownWidth * 0.92))
+  const goldBarPx = Math.max(28, Math.round(grownWidth * 0.42))
+
+  /** 너비·높이가 바뀔 때도 부드럽게(리마운트 없이 같은 DOM에 width 전달) */
+  const sizeTransitionClass = 'transition-[width,height] duration-500 ease-out'
+  const morphClass = `transition-[opacity,transform] duration-300 ease-out ${sizeTransitionClass} ${isMorphing ? 'opacity-70' : 'opacity-100'}`
+  const morphTransform = (extra: string) =>
+    `${extra} ${isMorphing ? 'scale(0.98)' : 'scale(1)'}`
+
+  /** 크레딧·상자 묶음을 살짝 아래로 내려 섬 레이아웃과 맞춤(px) — 섬에서 가용 크레딧 블록을 더 내릴 때 함께 키움 */
+  const CREDIT_NUDGE_DOWN_PX = 20
+
   return (
     <div
-      className={`relative shrink-0 ${opacityClass} ${className}`.trim()}
-      style={{ width: displayWidth, height: displayHeight }}
+      className={`relative shrink-0 ${opacityClass} ${className} ${sizeTransitionClass}`.trim()}
+      style={{ width: layoutWidth, height: displayHeight }}
       aria-hidden
     >
       {sparkleOn ? (
@@ -150,11 +253,14 @@ export default function FloatingCreditsStackVisual({
           ))}
         </>
       ) : null}
-      {/** 500 달성: 최종 프레임 `gold_and_crown` 단일 표시 */}
+
       {isFinal ? (
         <span
-          className={`absolute left-1/2 bottom-0 transition-all duration-300 ${isMorphing ? 'opacity-70 scale-[0.98]' : 'opacity-100 scale-100'}`}
-          style={{ transform: 'translateX(-50%)' }}
+          key={visualKey}
+          className={`absolute left-1/2 bottom-0 ${morphClass}`}
+          style={{
+            transform: morphTransform(`translateX(-50%) translateY(${CREDIT_NUDGE_DOWN_PX}px)`),
+          }}
         >
           <SpriteImage
             sheet={REWARD_CREDITS}
@@ -166,62 +272,115 @@ export default function FloatingCreditsStackVisual({
         </span>
       ) : isGoldBoxPhase ? (
         <>
+          {/** 중앙: 보석 상자(금고) — 안에 크레딧 더미 느낌은 스프라이트에 포함 */}
           <span
-            className={`absolute left-1/2 bottom-0 transition-all duration-300 ${isMorphing ? 'opacity-70 scale-[0.98]' : 'opacity-100 scale-100'}`}
-            style={{ transform: 'translateX(-50%)' }}
+            key={`${visualKey}-box`}
+            className={`absolute left-1/2 bottom-0 ${morphClass}`}
+            style={{
+              transform: morphTransform(`translateX(-50%) translateY(${CREDIT_NUDGE_DOWN_PX}px)`),
+            }}
           >
-            <SpriteImage
-              sheet={REWARD_CREDITS}
-              frame="gold_box"
-              width={Math.max(42, Math.round(grownWidth))}
-              clipRotated={false}
-              className="select-none drop-shadow-[0_4px_12px_rgba(0,0,0,0.18)]"
-            />
+          <SpriteImage
+            sheet={REWARD_CREDITS}
+            frame="gold_box"
+            width={boxW}
+            clipRotated={false}
+            className={`select-none drop-shadow-[0_4px_12px_rgba(0,0,0,0.18)] ${sizeTransitionClass}`}
+          />
           </span>
-          {Array.from({ length: diamondCount }).map((_, i) => (
+
+          {/** 상자 오른쪽: 다이아몬드 1개만, 기울기는 시계 방향(이전 -14° 반대) */}
+          {showSingleDiamond ? (
             <span
-              key={`diamond-${i}`}
-              className="absolute left-1/2"
+              key={`${visualKey}-diamond`}
+              className="absolute flex items-center justify-center"
               style={{
-                bottom: Math.max(6, Math.round(displayHeight * 0.38 + i * 2)),
-                transform: `translateX(${(i - (diamondCount - 1) / 2) * 10}px)`,
+                left: `calc(50% + ${Math.round(boxW * 0.4)}px)`,
+                bottom: Math.round(12 + CREDIT_NUDGE_DOWN_PX - LUXURY_ORNAMENTS_EXTRA_DOWN_PX),
+                transform: 'translateX(-35%) rotate(16deg)',
+                transformOrigin: 'center center',
               }}
             >
               <SpriteImage
                 sheet={REWARD_CREDITS}
                 frame="diamond"
-                width={Math.max(14, Math.round(grownWidth * 0.24))}
+                width={fullTableau ? Math.round(diamondPx * 1.06) : diamondPx}
                 clipRotated={false}
-                className="select-none"
+                className="select-none drop-shadow-[0_3px_10px_rgba(0,0,0,0.2)]"
               />
             </span>
-          ))}
+          ) : null}
+
+          {/** 상자 위(크레딧 더미 위): 왕관 — 이전보다 약 3배 큰 사이즈 */}
           {showCrown ? (
             <span
-              className="absolute left-1/2"
-              style={{ bottom: Math.max(16, Math.round(displayHeight * 0.64)), transform: 'translateX(-50%)' }}
+              key={`${visualKey}-crown`}
+              className={`absolute left-1/2 ${morphClass}`}
+              style={{
+                bottom: Math.round(
+                  boxHApprox +
+                    4 +
+                    CREDIT_NUDGE_DOWN_PX -
+                    LUXURY_ORNAMENTS_EXTRA_DOWN_PX -
+                    CROWN_ONLY_EXTRA_DOWN_PX,
+                ),
+                transform: morphTransform('translateX(-50%)'),
+                zIndex: 3,
+              }}
             >
               <SpriteImage
                 sheet={REWARD_CREDITS}
                 frame="crown"
-                width={Math.max(18, Math.round(grownWidth * 0.3))}
+                width={fullTableau ? Math.round(crownPx * 1.05) : crownPx}
                 clipRotated={false}
-                className="select-none"
+                className="select-none drop-shadow-[0_4px_14px_rgba(0,0,0,0.22)]"
               />
             </span>
           ) : null}
+
+          {/** 상자 왼쪽: 금괴가 하나씩 늘어남 */}
+          {goldBarCount > 0
+            ? Array.from({ length: goldBarCount }).map((_, i) => {
+                const barFrame = GOLDBAR_FRAMES[i % GOLDBAR_FRAMES.length] ?? 'goldbar2'
+                return (
+                  <span
+                    key={`goldbar-${i}`}
+                    className="absolute flex items-end justify-center"
+                    style={{
+                      left: `calc(50% - ${Math.round(boxW * 0.46)}px)`,
+                      bottom: Math.round(
+                        8 + i * (goldBarPx * 0.35) + CREDIT_NUDGE_DOWN_PX - LUXURY_ORNAMENTS_EXTRA_DOWN_PX,
+                      ),
+                      transform: 'translateX(-50%)',
+                      zIndex: 2,
+                    }}
+                  >
+                    <SpriteImage
+                      sheet={REWARD_CREDITS}
+                      frame={barFrame}
+                      width={fullTableau ? Math.round(goldBarPx * 1.08) : goldBarPx}
+                      clipRotated={false}
+                      className="select-none drop-shadow-[0_3px_8px_rgba(0,0,0,0.18)]"
+                    />
+                  </span>
+                )
+              })
+            : null}
         </>
       ) : (
+        // 동전 구간: key 없이 같은 노드에서 frame·width 만 갱신(티어 바뀔 때 리마운트 최소화)
         <span
-          className={`absolute left-1/2 bottom-0 transition-all duration-300 ${isMorphing ? 'opacity-70 scale-[0.98]' : 'opacity-100 scale-100'}`}
-          style={{ transform: 'translateX(-50%)' }}
+          className={`absolute left-1/2 bottom-0 ${morphClass}`}
+          style={{
+            transform: morphTransform(`translateX(-50%) translateY(${CREDIT_NUDGE_DOWN_PX}px)`),
+          }}
         >
           <SpriteImage
             sheet={REWARD_CREDITS}
             frame={creditFrame}
-            width={Math.max(36, Math.round(grownWidth))}
+            width={coinSpriteWidth}
             clipRotated={false}
-            className="select-none drop-shadow-[0_4px_12px_rgba(0,0,0,0.18)]"
+            className={`select-none drop-shadow-[0_4px_12px_rgba(0,0,0,0.18)] ${sizeTransitionClass}`}
           />
         </span>
       )}

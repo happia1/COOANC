@@ -826,7 +826,7 @@ export default function MarketTab({
                           style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.06)' }}
                         >
                           <SpriteImage sheet={ICONS} frame="credit" width={11} clipRotated={false} />
-                          <span className="truncate text-[8px] font-black tabular-nums text-gray-600 sm:text-[9px]">
+                          <span className="truncate text-[8px] font-black tabular-nums text-brand-blue sm:text-[9px]">
                             {item.credit_price.toLocaleString()}
                           </span>
                         </div>
@@ -856,7 +856,7 @@ export default function MarketTab({
           <div className="flex min-w-0 flex-1 items-baseline gap-1.5 text-gray-700">
             {/* 요청사항: '지갑(마켓)' 텍스트 대신 크레딧 아이콘으로 의미를 표시 */}
             <SpriteImage sheet={ICONS} frame="credit" width={16} clipRotated={false} />
-            <span className="truncate text-lg font-black tabular-nums text-amber-800 sm:text-xl">
+            <span className="truncate text-lg font-black tabular-nums text-brand-blue sm:text-xl">
               {currentWallet.toLocaleString()}
             </span>
           </div>
@@ -976,7 +976,7 @@ export default function MarketTab({
             {/* SpriteImage는 내부적으로 div를 렌더링하므로 p 대신 div로 감쌉니다. */}
             <div className="mt-2 text-center text-[11px] font-bold text-gray-500">
               <SpriteImage sheet={ICONS} frame="credit" width={12} className="inline-block align-[-2px]" clipRotated={false} />{' '}
-              <span className="tabular-nums font-black text-gray-700">
+              <span className="tabular-nums font-black text-brand-blue">
                 {shelfActionFor.item.credit_price.toLocaleString('ko-KR')}
               </span>
               크레딧 · 레벨 {shelfActionFor.item.level_required}+

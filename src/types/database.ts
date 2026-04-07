@@ -43,9 +43,12 @@ export type ChildStats = {
   current_level: number         // 0~5
   exp: number
   exp_to_next_level: number
-  eq_delay_score: number        // 만족 지연 지수 0~100
-  eq_routine_rate: number       // 루틴 완주율 0~100
-  eq_save_ratio: number         // 저축 비중 0~100
+  /** 만족 지연 지수 0~100 — 전체 credits 대비 저금통(credits_piggy) 비율 */
+  eq_delay_score: number
+  /** 루틴 완주율 0~100 — 최근 14일 mission_logs 기준 */
+  eq_routine_rate: number
+  /** 저축 비중 0~100 — 지갑+저금통 중 저금통 비율(섬·가용은 분모 제외) */
+  eq_save_ratio: number
   streak_days: number
   last_mission_date: string | null
   longest_streak: number

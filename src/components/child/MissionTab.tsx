@@ -18,6 +18,7 @@ import { missionRoutineIconFrame } from '@/lib/missionRoutineIconFrame'
 import MissionCreditToPiggyOverlay from '@/components/child/MissionCreditToPiggyOverlay'
 import MissionCreditMoveDialog, {
   MissionCreditActionSheet,
+  type CreditTransferApiSuccess,
   type CreditTransferKind,
 } from '@/components/child/MissionCreditMoveDialog'
 import {
@@ -64,6 +65,7 @@ function isMissionRolledBackPayload(v: unknown): v is { dailyMissionId: string; 
 
 /**
  * 미션 탭
+ * - 배경: 미션 상단 잔디 PNG 는 쓰지 않고, 자녀 레이아웃 배경만 보입니다.
  * - **6:4**: 상단 풍경 `flex-[6]` + 하단 카드 `flex-[4]` — 세로 스크롤 없음, 카드는 가로 스크롤
  * - 카드 썸네일: `public/.../routines_01.png` 아틀라스(`missionRoutineIconFrame`)
  * - 부모 Realtime 「다시 하기」: DB 는 서버에서 이미 되돌아가고, 여기서는 카드만 슬라이더에 다시 보이게 맞춥니다.
@@ -76,15 +78,6 @@ export default function MissionTab({
   today,
   isFullRestDay,
 }: Props) {
-  /** 미션 탭 전체에 깔리는 배경 이미지 스타일(사용자가 방금 전달한 이미지) */
-  const missionTabBackgroundStyle = {
-    /** 캐시 이슈를 피하기 위해 새 파일(v10)로 교체합니다. */
-    backgroundImage: "url('/assets/img/layouts/backgrounds/mission_tab_bg_v10.png')",
-    backgroundSize: 'cover',
-    backgroundPosition: 'center',
-    backgroundRepeat: 'no-repeat',
-  } as const
-
   const [stats, setStats] = useState<ChildStats | null>(initialStats)
   /** 지갑·저금통·섬 옮기기: 먼저 어떤 통을 눌렀는지(시트) → 종류 선택 후 수량 팝업 */
   const [creditSheetBucket, setCreditSheetBucket] = useState<'center' | 'wallet' | 'piggy' | null>(null)
@@ -180,6 +173,23 @@ export default function MissionTab({
     setToast(msg)
     setTimeout(() => setToast(null), 2500)
   }
+
+  /**
+   * 크레딧 옮기기 API 성공 직후: Supabase Realtime 은 늦게 올 수 있어, 응답 본문으로 `stats` 를 바로 맞춥니다.
+   * (이전에는 `onSuccess` 가 비어 있어 화면이 갱신되지 않거나 한참 뒤에야 바뀌는 것처럼 보였습니다.)
+   */
+  const applyCreditTransferSuccess = useCallback((result: CreditTransferApiSuccess) => {
+    setStats((prev) =>
+      normalizeChildStatsCreditsSplit(
+        mergeChildStatsPatch(prev, {
+          credits: result.credits,
+          credits_wallet: result.credits_wallet,
+          credits_piggy: result.credits_piggy,
+        }),
+      ),
+    )
+    setCreditSheetBucket(null)
+  }, [])
 
   /**
    * 롤백 알림 팝업을 한 번만 띄웁니다(실시간·브로드캐스트 중복 방지).
@@ -448,7 +458,7 @@ export default function MissionTab({
 
   /**
    * 상단 영역: `flexFill` 로 레이아웃이 주는 높이만 씀(고정 dvh 아님).
-   * 큰 풍경 PNG·섬 잔디 PNG 는 끄고, 레이아웃 녹색 그라데이션이 비치지 않게 `bg-white` 로 막음.
+   * 잔디 풍경 PNG 는 쓰지 않음(`showBackground={false}`) — 섬 일러스트도 `showIslandArt={false}`.
    */
   const heroBand = (
     <ChildHomeSceneryBand
@@ -460,8 +470,9 @@ export default function MissionTab({
     >
       {/** 연속일 등 상단 StatPill 은 사용하지 않음 — 크레딧은 섬 가운데·지갑·저금통에서 확인 */}
       {/** `flex-1 min-h-0`: 홈과 같이 섬 무대가 풍경 밴드 안 남는 공간에 맞춰 줄어듦 */}
-      <div className="flex min-h-0 flex-1 flex-col justify-end">
-        <div className="relative mx-auto flex min-h-0 w-full max-w-sm flex-1 flex-col items-center justify-end -mt-10 sm:-mt-12">
+      {/** `overflow-visible`: 섬·저금통 스프라이트가 세로로 삐져나와도 잘리지 않게 */}
+      <div className="flex min-h-0 flex-1 flex-col justify-end overflow-visible">
+        <div className="relative mx-auto flex min-h-0 w-full max-w-sm flex-1 flex-col items-center justify-end overflow-visible -mt-10 sm:-mt-12">
           <ChildHomeIslandStage
             scene="gippybank"
             density="flex"
@@ -672,11 +683,9 @@ export default function MissionTab({
   ) : null
 
   if (isFullRestDay) {
+    /** 휴식일 미션 탭도 전용 배경 없음 — 자녀 레이아웃 배경과 동일 */
     return (
-      <div
-        className="relative -mx-4 -mb-[calc(60px+0.35rem)] -mt-4 flex min-h-0 flex-1 flex-col bg-transparent"
-        style={missionTabBackgroundStyle}
-      >
+      <div className="relative -mx-4 -mb-[calc(60px+0.35rem)] -mt-4 flex min-h-0 flex-1 flex-col bg-transparent">
         <MissionSleepMorningLayer
           childId={childId}
           today={today}
@@ -710,17 +719,15 @@ export default function MissionTab({
           kind={creditMoveKind}
           maxAmount={creditMoveKind ? maxAmountForKind(creditMoveKind) : 0}
           title={creditMoveKind ? transferCopy[creditMoveKind].title : ''}
-          onSuccess={() => {}}
+          onSuccess={applyCreditTransferSuccess}
         />
       </div>
     )
   }
 
+  /** 미션 탭 전용 배경 이미지 없음 — 자녀 레이아웃의 배경이 그대로 보입니다 */
   return (
-    <div
-      className="relative -mx-4 -mb-[calc(60px+0.35rem)] -mt-4 flex min-h-0 flex-1 flex-col bg-transparent"
-      style={missionTabBackgroundStyle}
-    >
+    <div className="relative -mx-4 -mb-[calc(60px+0.35rem)] -mt-4 flex min-h-0 flex-1 flex-col bg-transparent">
       <MissionSleepMorningLayer
         childId={childId}
         today={today}
@@ -763,7 +770,7 @@ export default function MissionTab({
         kind={creditMoveKind}
         maxAmount={creditMoveKind ? maxAmountForKind(creditMoveKind) : 0}
         title={creditMoveKind ? transferCopy[creditMoveKind].title : ''}
-        onSuccess={() => {}}
+        onSuccess={applyCreditTransferSuccess}
       />
     </div>
   )

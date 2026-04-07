@@ -1,0 +1,76 @@
+{
+  "frames": {
+    "레이어 336.png": {
+      "frame": { "x": 1256, "y": 5, "w": 195, "h": 187 },
+      "rotated": true,
+      "trimmed": false,
+      "spriteSourceSize": { "x": 0, "y": 0, "w": 195, "h": 187 },
+      "sourceSize": { "w": 195, "h": 187 }
+    },
+    "레이어 337.png": {
+      "frame": { "x": 431, "y": 5, "w": 228, "h": 205 },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": { "x": 0, "y": 0, "w": 228, "h": 205 },
+      "sourceSize": { "w": 228, "h": 205 }
+    },
+    "레이어 338.png": {
+      "frame": { "x": 666, "y": 5, "w": 195, "h": 190 },
+      "rotated": true,
+      "trimmed": false,
+      "spriteSourceSize": { "x": 0, "y": 0, "w": 195, "h": 190 },
+      "sourceSize": { "w": 195, "h": 190 }
+    },
+    "레이어 339.png": {
+      "frame": { "x": 863, "y": 5, "w": 195, "h": 190 },
+      "rotated": true,
+      "trimmed": false,
+      "spriteSourceSize": { "x": 0, "y": 0, "w": 195, "h": 190 },
+      "sourceSize": { "w": 195, "h": 190 }
+    },
+    "레이어 340.png": {
+      "frame": { "x": 1060, "y": 5, "w": 195, "h": 189 },
+      "rotated": true,
+      "trimmed": false,
+      "spriteSourceSize": { "x": 0, "y": 0, "w": 195, "h": 189 },
+      "sourceSize": { "w": 195, "h": 189 }
+    },
+    "레이어 341.png": {
+      "frame": { "x": 1450, "y": 5, "w": 195, "h": 187 },
+      "rotated": true,
+      "trimmed": false,
+      "spriteSourceSize": { "x": 0, "y": 0, "w": 195, "h": 187 },
+      "sourceSize": { "w": 195, "h": 187 }
+    },
+    "레이어 342.png": {
+      "frame": { "x": 1644, "y": 5, "w": 192, "h": 183 },
+      "rotated": true,
+      "trimmed": false,
+      "spriteSourceSize": { "x": 0, "y": 0, "w": 192, "h": 183 },
+      "sourceSize": { "w": 192, "h": 183 }
+    },
+    "레이어 343.png": {
+      "frame": { "x": 231, "y": 5, "w": 193, "h": 209 },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": { "x": 0, "y": 0, "w": 193, "h": 209 },
+      "sourceSize": { "w": 193, "h": 209 }
+    },
+    "레이어 344.png": {
+      "frame": { "x": 5, "y": 5, "w": 219, "h": 212 },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": { "x": 0, "y": 0, "w": 219, "h": 212 },
+      "sourceSize": { "w": 219, "h": 212 }
+    }
+  },
+  "meta": {
+    "app": "https://www.codeandweb.com/texturepacker",
+    "version": "1.0",
+    "image": "piggy_bank.png",
+    "format": "RGBA8888",
+    "size": { "w": 1832, "h": 222 },
+    "scale": "1",
+    "smartupdate": "$TexturePacker:SmartUpdate:711ba611d2cc6de3e15d2589c4b8bb52:7f4bdc0d9f9c01a23f9e302b1f7c87da:f3489ca324e10155674b1c27a69d741d$"
+  }
+}

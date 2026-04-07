@@ -29,16 +29,22 @@ export default async function ChildLayout({ children }: { children: ReactNode })
     childName = childProfile.name.trim()
   }
 
-  // `h-dvh` + `overflow-hidden`: 홈·미션 탭이 위아래 스크롤 없이 한 화면에 들어가도록 전체 높이를 기기 화면에 맞춤
+  /**
+   * `h-dvh` 로 한 화면 높이를 맞춥니다.
+   * `overflow-hidden` 은 자식(미션 저금통 큰 스프라이트)이 위로 나올 때 머리가 잘립니다.
+   * `overflow-x` 와 `overflow-y` 를 섞으면(한쪽만 hidden) 브라우저가 세로를 `auto` 로 바꿔 잘릴 수 있어,
+   * 여기서는 **양축 `visible`** 만 쓰고 가로는 `max-w-md`·`mx-auto` 로 막습니다.
+   */
   return (
-    <div className="relative flex h-dvh max-h-dvh min-h-0 flex-col overflow-hidden bg-gradient-to-b from-sky-100/90 via-amber-50/50 to-green-50/80">
+    <div className="relative flex h-dvh max-h-dvh min-h-0 flex-col overflow-visible bg-gradient-to-b from-sky-100/90 via-amber-50/50 to-green-50/80">
       <ChildTopBar childName={childName} isParentPreview={ctx.isParentPreview} />
       {/**
        * `min-h-0` + `flex` 로 자식이 뷰포트 높이를 넘지 않게 할 수 있음(홈·미션 한 화면).
        * 세로 스크롤이 필요한 탭(마켓·스티커)은 각 탭 루트에 `overflow-y-auto` 를 둠.
        * `pb`: 하단 독 높이(60px) + 소량 여유 — 하단 패널과 독 사이 빈 화면을 줄임.
        */}
-      <main className="relative z-10 mx-auto flex min-h-0 w-full max-w-md flex-1 flex-col overflow-hidden px-4 pb-[calc(60px+0.35rem)] pt-4">
+      {/** 양축 `visible` — 위와 동일 이유로 `hidden`·축 혼합 사용 안 함 */}
+      <main className="relative z-10 mx-auto flex min-h-0 w-full max-w-md flex-1 flex-col overflow-visible px-4 pb-[calc(60px+0.35rem)] pt-4">
         {children}
       </main>
       <ChildNavBar />

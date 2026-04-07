@@ -28,6 +28,14 @@ const LIFT_CLASS = '-translate-y-[9rem] sm:-translate-y-[12rem]'
 const FLEX_UNIFIED_SCALE_CLASS =
   'pointer-events-none absolute bottom-0 left-1/2 h-[280px] w-[320px] max-w-full origin-bottom overflow-visible [transform:translateX(-50%)_translateY(calc(-1*min(11rem,24cqh)))_scale(clamp(0.38,min(1.18,calc(100cqw/320px),calc(100cqh/280px)),1.18))]'
 
+/**
+ * 미션(저금통·지갑 UI): 왕관 등 키 큰 스프라이트가 280px 캔버스 위로 넘칠 수 있어
+ * 논리 높이만 320px 로 키우고, cqh 기준도 320에 맞춥니다(홈 토끼 경로는 위 상수 유지).
+ * 최대 배율 `1.3` — 전체(아이콘·숫자)를 한꺼번에 조금 키움(이전 1.18).
+ */
+const FLEX_UNIFIED_SCALE_MISSION_CREDITS_CLASS =
+  'pointer-events-none absolute bottom-0 left-1/2 h-[320px] w-[320px] max-w-full origin-bottom overflow-visible [transform:translateX(-50%)_translateY(calc(-1*min(11rem,24cqh)))_scale(clamp(0.38,min(1.3,calc(100cqw/320px),calc(100cqh/320px)),1.3))]'
+
 /** 기본 무대 박스 — 고정 비율(스크롤이 생기기 쉬움). */
 const BOX_DEFAULT = 'h-[min(46dvh,400px)] min-h-[280px]'
 /** 예전 한 화면 실험용 — 매우 낮은 박스. */
@@ -201,6 +209,10 @@ export default function ChildHomeIslandStage({
   const [piggySparkleOn, setPiggySparkleOn] = useState(false)
   const [piggyLightFx, setPiggyLightFx] = useState<LightFx[]>([])
 
+  /** 9단계 중 마지막 두 칸은 왕관 돼지(343) — 위로 길어 `min-h`·`pt` 로 잘림을 줄입니다. */
+  const piggyStageCount = piggyBankStageCount()
+  const tallCrownStartIdx = Math.max(0, piggyStageCount - 2)
+
   useEffect(() => {
     animatedPiggyIdxRef.current = animatedPiggyIdx
   }, [animatedPiggyIdx])
@@ -295,119 +307,136 @@ export default function ChildHomeIslandStage({
       {scene === 'gippybank' && missionCredits ? (
         <>
           {/**
-           * 가운데: 아직 나누지 않은 크레딧 — `public/.../credits.png` 스프라이트에서
-           * 금액이 클수록 「더 많이 쌓인」 그림 칸을 골라 보여 줍니다.
-           * 금액이 0이면 흐리게만 표시하고, 탭해도 시트가 뜨지 않게 부모에서 막습니다.
+           * **이미지 행 위 / 숫자 행 아래** — 3열 그리드로 열마다 정렬.
+           * 숫자 행: 같은 `min-h` + `items-end` 로 자릿수(0 vs 440) 베이스라인 맞춤.
+           * 아이콘 행: `items-end` + 가운데 동전만 위로 올려 좌·우와 한 높이에 가깝게.
            */}
-          {/** 요청 반영: 가운데 크레딧을 더 많이 위로 올려 겹침 여유를 크게 확보합니다. */}
-          <div className="pointer-events-auto absolute bottom-[43%] left-1/2 z-[4] flex -translate-x-1/2 flex-col items-center sm:bottom-[38%]">
-            <button
-              type="button"
-              disabled={missionCredits.floating <= 0}
-              onClick={missionCredits.onCenterTap}
-              aria-label={
-                showIslandArt
-                  ? `섬에 쌓인 크레딧 ${missionCredits.floating}. 눌러서 지갑이나 저금통으로 옮기기`
-                  : `아직 나누지 않은 크레딧 ${missionCredits.floating}. 눌러서 지갑이나 저금통으로 옮기기`
-              }
-              className={`flex flex-col items-center rounded-2xl px-2 pb-1 pt-0.5 transition-transform active:scale-[0.97] ${
-                missionCredits.floating <= 0 ? 'opacity-45' : ''
-              }`}
-            >
-              <div className="flex h-[56px] w-[68px] items-end justify-center">
-                <FloatingCreditsStackVisual
-                  floating={missionCredits.floating}
-                  dimWhenEmpty={false}
-                  displayWidth={58}
-                  className="drop-shadow-[0_4px_12px_rgba(0,0,0,0.18)]"
-                />
-              </div>
-              {/** 요청 반영: 배경 블록 없이 숫자만 크게 표시합니다. */}
-              <SlotNumber
-                value={missionCredits.floating}
-                toneClass="text-brand-blue"
-                sizeClass="text-xl sm:text-2xl"
-                className="mt-0.5"
-              />
-            </button>
-          </div>
-
-          {/** 왼쪽 아래: 저금통 (예전 오른쪽 위치를 좌측으로 옮김) */}
-          {/** 왼쪽 저금통(황금돼지)도 함께 위로 이동 */}
-          <div className="pointer-events-auto absolute bottom-[13%] left-[2%] z-[4] sm:bottom-[14%] sm:left-[4%]">
-            <button
-              type="button"
-              onClick={missionCredits.onPiggyTap}
-              aria-label={`저금통 크레딧 ${missionCredits.piggy}. 눌러서 옮기기`}
-              className="flex flex-col items-center rounded-2xl p-1 transition-transform active:scale-[0.97]"
-            >
-              {/** 요청 반영: 황금돼지를 더 강조하기 위해 지갑보다 크게 표시 */}
-              {/**
-               * 단계 그림은 `piggyBankStages.ts` 에서 URL 목록 또는 합성 PNG 의 픽셀 영역으로 정합니다.
-               * 규격 그리드(3x3) 가 아니어도 됩니다.
-               */}
-              {/** 큰 프레임(왕관/의자) 머리 잘림 방지를 위해 높이 여유 + overflow-visible 적용 */}
-              <div className="flex h-[96px] w-[76px] items-end justify-center overflow-visible">
-                <PiggyBankStageVisual
-                  stepIndex={animatedPiggyIdx}
-                  /** 요청 반영: 미션 탭 저금통 크기를 아주 조금만 축소 */
-                  displayWidth={64}
-                  className="drop-shadow-[0_6px_14px_rgba(0,0,0,0.2)]"
-                />
-              </div>
-              {piggySparkleOn ? (
-                <>
-                  {piggyLightFx.map((fx, i) => (
-                    <span
-                      key={`piggy-light-${i}`}
-                      className="pointer-events-none absolute -translate-x-1/2 animate-ping"
-                      style={{
-                        left: `${fx.leftPct}%`,
-                        top: `${fx.topPct}%`,
-                        animationDuration: `${fx.durationMs}ms`,
-                        animationDelay: `${fx.delayMs}ms`,
-                        animationIterationCount: 3,
-                      }}
+          <div className="pointer-events-none absolute inset-x-0 bottom-[18%] z-[6] flex flex-col items-center gap-y-0 sm:bottom-[19%] sm:gap-y-px">
+            <div className="grid w-full max-w-[320px] grid-cols-3 items-end gap-x-2 px-1 sm:max-w-[340px] sm:gap-x-3 sm:px-2">
+              {/** `overflow-visible` + 아래 패딩: 돼지 그림 하단(엉덩이)이 잘리지 않게 */}
+              <div className="pointer-events-auto flex justify-center self-end overflow-visible">
+                <button
+                  type="button"
+                  onClick={missionCredits.onPiggyTap}
+                  aria-label={`저금통 크레딧 ${missionCredits.piggy}. 눌러서 옮기기`}
+                  className="relative flex flex-col items-center overflow-visible rounded-2xl p-1 transition-transform active:scale-[0.97]"
+                >
+                  <div className="flex w-full flex-col items-center overflow-visible">
+                    <div
+                      className={`relative z-0 flex w-[112px] items-end justify-center overflow-visible pb-2 sm:pb-2.5 ${
+                        animatedPiggyIdx >= tallCrownStartIdx
+                          ? 'min-h-[228px] pt-5 sm:min-h-[236px] sm:pt-6'
+                          : 'min-h-[208px]'
+                      }`.trim()}
                     >
-                      <SpriteImage
-                        sheet={EFFECT_LIGHTS}
-                        frame="lights"
-                        width={fx.size}
-                        className="select-none"
-                        style={{ opacity: fx.opacity }}
+                      <PiggyBankStageVisual
+                        stepIndex={animatedPiggyIdx}
+                        displayWidth={64}
+                        className="drop-shadow-[0_6px_14px_rgba(0,0,0,0.2)]"
                       />
-                    </span>
-                  ))}
-                </>
-              ) : null}
-              {/** 요청 반영: 배경 블록 없이 숫자만 크게 표시합니다. */}
-              <SlotNumber
-                value={missionCredits.piggy}
-                toneClass="text-sky-900"
-                sizeClass="text-lg sm:text-xl"
-                className="mt-1"
-              />
-            </button>
-          </div>
+                    </div>
+                  </div>
+                  {piggySparkleOn ? (
+                    <>
+                      {piggyLightFx.map((fx, i) => (
+                        <span
+                          key={`piggy-light-${i}`}
+                          className="pointer-events-none absolute -translate-x-1/2 animate-ping"
+                          style={{
+                            left: `${fx.leftPct}%`,
+                            top: `${fx.topPct}%`,
+                            animationDuration: `${fx.durationMs}ms`,
+                            animationDelay: `${fx.delayMs}ms`,
+                            animationIterationCount: 3,
+                          }}
+                        >
+                          <SpriteImage
+                            sheet={EFFECT_LIGHTS}
+                            frame="lights"
+                            width={fx.size}
+                            className="select-none"
+                            style={{ opacity: fx.opacity }}
+                          />
+                        </span>
+                      ))}
+                    </>
+                  ) : null}
+                </button>
+              </div>
 
-          {/** 오른쪽 아래: 지갑 (예전 왼쪽 위치를 우측으로 옮김) */}
-          {/** 오른쪽 지갑도 동일한 기준으로 위로 이동 */}
-          <div className="pointer-events-auto absolute bottom-[14%] right-[4%] z-[4] sm:bottom-[15%] sm:right-[6%]">
-            <button
-              type="button"
-              onClick={missionCredits.onWalletTap}
-              aria-label={`지갑 크레딧 ${missionCredits.wallet}. 눌러서 옮기기`}
-              className="flex flex-col items-center rounded-2xl p-1 transition-transform active:scale-[0.97]"
+              {/** 가운데 동전: 높은 `min-h` 때문에 아래로 치우쳐 보여 위로 당겨 좌·우 아이콘과 한 줄에 맞춤 */}
+              <div className="pointer-events-auto flex -translate-y-7 justify-center self-end sm:-translate-y-8">
+                <button
+                  type="button"
+                  disabled={missionCredits.floating <= 0}
+                  onClick={missionCredits.onCenterTap}
+                  aria-label={
+                    showIslandArt
+                      ? `섬에 쌓인 크레딧 ${missionCredits.floating}. 눌러서 지갑이나 저금통으로 옮기기`
+                      : `아직 나누지 않은 크레딧 ${missionCredits.floating}. 눌러서 지갑이나 저금통으로 옮기기`
+                  }
+                  className={`flex flex-col items-center rounded-2xl px-2 pb-1 pt-0.5 transition-transform active:scale-[0.97] ${
+                    missionCredits.floating <= 0 ? 'opacity-45' : ''
+                  }`}
+                >
+                  <div className="relative z-0 flex min-h-[96px] w-[72px] items-end justify-center overflow-visible sm:min-h-[100px]">
+                    <FloatingCreditsStackVisual
+                      floating={missionCredits.floating}
+                      dimWhenEmpty={false}
+                      displayWidth={58}
+                      className="drop-shadow-[0_4px_12px_rgba(0,0,0,0.18)]"
+                    />
+                  </div>
+                </button>
+              </div>
+
+              <div className="pointer-events-auto flex -translate-y-2 justify-center self-end sm:-translate-y-2.5">
+                <button
+                  type="button"
+                  onClick={missionCredits.onWalletTap}
+                  aria-label={`지갑 크레딧 ${missionCredits.wallet}. 눌러서 옮기기`}
+                  className="flex flex-col items-center rounded-2xl p-1 transition-transform active:scale-[0.97]"
+                >
+                  <SpriteImage
+                    sheet={ICONS}
+                    frame="wallet"
+                    width={56}
+                    clipRotated={false}
+                    className="relative z-0 drop-shadow-lg"
+                  />
+                </button>
+              </div>
+            </div>
+
+            <div
+              className="grid w-full max-w-[320px] grid-cols-3 items-end gap-x-2 px-1 sm:max-w-[340px] sm:gap-x-3 sm:px-2 -translate-y-1.5 sm:-translate-y-2"
+              aria-hidden
             >
-              <SpriteImage sheet={ICONS} frame="wallet" width={56} clipRotated={false} className="drop-shadow-lg" />
-              {/** 요청 반영: 배경 블록 없이 숫자만 크게 표시합니다. */}
-              <SlotNumber
-                value={missionCredits.wallet}
-                toneClass="text-amber-900"
-                sizeClass="text-lg sm:text-xl"
-                className="mt-1"
-              />
-            </button>
+              <div className="flex min-h-[2.25rem] items-end justify-center">
+                <SlotNumber
+                  value={missionCredits.piggy}
+                  toneClass="text-sky-900"
+                  sizeClass="text-lg sm:text-xl"
+                  className="leading-none"
+                />
+              </div>
+              <div className="flex min-h-[2.25rem] items-end justify-center">
+                <SlotNumber
+                  value={missionCredits.floating}
+                  toneClass="text-sky-900"
+                  sizeClass="text-lg sm:text-xl"
+                  className="leading-none"
+                />
+              </div>
+              <div className="flex min-h-[2.25rem] items-end justify-center">
+                <SlotNumber
+                  value={missionCredits.wallet}
+                  toneClass="text-sky-900"
+                  sizeClass="text-lg sm:text-xl"
+                  className="leading-none"
+                />
+              </div>
+            </div>
           </div>
         </>
       ) : scene === 'gippybank' && missionPiggy ? (
@@ -433,12 +462,19 @@ export default function ChildHomeIslandStage({
 
   if (density === 'flex') {
     // `[container-type:size]`: 이 박스가 `cqw`/`cqh` 기준이 되고, 안쪽 transform 의 scale 이 반응형으로 동작함.
+    const flexScaleLayerClass =
+      scene === 'gippybank' && missionCredits
+        ? FLEX_UNIFIED_SCALE_MISSION_CREDITS_CLASS
+        : FLEX_UNIFIED_SCALE_CLASS
+    /** `container-type` 이 일부 환경에서 자식 페인트를 제한하는 경우를 완화 */
+    const flexOuterContainClass =
+      scene === 'gippybank' && missionCredits ? 'contain-none [container-type:size]' : '[container-type:size]'
     return (
       <div
-        className={`relative mx-auto w-full ${stageMaxClass} ${box} [container-type:size] overflow-visible`}
+        className={`relative mx-auto w-full ${stageMaxClass} ${box} ${flexOuterContainClass} overflow-visible`}
       >
         <div className="pointer-events-none absolute inset-0 flex items-end justify-center overflow-visible">
-          <div className={FLEX_UNIFIED_SCALE_CLASS}>
+          <div className={flexScaleLayerClass}>
             <div className="relative h-full w-full overflow-visible">{stageLayers}</div>
           </div>
         </div>

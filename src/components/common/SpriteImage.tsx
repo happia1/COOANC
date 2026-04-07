@@ -126,6 +126,8 @@ export default function SpriteImage({
     backgroundRepeat: 'no-repeat',
     display: 'inline-block',
     flexShrink: 0,
+    /** 부모가 잘못 클립하는 환경에서도 배경이 잘리지 않도록 명시(기본값과 동일하지만 의도를 드러냄) */
+    overflow: 'visible',
     ...style,
   }
 

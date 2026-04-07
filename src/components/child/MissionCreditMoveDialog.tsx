@@ -19,6 +19,27 @@ export type CreditTransferKind =
   | 'wallet_to_piggy'
   | 'piggy_to_wallet'
 
+/** `/api/child/credits/transfer` 성공 시 본문 — 화면을 Realtime 기다리지 않고 바로 맞출 때 사용 */
+export type CreditTransferApiSuccess = {
+  credits: number
+  credits_wallet: number
+  credits_piggy: number
+}
+
+function parseTransferSuccessJson(raw: unknown): CreditTransferApiSuccess | null {
+  if (!raw || typeof raw !== 'object') return null
+  const o = raw as Record<string, unknown>
+  const credits = typeof o.credits === 'number' && Number.isFinite(o.credits) ? o.credits : NaN
+  const credits_wallet =
+    typeof o.credits_wallet === 'number' && Number.isFinite(o.credits_wallet) ? o.credits_wallet : NaN
+  const credits_piggy =
+    typeof o.credits_piggy === 'number' && Number.isFinite(o.credits_piggy) ? o.credits_piggy : NaN
+  if (!Number.isFinite(credits) || !Number.isFinite(credits_wallet) || !Number.isFinite(credits_piggy)) {
+    return null
+  }
+  return { credits, credits_wallet, credits_piggy }
+}
+
 type Props = {
   open: boolean
   onClose: () => void
@@ -27,7 +48,8 @@ type Props = {
   maxAmount: number
   /** 팝업 상단 제목(이동 방향 설명) */
   title: string
-  onSuccess: () => void
+  /** 서버가 돌려준 지갑·저금통·총액으로 부모 `stats` 를 즉시 갱신합니다(Realtime 지연과 무관). */
+  onSuccess: (result: CreditTransferApiSuccess) => void
 }
 
 /**
@@ -121,12 +143,24 @@ export default function MissionCreditMoveDialog({
         body: JSON.stringify({ kind, amount: n, childId }),
       })
       const text = await res.text()
-      const json = text ? JSON.parse(text) : {}
-      if (!res.ok) {
-        setErr(typeof json.error === 'string' ? json.error : '옮기지 못했어요')
+      let json: unknown = {}
+      try {
+        json = text ? JSON.parse(text) : {}
+      } catch {
+        setErr('응답을 읽지 못했어요')
         return
       }
-      onSuccess()
+      if (!res.ok) {
+        const errObj = json && typeof json === 'object' ? (json as Record<string, unknown>) : {}
+        setErr(typeof errObj.error === 'string' ? errObj.error : '옮기지 못했어요')
+        return
+      }
+      const okPayload = parseTransferSuccessJson(json)
+      if (!okPayload) {
+        setErr('옮겼지만 숫자를 확인하지 못했어요. 잠시 뒤 다시 열어 주세요.')
+        return
+      }
+      onSuccess(okPayload)
       onClose()
     } catch {
       setErr('네트워크 오류가 났어요')
@@ -192,7 +226,7 @@ export default function MissionCreditMoveDialog({
           */}
           <div
             id="credit-move-display"
-            className="mt-1 w-full rounded-lg border border-gray-200 bg-gray-50/80 px-2 py-2 text-center text-xl font-black tabular-nums text-brand-text sm:text-2xl sm:py-2.5"
+            className="mt-1 w-full rounded-lg border border-gray-200 bg-gray-50/80 px-2 py-2 text-center text-xl font-black tabular-nums text-sky-900 sm:text-2xl sm:py-2.5"
             role="status"
             aria-live="polite"
             aria-label={`옮길 크레딧 ${amount === '' ? '입력 전' : parsed.toLocaleString('ko-KR')}`}
@@ -238,7 +272,7 @@ export default function MissionCreditMoveDialog({
                 key={d}
                 type="button"
                 onClick={() => appendDigit(d)}
-                className="touch-manipulation rounded-md border border-gray-200 bg-white py-1.5 text-sm font-black tabular-nums text-brand-text shadow-sm active:scale-[0.98] sm:py-2 sm:text-base"
+                className="touch-manipulation rounded-md border border-gray-200 bg-white py-1.5 text-sm font-black tabular-nums text-sky-900 shadow-sm active:scale-[0.98] sm:py-2 sm:text-base"
               >
                 {d}
               </button>
@@ -248,7 +282,7 @@ export default function MissionCreditMoveDialog({
             <button
               type="button"
               onClick={() => appendDigit('0')}
-              className="touch-manipulation rounded-md border border-gray-200 bg-white py-1.5 text-sm font-black tabular-nums text-brand-text shadow-sm active:scale-[0.98] sm:py-2 sm:text-base"
+              className="touch-manipulation rounded-md border border-gray-200 bg-white py-1.5 text-sm font-black tabular-nums text-sky-900 shadow-sm active:scale-[0.98] sm:py-2 sm:text-base"
             >
               0
             </button>
@@ -384,7 +418,7 @@ export function MissionCreditActionSheet({ open, onClose, bucket, floating, wall
       <div className="relative z-[1] w-full max-w-sm rounded-t-2xl bg-white p-4 shadow-2xl sm:rounded-2xl">
         <p className="text-center text-sm font-black text-brand-text">{titleText}</p>
         {showAmount ? (
-          <p className="mt-0.5 text-center text-base font-black tabular-nums text-brand-blue sm:text-lg">
+          <p className="mt-0.5 text-center text-base font-black tabular-nums text-sky-900 sm:text-lg">
             {amountText}
           </p>
         ) : null}
@@ -406,6 +440,9 @@ export function MissionCreditActionSheet({ open, onClose, bucket, floating, wall
                   visual.tone === 'amber'
                     ? 'border-amber-200/90 bg-gradient-to-b from-amber-50/95 to-white'
                     : 'border-sky-200/90 bg-gradient-to-b from-sky-50/95 to-white'
+                /** 아이콘 영역: 종류마다 높이가 달라도 같은 박스 안에서 가로·세로 중앙 정렬(크레딧만 아래로 붙던 현상 제거) */
+                const iconAreaClass =
+                  'flex h-[104px] w-full shrink-0 items-center justify-center overflow-visible px-0.5'
                 return (
                   <button
                     key={r.kind}
@@ -414,12 +451,14 @@ export function MissionCreditActionSheet({ open, onClose, bucket, floating, wall
                       onPick(r.kind)
                       onClose()
                     }}
-                    className={`flex flex-col items-center gap-1 rounded-xl border-2 px-1.5 py-2.5 shadow-sm transition-transform active:scale-[0.98] ${toneClass}`}
+                    className={`flex flex-col items-stretch gap-1.5 rounded-xl border-2 px-1.5 py-2.5 shadow-sm transition-transform active:scale-[0.98] ${toneClass}`}
                   >
                     {visual.icon === 'wallet' ? (
-                      <SpriteImage sheet={ICONS} frame="wallet" width={52} clipRotated={false} className="drop-shadow-lg" />
+                      <div className={iconAreaClass}>
+                        <SpriteImage sheet={ICONS} frame="wallet" width={52} clipRotated={false} className="drop-shadow-lg" />
+                      </div>
                     ) : visual.icon === 'piggy' ? (
-                      <div className="flex h-[52px] w-[52px] items-end justify-center">
+                      <div className={iconAreaClass}>
                         <PiggyBankStageVisual
                           stepIndex={piggyStepIndex(piggy)}
                           displayWidth={52}
@@ -427,7 +466,7 @@ export function MissionCreditActionSheet({ open, onClose, bucket, floating, wall
                         />
                       </div>
                     ) : (
-                      <div className="flex h-[52px] w-[52px] items-end justify-center">
+                      <div className={iconAreaClass}>
                         <FloatingCreditsStackVisual floating={floating} dimWhenEmpty={false} displayWidth={44} />
                       </div>
                     )}

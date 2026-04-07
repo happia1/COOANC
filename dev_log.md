@@ -178,6 +178,35 @@
 
 ---
 
+## [2026-04-08] - 미션 섬 크레딧 UI·연출 + 저금통 자산·EQ 보강
+- **Status:** ✅ 완료
+- **Files Created:**
+  - `public/assets/img/items/piggy-bank/piggy_bank.png`, `piggy_bank.json` — 저금통 스프라이트(구 gold_piggy 대체)
+  - `src/constants/piggy_bank.atlas.json` — TexturePacker 아틀라스 메타
+  - `supabase/migrations/042_eq_recalculate_wallet_piggy_triggers.sql` — 지갑·저금통 변동 시 EQ 재계산 트리거
+- **Files Modified (요약):**
+  - `src/components/child/ChildHomeIslandStage.tsx` — 가운데·저금통·지갑 배치, 가용 크레딧 숫자 여백/색(`text-sky-900`), 지갑 아이콘만 `-translate-y` 등
+  - `src/components/child/FloatingCreditsStackVisual.tsx` — 동전~럭셔리 단계 연출: 표시 크레딧 스텝 애니메이션, `visualKey` 안정화+width 전환, 왕관·다이아·금괴 오프셋
+  - `src/components/child/MissionCreditMoveDialog.tsx`, `MarketTab.tsx` — 크레딧 숫자 색·마켓 가격 표시 통일
+  - `src/components/child/PiggyBankStageVisual.tsx`, `src/constants/piggyBankStages.ts` — 새 저금통 스테이지·비율 스케일
+  - `src/app/api/praise-sticker/place/route.ts`, `reset-board/route.ts` — `resolveApiActorChildId` 판별 시 `resolved.ok === false`로 타입 좁힘
+  - `src/lib/childCreditsSplit.ts` — `mergeChildStatsPatch` 첫 분기 `ChildStats` 단언
+  - `src/types/database.ts`, `supabase/migrations/013_eq_function.sql`, `src/components/parent/EconomicEqPanel.tsx`, `src/lib/childEqAiPlaceholders.ts` — EQ/타입·문구 정리
+  - `src/app/(child)/layout.tsx`, `src/components/child/MissionTab.tsx`, `ChildHomeSceneryBand.tsx`, `src/components/parent/HomeTab.tsx` — 레이아웃·탭 관련 조정
+  - `src/components/common/SpriteImage.tsx` — 소소한 보정
+- **Files Deleted:**
+  - `public/assets/img/items/piggy-bank/gold_piggy_bank.*` — 구 황금돼지 자산
+  - `public/assets/img/layouts/backgrounds/market_shelf.png`, `market_shelf_.png` — 미사용 배경 제거
+- **Summary:**
+  - 미션 섬에서 가용 크레딧·저금통·지갑의 위치·간격·색을 정리하고, 동전 더미가 금액에 따라 단계적으로 커지도록 표시값 보간·스프라이트 전환을 넣었습니다.
+  - 저금통은 새 `piggy_bank` 스프라이트·스테이지 규칙으로 통일했고, EQ는 지갑/저금통 변동 시 재계산되도록 마이그레이션을 추가했습니다.
+  - 빌드 깨짐을 막기 위해 praise-sticker API와 `childCreditsSplit`의 TypeScript 판별을 수정했습니다.
+- **Next Steps:**
+  - Supabase에 `042` 마이그레이션 적용 후 트리거·EQ 동작 검증
+  - 미션 섬 레이아웃은 기기별 스크린샷으로 한 번 더 확인
+
+---
+
 ## 📑 Commit Message Protocol
 1. 모든 커밋 메시지는 이 로그의 최신 기록을 바탕으로 작성한다.
 2. **형식**: `type: [작업명] #이슈번호(선택)`

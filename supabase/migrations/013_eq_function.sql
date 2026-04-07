@@ -1,6 +1,7 @@
 -- ============================================================
 -- 013_eq_function.sql
 -- recalculate_eq() — EQ 3축 지수 자동 계산 함수
+-- 최신 정의·지갑/저금통 연동은 042_eq_recalculate_wallet_piggy_triggers.sql 를 참고하세요.
 -- NOTE: eq_* 컬럼 직접 UPDATE 금지 — 반드시 이 함수 경유
 --
 -- EQ 3축:

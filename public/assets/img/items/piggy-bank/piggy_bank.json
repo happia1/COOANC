@@ -2,15 +2,15 @@
 
 "레이어 336.png":
 {
-	"frame": {"x":210,"y":6,"w":195,"h":187},
-	"rotated": false,
+	"frame": {"x":1256,"y":5,"w":195,"h":187},
+	"rotated": true,
 	"trimmed": false,
 	"spriteSourceSize": {"x":0,"y":0,"w":195,"h":187},
 	"sourceSize": {"w":195,"h":187}
 },
 "레이어 337.png":
 {
-	"frame": {"x":641,"y":207,"w":228,"h":205},
+	"frame": {"x":431,"y":5,"w":228,"h":205},
 	"rotated": false,
 	"trimmed": false,
 	"spriteSourceSize": {"x":0,"y":0,"w":228,"h":205},
@@ -18,83 +18,67 @@
 },
 "레이어 338.png":
 {
-	"frame": {"x":6,"y":205,"w":195,"h":190},
-	"rotated": false,
+	"frame": {"x":666,"y":5,"w":195,"h":190},
+	"rotated": true,
 	"trimmed": false,
 	"spriteSourceSize": {"x":0,"y":0,"w":195,"h":190},
 	"sourceSize": {"w":195,"h":190}
 },
 "레이어 339.png":
 {
-	"frame": {"x":213,"y":205,"w":195,"h":190},
-	"rotated": false,
+	"frame": {"x":863,"y":5,"w":195,"h":190},
+	"rotated": true,
 	"trimmed": false,
 	"spriteSourceSize": {"x":0,"y":0,"w":195,"h":190},
 	"sourceSize": {"w":195,"h":190}
 },
 "레이어 340.png":
 {
-	"frame": {"x":624,"y":6,"w":195,"h":189},
-	"rotated": false,
+	"frame": {"x":1060,"y":5,"w":195,"h":189},
+	"rotated": true,
 	"trimmed": false,
 	"spriteSourceSize": {"x":0,"y":0,"w":195,"h":189},
 	"sourceSize": {"w":195,"h":189}
 },
 "레이어 341.png":
 {
-	"frame": {"x":417,"y":6,"w":195,"h":187},
-	"rotated": false,
+	"frame": {"x":1450,"y":5,"w":195,"h":187},
+	"rotated": true,
 	"trimmed": false,
 	"spriteSourceSize": {"x":0,"y":0,"w":195,"h":187},
 	"sourceSize": {"w":195,"h":187}
 },
 "레이어 342.png":
 {
-	"frame": {"x":6,"y":6,"w":192,"h":183},
-	"rotated": false,
+	"frame": {"x":1644,"y":5,"w":192,"h":183},
+	"rotated": true,
 	"trimmed": false,
 	"spriteSourceSize": {"x":0,"y":0,"w":192,"h":183},
 	"sourceSize": {"w":192,"h":183}
 },
 "레이어 343.png":
 {
-	"frame": {"x":420,"y":207,"w":193,"h":209},
-	"rotated": true,
+	"frame": {"x":231,"y":5,"w":193,"h":209},
+	"rotated": false,
 	"trimmed": false,
 	"spriteSourceSize": {"x":0,"y":0,"w":193,"h":209},
 	"sourceSize": {"w":193,"h":209}
 },
 "레이어 344.png":
 {
-	"frame": {"x":6,"y":407,"w":219,"h":212},
+	"frame": {"x":5,"y":5,"w":219,"h":212},
 	"rotated": false,
 	"trimmed": false,
 	"spriteSourceSize": {"x":0,"y":0,"w":219,"h":212},
 	"sourceSize": {"w":219,"h":212}
-},
-"레이어 345.png":
-{
-	"frame": {"x":237,"y":412,"w":218,"h":318},
-	"rotated": true,
-	"trimmed": false,
-	"spriteSourceSize": {"x":0,"y":0,"w":218,"h":318},
-	"sourceSize": {"w":218,"h":318}
-},
-"레이어 346.png":
-{
-	"frame": {"x":567,"y":424,"w":331,"h":329},
-	"rotated": false,
-	"trimmed": false,
-	"spriteSourceSize": {"x":0,"y":0,"w":331,"h":329},
-	"sourceSize": {"w":331,"h":329}
 }},
 "meta": {
 	"app": "https://www.codeandweb.com/texturepacker",
 	"version": "1.0",
-	"image": "gold_piggy_bank.png",
+	"image": "piggy_bank.png",
 	"format": "RGBA8888",
-	"size": {"w":904,"h":759},
+	"size": {"w":1832,"h":222},
 	"scale": "1",
-	"smartupdate": "$TexturePacker:SmartUpdate:593593045cae876fb6b4ab4a88cefd6a:e06690ab2886fabaf81701a894a4e085:79358d64a7842fb6a45649606d1f78a1$"
+	"smartupdate": "$TexturePacker:SmartUpdate:711ba611d2cc6de3e15d2589c4b8bb52:7f4bdc0d9f9c01a23f9e302b1f7c87da:f3489ca324e10155674b1c27a69d741d$"
 }
 }
