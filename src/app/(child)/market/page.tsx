@@ -39,16 +39,19 @@ export default async function MarketPage() {
       .order('requested_at', { ascending: false })
       .limit(12),
 
-    supabase.from('market_wishlist_items').select('store_item_id').eq('child_id', childId),
+    supabase.from('market_wishlist_items').select('store_item_id, quantity').eq('child_id', childId),
   ])
 
   const level = statsRes.data?.current_level ?? 0
   const credits = statsRes.data?.credits ?? 0
   const creditsWallet =
     typeof statsRes.data?.credits_wallet === 'number' ? statsRes.data.credits_wallet : 0
-  const initialWishlistItemIds = wishRes.error
+  const initialWishlistEntries = wishRes.error
     ? []
-    : (wishRes.data ?? []).map((r: { store_item_id: string }) => r.store_item_id)
+    : (wishRes.data ?? []).map((r: { store_item_id: string; quantity?: number | null }) => ({
+        storeItemId: r.store_item_id,
+        quantity: typeof r.quantity === 'number' && r.quantity > 0 ? r.quantity : 1,
+      }))
 
   const familyLinkIds = new Set((linksRes.data ?? []).map((r: { id: string }) => r.id))
   const hiddenIds = new Set(
@@ -75,7 +78,7 @@ export default async function MarketPage() {
       initialHiddenStoreItemIds={initialHiddenStoreItemIds}
       requests={requests}
       creditsWallet={creditsWallet}
-      initialWishlistItemIds={initialWishlistItemIds}
+      initialWishlistEntries={initialWishlistEntries}
       level={level}
     />
   )

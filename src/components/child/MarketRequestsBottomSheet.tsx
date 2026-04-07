@@ -27,6 +27,9 @@ type Props = {
   marketItems: StoreItem[]
 }
 
+/** 내 요청(진행/대기/반려) 기본 노출 개수 — 초과분은 「더보기」 */
+const ACTIVE_PREVIEW_COUNT = 5
+
 /** 서울 달력 기준 오늘 포함 이전 3일(오늘·어제·그제) 안에 주문된 건만 남깁니다 */
 function filterRequestsWithinLast3SeoulDays(list: PurchaseRequest[]): PurchaseRequest[] {
   const todaySeoul = getSeoulDateString()
@@ -68,26 +71,32 @@ function RequestRow({
 
   return (
     <li className="flex gap-3 rounded-2xl bg-white p-3 shadow-sm ring-1 ring-black/[0.05]">
-      {/* 요청사항: 썸네일이 과하게 커 보이지 않도록 카드 이미지 영역을 축소 */}
-      <div className="flex h-[3.9rem] w-[3.9rem] shrink-0 items-end justify-center overflow-hidden rounded-xl bg-amber-50/80 ring-1 ring-amber-100">
+      {/* 요청사항: 썸네일을 기존 대비 절반 수준으로 추가 축소 */}
+      <div className="flex h-[2rem] w-[2rem] shrink-0 items-end justify-center overflow-hidden rounded-lg bg-amber-50/80 ring-1 ring-amber-100">
         {linked?.image_url ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={linked.image_url}
             alt=""
-            className="max-h-[3.45rem] max-w-full object-contain object-bottom"
+            className="max-h-[1.75rem] max-w-full object-contain object-bottom"
             draggable={false}
           />
         ) : (
-          <SpriteImage sheet={MARKET_ITEMS} frame={frame} height={56} clipRotated={false} />
+          <SpriteImage sheet={MARKET_ITEMS} frame={frame} height={28} clipRotated={false} />
         )}
       </div>
       <div className="min-w-0 flex-1">
-        {/* 요청사항: 항목 정보를 한 줄에 압축(이름·가격·날짜) */}
-        <div className="flex items-center justify-between gap-2">
-          <p className="min-w-0 flex-1 truncate text-[12px] font-black text-brand-text">
-            {r.item_name} · {r.item_price.toLocaleString()} 크레딧 · {dayMonth}
-          </p>
+        {/* 요청사항: 블록 높이 축소를 위해 상품명 옆에 날짜를 같은 줄로 배치 */}
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-baseline gap-1">
+              <p className="min-w-0 flex-1 truncate text-[12px] font-black text-brand-text">{r.item_name}</p>
+              <p className="shrink-0 text-[10px] text-gray-400">{dayMonth}</p>
+            </div>
+            <p className="mt-0.5 text-[11px] font-black tabular-nums text-red-500">
+              - {r.item_price.toLocaleString()} 크레딧
+            </p>
+          </div>
           <span
             className={`shrink-0 rounded-full px-3 py-1 text-[10px] font-black sm:text-[11px] ${su.pillClass}`}
           >
@@ -101,10 +110,14 @@ function RequestRow({
 
 export default function MarketRequestsBottomSheet({ open, onClose, requests, marketItems }: Props) {
   const [deliveredOpen, setDeliveredOpen] = useState(false)
+  const [activeShowAll, setActiveShowAll] = useState(false)
 
   /** 시트를 다시 열면 배송 완료 구역은 기본(접힘)으로 돌아갑니다 */
   useEffect(() => {
-    if (open) setDeliveredOpen(false)
+    if (open) {
+      setDeliveredOpen(false)
+      setActiveShowAll(false)
+    }
   }, [open])
 
   const { activeRows, deliveredRows } = useMemo(() => {
@@ -120,6 +133,8 @@ export default function MarketRequestsBottomSheet({ open, onClose, requests, mar
   if (!open) return null
 
   const hasAny = activeRows.length > 0 || deliveredRows.length > 0
+  const visibleActiveRows = activeShowAll ? activeRows : activeRows.slice(0, ACTIVE_PREVIEW_COUNT)
+  const activeHasMore = activeRows.length > ACTIVE_PREVIEW_COUNT
 
   return (
     <div className="fixed inset-0 z-[90] flex flex-col justify-end">
@@ -144,7 +159,11 @@ export default function MarketRequestsBottomSheet({ open, onClose, requests, mar
             닫기
           </button>
         </div>
-        <div className="overflow-y-auto px-4 pb-8 pt-3" style={{ maxHeight: 'min(68vh, 460px)' }}>
+        {/* 요청사항: 독바(하단 고정 영역)에 마지막 카드가 가리지 않도록 하단 패딩 확대 */}
+        <div
+          className="overflow-y-auto px-4 pt-3 pb-[max(6rem,env(safe-area-inset-bottom))]"
+          style={{ maxHeight: 'min(68vh, 460px)' }}
+        >
           {!hasAny ? (
             <p className="py-10 text-center text-sm font-bold text-gray-400">
               최근 3일 안에 요청 내역이 없어요
@@ -152,11 +171,24 @@ export default function MarketRequestsBottomSheet({ open, onClose, requests, mar
           ) : (
             <div className="flex flex-col gap-4">
               {activeRows.length > 0 && (
-                <ul className="flex flex-col gap-3">
-                  {activeRows.map((r) => (
-                    <RequestRow key={r.id} r={r} marketItems={marketItems} />
-                  ))}
-                </ul>
+                <div>
+                  <ul className="flex flex-col gap-3">
+                    {visibleActiveRows.map((r) => (
+                      <RequestRow key={r.id} r={r} marketItems={marketItems} />
+                    ))}
+                  </ul>
+                  {activeHasMore && (
+                    <button
+                      type="button"
+                      onClick={() => setActiveShowAll((v) => !v)}
+                      className="mt-2 w-full rounded-xl border border-gray-200 bg-white/80 py-2 text-xs font-bold text-brand-text"
+                    >
+                      {activeShowAll
+                        ? `간단히 보기 (${ACTIVE_PREVIEW_COUNT}개)`
+                        : `더보기 (${activeRows.length - ACTIVE_PREVIEW_COUNT}개 더)`}
+                    </button>
+                  )}
+                </div>
               )}
 
               {deliveredRows.length > 0 && (

@@ -29,6 +29,17 @@ export default function BearBoardCompleteModal({ open, onDismiss, onGoMarket }: 
         <p className="mt-2 text-center text-sm leading-relaxed text-gray-600">
           원하는 선물을 <span className="font-bold text-brand-blue">1개</span> 고를 수 있어요!
         </p>
+        <div className="mt-4 flex justify-center">
+          {/* 요청 이미지 경로: public/assets/img/common/ui/icons.png */}
+          {/* eslint-disable-next-line @next/next/no-img-element -- 완료 팝업 고정 아이콘 */}
+          <img
+            src="/assets/img/common/ui/icons.png"
+            alt="상점 아이콘"
+            width={64}
+            height={64}
+            className="h-16 w-16 object-contain"
+          />
+        </div>
         <div className="mt-5 flex flex-col gap-2">
           <Link
             href="/market"
@@ -38,14 +49,14 @@ export default function BearBoardCompleteModal({ open, onDismiss, onGoMarket }: 
             }}
             className="block w-full rounded-2xl bg-brand-blue py-3.5 text-center text-sm font-bold text-white shadow-md transition active:scale-[0.99]"
           >
-            상점으로 바로가기
+            선물 고르러가기
           </Link>
           <button
             type="button"
             onClick={onDismiss}
             className="w-full rounded-2xl border border-gray-200 py-3 text-sm font-bold text-gray-500"
           >
-            닫기
+            나중에
           </button>
         </div>
       </div>

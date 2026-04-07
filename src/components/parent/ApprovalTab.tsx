@@ -496,6 +496,21 @@ export default function ApprovalTab({
   async function handleApprove(requestId: string) {
     setLoading(requestId)
     try {
+      // #region agent log
+      fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '277560' },
+        body: JSON.stringify({
+          sessionId: '277560',
+          runId: 'pre-approve',
+          hypothesisId: 'E',
+          location: 'ApprovalTab.tsx:handleApprove:start',
+          message: 'parent clicked approve',
+          data: { requestId },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {})
+      // #endregion
       const res = await fetch('/api/market/approve', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -542,6 +557,21 @@ export default function ApprovalTab({
       }
       showToast('승인했어요. 자녀에게 전달됩니다.')
     } catch {
+      // #region agent log
+      fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '277560' },
+        body: JSON.stringify({
+          sessionId: '277560',
+          runId: 'pre-approve',
+          hypothesisId: 'E',
+          location: 'ApprovalTab.tsx:handleApprove:catch',
+          message: 'parent approve threw exception',
+          data: { requestId },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {})
+      // #endregion
       showToast('네트워크 오류가 발생했어요', false)
     } finally {
       setLoading(null)

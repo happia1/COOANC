@@ -301,6 +301,35 @@ export const PIGGY_BANK: SpriteSheet = {
   },
 }
 
+// ─── items/rewards ─────────────────────────────────────────────────
+
+/** `public/assets/img/items/rewards/credits.png` 아틀라스(크레딧 단계/보상 장식) */
+export const REWARD_CREDITS: SpriteSheet = {
+  image: 'items/rewards/credits.png',
+  atlasW: 504,
+  atlasH: 1165,
+  frames: {
+    credit1: { x: 6, y: 1060, w: 91, h: 91, rotated: false },
+    /**
+     * `credits.json`에서 rotated=true인 프레임은 아틀라스 점유 폭/높이가 서로 바뀐 상태로 해석해야
+     * 실제 배경 크롭이 맞습니다. 그대로 넣으면 오른쪽이 잘린 것처럼 보일 수 있습니다.
+     */
+    credit2: { x: 398, y: 894, w: 100, h: 165, rotated: true },
+    credit3: { x: 345, y: 1071, w: 124, h: 88, rotated: false },
+    credit4: { x: 189, y: 996, w: 144, h: 123, rotated: false },
+    credit8: { x: 6, y: 726, w: 187, h: 176, rotated: false },
+    credit9: { x: 223, y: 715, w: 190, h: 167, rotated: false },
+    credit10: { x: 248, y: 383, w: 223, h: 168, rotated: false },
+    crown: { x: 223, y: 563, w: 203, h: 140, rotated: false },
+    diamond: { x: 6, y: 914, w: 171, h: 134, rotated: false },
+    gold_and_crown: { x: 6, y: 6, w: 406, h: 365, rotated: false },
+    gold_box: { x: 6, y: 524, w: 205, h: 190, rotated: false },
+    goldbar2: { x: 205, y: 894, w: 181, h: 90, rotated: false },
+    goldbar5: { x: 6, y: 383, w: 230, h: 129, rotated: false },
+    goldber1: { x: 424, y: 6, w: 74, h: 130, rotated: true },
+  },
+}
+
 // ─── items/shop ────────────────────────────────────────────────────
 
 export const SHOP_ANIMATIONS: SpriteSheet = {
@@ -439,6 +468,7 @@ export type FarmHorseFrameName = keyof typeof FARM_HORSE.frames
 export type FarmPiggyFrameName = keyof typeof FARM_PIGGY.frames
 export type FarmSheepFrameName = keyof typeof FARM_SHEEP.frames
 export type PiggyBankFrameName = keyof typeof PIGGY_BANK.frames
+export type RewardCreditsFrameName = keyof typeof REWARD_CREDITS.frames
 export type ShopAnimFrameName  = keyof typeof SHOP_ANIMATIONS.frames
 export type MarketItemFrameName = keyof typeof MARKET_ITEMS.frames
 export type BannerFrameName    = keyof typeof BANNERS.frames

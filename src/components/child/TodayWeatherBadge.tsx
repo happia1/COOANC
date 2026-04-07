@@ -1,6 +1,5 @@
 'use client'
 
-import Image from 'next/image'
 import { useEffect, useMemo, useState } from 'react'
 
 /**
@@ -39,7 +38,7 @@ function mapWeatherCodeToUi(code: number | undefined): WeatherUi {
 
 /**
  * 캐릭터 영역 우상단에 보이는 "오늘 날씨 배지"입니다.
- * - 배경은 디자인 자산(`weather.png`)을 그대로 사용합니다.
+ * - 요청 반영: 배경 이미지를 제거하고 날씨 정보(이모지/기온)만 깔끔하게 표시합니다.
  * - 위에 현재 날씨 이모지와 기온을 겹쳐서 실제 날씨 데이터를 전달합니다.
  * - 현재는 서울 기준 좌표를 사용하며, 추후 아이 프로필 지역값으로 쉽게 교체할 수 있습니다.
  */
@@ -48,8 +47,6 @@ export default function TodayWeatherBadge() {
   const [current, setCurrent] = useState<OpenMeteoCurrent | null>(null)
   /** 네트워크 실패 시에도 UI가 깨지지 않도록 실패 상태를 분리 */
   const [failed, setFailed] = useState(false)
-  /** weather.png 자산이 깨졌을 때를 대비한 보호 상태 */
-  const [weatherImgOk, setWeatherImgOk] = useState(true)
 
   useEffect(() => {
     let cancelled = false
@@ -87,25 +84,13 @@ export default function TodayWeatherBadge() {
 
   return (
     <div className="pointer-events-none relative h-10 w-10 sm:h-11 sm:w-11" aria-label="오늘 날씨">
-      {weatherImgOk ? (
-        <Image
-          src="/assets/img/common/ui/weather.png"
-          alt=""
-          fill
-          sizes="44px"
-          className="object-contain"
-          onError={() => setWeatherImgOk(false)}
-        />
-      ) : (
-        /** 자산 로드 실패 시에도 날씨 정보는 계속 보여줍니다. */
-        <div className="h-full w-full rounded-full bg-white/80 shadow-sm" />
-      )}
-
       <div className="absolute inset-0 flex flex-col items-center justify-center leading-none">
-        <span className="text-[13px] sm:text-[14px]" aria-hidden>
+        {/** 이모지를 더 크게 보여 아이가 한눈에 날씨를 인식하도록 조정 */}
+        <span className="text-[20px] sm:text-[22px]" aria-hidden>
           {failed ? '⚠️' : weatherUi.icon}
         </span>
-        <span className="mt-0.5 text-[9px] font-black text-slate-700">{failed ? '오류' : tempText}</span>
+        {/** 온도 텍스트는 요청대로 흐린 그레이 톤으로 완화 */}
+        <span className="mt-0.5 text-[9px] font-black text-gray-400">{failed ? '오류' : tempText}</span>
       </div>
 
       <span className="sr-only">

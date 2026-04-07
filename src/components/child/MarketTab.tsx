@@ -28,8 +28,8 @@ type Props = {
   requests: PurchaseRequest[]
   /** 마켓 결제에 쓰는 지갑 크레딧(섬·저금통에 둔 것 제외) */
   creditsWallet: number
-  /** 장바구니(서버 `market_wishlist_items`)에 담은 상품 id */
-  initialWishlistItemIds: string[]
+  /** 장바구니(서버 `market_wishlist_items`) 초기 목록(상품별 수량 포함) */
+  initialWishlistEntries: { storeItemId: string; quantity: number }[]
   level: number
 }
 
@@ -51,6 +51,8 @@ type DeliveryOverlay = {
 
 /** `public/assets/img/layouts/backgrounds/market_roof.png` — 브라우저에서는 /public 기준 경로 */
 const ROOF_SRC = '/assets/img/layouts/backgrounds/market_roof.png'
+/** 요청사항: 물건이 담긴 장바구니 아이콘(공용 정적 이미지) */
+const BASKET_FILLED_SRC = '/assets/img/common/ui/basket_filled.png'
 
 /** 선반 3단을 한 화면에 넣기 위한 카드·썸네일 크기(가로 스크롤 행 안에서 사용) */
 const SHELF_IMG_AREA_PX = 52
@@ -67,8 +69,12 @@ const MARKET_DELIVERY_OVERLAY_ENABLED = false
 const MARKET_REQUEST_PARENT_NOTICE =
   '마켓에서 크레딧으로 이 상품 구매를 요청했어요. 확인 후 승인 부탁드려요!'
 
-/** 선반에서 같은 상품을 중복 요청하지 못하게 막는 상태(진행 중인 요청이 있을 때) */
-const SHELF_BLOCK_STATUSES: PurchaseRequest['status'][] = ['pending', 'parent_buying', 'approved']
+/**
+ * 선반에서 같은 상품을 중복 요청하지 못하게 막는 상태
+ * - pending / parent_buying: 아직 진행 중이므로 재요청 차단
+ * - approved: 이미 승인된 과거 요청이 남아 있어도 다시 구매할 수 있어야 하므로 차단에서 제외
+ */
+const SHELF_BLOCK_STATUSES: PurchaseRequest['status'][] = ['pending', 'parent_buying']
 
 export default function MarketTab({
   childId,
@@ -76,11 +82,18 @@ export default function MarketTab({
   initialHiddenStoreItemIds,
   requests,
   creditsWallet,
-  initialWishlistItemIds,
+  initialWishlistEntries,
   level,
 }: Props) {
   const [currentWallet, setCurrentWallet] = useState(creditsWallet)
-  const [wishlistIds, setWishlistIds] = useState<string[]>(() => [...initialWishlistItemIds])
+  /** 상품별 장바구니 수량(1 이상) */
+  const [wishlistQuantities, setWishlistQuantities] = useState<Record<string, number>>(() => {
+    const base: Record<string, number> = {}
+    for (const e of initialWishlistEntries) {
+      if (e.quantity > 0) base[e.storeItemId] = e.quantity
+    }
+    return base
+  })
   const [myRequests, setMyRequests] = useState<PurchaseRequest[]>(requests)
   /** 부모가 마켓에서 숨긴 상품 id — INSERT 되면 추가, DELETE 되면 제거(자녀 화면에 곧바로 반영) */
   const [hiddenStoreItemIds, setHiddenStoreItemIds] = useState<string[]>(() =>
@@ -98,12 +111,20 @@ export default function MarketTab({
   }, [hiddenBootstrapKey])
 
   const wishlistBootstrapKey = useMemo(
-    () => `${childId}|${[...initialWishlistItemIds].sort().join('|')}`,
-    [childId, initialWishlistItemIds],
+    () =>
+      `${childId}|${[...initialWishlistEntries]
+        .sort((a, b) => a.storeItemId.localeCompare(b.storeItemId))
+        .map((e) => `${e.storeItemId}:${e.quantity}`)
+        .join('|')}`,
+    [childId, initialWishlistEntries],
   )
   useEffect(() => {
-    setWishlistIds([...initialWishlistItemIds])
-  }, [wishlistBootstrapKey, initialWishlistItemIds])
+    const next: Record<string, number> = {}
+    for (const e of initialWishlistEntries) {
+      if (e.quantity > 0) next[e.storeItemId] = e.quantity
+    }
+    setWishlistQuantities(next)
+  }, [wishlistBootstrapKey, initialWishlistEntries])
 
   useEffect(() => {
     setCurrentWallet(creditsWallet)
@@ -111,8 +132,8 @@ export default function MarketTab({
 
   /** 장바구니가 비면 열린 시트를 자동으로 닫아 빈 화면을 막음 */
   useEffect(() => {
-    if (wishlistIds.length === 0) setWishlistSheetOpen(false)
-  }, [wishlistIds.length])
+    if (Object.keys(wishlistQuantities).length === 0) setWishlistSheetOpen(false)
+  }, [wishlistQuantities])
 
   /** 미션·옮기기 등으로 child_stats 가 바뀌면 지갑 잔액을 맞춤 */
   useEffect(() => {
@@ -203,13 +224,26 @@ export default function MarketTab({
     [visibleItems],
   )
 
+  const wishlistItemIds = useMemo(() => Object.keys(wishlistQuantities), [wishlistQuantities])
   const wishlistItemsResolved = useMemo(
-    () => marketEligibleItems.filter((i) => wishlistIds.includes(i.id)),
-    [marketEligibleItems, wishlistIds],
+    () => marketEligibleItems.filter((i) => wishlistItemIds.includes(i.id)),
+    [marketEligibleItems, wishlistItemIds],
+  )
+  const wishlistEntriesResolved = useMemo(
+    () =>
+      wishlistItemsResolved.map((item) => ({
+        item,
+        quantity: wishlistQuantities[item.id] ?? 1,
+      })),
+    [wishlistItemsResolved, wishlistQuantities],
   )
   const wishlistTotalCredits = useMemo(
-    () => wishlistItemsResolved.reduce((acc, i) => acc + i.credit_price, 0),
-    [wishlistItemsResolved],
+    () => wishlistEntriesResolved.reduce((acc, e) => acc + e.item.credit_price * e.quantity, 0),
+    [wishlistEntriesResolved],
+  )
+  const wishlistTotalCount = useMemo(
+    () => wishlistEntriesResolved.reduce((acc, e) => acc + e.quantity, 0),
+    [wishlistEntriesResolved],
   )
   const wishlistShortage = Math.max(0, wishlistTotalCredits - currentWallet)
 
@@ -220,68 +254,6 @@ export default function MarketTab({
     }
     return s
   }, [myRequests])
-
-  /**
-   * [디버그] 마켓 선반 상태를 한 번에 기록합니다.
-   * - H1: 진행 중 요청 때문에 item_id 가 차단 집합에 들어갔는지
-   * - H2/H3: level vs level_required 로 회색 처리되는지, level_required 가 비정상인지
-   * - H4: 지갑 잔액 값
-   */
-  useEffect(() => {
-    const blockedIds = Array.from(shelfBlockedItemIds)
-    const blockingRequests = myRequests
-      .filter((r) => r.item_id && SHELF_BLOCK_STATUSES.includes(r.status))
-      .map((r) => ({
-        requestId: r.id,
-        item_id: r.item_id,
-        status: r.status,
-        item_name: r.item_name,
-      }))
-    const snackRows = visibleItems
-      .filter((i) => parentMarketSectionIdForItem(i.category) === 'snack')
-      .map((i) => {
-        const lr = i.level_required
-        const meetsLevel = level >= lr
-        return {
-          id: i.id,
-          name: i.name,
-          level_required: lr,
-          level_requiredIsFinite: Number.isFinite(lr),
-          childLevel: level,
-          meetsLevel,
-          isPendingBlocked: shelfBlockedItemIds.has(i.id),
-          canAfford: currentWallet >= i.credit_price,
-        }
-      })
-    // #region agent log
-    fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '9263e0' },
-      body: JSON.stringify({
-        sessionId: '9263e0',
-        runId: 'pre-fix',
-        hypothesisId: 'H1-H5',
-        location: 'MarketTab.tsx:shelfDebugEffect',
-        message: 'market shelf snapshot',
-        data: {
-          childId,
-          currentWallet,
-          blockedIds,
-          blockingRequests,
-          snackRows,
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {})
-    // #endregion
-  }, [
-    childId,
-    currentWallet,
-    level,
-    myRequests,
-    shelfBlockedItemIds,
-    visibleItems,
-  ])
 
   /** 부모가 「상품 구매하기」를 눌렀을 때 — 외부 주문 안내 */
   const [parentShopNoticeOpen, setParentShopNoticeOpen] = useState(false)
@@ -320,26 +292,114 @@ export default function MarketTab({
 
   const [wishBusy, setWishBusy] = useState<string | null>(null)
 
-  /** 장바구니에 담기/빼기 — 성공 시 true (토스트는 호출 쪽에서 선택) */
-  const toggleWishlist = useCallback(
+  /** 장바구니 담기(+1) — 성공 시 true */
+  const addWishlistOne = useCallback(
     async (storeItemId: string): Promise<boolean> => {
       if (wishBusy) return false
-      const inList = wishlistIds.includes(storeItemId)
+      setWishBusy(storeItemId)
+      // #region agent log
+      fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '9263e0' },
+        body: JSON.stringify({
+          sessionId: '9263e0',
+          runId: 'pre-fix',
+          hypothesisId: 'H4-H5',
+          location: 'MarketTab.tsx:addWishlistOne:beforeFetch',
+          message: 'add wishlist requested',
+          data: {
+            childId,
+            storeItemId,
+            localPrevQty: wishlistQuantities[storeItemId] ?? 0,
+          },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {})
+      // #endregion
+      try {
+        const res = await fetch('/api/market/wishlist', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'add', storeItemId, childId }),
+        })
+        const text = await res.text()
+        const json = text ? JSON.parse(text) : {}
+        // #region agent log
+        fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '9263e0' },
+          body: JSON.stringify({
+            sessionId: '9263e0',
+            runId: 'pre-fix',
+            hypothesisId: 'H4-H5',
+            location: 'MarketTab.tsx:addWishlistOne:afterFetch',
+            message: 'add wishlist response',
+            data: {
+              ok: res.ok,
+              status: res.status,
+              responseError: typeof json.error === 'string' ? json.error : null,
+              responseQty: typeof json.quantity === 'number' ? json.quantity : null,
+              storeItemId,
+            },
+            timestamp: Date.now(),
+          }),
+        }).catch(() => {})
+        // #endregion
+        if (!res.ok) {
+          showToast(typeof json.error === 'string' ? json.error : '처리에 실패했어요', false)
+          return false
+        }
+        setWishlistQuantities((prev) => {
+          const nextQty = typeof json.quantity === 'number' && json.quantity > 0 ? json.quantity : (prev[storeItemId] ?? 0) + 1
+          return { ...prev, [storeItemId]: nextQty }
+        })
+        return true
+      } catch {
+        // #region agent log
+        fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '9263e0' },
+          body: JSON.stringify({
+            sessionId: '9263e0',
+            runId: 'pre-fix',
+            hypothesisId: 'H5',
+            location: 'MarketTab.tsx:addWishlistOne:catch',
+            message: 'add wishlist network/client exception',
+            data: { storeItemId },
+            timestamp: Date.now(),
+          }),
+        }).catch(() => {})
+        // #endregion
+        showToast('네트워크 오류가 났어요', false)
+        return false
+      } finally {
+        setWishBusy(null)
+      }
+    },
+    [childId, wishBusy, wishlistQuantities],
+  )
+
+  /** 장바구니에서 상품 삭제(X) */
+  const removeWishlistItem = useCallback(
+    async (storeItemId: string): Promise<boolean> => {
+      if (wishBusy) return false
       setWishBusy(storeItemId)
       try {
         const res = await fetch('/api/market/wishlist', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: inList ? 'remove' : 'add', storeItemId, childId }),
+          body: JSON.stringify({ action: 'remove', storeItemId, childId }),
         })
         const json = await res.json().catch(() => ({}))
         if (!res.ok) {
-          showToast(typeof json.error === 'string' ? json.error : '처리에 실패했어요', false)
+          showToast(typeof json.error === 'string' ? json.error : '삭제에 실패했어요', false)
           return false
         }
-        setWishlistIds((prev) =>
-          inList ? prev.filter((id) => id !== storeItemId) : [...prev, storeItemId],
-        )
+        setWishlistQuantities((prev) => {
+          const copy = { ...prev }
+          delete copy[storeItemId]
+          return copy
+        })
         return true
       } catch {
         showToast('네트워크 오류가 났어요', false)
@@ -348,7 +408,36 @@ export default function MarketTab({
         setWishBusy(null)
       }
     },
-    [childId, wishBusy, wishlistIds],
+    [childId, wishBusy],
+  )
+
+  /** 장바구니 수량 변경(+/-) */
+  const updateWishlistQuantity = useCallback(
+    async (storeItemId: string, quantity: number): Promise<boolean> => {
+      if (wishBusy) return false
+      if (quantity < 1) return removeWishlistItem(storeItemId)
+      setWishBusy(storeItemId)
+      try {
+        const res = await fetch('/api/market/wishlist', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'set_quantity', storeItemId, quantity, childId }),
+        })
+        const json = await res.json().catch(() => ({}))
+        if (!res.ok) {
+          showToast(typeof json.error === 'string' ? json.error : '수량 변경에 실패했어요', false)
+          return false
+        }
+        setWishlistQuantities((prev) => ({ ...prev, [storeItemId]: quantity }))
+        return true
+      } catch {
+        showToast('네트워크 오류가 났어요', false)
+        return false
+      } finally {
+        setWishBusy(null)
+      }
+    },
+    [childId, wishBusy, removeWishlistItem],
   )
 
   /** API 성공 후 확인 팝업이 닫힌 뒤 축하 연출(콘페티·낙하산) */
@@ -552,28 +641,7 @@ export default function MarketTab({
 
   /** 카드 탭: 바로 구매 확인으로 가지 않고, 먼저 「구매 / 장바구니」액션 시트를 띄웁니다 */
   function handleItemClick(item: StoreItem, frame: MarketItemFrameKey) {
-    const blocked = shelfBlockedItemIds.has(item.id)
-    if (blocked || loading) {
-      // #region agent log
-      fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '9263e0' },
-        body: JSON.stringify({
-          sessionId: '9263e0',
-          runId: 'pre-fix',
-          hypothesisId: 'H1',
-          location: 'MarketTab.tsx:handleItemClick',
-          message: blocked ? 'click ignored: shelf blocked' : 'click ignored: loading',
-          data: {
-            itemId: item.id,
-            itemName: item.name,
-            shelfBlocked: blocked,
-            loading: !!loading,
-          },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {})
-      // #endregion
+    if (loading) {
       return
     }
     setShelfActionFor({ item, frame })
@@ -594,13 +662,12 @@ export default function MarketTab({
   const cartFromShelfAction = useCallback(async () => {
     if (!shelfActionFor) return
     const id = shelfActionFor.item.id
-    const wasIn = wishlistIds.includes(id)
-    const ok = await toggleWishlist(id)
+    const ok = await addWishlistOne(id)
     if (ok) {
-      showToast(wasIn ? '장바구니에서 뺐어요' : '장바구니에 담았어요')
+      showToast('장바구니에 담았어요')
       dismissShelfAction()
     }
-  }, [shelfActionFor, wishlistIds, toggleWishlist, dismissShelfAction])
+  }, [shelfActionFor, addWishlistOne, dismissShelfAction])
 
   /** 액션 시트에 쓰는 구매 가능 여부·안내 문구(카드 탭 시점의 상품 기준) */
   const shelfActionBuyMeta = useMemo(() => {
@@ -761,7 +828,7 @@ export default function MarketTab({
                       onClick={() => handleItemClick(item, frameKey)}
                       className={`relative flex min-w-0 w-full flex-col rounded-xl bg-white/95 p-1 pt-1.5 shadow-md ring-1 ring-black/[0.06] transition-transform active:scale-[0.98] ${
                         isDimmed ? 'grayscale brightness-[0.72]' : ''
-                      } ${isPending ? 'opacity-60' : ''}`}
+                      }`}
                     >
                       {isBest && !isDimmed && (
                         <span className="absolute right-0.5 top-0.5 z-10 rounded-full bg-green-500 px-1 py-px text-[7px] font-black leading-none text-white">
@@ -820,7 +887,7 @@ export default function MarketTab({
       */}
       <div
         className={`flex shrink-0 flex-col gap-1 border-t border-amber-900/10 bg-[#F3EBE2]/95 px-3 py-2 shadow-[0_-4px_12px_rgba(0,0,0,0.04)] backdrop-blur-[6px] sm:px-4 sm:py-2.5 ${
-          myRequests.length > 0 || wishlistIds.length > 0 ? 'pr-[4.5rem]' : ''
+          myRequests.length > 0 || wishlistItemIds.length > 0 ? 'pr-[4.5rem]' : ''
         }`}
       >
         <div className="flex items-center gap-2 sm:gap-2.5">
@@ -844,23 +911,25 @@ export default function MarketTab({
         - `bottom` 은 독바(60px) + 여유 + safe-area 로 잡아 탭바에 가리지 않게 합니다.
         - 부모는 `pointer-events-none`, 버튼만 `pointer-events-auto` 로 배경 탭이 막히지 않게 합니다.
       */}
-      {(wishlistIds.length > 0 || myRequests.length > 0) && (
+      {(wishlistItemIds.length > 0 || myRequests.length > 0) && (
         <div
           className="pointer-events-none fixed right-4 z-[55] flex flex-col gap-3 items-end sm:right-5"
           style={{
             bottom: 'max(1rem, calc(60px + 0.85rem + env(safe-area-inset-bottom, 0px)))',
           }}
         >
-          {wishlistIds.length > 0 && (
+          {wishlistItemIds.length > 0 && (
             <button
               type="button"
               onClick={() => setWishlistSheetOpen(true)}
               className="pointer-events-auto relative flex h-11 w-11 items-center justify-center rounded-full bg-white shadow-md ring-2 ring-amber-200/90 transition-transform active:scale-95"
-              aria-label={`장바구니 열기, ${wishlistItemsResolved.length}개`}
+              aria-label={`장바구니 열기, ${wishlistTotalCount}개`}
             >
-              <SpriteImage sheet={ICONS} frame="bag" width={28} clipRotated={false} />
+              {/* 요청사항: 플로팅 장바구니 아이콘을 basket_filled.png 로 통일 */}
+              {/* eslint-disable-next-line @next/next/no-img-element -- public 정적 자산 경로 */}
+              <img src={BASKET_FILLED_SRC} alt="" className="h-6 w-6 object-contain" draggable={false} />
               <span className="absolute -right-0.5 -top-0.5 flex min-h-[1rem] min-w-[1rem] items-center justify-center rounded-full bg-brand-blue px-0.5 text-[9px] font-black tabular-nums text-white ring-2 ring-white">
-                {wishlistItemsResolved.length > 99 ? '99+' : wishlistItemsResolved.length}
+                {wishlistTotalCount > 99 ? '99+' : wishlistTotalCount}
               </span>
             </button>
           )}
@@ -882,10 +951,14 @@ export default function MarketTab({
       <MarketWishlistBottomSheet
         open={wishlistSheetOpen}
         onClose={() => setWishlistSheetOpen(false)}
-        wishlistCount={wishlistItemsResolved.length}
+        wishlistEntries={wishlistEntriesResolved}
+        wishlistCount={wishlistTotalCount}
         wishlistTotalCredits={wishlistTotalCredits}
         currentWallet={currentWallet}
         wishlistShortage={wishlistShortage}
+        busyItemId={wishBusy}
+        onRemoveItem={removeWishlistItem}
+        onChangeQty={updateWishlistQuantity}
       />
 
       <MarketRequestsBottomSheet
@@ -941,13 +1014,14 @@ export default function MarketTab({
                 )}
               </div>
             </div>
-            <p className="mt-2 text-center text-[11px] font-bold text-gray-500">
+            {/* SpriteImage는 내부적으로 div를 렌더링하므로 p 대신 div로 감쌉니다. */}
+            <div className="mt-2 text-center text-[11px] font-bold text-gray-500">
               <SpriteImage sheet={ICONS} frame="credit" width={12} className="inline-block align-[-2px]" clipRotated={false} />{' '}
               <span className="tabular-nums font-black text-gray-700">
                 {shelfActionFor.item.credit_price.toLocaleString('ko-KR')}
               </span>
               크레딧 · 레벨 {shelfActionFor.item.level_required}+
-            </p>
+            </div>
 
             {/* 액션 버튼을 한 줄 2칸으로 배치해 선택지를 직관적으로 비교 */}
             <div className="mt-4 flex flex-col gap-2">
@@ -960,7 +1034,11 @@ export default function MarketTab({
                       onClick={openPurchaseFromShelfAction}
                       className="rounded-2xl bg-brand-blue px-2 py-3 text-sm font-black text-white shadow-md ring-1 ring-brand-blue/20 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-500 disabled:ring-0 active:scale-[0.99] disabled:active:scale-100"
                     >
-                      🛍️ 구매하기
+                      <span className="inline-flex items-center gap-1.5">
+                        {/* 요청사항: 구매 버튼 아이콘을 지갑으로 통일 */}
+                        <SpriteImage sheet={ICONS} frame="wallet" width={16} clipRotated={false} />
+                        <span>구매하기</span>
+                      </span>
                     </button>
                     <button
                       type="button"
@@ -968,7 +1046,12 @@ export default function MarketTab({
                       onClick={() => void cartFromShelfAction()}
                       className="rounded-2xl border-2 border-sky-400/80 bg-sky-50 px-2 py-3 text-sm font-black text-sky-950 shadow-sm active:scale-[0.99] disabled:opacity-50"
                     >
-                      {wishlistIds.includes(shelfActionBuyMeta.it.id) ? '🧺 빼기' : '🧺 담기'}
+                      <span className="inline-flex items-center gap-1.5">
+                        {/* 요청사항: 카트 이모지 대신 basket_filled 이미지 사용 */}
+                        {/* eslint-disable-next-line @next/next/no-img-element -- public 정적 자산 경로 */}
+                        <img src={BASKET_FILLED_SRC} alt="" className="h-4 w-4 object-contain" draggable={false} />
+                        <span>장바구니</span>
+                      </span>
                     </button>
                   </div>
                   {!shelfActionBuyMeta.canBuy && (

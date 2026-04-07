@@ -57,11 +57,13 @@ function piggyBankFrameIndex(completed: number, total: number): number {
 }
 
 /** 저금통에 넣은 비율로 그림이 차 보이게(미션 완료 수 대신 금액 기반) */
-function piggyBankFrameIndexFromPiggy(piggy: number, totalCredits: number): number {
+function piggyBankFrameIndexFromPiggy(piggy: number): number {
   const n = piggyBankStageCount()
   if (n <= 1) return 0
-  const t = Math.max(1, totalCredits)
-  const ratio = Math.max(0, Math.min(1, piggy / t))
+  /** 요청사항: 저금통 단계 최대치는 항상 500 크레딧 기준 */
+  const t = Math.max(1, 500)
+  const safePiggy = Math.max(0, Math.min(piggy, t))
+  const ratio = safePiggy / t
   return Math.round(ratio * (n - 1))
 }
 
@@ -121,16 +123,14 @@ export default function ChildHomeIslandStage({
       ? 'pointer-events-none absolute inset-x-0 bottom-0 z-0 flex justify-center overflow-visible -translate-y-1 sm:-translate-y-2'
       : 'pointer-events-none absolute inset-x-0 bottom-0 z-0 flex justify-center overflow-visible'
 
-  const totalMissionCredits =
-    missionCredits != null
-      ? missionCredits.floating + missionCredits.wallet + missionCredits.piggy
-      : 0
   const piggyIdx =
-    scene === 'gippybank' && missionPiggy
-      ? piggyBankFrameIndex(missionPiggy.completed, missionPiggy.total)
-      : scene === 'gippybank' && missionCredits
-        ? piggyBankFrameIndexFromPiggy(missionCredits.piggy, totalMissionCredits)
+    /** missionCredits가 있으면 항상 '저금통 크레딧' 기준으로 단계를 계산합니다. */
+    scene === 'gippybank' && missionCredits
+      ? piggyBankFrameIndexFromPiggy(missionCredits.piggy)
+      : scene === 'gippybank' && missionPiggy
+        ? piggyBankFrameIndex(missionPiggy.completed, missionPiggy.total)
         : 0
+
   /** 섬·토끼·돼지 레이어 (flex / 비-flex 공통 JSX) */
   const stageLayers = (
     <>
@@ -192,7 +192,8 @@ export default function ChildHomeIslandStage({
            * 금액이 클수록 「더 많이 쌓인」 그림 칸을 골라 보여 줍니다.
            * 금액이 0이면 흐리게만 표시하고, 탭해도 시트가 뜨지 않게 부모에서 막습니다.
            */}
-          <div className="pointer-events-auto absolute bottom-[20%] left-1/2 z-[4] flex -translate-x-1/2 flex-col items-center sm:bottom-[22%]">
+          {/** 요청 반영: 가운데 크레딧을 더 많이 위로 올려 겹침 여유를 크게 확보합니다. */}
+          <div className="pointer-events-auto absolute bottom-[43%] left-1/2 z-[4] flex -translate-x-1/2 flex-col items-center sm:bottom-[38%]">
             <button
               type="button"
               disabled={missionCredits.floating <= 0}
@@ -214,41 +215,45 @@ export default function ChildHomeIslandStage({
                   className="drop-shadow-[0_4px_12px_rgba(0,0,0,0.18)]"
                 />
               </div>
-              <span className="mt-0.5 rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-black tabular-nums text-brand-blue shadow-sm ring-1 ring-black/5">
+              {/** 요청 반영: 배경 블록 없이 숫자만 크게 표시합니다. */}
+              <span className="mt-0.5 text-xl font-black tabular-nums text-brand-blue sm:text-2xl">
                 {missionCredits.floating.toLocaleString('ko-KR')}
               </span>
             </button>
           </div>
 
           {/** 왼쪽 아래: 저금통 (예전 오른쪽 위치를 좌측으로 옮김) */}
-          <div className="pointer-events-auto absolute bottom-[7%] left-[2%] z-[4] sm:bottom-[8%] sm:left-[4%]">
+          {/** 왼쪽 저금통(황금돼지)도 함께 위로 이동 */}
+          <div className="pointer-events-auto absolute bottom-[13%] left-[2%] z-[4] sm:bottom-[14%] sm:left-[4%]">
             <button
               type="button"
               onClick={missionCredits.onPiggyTap}
               aria-label={`저금통 크레딧 ${missionCredits.piggy}. 눌러서 옮기기`}
               className="flex flex-col items-center rounded-2xl p-1 transition-transform active:scale-[0.97]"
             >
-              {/** 표시 너비를 지갑(`wallet` 56px)과 같게 해 좌·우 아이콘 밸런스를 맞춤 */}
+              {/** 요청 반영: 황금돼지를 더 강조하기 위해 지갑보다 크게 표시 */}
               {/**
                * 단계 그림은 `piggyBankStages.ts` 에서 URL 목록 또는 합성 PNG 의 픽셀 영역으로 정합니다.
                * 규격 그리드(3x3) 가 아니어도 됩니다.
                */}
-              <div className="flex h-[56px] w-[56px] items-end justify-center">
+              {/** 큰 프레임(왕관/의자) 머리 잘림 방지를 위해 높이 여유 + overflow-visible 적용 */}
+              <div className="flex h-[96px] w-[76px] items-end justify-center overflow-visible">
                 <PiggyBankStageVisual
                   stepIndex={piggyIdx}
-                  displayWidth={56}
+                  displayWidth={70}
                   className="drop-shadow-[0_6px_14px_rgba(0,0,0,0.2)]"
                 />
               </div>
-              {/** 아이콘과 숫자가 겹치지 않게 위쪽 여백을 둡니다. */}
-              <span className="mt-1 rounded-full bg-sky-50 px-2 py-px text-[9px] font-black tabular-nums text-sky-900 shadow-sm ring-1 ring-sky-200/80">
+              {/** 요청 반영: 배경 블록 없이 숫자만 크게 표시합니다. */}
+              <span className="mt-1 text-lg font-black tabular-nums text-sky-900 sm:text-xl">
                 {missionCredits.piggy.toLocaleString('ko-KR')}
               </span>
             </button>
           </div>
 
           {/** 오른쪽 아래: 지갑 (예전 왼쪽 위치를 우측으로 옮김) */}
-          <div className="pointer-events-auto absolute bottom-[8%] right-[4%] z-[4] sm:bottom-[9%] sm:right-[6%]">
+          {/** 오른쪽 지갑도 동일한 기준으로 위로 이동 */}
+          <div className="pointer-events-auto absolute bottom-[14%] right-[4%] z-[4] sm:bottom-[15%] sm:right-[6%]">
             <button
               type="button"
               onClick={missionCredits.onWalletTap}
@@ -256,8 +261,8 @@ export default function ChildHomeIslandStage({
               className="flex flex-col items-center rounded-2xl p-1 transition-transform active:scale-[0.97]"
             >
               <SpriteImage sheet={ICONS} frame="wallet" width={56} clipRotated={false} className="drop-shadow-lg" />
-              {/** 아이콘과 숫자가 겹치지 않게 위쪽 여백을 둡니다. */}
-              <span className="mt-1 rounded-full bg-amber-50 px-2 py-px text-[9px] font-black tabular-nums text-amber-900 shadow-sm ring-1 ring-amber-200/80">
+              {/** 요청 반영: 배경 블록 없이 숫자만 크게 표시합니다. */}
+              <span className="mt-1 text-lg font-black tabular-nums text-amber-900 sm:text-xl">
                 {missionCredits.wallet.toLocaleString('ko-KR')}
               </span>
             </button>

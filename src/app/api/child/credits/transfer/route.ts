@@ -97,7 +97,6 @@ export async function POST(req: NextRequest) {
 
   let nw = w
   let np = p
-
   switch (kind as Kind) {
     case 'float_to_wallet':
       if (amount > float) return NextResponse.json({ error: '섬에 있는 크레딧이 부족해요' }, { status: 400 })

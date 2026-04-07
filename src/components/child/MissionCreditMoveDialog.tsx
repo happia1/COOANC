@@ -3,6 +3,9 @@
 import { useCallback, useEffect, useLayoutEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import SpriteImage from '@/components/common/SpriteImage'
+import FloatingCreditsStackVisual from '@/components/child/FloatingCreditsStackVisual'
+import PiggyBankStageVisual from '@/components/child/PiggyBankStageVisual'
+import { piggyBankStageCount } from '@/constants/piggyBankStages'
 import { ICONS, PIGGY_BANK } from '@/constants/sprites'
 
 /** 시트·다이얼로그에서 보여 줄 고정 저금통 그림(실제 채움 단계와 달라도 「저금통」만 알아보면 됨) */
@@ -339,21 +342,56 @@ export function MissionCreditActionSheet({ open, onClose, bucket, floating, wall
       rows.push({ kind: 'wallet_to_float', label: '섬으로 꺼내기 (다시 모아 두기)' })
       rows.push({ kind: 'wallet_to_piggy', label: '저금통으로 옮기기' })
     }
-    if (floating > 0) {
-      rows.push({ kind: 'float_to_wallet', label: '섬에서 지갑으로 받기' })
-    }
   } else {
     if (piggy > 0) {
       rows.push({ kind: 'piggy_to_float', label: '섬으로 꺼내기' })
       rows.push({ kind: 'piggy_to_wallet', label: '지갑으로 옮기기 (쓸 준비)' })
     }
-    if (floating > 0) {
-      rows.push({ kind: 'float_to_piggy', label: '섬에서 저금통으로 넣기' })
+  }
+
+  /**
+   * 모든 버킷(섬/지갑/저금통)에서 이미지 카드로 선택하도록 통일합니다.
+   * - 사용자가 텍스트를 읽지 않아도 아이콘만 보고 방향을 고를 수 있게 합니다.
+   */
+  function optionVisual(kind: CreditTransferKind): {
+    title: string
+    subtitle: string
+    icon: 'wallet' | 'piggy' | 'credit'
+    tone: 'amber' | 'sky'
+  } {
+    switch (kind) {
+      case 'float_to_wallet':
+      case 'piggy_to_wallet':
+        return { title: '지갑으로', subtitle: '마켓에서 쓸 돈', icon: 'wallet', tone: 'amber' }
+      case 'float_to_piggy':
+      case 'wallet_to_piggy':
+        return { title: '저금통으로', subtitle: '모아 두기', icon: 'piggy', tone: 'sky' }
+      case 'wallet_to_float':
+      case 'piggy_to_float':
+        return { title: '꺼내기', subtitle: '다시 나눠 두기', icon: 'credit', tone: 'sky' }
+      default:
+        return { title: '선택', subtitle: '이동하기', icon: 'wallet', tone: 'amber' }
     }
   }
 
-  /** 섬 중앙 크레딧 전용: 글자 목록 대신 지갑·저금통 카드 두 장 */
-  const centerImagePick = bucket === 'center' && floating > 0 && rows.length === 2
+  /**
+   * 저금통 현재 크레딧을 단계 이미지로 보여 주기 위한 인덱스 계산입니다.
+   * - 최대 500 기준으로 0~마지막 단계를 고릅니다.
+   */
+  function piggyStepIndex(currentPiggy: number): number {
+    const n = piggyBankStageCount()
+    if (n <= 1) return 0
+    const clamped = Math.max(0, Math.min(currentPiggy, 500))
+    return Math.round((clamped / 500) * (n - 1))
+  }
+
+  const titleText = bucket === 'wallet' ? '지갑' : bucket === 'piggy' ? '저금통' : '크레딧'
+  const amountForBucket = bucket === 'center' ? floating : bucket === 'wallet' ? wallet : piggy
+  const amountText =
+    bucket === 'wallet' || bucket === 'piggy'
+      ? amountForBucket.toLocaleString('ko-KR')
+      : `${amountForBucket.toLocaleString('ko-KR')} 크레딧`
+  const showAmount = bucket === 'center' ? floating > 0 : true
 
   const sheet = (
     <div
@@ -363,72 +401,61 @@ export function MissionCreditActionSheet({ open, onClose, bucket, floating, wall
     >
       <button type="button" className="absolute inset-0 bg-black/45" aria-label="닫기" onClick={onClose} />
       <div className="relative z-[1] w-full max-w-sm rounded-t-2xl bg-white p-4 shadow-2xl sm:rounded-2xl">
-        <p className="text-center text-sm font-black text-brand-text">
-          {bucket === 'center' ? '섬에 쌓인 크레딧' : bucket === 'wallet' ? '지갑' : '저금통'}
-        </p>
-        {bucket === 'center' && floating > 0 ? (
-          <p className="mt-0.5 text-center text-xs font-black tabular-nums text-brand-blue">
-            {floating.toLocaleString('ko-KR')} 크레딧
+        <p className="text-center text-sm font-black text-brand-text">{titleText}</p>
+        {showAmount ? (
+          <p className="mt-0.5 text-center text-base font-black tabular-nums text-brand-blue sm:text-lg">
+            {amountText}
           </p>
         ) : null}
         <p className="mt-1 text-center text-[11px] text-gray-500">
-          {centerImagePick ? '그림을 눌러 어디로 보낼지 골라요. 다음에 숫자를 정해요.' : '어디로 옮길까요?'}
+          어디로 보낼지 골라보세요.
         </p>
 
         <div className="mt-3 flex flex-col gap-2">
           {rows.length === 0 ? (
-            <p className="py-4 text-center text-xs text-gray-500">지금은 옮길 크레딧이 없어요</p>
-          ) : centerImagePick ? (
-            <div className="grid grid-cols-2 gap-3 pt-1">
-              {/**
-               * 왼쪽: 지갑 — 마켓에서 쓸 돈으로 보냄.
-               * 오른쪽: 저금통 — 모아 두는 통으로 보냄.
-               */}
-              <button
-                type="button"
-                onClick={() => {
-                  onPick('float_to_wallet')
-                  onClose()
-                }}
-                className="flex flex-col items-center gap-2 rounded-2xl border-2 border-amber-200/90 bg-gradient-to-b from-amber-50/95 to-white px-2 py-4 shadow-sm transition-transform active:scale-[0.98]"
-              >
-                <SpriteImage sheet={ICONS} frame="wallet" width={72} clipRotated={false} className="drop-shadow-lg" />
-                <span className="text-center text-xs font-black leading-tight text-brand-text">지갑으로</span>
-                <span className="text-center text-[10px] font-medium leading-snug text-gray-500">마켓에서 쓸 돈</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  onPick('float_to_piggy')
-                  onClose()
-                }}
-                className="flex flex-col items-center gap-2 rounded-2xl border-2 border-sky-200/90 bg-gradient-to-b from-sky-50/95 to-white px-2 py-4 shadow-sm transition-transform active:scale-[0.98]"
-              >
-                <SpriteImage
-                  sheet={PIGGY_BANK}
-                  frame={PIGGY_PREVIEW_FRAME}
-                  width={88}
-                  clipRotated={false}
-                  className="select-none drop-shadow-[0_6px_14px_rgba(0,0,0,0.15)]"
-                />
-                <span className="text-center text-xs font-black leading-tight text-brand-text">저금통으로</span>
-                <span className="text-center text-[10px] font-medium leading-snug text-gray-500">모아 두기</span>
-              </button>
-            </div>
+            <p className="py-4 text-center text-xs text-gray-500">보낼 크레딧이 없어요</p>
           ) : (
-            rows.map((r) => (
-              <button
-                key={r.kind}
-                type="button"
-                onClick={() => {
-                  onPick(r.kind)
-                  onClose()
-                }}
-                className="rounded-xl border border-gray-100 bg-sky-50/80 py-3 text-center text-sm font-bold text-brand-text active:scale-[0.99]"
-              >
-                {r.label}
-              </button>
-            ))
+            <div
+              className="grid gap-2 pt-1"
+              style={{ gridTemplateColumns: `repeat(${Math.min(rows.length, 3)}, minmax(0, 1fr))` }}
+            >
+              {rows.map((r) => {
+                const visual = optionVisual(r.kind)
+                const toneClass =
+                  visual.tone === 'amber'
+                    ? 'border-amber-200/90 bg-gradient-to-b from-amber-50/95 to-white'
+                    : 'border-sky-200/90 bg-gradient-to-b from-sky-50/95 to-white'
+                return (
+                  <button
+                    key={r.kind}
+                    type="button"
+                    onClick={() => {
+                      onPick(r.kind)
+                      onClose()
+                    }}
+                    className={`flex flex-col items-center gap-1 rounded-xl border-2 px-1.5 py-2.5 shadow-sm transition-transform active:scale-[0.98] ${toneClass}`}
+                  >
+                    {visual.icon === 'wallet' ? (
+                      <SpriteImage sheet={ICONS} frame="wallet" width={52} clipRotated={false} className="drop-shadow-lg" />
+                    ) : visual.icon === 'piggy' ? (
+                      <div className="flex h-[52px] w-[52px] items-end justify-center">
+                        <PiggyBankStageVisual
+                          stepIndex={piggyStepIndex(piggy)}
+                          displayWidth={52}
+                          className="drop-shadow-[0_6px_14px_rgba(0,0,0,0.15)]"
+                        />
+                      </div>
+                    ) : (
+                      <div className="flex h-[52px] w-[52px] items-end justify-center">
+                        <FloatingCreditsStackVisual floating={floating} dimWhenEmpty={false} displayWidth={44} />
+                      </div>
+                    )}
+                    <span className="text-center text-[11px] font-black leading-tight text-brand-text">{visual.title}</span>
+                    <span className="text-center text-[9px] font-medium leading-snug text-gray-500">{visual.subtitle}</span>
+                  </button>
+                )
+              })}
+            </div>
           )}
         </div>
         <button type="button" onClick={onClose} className="mt-3 w-full py-2 text-sm font-bold text-gray-500">

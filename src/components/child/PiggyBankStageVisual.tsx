@@ -1,9 +1,12 @@
 'use client'
 
 import Image from 'next/image'
+import SpriteImage from '@/components/common/SpriteImage'
 import {
   PIGGY_BANK_ATLAS_SIZE,
   PIGGY_BANK_COMBINED_SRC,
+  GOLD_PIGGY_BANK_FRAMES,
+  PIGGY_BANK_STAGE_FRAME_ORDER,
   PIGGY_BANK_STAGE_RECTS,
   PIGGY_BANK_STAGE_URLS,
   piggyBankStageCount,
@@ -43,6 +46,32 @@ export default function PiggyBankStageVisual({ stepIndex, displayWidth, classNam
   }
 
   const rects = PIGGY_BANK_STAGE_RECTS
+  const frameOrder = PIGGY_BANK_STAGE_FRAME_ORDER
+
+  if (frameOrder.length > 0) {
+    const frameName = frameOrder[idx] ?? frameOrder[0]
+    const spriteFrames = Object.fromEntries(
+      GOLD_PIGGY_BANK_FRAMES.map((f) => [
+        f.name,
+        { x: f.x, y: f.y, w: f.w, h: f.h, rotated: f.rotated },
+      ]),
+    )
+    return (
+      <SpriteImage
+        sheet={{
+          image: PIGGY_BANK_COMBINED_SRC.replace('/assets/img/', ''),
+          atlasW: PIGGY_BANK_ATLAS_SIZE.w,
+          atlasH: PIGGY_BANK_ATLAS_SIZE.h,
+          frames: spriteFrames,
+        }}
+        frame={frameName}
+        width={displayWidth}
+        clipRotated={false}
+        className={['select-none object-contain', className].filter(Boolean).join(' ')}
+      />
+    )
+  }
+
   if (rects.length > 0) {
     const r = rects[idx] ?? rects[0]
     const scale = displayWidth / r.w
