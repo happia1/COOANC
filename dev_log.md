@@ -263,6 +263,30 @@
 
 ---
 
+## [2026-04-09] - 미션 섬 크레딧·저금통 UI 다듬기 + 옮기기 다이얼로그·에셋
+- **Status:** ✅ 완료
+- **Git:** `385d989` — `feat(child): 미션 섬 크레딧·저금통 UI 정리 및 관련 개선` (`main` push)
+- **Files Created (에셋·맵):**
+  - `public/assets/img/games/map/bank.png`, `bank2.png`, `home.png`, `map.png`, `market.png`, `market2.png`
+  - `public/assets/img/layouts/backgrounds/background2.png` ~ `background4.png`, `grass_background.png`
+- **Files Modified (핵심):**
+  - `src/components/child/ChildHomeIslandStage.tsx` — 돼지·크레딧·지갑 `drop-shadow`(번짐·오프셋 0), 맵 배경 `blur` 완화, 돼지/지갑/가용 크레딧 `translate-y` 분리·저금통 추가 하강, 크레딧 **숫자를 열마다** 아이콘·건물 바로 위로 배치
+  - `src/components/child/FloatingCreditsStackVisual.tsx` — 동전 7단계·프레임별 실제 비율로 레이아웃 높이·너비 계산, `filter`를 바깥 래퍼로 분리·가로 잘림 완화, `width/height` CSS 트랜지션 제거; (이전 맥락) 단계별 크기·다이아/왕관 제거·500티어 `credit10` 등
+  - `src/components/child/PiggyBankStageVisual.tsx` — 초기 단계 광학 배율·`filter` 래퍼·여백으로 엉덩이·그림자 잘림 완화
+  - `src/components/child/MissionCreditMoveDialog.tsx`, `MissionTab.tsx` — `float_to_piggy` 미리보기를 `PiggyBankStageVisual`+`piggyBankStepIndexForBalance`로 교체, `piggyBalance` prop, 수량 입력 **초기값 0**
+  - `src/constants/piggyBankStages.ts` — (필요 시) 미션 단계 상한 등 상수 정리
+- **Files Modified (동반 커밋):**
+  - `ChildTopBar.tsx`, `HomeTab.tsx`, `MarketTab.tsx`, `MarketPurchaseConfirmDialog.tsx`, `MissionSleepMorningLayer.tsx`, `ApprovalTab.tsx`, `ParentMarketMenuControl.tsx`, `PraiseStickerPanel.tsx`, `RoutineTab.tsx`, `src/lib/praiseAssetStickers.ts`, `public/.../background.png` 등
+- **Summary:**
+  - 미션 섬에서 아이콘 그림자·맵 흐림·저금통·지갑 위치를 조정하고, 가용 크레딧 스프라이트가 단계별로 잘리지 않도록 박스·그림자 구조를 바꿨으며, 크레딧 숫자를 건물·아이콘에 가깝게 열 단위로 붙였습니다.
+  - 옮기기 팝업은 깨지던 저금통 스프라이트를 현재 잔액 단계 이미지로 보이게 하고 입력은 0부터 시작하도록 맞췄습니다.
+  - 맵·배경 PNG와 부모/마켓/칭찬 등 로컬 수정을 동일 커밋에 포함해 원격 `main`에 반영했습니다.
+- **Next Steps:**
+  - 실제 기기에서 미션 섬·옮기기 팝업 스크린샷으로 잘림·겹침 재확인
+  - `MissionTab.tsx` 등 에디터에서 “1줄”로 보일 때 디스크 내용과 불일치 여부 확인(저장·인코딩)
+
+---
+
 ## 📑 Commit Message Protocol
 1. 모든 커밋 메시지는 이 로그의 최신 기록을 바탕으로 작성한다.
 2. **형식**: `type: [작업명] #이슈번호(선택)`
