@@ -10,7 +10,6 @@ import PraiseGiftArrivalModal from '@/components/child/PraiseGiftArrivalModal'
 import ChildHomeIslandStage from '@/components/child/ChildHomeIslandStage'
 import ChildHomeSceneryBand from '@/components/child/ChildHomeSceneryBand'
 import { MapActionPill, StickerActionPill } from '@/components/child/ChildSceneryTopPills'
-import TodayWeatherBadge from '@/components/child/TodayWeatherBadge'
 import { mergePraiseStickerGrantsFromServer } from '@/lib/mergePraiseStickerGrantsFromServer'
 import { mergeChildStatsPatch, normalizeChildStatsCreditsSplit } from '@/lib/childCreditsSplit'
 import { ASSETS } from '@/constants/assets'
@@ -32,7 +31,7 @@ type Props = {
  * - **한 화면**: 상단 풍경·하단 꾸미기가 **6:4** 비율(`flex-[6]`/`flex-[4]`)로 나뉨
  * - 섬 무대는 `ChildHomeIslandStage` 의 `density="flex"` 로 남는 세로 공간에 맞춤
  * - 상단: 풍경 PNG 는 끄고(`showBackground={false}`) 페이지 기본 배경만 사용. 연속일·크레딧 알약(StatPill)은 표시하지 않음.
- * - 칭찬 스티커(곰)는 **화면 오른쪽 아래 플로팅**, 성장 지도는 무대 **왼쪽** 지도 단추로만 엽니다.
+ * - 칭찬 스티커(곰)는 무대 **오른쪽 상단**(기존 날씨 자리), 성장 지도는 무대 **왼쪽** 지도 단추로 엽니다.
  * - 부모가 칭찬 스티커를 내면 팝업 후 곰돌이 판에서 붙일 수 있음
  */
 export default function HomeTab({
@@ -280,15 +279,13 @@ export default function HomeTab({
   )
 
   /**
-   * 곰 스티커 보관함 단추를 **화면 오른쪽 아래**에 고정합니다(예전 미션 탭과 같은 위치·스타일).
-   * - `fixed`: 아래로 스크롤해도 항상 같은 자리에서 열 수 있어요.
-   * - 하단 탭바(60px) + 안전 영역만큼 위로 띄워 탭과 겹치지 않게 해요.
-   * - 바깥은 `pointer-events-none`, 누르는 원만 `pointer-events-auto` 로 빈 화면 탭은 그대로 통과합니다.
-   * - `clientReady` 가 된 뒤에만 커스텀 곰 이미지를 써서 첫 페인트와 서버 HTML 이 어긋나지 않게 합니다.
+   * 곰 스티커 단추를 무대 **오른쪽 상단**(기존 날씨 자리)으로 옮깁니다.
+   * - 원형 배경 래퍼를 제거해 아이콘 자체만 보이게 합니다.
+   * - 바깥은 `pointer-events-none`, 버튼만 `pointer-events-auto` 로 눌리게 유지합니다.
    */
-  const stickerFabFloating = (
-    <div className="pointer-events-none fixed bottom-[calc(60px+env(safe-area-inset-bottom,0px)+0.5rem)] right-3 z-40 sm:right-4">
-      <div className="pointer-events-auto rounded-full bg-white/92 p-1 shadow-[0_10px_34px_rgba(15,23,42,0.2)] ring-[1.5px] ring-white/90 backdrop-blur-sm transition-transform active:scale-[0.96] sm:p-1.5">
+  const stickerTopRightButton = (
+    <div className="pointer-events-none absolute right-0 top-0 z-20 pr-0.5 pt-3 sm:pr-1 sm:pt-4">
+      <div className="pointer-events-auto shrink-0">
         <StickerActionPill
           useCustomImage={clientReady && stickerFabImgOk}
           onImageError={() => setStickerFabImgOk(false)}
@@ -330,14 +327,8 @@ export default function HomeTab({
                     <MapActionPill onClick={() => setMapOpen(true)} />
                   </div>
                 </div>
-                {/**
-                 * 오늘 날씨 배지 위치
-                 * - 요청사항: "캐릭터(토끼) 영역의 오른쪽 상단"
-                 * - 지도 버튼과 균형을 맞춰 무대 컨테이너 우상단에 고정합니다.
-                 */}
-                <div className="absolute right-0 top-0 z-20 pr-0.5 pt-3 sm:pr-1 sm:pt-4">
-                  <TodayWeatherBadge />
-                </div>
+                {/** 기존 날씨 위치에 곰 스티커 단추를 배치합니다. */}
+                {stickerTopRightButton}
                 <ChildHomeIslandStage density="flex" homeAvatarUrl={childAvatarUrl} />
               </div>
             </div>
@@ -346,7 +337,6 @@ export default function HomeTab({
             <CharacterDecorInventoryPlaceholder />
           </section>
         </div>
-        {stickerFabFloating}
         {sheets}
         {arrivalModal}
       </>
@@ -356,7 +346,7 @@ export default function HomeTab({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <ChildHomeSceneryBand flexFill showBackground={false} ariaLabel="홈 상단">
-        {/** 토끼·섬 무대만 `-mt` — 레벨업 배너는 아래 줄이라 같이 당겨지지 않음 */}
+        {/** 토끼·섬 무대만 `-mt` 로 살짝 위로 당겨 하단 꾸미기와 맞물리게 합니다. */}
         <div className="flex min-h-0 flex-1 flex-col justify-end gap-1.5">
           <div className="relative mx-auto flex min-h-0 w-full max-w-sm flex-1 flex-col items-center justify-end -mt-6 sm:-mt-8">
             {/**
@@ -369,28 +359,33 @@ export default function HomeTab({
                 <MapActionPill onClick={() => setMapOpen(true)} />
               </div>
             </div>
-            {/**
-             * 오늘 날씨 배지 위치(정상 화면)
-             * - 로딩 화면과 동일한 우상단 좌표를 사용해 사용자 경험을 맞춥니다.
-             */}
-            <div className="absolute right-0 top-0 z-20 pr-0.5 pt-3 sm:pr-1 sm:pt-4">
-              <TodayWeatherBadge />
-            </div>
+            {/** 기존 날씨 위치(우상단)에 곰 스티커 단추를 동일하게 배치합니다. */}
+            {stickerTopRightButton}
             <ChildHomeIslandStage density="flex" homeAvatarUrl={childAvatarUrl} />
           </div>
-          {stats.promotion_pending && (
-            <div className="flex items-center gap-2 rounded-xl border border-brand-yellow bg-brand-yellow/40 px-4 py-2">
-              <span className="text-xs font-bold text-brand-text">레벨 업 대기 중! 부모님 확인을 기다려요</span>
-            </div>
-          )}
         </div>
       </ChildHomeSceneryBand>
 
+      {/**
+       * 레벨 업 대기 안내는 **하단 꾸미기 섹션**으로 옮깁니다.
+       * - 예전에는 상단 풍경 밴드 안에 있어서, 하단 패널의 `-mt` 때문에 「내 캐릭터 꾸미기」 제목과 겹쳐 보였습니다.
+       * - 그리드 아래 `shrink-0` 로 고정해 항상 한 줄로 읽히게 합니다.
+       */}
       <section className={homeBottomPanelClass} aria-label="내 캐릭터 꾸미기">
         <CharacterDecorInventoryPlaceholder />
+        {stats.promotion_pending && (
+          <div
+            className="shrink-0 rounded-xl border border-brand-yellow bg-brand-yellow/40 px-3 py-2 sm:px-4"
+            role="status"
+            aria-live="polite"
+          >
+            <span className="text-xs font-bold text-brand-text">
+              레벨 업 대기 중! 부모님 확인을 기다려요
+            </span>
+          </div>
+        )}
       </section>
 
-      {stickerFabFloating}
       {sheets}
       {arrivalModal}
     </div>

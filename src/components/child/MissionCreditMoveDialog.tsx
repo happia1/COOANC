@@ -5,11 +5,19 @@ import { createPortal } from 'react-dom'
 import SpriteImage from '@/components/common/SpriteImage'
 import FloatingCreditsStackVisual from '@/components/child/FloatingCreditsStackVisual'
 import PiggyBankStageVisual from '@/components/child/PiggyBankStageVisual'
-import { piggyBankStageCount } from '@/constants/piggyBankStages'
-import { ICONS, PIGGY_BANK } from '@/constants/sprites'
+import { MISSION_CREDITS_STAGE_CAP, piggyBankStageCount } from '@/constants/piggyBankStages'
+import { ICONS } from '@/constants/sprites'
 
-/** 시트·다이얼로그에서 보여 줄 고정 저금통 그림(실제 채움 단계와 달라도 「저금통」만 알아보면 됨) */
-const PIGGY_PREVIEW_FRAME = '레이어 282' as const
+/**
+ * 미션 섬·옮기기 UI 와 동일 규칙: 저금통 잔액(0~`MISSION_CREDITS_STAGE_CAP`)으로 단계 인덱스를 고릅니다.
+ */
+function piggyBankStepIndexForBalance(currentPiggy: number): number {
+  const n = piggyBankStageCount()
+  if (n <= 1) return 0
+  const cap = MISSION_CREDITS_STAGE_CAP
+  const clamped = Math.max(0, Math.min(currentPiggy, cap))
+  return Math.round((clamped / cap) * (n - 1))
+}
 
 export type CreditTransferKind =
   | 'float_to_wallet'
@@ -50,6 +58,8 @@ type Props = {
   title: string
   /** 서버가 돌려준 지갑·저금통·총액으로 부모 `stats` 를 즉시 갱신합니다(Realtime 지연과 무관). */
   onSuccess: (result: CreditTransferApiSuccess) => void
+  /** 저금통 미리보기(`float_to_piggy` 등)에 쓸 현재 저금통 잔액 — 섬과 같은 단계 그림 */
+  piggyBalance: number
 }
 
 /**
@@ -64,9 +74,10 @@ export default function MissionCreditMoveDialog({
   maxAmount,
   title,
   onSuccess,
+  piggyBalance,
 }: Props) {
-  /** 화면에 보이는 숫자(문자열). 빈 문자열이면 아직 0·미입력 상태로 봅니다. */
-  const [amount, setAmount] = useState('1')
+  /** 화면에 보이는 숫자(문자열). 빈 문자열이면 표시는 0, 아직 숫자 패드로만 채웁니다. */
+  const [amount, setAmount] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   /** `body`에 붙일 준비가 됐는지 — SSR·첫 페인트 직후에만 true (포털용) */
@@ -78,7 +89,7 @@ export default function MissionCreditMoveDialog({
 
   useEffect(() => {
     if (open) {
-      setAmount(maxAmount >= 1 ? String(Math.min(10, maxAmount)) : '1')
+      setAmount('')
       setErr(null)
       setBusy(false)
     }
@@ -114,7 +125,7 @@ export default function MissionCreditMoveDialog({
       setAmount((prev) => {
         const cur = Math.floor(parseInt(prev.replace(/\D/g, ''), 10) || 0)
         const next = cur + delta
-        return String(Math.min(maxAmount, Math.max(1, next)))
+        return String(Math.min(maxAmount, Math.max(0, next)))
       })
     },
     [maxAmount],
@@ -203,13 +214,13 @@ export default function MissionCreditMoveDialog({
               {kind === 'float_to_wallet' ? (
                 <SpriteImage sheet={ICONS} frame="wallet" width={36} clipRotated={false} className="drop-shadow-md" />
               ) : (
-                <SpriteImage
-                  sheet={PIGGY_BANK}
-                  frame={PIGGY_PREVIEW_FRAME}
-                  width={44}
-                  clipRotated={false}
-                  className="select-none drop-shadow-md"
-                />
+                <div className="flex min-h-[64px] min-w-[56px] shrink-0 items-end justify-center overflow-visible px-0.5 pb-0.5">
+                  <PiggyBankStageVisual
+                    stepIndex={piggyBankStepIndexForBalance(piggyBalance)}
+                    displayWidth={44}
+                    className="drop-shadow-md"
+                  />
+                </div>
               )}
             </div>
           ) : (
@@ -389,33 +400,19 @@ export function MissionCreditActionSheet({ open, onClose, bucket, floating, wall
     }
   }
 
-  /**
-   * 저금통 현재 크레딧을 단계 이미지로 보여 주기 위한 인덱스 계산입니다.
-   * - 최대 500 기준으로 0~마지막 단계를 고릅니다.
-   */
-  function piggyStepIndex(currentPiggy: number): number {
-    const n = piggyBankStageCount()
-    if (n <= 1) return 0
-    const clamped = Math.max(0, Math.min(currentPiggy, 500))
-    return Math.round((clamped / 500) * (n - 1))
-  }
-
   const titleText = bucket === 'wallet' ? '지갑' : bucket === 'piggy' ? '저금통' : '크레딧'
   const amountForBucket = bucket === 'center' ? floating : bucket === 'wallet' ? wallet : piggy
-  const amountText =
-    bucket === 'wallet' || bucket === 'piggy'
-      ? amountForBucket.toLocaleString('ko-KR')
-      : `${amountForBucket.toLocaleString('ko-KR')} 크레딧`
+  const amountText = amountForBucket.toLocaleString('ko-KR')
   const showAmount = bucket === 'center' ? floating > 0 : true
 
   const sheet = (
     <div
-      className="fixed inset-0 z-[115] flex items-end justify-center pb-[max(0.5rem,env(safe-area-inset-bottom,0px))] sm:items-center sm:pb-0"
+      className="fixed inset-0 z-[115] flex items-center justify-center px-3 py-3 pt-[max(0.75rem,env(safe-area-inset-top,0px))] pb-[max(0.75rem,env(safe-area-inset-bottom,0px))]"
       role="dialog"
       aria-modal="true"
     >
       <button type="button" className="absolute inset-0 bg-black/45" aria-label="닫기" onClick={onClose} />
-      <div className="relative z-[1] w-full max-w-sm rounded-t-2xl bg-white p-4 shadow-2xl sm:rounded-2xl">
+      <div className="relative z-[1] w-full max-w-sm rounded-2xl bg-white p-4 shadow-2xl">
         <p className="text-center text-sm font-black text-brand-text">{titleText}</p>
         {showAmount ? (
           <p className="mt-0.5 text-center text-base font-black tabular-nums text-sky-900 sm:text-lg">
@@ -440,7 +437,7 @@ export function MissionCreditActionSheet({ open, onClose, bucket, floating, wall
                   visual.tone === 'amber'
                     ? 'border-amber-200/90 bg-gradient-to-b from-amber-50/95 to-white'
                     : 'border-sky-200/90 bg-gradient-to-b from-sky-50/95 to-white'
-                /** 아이콘 영역: 종류마다 높이가 달라도 같은 박스 안에서 가로·세로 중앙 정렬(크레딧만 아래로 붙던 현상 제거) */
+                /** 아이콘 영역: 동일 높이 박스 안에서 가로·세로 중앙 — 크레딧 더미는 `centerInFrame` 으로 내부 스프라이트도 중앙 */
                 const iconAreaClass =
                   'flex h-[104px] w-full shrink-0 items-center justify-center overflow-visible px-0.5'
                 return (
@@ -460,14 +457,19 @@ export function MissionCreditActionSheet({ open, onClose, bucket, floating, wall
                     ) : visual.icon === 'piggy' ? (
                       <div className={iconAreaClass}>
                         <PiggyBankStageVisual
-                          stepIndex={piggyStepIndex(piggy)}
+                          stepIndex={piggyBankStepIndexForBalance(piggy)}
                           displayWidth={52}
                           className="drop-shadow-[0_6px_14px_rgba(0,0,0,0.15)]"
                         />
                       </div>
                     ) : (
                       <div className={iconAreaClass}>
-                        <FloatingCreditsStackVisual floating={floating} dimWhenEmpty={false} displayWidth={44} />
+                        <FloatingCreditsStackVisual
+                          floating={floating}
+                          dimWhenEmpty={false}
+                          displayWidth={44}
+                          centerInFrame
+                        />
                       </div>
                     )}
                     <span className="text-center text-[11px] font-black leading-tight text-brand-text">{visual.title}</span>

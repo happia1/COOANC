@@ -295,31 +295,34 @@ export default function MarketPurchaseConfirmDialog({
                   <div className="mb-1.5 flex items-center justify-center gap-1.5">
                     <SpriteImage sheet={ICONS} frame="credits" width={18} clipRotated={false} />
                     <span className="text-[11px] font-bold tracking-tight text-gray-500 sm:text-xs">
-                      지금 내 크레딧
+                      내 크레딧
                     </span>
                   </div>
                   <div className="text-2xl font-black leading-tight tabular-nums sm:text-3xl">
                     <span className="text-brand-blue">{balanceBefore.toLocaleString('ko-KR')}</span>
                   </div>
-                  <div className="mt-4 flex gap-3 border-t border-dashed border-gray-200/90 pt-4 text-left">
-                    <div className="flex h-[5.25rem] w-[5.25rem] shrink-0 items-end justify-center overflow-hidden rounded-xl bg-white/90 shadow-inner ring-1 ring-black/[0.06] sm:h-[5.75rem] sm:w-[5.75rem]">
+                  {/* 좁은 화면에서는 세로 스택으로 바꿔 이미지/텍스트가 겹치지 않게 정렬합니다. */}
+                  {/* 요청사항: 중간 구분선을 없애고 여백을 줄여 카드 높이를 낮춥니다. */}
+                  <div className="mt-2.5 flex flex-col items-center gap-2.5 text-center sm:mt-3 sm:flex-row sm:items-start sm:text-left">
+                    {/* 모바일에서 이미지 박스를 함께 줄여 전체 카드 비율을 안정적으로 유지합니다. */}
+                    <div className="flex h-[4.6rem] w-[4.6rem] shrink-0 items-end justify-center overflow-hidden rounded-xl bg-white/90 shadow-inner ring-1 ring-black/[0.06] sm:h-[5.75rem] sm:w-[5.75rem]">
                       {item.image_url ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
                           src={item.image_url}
                           alt=""
-                          className="max-h-[4.75rem] max-w-full object-contain object-bottom sm:max-h-[5.25rem]"
+                          className="max-h-[4.1rem] max-w-full object-contain object-bottom sm:max-h-[5.25rem]"
                           draggable={false}
                         />
                       ) : (
-                        <MarketItemImage frame={frame} height={84} />
+                        <MarketItemImage frame={frame} height={74} />
                       )}
                     </div>
-                    <div className="flex min-w-0 flex-1 flex-col justify-center gap-1.5">
-                      <p className="text-[10px] font-bold uppercase tracking-wide text-gray-400">살 물건</p>
+                    {/* 세로 스택일 때도 텍스트 블록이 자연스럽게 줄바꿈되도록 중앙 정렬을 허용합니다. */}
+                    <div className="flex min-w-0 flex-1 flex-col items-center justify-center gap-1.5 sm:items-start">
                       <p
                         id="market-purchase-title"
-                        className="text-sm font-black leading-snug text-brand-text sm:text-[0.95rem]"
+                        className="text-[0.82rem] font-black leading-snug text-brand-text sm:text-[0.95rem]"
                       >
                         {item.name}
                       </p>
@@ -328,9 +331,10 @@ export default function MarketPurchaseConfirmDialog({
                           {item.description}
                         </p>
                       )}
-                      <div className="mt-1 flex flex-wrap items-center justify-start gap-2">
-                        <SpriteImage sheet={ICONS} frame="credit" width={22} clipRotated={false} />
-                        <span className="text-2xl font-black leading-none tabular-nums text-red-600 sm:text-3xl">
+                      {/* 가격 행도 모바일에서는 중앙, 넓은 화면에서는 좌측 정렬로 전환합니다. */}
+                      <div className="mt-1 flex flex-wrap items-center justify-center gap-2 sm:justify-start">
+                        <SpriteImage sheet={ICONS} frame="credit" width={20} clipRotated={false} />
+                        <span className="text-[1.75rem] font-black leading-none tabular-nums text-red-600 sm:text-3xl">
                           -{price.toLocaleString('ko-KR')}
                         </span>
                       </div>

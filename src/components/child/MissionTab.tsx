@@ -1,18 +1,19 @@
 'use client'
 
 import { useState, useEffect, useMemo, useCallback, useRef, type MouseEvent } from 'react'
+import { useRouter } from 'next/navigation'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/client'
-import type { ChildStats, DailyMissionWithTemplate } from '@/types/database'
+import type { ChildStats, DailyMission, DailyMissionWithTemplate } from '@/types/database'
 import ChildHomeIslandStage from '@/components/child/ChildHomeIslandStage'
 import ChildHomeSceneryBand from '@/components/child/ChildHomeSceneryBand'
 import { parseSpecialMissionPopup } from '@/lib/specialMissionDescription'
 import { isSpecialSectionMission } from '@/lib/specialMissionChips'
 import { parseAlarmFromMissionDescription } from '@/lib/missionAlarmDescription'
-import { scaledMissionRewards } from '@/lib/missionRewardMultiplier'
+import { scaledMissionRewards, type RewardMultiplier } from '@/lib/missionRewardMultiplier'
 import MissionSleepMorningLayer from '@/components/child/MissionSleepMorningLayer'
 import SpriteImage from '@/components/common/SpriteImage'
-import { ICONS } from '@/constants/sprites'
+import { BANNERS, ICONS } from '@/constants/sprites'
 import { MISSION_ROUTINES_ATLAS } from '@/constants/missionRoutineAtlas'
 import { missionRoutineIconFrame } from '@/lib/missionRoutineIconFrame'
 import MissionCreditToPiggyOverlay from '@/components/child/MissionCreditToPiggyOverlay'
@@ -57,6 +58,66 @@ function orderedMissionsForSlider(list: DailyMissionWithTemplate[]): DailyMissio
 /**
  * 부모 「다시하기」 후 서버 롤백이 끝난 뒤 오는 브로드캐스트 페이로드 검사 — 형식이 맞지 않으면 무시합니다.
  */
+
+/** assign-today 브로드캐스트로 온 행 + 템플릿을 자녀 카드 목록 형태로 만듭니다. */
+function dailyMissionFromAssignPayload(
+  childId: string,
+  row: Record<string, unknown> | null | undefined,
+  template: DailyMissionWithTemplate['missions'] | null | undefined,
+): DailyMissionWithTemplate | null {
+  if (!row || !template) return null
+  const id = typeof row.id === 'string' ? row.id : ''
+  if (!id) return null
+  return {
+    id,
+    child_id: typeof row.child_id === 'string' ? row.child_id : childId,
+    mission_template_id: typeof row.mission_template_id === 'string' ? row.mission_template_id : '',
+    date: typeof row.date === 'string' ? row.date.slice(0, 10) : '',
+    scheduled_time: (row.scheduled_time as string | null) ?? null,
+    routine_type: (row.routine_type as DailyMission['routine_type']) ?? 'weekday',
+    is_completed: Boolean(row.is_completed),
+    completed_at: (row.completed_at as string | null) ?? null,
+    created_at: typeof row.created_at === 'string' ? row.created_at : '',
+    missions: template,
+  }
+}
+
+/** 특별 배달 미션 팝업에 넣을 필드만 골라 냅니다(이미 본 적이면 null). */
+function trySpecialDeliveryPopupFields(
+  dm: DailyMissionWithTemplate,
+  todayStr: string,
+): {
+  dailyMissionId: string
+  headline: string
+  missionTitle: string
+  missionDescription: string | null
+  /** 카드 하단과 동일: 배율 적용 후 크레딧 */
+  creditReward: number
+  /** 카드 하단과 동일: 배율 적용 후 EXP(하트 아이콘으로 표시) */
+  expReward: number
+  /** 보너스 배율(1이면 UI에서 배너·×N배 숨김) */
+  rewardMultiplier: RewardMultiplier
+} | null {
+  if (typeof window === 'undefined') return null
+  const m = dm.missions
+  if (!m || !isSpecialSectionMission(m)) return null
+  if (m.repeat_type !== 'event') return null
+  const { isSpecial } = parseSpecialMissionPopup(m.description)
+  if (!isSpecial) return null
+  const key = `cooanc_sp_shown_${dm.id}_${todayStr}`
+  if (sessionStorage.getItem(key)) return null
+  const rw = scaledMissionRewards(m)
+  return {
+    dailyMissionId: dm.id,
+    headline: '특별 미션이 도착했어요!',
+    missionTitle: m.title,
+    missionDescription: m.description ?? null,
+    creditReward: rw.credit,
+    expReward: rw.exp,
+    rewardMultiplier: rw.mult,
+  }
+}
+
 function isMissionRolledBackPayload(v: unknown): v is { dailyMissionId: string; title: string } {
   if (!v || typeof v !== 'object') return false
   const o = v as Record<string, unknown>
@@ -91,8 +152,27 @@ export default function MissionTab({
     dailyMissionId: string
     headline: string
     missionTitle: string
-    message: string
+    /** 카드 썸네일과 같은 그림을 쓰기 위해 미션 템플릿 설명(JSON 포함)을 보관합니다. */
+    missionDescription: string | null
+    /** 완료 보상 — 카드와 같은 규칙(배율 적용) */
+    creditReward: number
+    expReward: number
+    /** 2·3배 보너스일 때 배너 스프라이트와 함께 표시 */
+    rewardMultiplier: RewardMultiplier
   } | null>(null)
+
+  const router = useRouter()
+  /** 부모가 오늘 일정을 넣은 뒤 날짜 비교에 쓰는 최신 today 문자열 */
+  const todayRef = useRef(today)
+  todayRef.current = today
+
+  /**
+   * 서버 props 와 동기화하되, 부모 assign 브로드캐스트로 행이 먼저 오면 여기에 합쳐 즉시 카드·팝업을 맞춥니다.
+   */
+  const [missionList, setMissionList] = useState<DailyMissionWithTemplate[]>(dailyMissions)
+  useEffect(() => {
+    setMissionList(dailyMissions)
+  }, [dailyMissions])
 
   /** 부모 「다시하기」로 미션이 되돌아갔을 때 띄우는 알림 팝업(토스트와 별도) */
   const [rollbackPopup, setRollbackPopup] = useState<{
@@ -119,7 +199,7 @@ export default function MissionTab({
   })
   const endCreditFx = useCallback(() => setCreditFxOn(false), [])
 
-  const ordered = useMemo(() => orderedMissionsForSlider(dailyMissions), [dailyMissions])
+  const ordered = useMemo(() => orderedMissionsForSlider(missionList), [missionList])
 
   /** 완료한 카드는 가로 슬라이더에서 제거해 바로 「사라진」 느낌을 줍니다 */
   const incompleteOrdered = useMemo(() => ordered.filter((dm) => !done.has(dm.id)), [ordered, done])
@@ -168,6 +248,56 @@ export default function MissionTab({
       void supabase.removeChannel(refreshCh)
     }
   }, [childId])
+
+  /**
+   * 부모가 assign-today 등으로 오늘 daily_missions 행을 넣으면, 서버 컴포넌트 props 는 그대로라
+   * 특별 미션 팝업이 안 뜰 수 있습니다. INSERT·부모 브로드캐스트 시 오늘 날짜면 RSC 를 다시 받아옵니다(브로드캐스트 페이로드로는 이미 낙관적 반영).
+   */
+  useEffect(() => {
+    const supabase = createClient()
+    const channel = supabase
+      .channel(`daily_missions_child_refresh:${childId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'daily_missions',
+          filter: `child_id=eq.${childId}`,
+        },
+        (payload) => {
+          const row = payload.new as { date?: string }
+          const d = typeof row.date === 'string' ? row.date.slice(0, 10) : ''
+          if (d === todayRef.current) router.refresh()
+        },
+      )
+      .on('broadcast', { event: 'assign_today_ok' }, (msg) => {
+        type P = {
+          date?: string
+          alreadyAssigned?: boolean
+          dailyMission?: Record<string, unknown> | null
+          missionTemplate?: DailyMissionWithTemplate['missions'] | null
+        }
+        const p = (msg as { payload?: P }).payload
+        const d = typeof p?.date === 'string' ? p.date.slice(0, 10) : ''
+        const shouldRefresh = !d || d === todayRef.current
+        if (shouldRefresh && p && !p.alreadyAssigned && p.dailyMission && p.missionTemplate) {
+          const optimisticDm = dailyMissionFromAssignPayload(childId, p.dailyMission, p.missionTemplate)
+          if (optimisticDm) {
+            setMissionList((prev) =>
+              prev.some((x) => x.id === optimisticDm.id) ? prev : [...prev, optimisticDm],
+            )
+            const fields = trySpecialDeliveryPopupFields(optimisticDm, todayRef.current)
+            if (fields) setSpecialPopup(fields)
+          }
+        }
+        if (shouldRefresh) router.refresh()
+      })
+      .subscribe()
+    return () => {
+      void supabase.removeChannel(channel)
+    }
+  }, [childId, router])
 
   const showToast = (msg: string) => {
     setToast(msg)
@@ -283,23 +413,27 @@ export default function MissionTab({
 
   useEffect(() => {
     if (typeof window === 'undefined') return
-    for (const dm of dailyMissions) {
+    for (const dm of missionList) {
       const m = dm.missions
       if (!m || !isSpecialSectionMission(m)) continue
+      const { isSpecial } = parseSpecialMissionPopup(m.description)
       if (m.repeat_type !== 'event') continue
-      const { isSpecial, popupMessage } = parseSpecialMissionPopup(m.description)
       if (!isSpecial) continue
       const key = `cooanc_sp_shown_${dm.id}_${today}`
       if (sessionStorage.getItem(key)) continue
+      const rw = scaledMissionRewards(m)
       setSpecialPopup({
         dailyMissionId: dm.id,
         headline: '특별 미션이 도착했어요!',
         missionTitle: m.title,
-        message: popupMessage.trim() || '오늘만 하는 특별 미션을 완료해 보아요!',
+        missionDescription: m.description ?? null,
+        creditReward: rw.credit,
+        expReward: rw.exp,
+        rewardMultiplier: rw.mult,
       })
       break
     }
-  }, [dailyMissions, today])
+  }, [missionList, today])
 
   function dismissSpecialPopup() {
     if (specialPopup && typeof window !== 'undefined') {
@@ -381,7 +515,7 @@ export default function MissionTab({
   const expPct = Math.min(100, (exp / expToNext) * 100)
 
   const completedCount = done.size
-  const total = dailyMissions.length
+  const total = missionList.length
 
   /** 크레딧 옮기기 팝업 제목만(본문 힌트는 레이아웃·겹침 이슈로 팝업에서 제거함) */
   const transferCopy: Record<CreditTransferKind, { title: string }> = {
@@ -458,7 +592,7 @@ export default function MissionTab({
 
   /**
    * 상단 영역: `flexFill` 로 레이아웃이 주는 높이만 씀(고정 dvh 아님).
-   * 배경 이미지는 사용하지 않고(`showBackground={false}`), 기존 투명 상단 밴드만 유지합니다.
+   * 요청하신 `grass_background.png`를 상단 배경으로 적용합니다.
    * 저금통/크레딧/지갑 위치는 기존 레이아웃 그대로 유지됩니다.
    */
   const heroBand = (
@@ -466,6 +600,9 @@ export default function MissionTab({
       flexFill
       /** 상단 배경 이미지를 완전히 비활성화합니다. */
       showBackground={false}
+      /** 요청하신 잔디 배경 이미지 경로를 상단 영역에 적용합니다. */
+      /** 배경은 중앙 정렬로 맞춰 오브젝트가 치우치지 않게 합니다. */
+      /** 미션 탭은 배경을 위로 당기지 않아(리프트 제거) 작은 화면에서도 잘림을 줄입니다. */
       /** 밴드 자체 바탕색은 투명으로 두어 이미지 외 배경 덮임을 막습니다. */
       className="bg-transparent"
       ariaLabel="미션 상단"
@@ -509,8 +646,7 @@ export default function MissionTab({
         </div>
       ) : incompleteOrdered.length === 0 ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-1 px-6 py-6 text-center">
-          <p className="text-sm font-bold text-gray-500">남은 미션 카드가 없어요</p>
-          <p className="text-xs text-gray-400">아래에서 오늘의 결과를 확인해 보아요</p>
+          <p className="text-sm font-bold text-gray-500">오늘의 미션을 모두 완료했어요</p>
         </div>
       ) : (
         <div
@@ -621,8 +757,63 @@ export default function MissionTab({
         <p id="sp-pop-title" className="text-center text-lg font-black text-amber-900">
           {specialPopup.headline}
         </p>
+        {/**
+         * 특별 미션 카드와 같은 아틀라스 프레임으로 그림을 보여 줍니다(제목·설명 키워드 기반).
+         */}
+        <div className="mt-3 flex justify-center">
+          <SpriteImage
+            sheet={MISSION_ROUTINES_ATLAS}
+            frame={missionRoutineIconFrame(specialPopup.missionTitle, specialPopup.missionDescription)}
+            width={88}
+            clipRotated={false}
+            className="select-none drop-shadow-[0_2px_8px_rgba(0,0,0,0.08)]"
+          />
+        </div>
         <p className="mt-2 text-center text-sm font-bold text-amber-800">{specialPopup.missionTitle}</p>
-        <p className="mt-3 text-center text-sm leading-relaxed text-amber-900/80">{specialPopup.message}</p>
+        {/**
+         * 보너스(2·3배)일 때 banners.png의 강조 마크(special_mark)와 ×N배를 알약 왼쪽에 붙여 보상이 커졌음을 알립니다.
+         * 미션 카드 하단과 같은 아이콘: 크레딧 · 경험치(EXP는 하트 스프라이트).
+         */}
+        <div className="mt-4 flex flex-wrap items-center justify-center gap-2 px-1">
+          {specialPopup.rewardMultiplier > 1 ? (
+            <div className="flex shrink-0 items-center gap-1.5 rounded-full bg-white/85 px-2 py-1 shadow-sm ring-1 ring-amber-400/50">
+              <SpriteImage
+                sheet={BANNERS}
+                frame="special_mark"
+                width={42}
+                clipRotated={false}
+                className="shrink-0 select-none drop-shadow-sm"
+              />
+              <span className="pr-0.5 text-sm font-black tabular-nums text-amber-950">
+                ×{specialPopup.rewardMultiplier}배
+              </span>
+            </div>
+          ) : null}
+          <div
+            className="inline-flex max-w-full flex-nowrap items-center justify-center gap-x-2 rounded-full px-3 py-2 text-sm font-black tabular-nums tracking-tight text-gray-800 shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] ring-1 ring-black/[0.06] bg-amber-100/90"
+            role="group"
+            aria-label={
+              specialPopup.rewardMultiplier > 1
+                ? `보너스 ${specialPopup.rewardMultiplier}배, 크레딧 ${specialPopup.creditReward}, 경험치 ${specialPopup.expReward}`
+                : `미션 보상: 크레딧 ${specialPopup.creditReward}, 경험치 ${specialPopup.expReward}`
+            }
+          >
+            <span className="inline-flex items-center gap-1">
+              <SpriteImage
+                sheet={ICONS}
+                frame="credit"
+                width={18}
+                clipRotated={false}
+                className="shrink-0 select-none"
+              />
+              <span>{specialPopup.creditReward}</span>
+            </span>
+            <span className="inline-flex items-center gap-1" title="경험치(EXP)">
+              <SpriteImage sheet={ICONS} frame="heart" width={18} className="shrink-0 select-none" />
+              <span>{specialPopup.expReward}</span>
+            </span>
+          </div>
+        </div>
         <button
           type="button"
           onClick={dismissSpecialPopup}
@@ -722,6 +913,7 @@ export default function MissionTab({
           kind={creditMoveKind}
           maxAmount={creditMoveKind ? maxAmountForKind(creditMoveKind) : 0}
           title={creditMoveKind ? transferCopy[creditMoveKind].title : ''}
+          piggyBalance={piggyCredits}
           onSuccess={applyCreditTransferSuccess}
         />
       </div>
@@ -773,6 +965,7 @@ export default function MissionTab({
         kind={creditMoveKind}
         maxAmount={creditMoveKind ? maxAmountForKind(creditMoveKind) : 0}
         title={creditMoveKind ? transferCopy[creditMoveKind].title : ''}
+        piggyBalance={piggyCredits}
         onSuccess={applyCreditTransferSuccess}
       />
     </div>

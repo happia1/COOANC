@@ -271,7 +271,8 @@ export default function MissionSleepMorningLayer({
       {/* 수면 안내 팝업: 하단 탭(독) 높이만큼 아래 여백을 두고, 그 안에서 세로 중앙 정렬 */}
       {sleepModalOpen && (
         <div
-          className="fixed inset-0 z-[106] flex items-center justify-center px-4 pt-4 pb-[max(1rem,calc(env(safe-area-inset-bottom)+5rem))] sm:px-6 sm:pt-6 sm:pb-[max(1rem,calc(env(safe-area-inset-bottom)+5rem))]"
+          /* 요청사항: 팝업을 화면 정중앙에 배치하기 위해 하단 보정 여백을 제거합니다. */
+          className="fixed inset-0 z-[106] flex items-center justify-center px-4 py-4 sm:px-6 sm:py-6"
           role="dialog"
           aria-modal="true"
           aria-labelledby="sleep-modal-title"
@@ -293,19 +294,13 @@ export default function MissionSleepMorningLayer({
                   <p id="sleep-modal-title" className="text-lg font-black text-indigo-950">
                     수면 모드 · 잘 자요
                   </p>
-                  {/* 본문: 첫 줄·둘째 줄을 나눠 읽기 쉽게 표시 */}
-                  <p className="mt-2 text-sm font-bold leading-relaxed text-indigo-900/80">
-                    모든 미션을 마쳤어요
-                    <br />
-                    푹쉬고 내일 또 만나요!
-                  </p>
                 </div>
                 <button
                   type="button"
                   onClick={() => setSleepModalOpen(false)}
                   className="w-full rounded-2xl bg-brand-blue py-3 text-sm font-black text-white shadow-md active:scale-[0.99]"
                 >
-                  확인했어요
+                  내일만나요
                 </button>
               </div>
             </div>

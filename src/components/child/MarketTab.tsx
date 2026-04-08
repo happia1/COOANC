@@ -973,13 +973,12 @@ export default function MarketTab({
                 )}
               </div>
             </div>
-            {/* SpriteImage는 내부적으로 div를 렌더링하므로 p 대신 div로 감쌉니다. */}
-            <div className="mt-2 text-center text-[11px] font-bold text-gray-500">
-              <SpriteImage sheet={ICONS} frame="credit" width={12} className="inline-block align-[-2px]" clipRotated={false} />{' '}
-              <span className="tabular-nums font-black text-brand-blue">
+            {/* 요청사항: 레벨 표시는 제거하고, 크레딧 가독성을 높이기 위해 숫자 크기를 키웁니다. */}
+            <div className="mt-2 text-center text-sm font-bold text-gray-500">
+              <SpriteImage sheet={ICONS} frame="credit" width={14} className="inline-block align-[-2px]" clipRotated={false} />{' '}
+              <span className="tabular-nums text-lg font-black text-brand-blue">
                 {shelfActionFor.item.credit_price.toLocaleString('ko-KR')}
               </span>
-              크레딧 · 레벨 {shelfActionFor.item.level_required}+
             </div>
 
             {/* 액션 버튼을 한 줄 2칸으로 배치해 선택지를 직관적으로 비교 */}
@@ -993,7 +992,8 @@ export default function MarketTab({
                       onClick={openPurchaseFromShelfAction}
                       className="rounded-2xl bg-brand-blue px-2 py-3 text-sm font-black text-white shadow-md ring-1 ring-brand-blue/20 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-500 disabled:ring-0 active:scale-[0.99] disabled:active:scale-100"
                     >
-                      <span className="inline-flex items-center gap-1.5">
+                      {/* 요청사항: 버튼 내부를 아이콘(윗줄) + 텍스트(아랫줄) 2단으로 표시합니다. */}
+                      <span className="inline-flex flex-col items-center justify-center gap-1 leading-none">
                         {/* 요청사항: 구매 버튼 아이콘을 지갑으로 통일 */}
                         <SpriteImage sheet={ICONS} frame="wallet" width={16} clipRotated={false} />
                         <span>구매하기</span>
@@ -1005,7 +1005,8 @@ export default function MarketTab({
                       onClick={() => void cartFromShelfAction()}
                       className="rounded-2xl border-2 border-sky-400/80 bg-sky-50 px-2 py-3 text-sm font-black text-sky-950 shadow-sm active:scale-[0.99] disabled:opacity-50"
                     >
-                      <span className="inline-flex items-center gap-1.5">
+                      {/* 요청사항: 장바구니 버튼도 아이콘(윗줄) + 텍스트(아랫줄) 구성으로 통일합니다. */}
+                      <span className="inline-flex flex-col items-center justify-center gap-1 leading-none">
                         {/* 요청사항: 카트 이모지 대신 basket_filled 이미지 사용 */}
                         {/* eslint-disable-next-line @next/next/no-img-element -- public 정적 자산 경로 */}
                         <img src={BASKET_FILLED_SRC} alt="" className="h-4 w-4 object-contain" draggable={false} />

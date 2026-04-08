@@ -11,10 +11,13 @@
  * - 매일 스페셜은 「보상 배율」로만 배율을 바꿉니다(카드에 「보상 N배」 문구는 넣지 않음).
  */
 
-import { useState, useEffect, useLayoutEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useLayoutEffect, useMemo, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { usePathname } from 'next/navigation'
 import { useParentStore } from '@/store/parentStore'
+import { createClient } from '@/lib/supabase/client'
+import type { RealtimeChannel } from '@supabase/supabase-js'
+import { getSeoulDateString } from '@/lib/koreaDate'
 import ChildProfileNav, { type ChildTab } from '@/components/parent/ChildProfileNav'
 import { CompactChildProfileCard } from '@/components/parent/CompactChildProfileCard'
 import CalendarSection from '@/components/parent/CalendarSection'
@@ -30,6 +33,7 @@ import {
   isSpecialSectionMission,
 } from '@/lib/specialMissionChips'
 import { sortMissionsByRoutineFlow } from '@/lib/routineChips'
+
 
 /** HH:MM → "오전/오후 H:MM" */
 function formatTime(t: string | null | undefined): string {
@@ -386,6 +390,46 @@ export default function RoutineTab({ missions: initial, children, todayDailyMiss
   const currentId = selectedChildId ?? children[0]?.id ?? null
   const currentChild = children.find((c) => c.id === currentId) ?? children[0]
   const childLevel = currentChild?.level ?? 0
+
+  /** assign-today 브로드캐스트를 SUBSCRIBED 직후 바로 쏠 수 있게 미리 붙여 둡니다(매번 subscribe 대기 제거). */
+  const assignNotifyChannelRef = useRef<RealtimeChannel | null>(null)
+
+  useEffect(() => {
+    if (!currentId) {
+      assignNotifyChannelRef.current = null
+      return
+    }
+    const supabase = createClient()
+    const ch = supabase.channel(`daily_missions_child_refresh:${currentId}`, {
+      config: { broadcast: { ack: false } },
+    })
+    ch.subscribe((status) => {
+      if (status === 'SUBSCRIBED') assignNotifyChannelRef.current = ch
+    })
+    return () => {
+      assignNotifyChannelRef.current = null
+      void supabase.removeChannel(ch)
+    }
+  }, [currentId])
+
+  const sendAssignTodayBroadcast = useCallback((childId: string, payload: Record<string, unknown>) => {
+    const ready = assignNotifyChannelRef.current
+    if (ready) {
+      void ready.send({ type: 'broadcast', event: 'assign_today_ok', payload })
+      return
+    }
+    const supabase = createClient()
+    const ch = supabase.channel(`daily_missions_child_refresh:${childId}`, {
+      config: { broadcast: { ack: false } },
+    })
+    ch.subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        void ch.send({ type: 'broadcast', event: 'assign_today_ok', payload })
+        void supabase.removeChannel(ch)
+      }
+    })
+  }, [])
+
   /** 온보딩과 동일: 집 보육이 아니면 학교·기관 루틴으로 봅니다 */
   const hasSchool =
     Boolean(currentChild?.institutionType && currentChild.institutionType !== 'home')
@@ -492,6 +536,27 @@ export default function RoutineTab({ missions: initial, children, todayDailyMiss
         return
       }
       showToast(json.alreadyAssigned ? '이미 오늘 일정에 있어요' : '오늘 자녀 화면에 넣었어요')
+      const missionRow = missions.find((m) => m.id === templateId)
+      const missionTemplate = missionRow
+        ? {
+            title: missionRow.title,
+            icon_emoji: missionRow.icon_emoji,
+            description: missionRow.description,
+            credit_reward: missionRow.credit_reward,
+            heart_reward: missionRow.heart_reward,
+            exp_reward: missionRow.exp_reward,
+            reward_multiplier: missionRow.reward_multiplier ?? null,
+            difficulty: missionRow.difficulty,
+            block: missionRow.block,
+            repeat_type: missionRow.repeat_type,
+          }
+        : null
+      sendAssignTodayBroadcast(currentId, {
+        date: typeof json.date === 'string' ? json.date : getSeoulDateString(),
+        alreadyAssigned: Boolean(json.alreadyAssigned),
+        dailyMission: json.dailyMission ?? null,
+        missionTemplate,
+      })
     } catch {
       showToast('네트워크 오류가 발생했어요', false)
     } finally {

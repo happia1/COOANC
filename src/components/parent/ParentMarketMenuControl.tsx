@@ -29,8 +29,6 @@ export type ParentMarketMenuControlProps = {
   familyLinkIdForChild: string | null
   /** 숨김 목록이 바뀔 때(토글 후) */
   onHiddenChange: (next: Set<string>) => void
-  /** 메뉴 제어 탭 전체 초기화(숨김 목록/DB/목록 재로딩)를 요청합니다 */
-  onResetMenu?: () => Promise<void>
   /** 가족 전용 상품이 추가되면 목록에 합칩니다 */
   onItemCreated: (item: StoreItem) => void
 }
@@ -75,7 +73,6 @@ export default function ParentMarketMenuControl({
   hiddenItemIds,
   familyLinkIdForChild,
   onHiddenChange,
-  onResetMenu,
   onItemCreated,
 }: ParentMarketMenuControlProps) {
   const [addOpen, setAddOpen] = useState(false)
@@ -91,7 +88,16 @@ export default function ParentMarketMenuControl({
   const [addCategory, setAddCategory] = useState<string>('food')
   /** 마켓 보이기/숨기기 토글 API 실패 시 잠깐 보여 줄 메시지 */
   const [toggleSaveErr, setToggleSaveErr] = useState<string | null>(null)
-  const [resetLoading, setResetLoading] = useState(false)
+  /**
+   * 구역마다 상품 타일 영역을 **접기/펼치기** 합니다.
+   * 디폴트는 **전부 접힘**(첫 줄도 숨김) — `true` 인 구역만 타일을 그립니다. 자녀 변경 시 전부 접힘으로 리셋합니다.
+   */
+  const [menuSectionExpanded, setMenuSectionExpanded] = useState<Record<string, boolean>>({})
+
+  /** 선택 자녀가 바뀌면 펼쳐 두었던 구역을 초기화해, 항상 첫 진입은 모두 접힌 상태가 되게 합니다. */
+  useEffect(() => {
+    setMenuSectionExpanded({})
+  }, [childId])
 
   const cameraInputRef = useRef<HTMLInputElement>(null)
   const galleryInputRef = useRef<HTMLInputElement>(null)
@@ -127,23 +133,32 @@ export default function ParentMarketMenuControl({
   }, [storeItems, childId, familyLinkIdForChild])
 
   /**
-   * 간식 / 장난감 / 이벤트(활동+체험) / 기타 순으로 묶은 목록
-   * — 비어 있는 구역은 제목 자체를 숨깁니다.
+   * 구역별 상품 목록 — 간식 / 장난감 / 이벤트(활동+체험) / 기타 순, 비어 있으면 구역 제목 숨김
+   * - 정렬: 마켓에 켜 둔 항목(숨김 아님)을 먼저, 그다음 꺼진 항목 — 같은 그룹 안에서는 이름 순.
+   * - 배치: 펼침일 때만 타일을 그립니다. 2줄 이상이면 열 방향 채움(위칸→아래칸→다음 열). 접힘이면 상품 줄 전체 숨김.
    */
   const menuSectionsToRender = useMemo(() => {
+    const sortItemsForSection = (items: StoreItem[]) =>
+      [...items].sort((a, b) => {
+        const aOn = !hiddenItemIds.has(a.id)
+        const bOn = !hiddenItemIds.has(b.id)
+        if (aOn !== bOn) return aOn ? -1 : 1
+        return a.name.localeCompare(b.name, 'ko')
+      })
+
     const rows: { sectionKey: string; title: string; items: StoreItem[] }[] = []
     for (const sec of PARENT_MARKET_MENU_SECTIONS) {
       const items = itemsForChild.filter((it) => parentMarketSectionIdForItem(it.category) === sec.id)
       if (items.length > 0) {
-        rows.push({ sectionKey: sec.id, title: sec.title, items })
+        rows.push({ sectionKey: sec.id, title: sec.title, items: sortItemsForSection(items) })
       }
     }
     const other = itemsForChild.filter((it) => parentMarketSectionIdForItem(it.category) === 'other')
     if (other.length > 0) {
-      rows.push({ sectionKey: 'other', title: '기타', items: other })
+      rows.push({ sectionKey: 'other', title: '기타', items: sortItemsForSection(other) })
     }
     return rows
-  }, [itemsForChild])
+  }, [itemsForChild, hiddenItemIds])
 
   const toggleHidden = useCallback(
     async (itemId: string, currentlyVisible: boolean) => {
@@ -182,6 +197,42 @@ export default function ParentMarketMenuControl({
     },
     [childId, hiddenItemIds, onHiddenChange],
   )
+
+  /** 한 칸(썸네일·이름·토글) — 가로 스크롤 줄에서 재사용합니다. */
+  function renderMenuItemTile(it: StoreItem) {
+    const hidden = hiddenItemIds.has(it.id)
+    const visible = !hidden
+    const spriteFrame = marketFrameKeyForItemId(it.id, it.name)
+    return (
+      <div key={it.id} className="flex min-w-0 snap-start flex-col items-center gap-1">
+        {/** 이미지 블록 가로를 줄여 한 화면에 더 많은 칸이 들어가게 합니다. */}
+        <div className="flex h-12 w-full max-w-[3.25rem] items-center justify-center overflow-hidden rounded-lg bg-gray-50 ring-1 ring-gray-100 sm:max-w-[3.5rem]">
+          {it.image_url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={it.image_url}
+              alt=""
+              className="max-h-[34px] max-w-[34px] object-contain object-center"
+              draggable={false}
+            />
+          ) : (
+            <MarketItemImage frame={spriteFrame} height={34} />
+          )}
+        </div>
+        <p
+          className="w-full truncate text-center text-[9px] font-bold leading-tight text-gray-700"
+          title={it.name}
+        >
+          {it.name}
+        </p>
+        <VisibilityToggle
+          on={visible}
+          ariaLabel={visible ? `${it.name} 마켓에서 숨기기` : `${it.name} 마켓에 표시하기`}
+          onToggle={() => toggleHidden(it.id, visible)}
+        />
+      </div>
+    )
+  }
 
   function onPickFile(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]
@@ -234,31 +285,6 @@ export default function ParentMarketMenuControl({
       <div className="mb-1 flex items-start justify-between gap-2">
         <h2 className="text-sm font-bold text-brand-text">메뉴 제어</h2>
         <div className="flex items-center gap-2">
-          {onResetMenu && (
-            <button
-              type="button"
-              disabled={!childId || resetLoading}
-              onClick={async () => {
-                if (!childId) return
-                setToggleSaveErr(null)
-                if (!confirm('메뉴 제어를 모두 초기화하고(전체 표시) 다시 불러올까요?')) return
-                setResetLoading(true)
-                try {
-                  setAddOpen(false)
-                  setAddErr(null)
-                  await onResetMenu()
-                } catch (e) {
-                  const msg = e instanceof Error ? e.message : '초기화에 실패했어요'
-                  setToggleSaveErr(msg)
-                } finally {
-                  setResetLoading(false)
-                }
-              }}
-              className="shrink-0 text-[11px] font-bold text-gray-400 underline-offset-2 hover:text-gray-500 hover:underline disabled:opacity-30"
-            >
-              {resetLoading ? '초기화 중...' : '초기화'}
-            </button>
-          )}
           <button
             type="button"
             disabled={!childId}
@@ -290,52 +316,56 @@ export default function ParentMarketMenuControl({
         </div>
       ) : (
         <div className="space-y-6 rounded-2xl bg-white p-3 shadow-sm">
-          {menuSectionsToRender.map((block) => (
-            <div key={block.sectionKey}>
-              <h3 className="mb-2 flex items-center gap-1.5 border-b border-gray-100 pb-2 text-xs font-black text-gray-800">
-                {block.title}
-                <span className="ml-auto tabular-nums text-[10px] font-bold text-gray-400">{block.items.length}개</span>
-              </h3>
-              <div className="grid grid-cols-5 gap-x-1 gap-y-3 pt-1">
-                {block.items.map((it) => {
-                  const hidden = hiddenItemIds.has(it.id)
-                  const visible = !hidden
-                  // 자녀 마켓(MarketTab)과 동일: id·이름으로 항상 같은 PNG 가 나오게 함
-                  const spriteFrame = marketFrameKeyForItemId(it.id, it.name)
-                  return (
-                    <div key={it.id} className="flex min-w-0 flex-col items-center gap-1.5">
-                      <div className="flex h-14 w-full items-center justify-center overflow-hidden rounded-lg bg-gray-50 ring-1 ring-gray-100">
-                        {it.image_url ? (
-                          // 가족 전용으로 올린 사진도 블록 안에 들어오도록 contain + 축소 표시
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={it.image_url}
-                            alt=""
-                            className="max-h-[42px] max-w-[42px] object-contain object-center"
-                            draggable={false}
-                          />
-                        ) : (
-                          // 기본 이미지도 기존보다 살짝 줄여 블록 안쪽 여백을 확보
-                          <MarketItemImage frame={spriteFrame} height={42} />
-                        )}
-                      </div>
-                      <p
-                        className="w-full truncate text-center text-[9px] font-bold leading-tight text-gray-700"
-                        title={it.name}
-                      >
-                        {it.name}
-                      </p>
-                      <VisibilityToggle
-                        on={visible}
-                        ariaLabel={visible ? `${it.name} 마켓에서 숨기기` : `${it.name} 마켓에 표시하기`}
-                        onToggle={() => toggleHidden(it.id, visible)}
-                      />
+          {menuSectionsToRender.map((block) => {
+            /** 접힘이면 상품 타일(첫 줄 포함)을 아예 그리지 않습니다. */
+            const expanded = menuSectionExpanded[block.sectionKey] === true
+            /** 펼쳤을 때만 2줄 그리드 — 상품이 1개면 1줄 */
+            const useTwoRows = block.items.length > 1
+
+            return (
+              <div key={block.sectionKey}>
+                {/** 왼쪽: 구역명·개수 / 오른쪽: 펼치기·접기(항상 표시 — 접힘 시 타일 숨김) */}
+                <h3 className="mb-2 flex items-center gap-2 border-b border-gray-100 pb-2 text-xs font-black text-gray-800">
+                  <div className="flex min-w-0 flex-1 items-baseline gap-x-2">
+                    <span className="min-w-0 truncate">{block.title}</span>
+                    <span className="shrink-0 text-[9px] font-extralight tabular-nums tracking-tight text-gray-400">
+                      {block.items.length}개
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    aria-expanded={expanded}
+                    onClick={() =>
+                      setMenuSectionExpanded((prev) => ({
+                        ...prev,
+                        [block.sectionKey]: !expanded,
+                      }))
+                    }
+                    className="shrink-0 text-[10px] font-medium text-gray-500 underline-offset-2 transition-colors hover:text-gray-700 hover:underline active:opacity-80"
+                  >
+                    <span aria-hidden className="mr-0.5 inline-block align-middle text-[9px] leading-none">
+                      {expanded ? '▲' : '▼'}
+                    </span>
+                    {expanded ? '접기' : '펼치기'}
+                  </button>
+                </h3>
+                {/**
+                 * 접힘: 첫 줄 포함 **아무 타일도 안 보임**. 펼침: 2개 이상이면 2줄 그리드 + 가로 스크롤.
+                 */}
+                {expanded ? (
+                  <div className="-mx-1 snap-x snap-mandatory overflow-x-auto overflow-y-hidden pb-1 pt-1 [scrollbar-width:thin] [-ms-overflow-style:none] [&::-webkit-scrollbar]:h-1">
+                    <div
+                      className={`grid w-max grid-flow-col gap-x-1.5 gap-y-2.5 px-1 auto-cols-[minmax(3.25rem,3.5rem)] sm:auto-cols-[minmax(3.5rem,3.75rem)] ${
+                        useTwoRows ? 'grid-rows-2' : 'grid-rows-1'
+                      }`}
+                    >
+                      {block.items.map((it) => renderMenuItemTile(it))}
                     </div>
-                  )
-                })}
+                  </div>
+                ) : null}
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
 

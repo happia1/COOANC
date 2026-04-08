@@ -60,15 +60,24 @@ export default function PiggyBankStageVisual({ stepIndex, displayWidth, classNam
     const w = Math.round(displayWidth * stageMul)
     const src = urls[idx] ?? urls[0]
     return (
-      <Image
-        src={src}
-        alt=""
-        width={w}
-        height={w}
-        className={['h-auto w-full max-w-none select-none object-contain', className].filter(Boolean).join(' ')}
-        style={{ width: w, height: 'auto' }}
-        draggable={false}
-      />
+      <div
+        className={[
+          'inline-flex max-w-none items-end justify-center overflow-visible px-0.5 pb-2.5 pt-0.5',
+          className,
+        ]
+          .filter(Boolean)
+          .join(' ')}
+      >
+        <Image
+          src={src}
+          alt=""
+          width={w}
+          height={w}
+          className="h-auto w-full max-w-none select-none object-contain"
+          style={{ width: w, height: 'auto' }}
+          draggable={false}
+        />
+      </div>
     )
   }
 
@@ -77,8 +86,9 @@ export default function PiggyBankStageVisual({ stepIndex, displayWidth, classNam
     const frameName = atlasFrame?.name ?? frameOrder[idx] ?? frameOrder[0]
     const vw = atlasFrame ? piggyAtlasVisualSize(atlasFrame).vw : refPinkW
 
+    /** 336 은 1.0 유지 — 0.9 는 세로 여백만 줄어들어 엉덩이·다리가 잘린 것처럼 보일 수 있음 */
     const OPTICAL_SCALE_BY_FRAME: Record<string, number> = {
-      '레이어 336': 0.9,
+      '레이어 336': 1,
       '레이어 337': 1.06,
       '레이어 338': 1.03,
       '레이어 339': 1.02,
@@ -93,8 +103,19 @@ export default function PiggyBankStageVisual({ stepIndex, displayWidth, classNam
         { x: f.x, y: f.y, w: f.w, h: f.h, rotated: f.rotated },
       ]),
     )
+    /**
+     * 그림자(`filter`)·회전 스프라이트는 바깥 박스에 딱 맞추면 아래가 잘려 보일 수 있어,
+     * `filter`·여백은 바깥 래퍼에 두고 안쪽은 `overflow-visible` 만 유지합니다.
+     */
     return (
-      <div className="overflow-visible">
+      <div
+        className={[
+          'inline-flex max-w-none items-end justify-center overflow-visible px-0.5 pb-2.5 pt-0.5',
+          className,
+        ]
+          .filter(Boolean)
+          .join(' ')}
+      >
         <SpriteImage
           sheet={{
             image: PIGGY_BANK_COMBINED_SRC.replace('/assets/img/', ''),
@@ -105,7 +126,7 @@ export default function PiggyBankStageVisual({ stepIndex, displayWidth, classNam
           frame={frameName}
           width={normalizedWidth}
           clipRotated={false}
-          className={['select-none object-contain', className].filter(Boolean).join(' ')}
+          className="select-none object-contain"
         />
       </div>
     )
@@ -119,29 +140,47 @@ export default function PiggyBankStageVisual({ stepIndex, displayWidth, classNam
     const { w: aw, h: ah } = PIGGY_BANK_ATLAS_SIZE
     return (
       <div
-        aria-hidden
-        className={['shrink-0 bg-no-repeat', className].filter(Boolean).join(' ')}
-        style={{
-          width: Math.round(w0),
-          height: boxH,
-          backgroundImage: `url(${PIGGY_BANK_COMBINED_SRC})`,
-          backgroundSize: `${aw * scale}px ${ah * scale}px`,
-          backgroundPosition: `-${r.x * scale}px -${r.y * scale}px`,
-        }}
-      />
+        className={[
+          'inline-flex max-w-none items-end justify-center overflow-visible px-0.5 pb-2.5 pt-0.5',
+          className,
+        ]
+          .filter(Boolean)
+          .join(' ')}
+      >
+        <div
+          aria-hidden
+          className="shrink-0 bg-no-repeat"
+          style={{
+            width: Math.round(w0),
+            height: boxH,
+            backgroundImage: `url(${PIGGY_BANK_COMBINED_SRC})`,
+            backgroundSize: `${aw * scale}px ${ah * scale}px`,
+            backgroundPosition: `-${r.x * scale}px -${r.y * scale}px`,
+          }}
+        />
+      </div>
     )
   }
 
   const wFallback = Math.round(displayWidth * stageMul)
   return (
-    <Image
-      src={PIGGY_BANK_COMBINED_SRC}
-      alt=""
-      width={wFallback}
-      height={wFallback}
-      className={['h-auto w-full max-w-none select-none object-contain', className].filter(Boolean).join(' ')}
-      style={{ width: wFallback, height: 'auto' }}
-      draggable={false}
-    />
+    <div
+      className={[
+        'inline-flex max-w-none items-end justify-center overflow-visible px-0.5 pb-2.5 pt-0.5',
+        className,
+      ]
+        .filter(Boolean)
+        .join(' ')}
+    >
+      <Image
+        src={PIGGY_BANK_COMBINED_SRC}
+        alt=""
+        width={wFallback}
+        height={wFallback}
+        className="h-auto w-full max-w-none select-none object-contain"
+        style={{ width: wFallback, height: 'auto' }}
+        draggable={false}
+      />
+    </div>
   )
 }

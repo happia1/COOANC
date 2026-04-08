@@ -9,6 +9,12 @@
 
 import piggyBankAtlasJson from '@/constants/piggy_bank.atlas.json'
 
+/**
+ * 미션 섬에서 **저금통 그림 단계**와 **가운데 가용 크레딧(동전) 그림**을 나눌 때 쓰는 크레딧 상한입니다.
+ * 이 값을 넘는 잔액은 시각적으로는 마지막 단계와 동일하게 보입니다.
+ */
+export const MISSION_CREDITS_STAGE_CAP = 1000 as const
+
 /** 한 장에 여러 단계를 붙여 둔 PNG 경로 (`public` 기준) */
 export const PIGGY_BANK_COMBINED_SRC = '/assets/img/items/piggy-bank/piggy_bank.png' as const
 
