@@ -289,7 +289,7 @@
 
 ## [2026-04-09] - 온보딩 캐릭터 선택·설정 자녀 카드·뒤로가기 (UI 세션)
 - **Status:** ✅ 완료
-- **Git:** `feat(parent): 온보딩 캐릭터 블록·설정 자녀 카드·뒤로가기 문구` — `main` push (해시는 `git log -1 --oneline`)
+- **Git:** `2509bec` — `feat(parent): 온보딩 캐릭터 블록·설정 자녀 카드·뒤로가기 문구` (`main` push)
 - **Files Modified:**
   - `src/components/common/ChildProfileAvatarPicker.tsx` — 온보딩: 캐릭터 썸네일 축소, 원형 링 제거 후 카드 내 사각 블록(`rounded-lg`) + `object-contain`으로 전신이 보이게
   - `src/components/parent/CompactChildProfileCard.tsx` — `hideStats`·`actions` props: 오른쪽 통계 그리드 대신 슬롯(설정의 수정/삭제 등)
