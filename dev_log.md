@@ -287,6 +287,22 @@
 
 ---
 
+## [2026-04-09] - 온보딩 캐릭터 선택·설정 자녀 카드·뒤로가기 (UI 세션)
+- **Status:** ✅ 완료
+- **Git:** `feat(parent): 온보딩 캐릭터 블록·설정 자녀 카드·뒤로가기 문구` — `main` push (해시는 `git log -1 --oneline`)
+- **Files Modified:**
+  - `src/components/common/ChildProfileAvatarPicker.tsx` — 온보딩: 캐릭터 썸네일 축소, 원형 링 제거 후 카드 내 사각 블록(`rounded-lg`) + `object-contain`으로 전신이 보이게
+  - `src/components/parent/CompactChildProfileCard.tsx` — `hideStats`·`actions` props: 오른쪽 통계 그리드 대신 슬롯(설정의 수정/삭제 등)
+  - `src/app/settings/page.tsx` — 자녀 프로필을 홈과 동일 카드 레이아웃으로 표시(`child_stats.current_level` 조회), 크레딧·하트·스트릭 숨김; 상단 `<` 제거 → 작은 회색 「이전으로 돌아가기」텍스트 버튼(`router.back`)
+- **Summary:**
+  - 자녀 등록 온보딩에서 캐릭터 선택 UI를 사각 프레임 안에 넣고 크기를 줄여 카드와 균형을 맞췄습니다.
+  - 설정 탭 자녀 줄을 `CompactChildProfileCard`로 통일하고 오른쪽은 수정·삭제만 두었습니다.
+  - 설정 헤더 뒤로가기는 꺾쇠 아이콘 대신 얇은 회색 문구 링크로 바꿨습니다.
+- **Next Steps:**
+  - 다자녀 설정 화면에서 카드 여러 개 스크롤·삭제 확인 레이아웃을 실제 폭에서 한 번 확인
+
+---
+
 ## 📑 Commit Message Protocol
 1. 모든 커밋 메시지는 이 로그의 최신 기록을 바탕으로 작성한다.
 2. **형식**: `type: [작업명] #이슈번호(선택)`

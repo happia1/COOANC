@@ -1,13 +1,14 @@
 /**
- * 부모 앱용 컴팩트 자녀 프로필 카드 (홈·자녀 상세 공통)
+ * 부모 앱용 컴팩트 자녀 프로필 카드 (홈·설정·자녀 상세 공통)
  * - 왼쪽: 아바타
  * - 가운데(세로): **이름 + Lv**(Lv 는 얇은 글씨·회색) → **미취학·유치원·나이** — 아바타 원과 **세로 가운데** 맞춤
- * - 오른쪽(예전 레벨 칸): 크레딧·하트·연속일을 **2열 그리드**(고정 아이콘 칸 + 숫자 우측 정렬)
- * - 홈에서만: 하단 전체 너비로 오늘 미션 달성률
+ * - 오른쪽: 기본은 크레딧·하트·연속일 **2열 그리드** — `hideStats` 이면 통계 대신 `actions`(설정의 수정/삭제 등)
+ * - 홈에서만: 하단 전체 너비로 오늘 미션 달성률(`mission`)
  *
  * 통계: 크레딧·하트는 `icons.png` 스프라이트, 연속 일은 불꽃 SVG(스트릭).
  */
 
+import type { ReactNode } from 'react'
 import SpriteImage from '@/components/common/SpriteImage'
 import { ICONS } from '@/constants/sprites'
 
@@ -39,6 +40,10 @@ export type CompactChildProfileCardProps = {
   ageGroupLabel?: string | null
   /** 가정보육·어린이집 등 — DB 에 없으면 생략 */
   childcareLabel?: string | null
+  /** true 이면 오른쪽 통계(크레딧·하트·연속일)를 숨기고 `actions` 만 표시합니다 */
+  hideStats?: boolean
+  /** `hideStats` 일 때 오른쪽 열에 넣는 UI(버튼·삭제 확인 등) */
+  actions?: ReactNode
 }
 
 export function CompactChildProfileCard({
@@ -53,6 +58,8 @@ export function CompactChildProfileCard({
   mission = null,
   ageGroupLabel = null,
   childcareLabel = null,
+  hideStats = false,
+  actions = null,
 }: CompactChildProfileCardProps) {
   const lv = Math.min(Math.max(level, 0), LEVEL_NAMES.length - 1)
   const stageName = LEVEL_NAMES[lv]
@@ -111,11 +118,12 @@ export function CompactChildProfileCard({
           </div>
         </div>
 
-        {/**
-         * 크레딧 → 하트 → 연속일: **CSS Grid** 2열(아이콘 칸 | 숫자)로 묶습니다.
-         * 예전처럼 행마다 `inline-flex`만 쓰면 글자 길이에 따라 행 너비가 달라져 아이콘이 들쭉날쭉합니다.
-         * 1열 너비를 고정하고 안에서 아이콘만 가운데 두면 동전·하트·불꽃이 한 세로선에 맞습니다.
-         */}
+        {hideStats ? (
+          <div className="flex shrink-0 flex-col items-end justify-center gap-1">
+            {/* 설정 탭: 크레딧 칸 대신 수정·삭제(또는 삭제 확인) */}
+            {actions}
+          </div>
+        ) : (
         <div
           className="grid shrink-0 grid-cols-[14px_auto] items-center gap-x-1.5 gap-y-1 text-[11px] font-bold tabular-nums leading-none sm:grid-cols-[18px_auto] sm:text-sm"
           aria-label={`크레딧 ${credits.toLocaleString()}, 하트 ${hearts}, 연속 미션 ${streakDays}일`}
@@ -212,6 +220,7 @@ export function CompactChildProfileCard({
             {streakDays}일
           </span>
         </div>
+        )}
       </div>
 
       {mission != null && (

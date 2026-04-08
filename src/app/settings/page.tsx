@@ -3,15 +3,23 @@
 /**
  * 앱 설정 화면
  * - 프로필 이름 편집
- * - 부모: 자녀 프로필 수정(연필)·삭제(휴지통), 계정 삭제(로그아웃 아래 회색 링크)
+ * - 부모: 자녀 프로필은 홈 탭과 같은 카드 레이아웃(아바타·이름·Lv·메타) + 오른쪽 수정/삭제만(크레딧 숫자 없음)
+ * - 계정 삭제(로그아웃 아래 회색 링크)
  * - 로그아웃
  * - 알림 / 소리 토글 (localStorage)
  */
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { resolveDisplayAge } from '@/lib/ageFromBirthDate'
+import {
+  profileAgeGroupShortLabel,
+  profileInstitutionLabel,
+  resolveProfileAgeGroup,
+} from '@/lib/childProfileDisplay'
 import { useParentStore } from '@/store/parentStore'
 import { removeLocalStorageScopedToChild } from '@/lib/localStorageChildScope'
+import { CompactChildProfileCard } from '@/components/parent/CompactChildProfileCard'
 import DeleteParentAccountSection from '@/components/parent/DeleteParentAccountSection'
 import ChildProfileEditModal from '@/components/settings/ChildProfileEditModal'
 
@@ -25,6 +33,8 @@ type LinkedChildRow = {
   age_group: string | null
   /** 캐릭터 프로필 PNG 공개 경로 — 없으면 홈 카드에 레벨 이름이 대신 나옵니다 */
   avatar_url: string | null
+  /** `child_stats.current_level` — 카드에 Lv 표시(없으면 0) */
+  current_level: number
 }
 
 export default function SettingsPage() {
@@ -120,6 +130,18 @@ export default function SettingsPage() {
       setChildrenLoading(false)
       return
     }
+    /** 홈 카드와 동일하게 Lv 를 맞추기 위해 레벨만 추가 조회합니다 */
+    const { data: statRows } = await supabase
+      .from('child_stats')
+      .select('child_id, current_level')
+      .in('child_id', ids)
+    const levelByChild = Object.fromEntries(
+      (statRows ?? []).map((s) => {
+        const row = s as { child_id: string; current_level?: number | null }
+        const lv = typeof row.current_level === 'number' ? row.current_level : 0
+        return [row.child_id, lv] as const
+      }),
+    )
     setLinkedChildren(
       (rows ?? []).map((r) => ({
         id: r.id,
@@ -132,6 +154,7 @@ export default function SettingsPage() {
           typeof (r as { avatar_url?: string | null }).avatar_url === 'string'
             ? (r as { avatar_url: string }).avatar_url
             : null,
+        current_level: levelByChild[r.id] ?? 0,
       })),
     )
     setChildrenLoading(false)
@@ -205,14 +228,14 @@ export default function SettingsPage() {
   return (
     <div className="flex min-h-screen flex-col bg-gradient-to-b from-sky-100 via-white to-green-50">
       <div className="mx-auto flex w-full max-w-md flex-col gap-4 px-4 pb-10 pt-6">
-        <div className="mb-2 flex items-center">
+        {/* 상단: 화살표 대신 얇은 회색 글자로 뒤로가기(터치 영역은 글자 전체) */}
+        <div className="mb-1 flex items-center">
           <button
             type="button"
             onClick={() => router.back()}
-            aria-label="뒤로"
-            className="flex h-10 w-10 items-center justify-center rounded-xl text-2xl font-bold leading-none text-gray-500 transition-colors hover:bg-gray-100"
+            className="text-left text-[11px] font-light leading-snug text-gray-400 underline-offset-2 transition-colors hover:text-gray-500 hover:underline active:opacity-80"
           >
-            {'<'}
+            이전으로 돌아가기
           </button>
         </div>
 
@@ -292,66 +315,78 @@ export default function SettingsPage() {
               <p className="text-sm font-bold text-gray-800">연결된 자녀가 없어요.</p>
             ) : (
               <ul className="flex flex-col gap-2">
-                {linkedChildren.map((c) => (
-                  <li
-                    key={c.id}
-                    className="flex flex-col gap-2 rounded-xl border border-amber-200/80 bg-white px-3 py-2.5"
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="truncate font-bold text-gray-800">{c.name}</p>
-                      </div>
-                      {pendingDeleteId === c.id ? (
-                        <div className="flex shrink-0 flex-col items-end gap-1">
-                          <span className="text-[10px] font-bold text-red-600">정말 삭제할까요?</span>
-                          <div className="flex gap-1">
-                            <button
-                              type="button"
-                              disabled={deletingId === c.id}
-                              onClick={() => setPendingDeleteId(null)}
-                              className="rounded-lg bg-gray-100 px-2 py-1 text-[10px] font-bold text-gray-600"
-                            >
-                              취소
-                            </button>
-                            <button
-                              type="button"
-                              disabled={deletingId === c.id}
-                              onClick={() => void deleteChildProfile(c.id)}
-                              className="rounded-lg bg-red-500 px-2 py-1 text-[10px] font-bold text-white disabled:opacity-50"
-                            >
-                              {deletingId === c.id ? '삭제 중…' : '삭제'}
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="flex shrink-0 items-center gap-1">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setDeleteMsg(null)
-                              setEditingChild(c)
-                            }}
-                            className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#4A90E2]/30 bg-[#4A90E2]/5 text-[#4A90E2] transition-colors hover:bg-[#4A90E2]/15 active:scale-95"
-                            aria-label={`${c.name} 프로필 수정`}
-                          >
-                            <PencilIcon className="h-[18px] w-[18px]" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setDeleteMsg(null)
-                              setPendingDeleteId(c.id)
-                            }}
-                            className="flex h-9 w-9 items-center justify-center rounded-lg border border-red-200 bg-red-50 text-red-600 transition-colors hover:bg-red-100 active:scale-95"
-                            aria-label={`${c.name} 프로필 삭제`}
-                          >
-                            <TrashIcon className="h-[18px] w-[18px]" />
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </li>
-                ))}
+                {linkedChildren.map((c) => {
+                  /** 홈 탭과 같은 나이·연령대·보육 라벨 규칙 */
+                  const displayAge = resolveDisplayAge(c.birth_date, c.age)
+                  const ag = resolveProfileAgeGroup(c.age_group, displayAge)
+                  return (
+                    <li key={c.id} className="list-none">
+                      <CompactChildProfileCard
+                        name={c.name}
+                        age={displayAge}
+                        avatarUrl={c.avatar_url}
+                        level={c.current_level}
+                        credits={0}
+                        hearts={0}
+                        streakDays={0}
+                        ageGroupLabel={profileAgeGroupShortLabel(ag)}
+                        childcareLabel={profileInstitutionLabel(ag, c.institution_type)}
+                        hideStats
+                        mission={null}
+                        actions={
+                          pendingDeleteId === c.id ? (
+                            <div className="flex max-w-[9rem] flex-col items-end gap-1">
+                              <span className="text-[10px] font-bold text-red-600">정말 삭제할까요?</span>
+                              <div className="flex flex-wrap justify-end gap-1">
+                                <button
+                                  type="button"
+                                  disabled={deletingId === c.id}
+                                  onClick={() => setPendingDeleteId(null)}
+                                  className="rounded-lg bg-gray-100 px-2 py-1 text-[10px] font-bold text-gray-600"
+                                >
+                                  취소
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={deletingId === c.id}
+                                  onClick={() => void deleteChildProfile(c.id)}
+                                  className="rounded-lg bg-red-500 px-2 py-1 text-[10px] font-bold text-white disabled:opacity-50"
+                                >
+                                  {deletingId === c.id ? '삭제 중…' : '삭제'}
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex shrink-0 items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setDeleteMsg(null)
+                                  setEditingChild(c)
+                                }}
+                                className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#4A90E2]/30 bg-[#4A90E2]/5 text-[#4A90E2] transition-colors hover:bg-[#4A90E2]/15 active:scale-95"
+                                aria-label={`${c.name} 프로필 수정`}
+                              >
+                                <PencilIcon className="h-[18px] w-[18px]" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setDeleteMsg(null)
+                                  setPendingDeleteId(c.id)
+                                }}
+                                className="flex h-9 w-9 items-center justify-center rounded-lg border border-red-200 bg-red-50 text-red-600 transition-colors hover:bg-red-100 active:scale-95"
+                                aria-label={`${c.name} 프로필 삭제`}
+                              >
+                                <TrashIcon className="h-[18px] w-[18px]" />
+                              </button>
+                            </div>
+                          )
+                        }
+                      />
+                    </li>
+                  )
+                })}
               </ul>
             )}
             {deleteMsg ? <p className="text-xs font-bold text-red-600">{deleteMsg}</p> : null}
