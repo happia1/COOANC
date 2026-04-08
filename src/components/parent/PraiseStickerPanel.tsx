@@ -10,10 +10,14 @@ type Props = {
 
 /**
  * 승인 탭 — 아이콘을 누르면 확인 후 자녀에게 칭찬 스티커를 보냅니다.
+ * (스티커판 비우기·보낸 기록 일괄 삭제는 이 패널에서 제공하지 않습니다.)
  */
 export default function PraiseStickerPanel({ childId, childName }: Props) {
+  /** 어떤 스티커를 보낼지 고른 뒤 확인 모달을 띄울 때 사용하는 키 */
   const [confirmKey, setConfirmKey] = useState<string | null>(null)
+  /** 스티커 전송 중이면 버튼을 비활성화합니다 */
   const [loading, setLoading] = useState(false)
+  /** 전송 실패 시에만 아래 한 줄로 오류를 보여 줍니다(성공 메시지는 표시하지 않음). */
   const [toast, setToast] = useState<{ text: string; ok: boolean } | null>(null)
 
   const send = useCallback(
@@ -33,7 +37,7 @@ export default function PraiseStickerPanel({ childId, childName }: Props) {
           setToast({ text: json.error ?? '전송에 실패했어요', ok: false })
           return
         }
-        setToast({ text: `${childName}에게 선물했어요!`, ok: true })
+        setToast(null)
         setConfirmKey(null)
       } catch {
         setToast({ text: '네트워크 오류가 났어요', ok: false })
@@ -41,7 +45,7 @@ export default function PraiseStickerPanel({ childId, childName }: Props) {
         setLoading(false)
       }
     },
-    [childId, childName],
+    [childId],
   )
 
   if (!childId) {
@@ -52,7 +56,7 @@ export default function PraiseStickerPanel({ childId, childName }: Props) {
     <section className="rounded-2xl border border-brand-blue/20 bg-sky-50/80 p-4 shadow-sm">
       <h2 className="text-sm font-bold text-brand-text">칭찬 스티커 보상</h2>
       <p className="mb-3 mt-1 text-[11px] leading-snug text-gray-600">
-        스티커를 클릭하면 자녀에게 스티커를 선물 할 수 있어요!
+        스티커를 클릭하면 자녀에게 선물 할 수 있어요!
       </p>
 
       {/*

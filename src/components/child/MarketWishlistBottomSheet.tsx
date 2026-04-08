@@ -9,7 +9,8 @@
 import Link from 'next/link'
 import type { StoreItem } from '@/types/database'
 import SpriteImage from '@/components/common/SpriteImage'
-import { ICONS, MARKET_ITEMS } from '@/constants/sprites'
+import MarketItemImage from '@/components/common/MarketItemImage'
+import { ICONS } from '@/constants/sprites'
 import { marketFrameKeyForItemId } from '@/lib/marketItemFrame'
 /** 요청사항: 물건이 담긴 장바구니 아이콘(공용 정적 이미지) */
 const BASKET_FILLED_SRC = '/assets/img/common/ui/basket_filled.png'
@@ -99,12 +100,7 @@ export default function MarketWishlistBottomSheet({
                           draggable={false}
                         />
                       ) : (
-                        <SpriteImage
-                          sheet={MARKET_ITEMS}
-                          frame={marketFrameKeyForItemId(item.id, item.name)}
-                          width={20}
-                          clipRotated={false}
-                        />
+                        <MarketItemImage frame={marketFrameKeyForItemId(item.id, item.name)} width={20} />
                       )}
                     </div>
                     <span className="truncate text-gray-700">{item.name}</span>

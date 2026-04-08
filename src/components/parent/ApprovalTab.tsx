@@ -18,8 +18,7 @@ import ParentMarketMenuControl from '@/components/parent/ParentMarketMenuControl
 import PraiseStickerPanel from '@/components/parent/PraiseStickerPanel'
 import type { PurchaseRequest, StoreItem } from '@/types/database'
 import { createClient } from '@/lib/supabase/client'
-import SpriteImage from '@/components/common/SpriteImage'
-import { MARKET_ITEMS } from '@/constants/sprites'
+import MarketItemImage from '@/components/common/MarketItemImage'
 import { marketFrameKeyForItemId } from '@/lib/marketItemFrame'
 import {
   getMsUntilNextSeoulMidnight,
@@ -465,6 +464,45 @@ export default function ApprovalTab({
     [currentId],
   )
 
+  /**
+   * 마켓 메뉴 제어 탭을 "전체 표시" 상태로 초기화합니다.
+   * - DB: `child_market_hidden_items`(현재 자녀) 전체 삭제
+   * - UI: `store_items`를 다시 내려받고, 현재 자녀 숨김 state 도 비웁니다.
+   */
+  const onResetMenuForCurrent = useCallback(async () => {
+    if (!currentId) return
+
+    const res = await fetch('/api/market/reset-child-hidden-items', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ childId: currentId }),
+    })
+    const text = await res.text()
+    const json = text ? (JSON.parse(text) as { error?: string }) : {}
+
+    if (!res.ok) {
+      throw new Error(json.error ?? '초기화에 실패했어요')
+    }
+
+    // 현재 부모가 볼 수 있는 family_link_id 목록 기준으로 store_items 재조회
+    const linkIds = [...new Set(Object.values(linkByChild).filter((v) => typeof v === 'string' && v.trim()))]
+    const supabase = createClient()
+    let q = supabase.from('store_items').select('*').eq('is_active', true)
+    if (linkIds.length === 0) {
+      q = q.is('family_link_id', null)
+    } else {
+      q = q.or(`family_link_id.is.null,family_link_id.in.(${linkIds.join(',')})`)
+    }
+
+    const { data, error } = await q
+    if (error) {
+      throw new Error(error.message ?? '상품 목록을 불러오지 못했어요')
+    }
+
+    setStoreItems((data ?? []) as StoreItem[])
+    setHiddenByChild((prev) => ({ ...prev, [currentId]: new Set<string>() }))
+  }, [currentId, linkByChild])
+
   /** 외부 쇼핑(플레이스홀더 URL) — DB 는 `parent_buying`, 자녀는 실시간으로 안내 팝업 */
   async function handleParentShopPath(requestId: string) {
     setLoading(requestId)
@@ -823,7 +861,7 @@ export default function ApprovalTab({
                           isParentBuying ? 'bg-sky-50/80 ring-sky-100' : 'bg-amber-50/80 ring-amber-100'
                         }`}
                       >
-                        <SpriteImage sheet={MARKET_ITEMS} frame={frame} height={44} clipRotated={false} />
+                        <MarketItemImage frame={frame} height={44} />
                       </div>
                       <div className="min-w-0 flex-1">
                         {/** 요청사항 반영: 텍스트 크기를 한 단계 더 줄여 카드 밀도 개선 */}
@@ -1115,6 +1153,7 @@ export default function ApprovalTab({
           hiddenItemIds={hiddenSetForCurrent}
           familyLinkIdForChild={currentId ? linkByChild[currentId] ?? null : null}
           onHiddenChange={onHiddenChangeForCurrent}
+          onResetMenu={onResetMenuForCurrent}
           onItemCreated={(item) => setStoreItems((prev) => [...prev, item])}
         />
       </section>

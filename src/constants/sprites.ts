@@ -349,36 +349,6 @@ export const SHOP_ANIMATIONS: SpriteSheet = {
   },
 }
 
-export const MARKET_ITEMS: SpriteSheet = {
-  image: 'items/shop/market_items.png',
-  atlasW: 1545,
-  atlasH: 253,
-  frames: {
-    'bear':             { x: 882,  y: 167, w: 77,  h: 98,  rotated: true  },
-    'blocks':           { x: 1082, y: 161, w: 95,  h: 89,  rotated: false },
-    'bluberry_juice':   { x: 876,  y: 3,   w: 66,  h: 160, rotated: false },
-    'candy':            { x: 1428, y: 123, w: 119, h: 106, rotated: true  },
-    'chew':             { x: 567,  y: 3,   w: 125, h: 167, rotated: false },
-    'chew2':            { x: 696,  y: 3,   w: 114, h: 167, rotated: false },
-    'chips':            { x: 437,  y: 3,   w: 126, h: 167, rotated: false },
-    'choco_milk':       { x: 946,  y: 3,   w: 89,  h: 155, rotated: false },
-    'chocolate (2)':    { x: 1328, y: 147, w: 99,  h: 96,  rotated: true  },
-    'chocolate':        { x: 1244, y: 3,   w: 112, h: 140, rotated: false },
-    'coockie':          { x: 1428, y: 3,   w: 116, h: 114, rotated: true  },
-    'drink':            { x: 360,  y: 3,   w: 73,  h: 205, rotated: false },
-    'flower':           { x: 437,  y: 174, w: 74,  h: 112, rotated: true  },
-    'gummy':            { x: 814,  y: 3,   w: 58,  h: 161, rotated: false },
-    'icecream':         { x: 1181, y: 157, w: 91,  h: 143, rotated: true  },
-    'luckybox':         { x: 984,  y: 162, w: 86,  h: 94,  rotated: true  },
-    'mango_juice':      { x: 553,  y: 174, w: 68,  h: 161, rotated: true  },
-    'pudding':          { x: 1132, y: 3,   w: 150, h: 108, rotated: true  },
-    'strawberry_juice': { x: 718,  y: 174, w: 67,  h: 160, rotated: true  },
-    'strawberry_milk':  { x: 1039, y: 3,   w: 89,  h: 154, rotated: false },
-    '레이어 9':          { x: 172,  y: 3,   w: 221, h: 184, rotated: true  },
-    '레이어 10':         { x: 3,    y: 3,   w: 165, h: 226, rotated: false },
-  },
-}
-
 // ─── layouts/banners ───────────────────────────────────────────────
 
 export const BANNERS: SpriteSheet = {
@@ -470,6 +440,5 @@ export type FarmSheepFrameName = keyof typeof FARM_SHEEP.frames
 export type PiggyBankFrameName = keyof typeof PIGGY_BANK.frames
 export type RewardCreditsFrameName = keyof typeof REWARD_CREDITS.frames
 export type ShopAnimFrameName  = keyof typeof SHOP_ANIMATIONS.frames
-export type MarketItemFrameName = keyof typeof MARKET_ITEMS.frames
 export type BannerFrameName    = keyof typeof BANNERS.frames
 export type RoutineFrameName   = keyof typeof ROUTINES_01.frames

@@ -15,7 +15,8 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import type { StoreItem } from '@/types/database'
 import SpriteImage from '@/components/common/SpriteImage'
-import { MARKET_ITEMS, SHOP_ANIMATIONS, ICONS } from '@/constants/sprites'
+import MarketItemImage from '@/components/common/MarketItemImage'
+import { SHOP_ANIMATIONS, ICONS } from '@/constants/sprites'
 import type { MarketItemFrameKey } from '@/lib/marketItemFrame'
 
 export type MarketPurchaseSelected = {
@@ -311,7 +312,7 @@ export default function MarketPurchaseConfirmDialog({
                           draggable={false}
                         />
                       ) : (
-                        <SpriteImage sheet={MARKET_ITEMS} frame={frame} height={84} clipRotated={false} />
+                        <MarketItemImage frame={frame} height={84} />
                       )}
                     </div>
                     <div className="flex min-w-0 flex-1 flex-col justify-center gap-1.5">

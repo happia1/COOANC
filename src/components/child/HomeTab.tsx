@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import { useCallback, useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { ChildStats, PraiseStickerGrant, PraiseStickerPlacement } from '@/types/database'
@@ -12,11 +13,14 @@ import { MapActionPill, StickerActionPill } from '@/components/child/ChildScener
 import TodayWeatherBadge from '@/components/child/TodayWeatherBadge'
 import { mergePraiseStickerGrantsFromServer } from '@/lib/mergePraiseStickerGrantsFromServer'
 import { mergeChildStatsPatch, normalizeChildStatsCreditsSplit } from '@/lib/childCreditsSplit'
+import { ASSETS } from '@/constants/assets'
 
 type Props = {
   childId: string
   initialStats: ChildStats | null
   childName: string
+  /** 프로필에 고른 캐릭터 — 홈 섬 정면 스프라이트와 맞춥니다(없으면 토끼) */
+  childAvatarUrl?: string | null
   /** 지도 시트 안의 뱃지 컬렉션용(전체 뱃지 + 획득 맵) */
   growthMapData: GrowthMapSheetData
   initialPraiseGrants: PraiseStickerGrant[]
@@ -35,6 +39,7 @@ export default function HomeTab({
   childId,
   initialStats,
   childName,
+  childAvatarUrl = null,
   growthMapData,
   initialPraiseGrants,
   initialPraisePlacements,
@@ -46,6 +51,11 @@ export default function HomeTab({
   const [bearOpen, setBearOpen] = useState(false)
   const [grants, setGrants] = useState(initialPraiseGrants)
   const [placements, setPlacements] = useState(initialPraisePlacements)
+  /**
+   * 20칸 완주 후 grants 가 통째로 사라질 때 BearStickerSheet 가 merge 로 옛 목록을 살리지 않게 합니다.
+   * 숫자만 올리면 시트 안쪽 `initialGrants` 를 그대로 덮어씁니다.
+   */
+  const [praiseGrantsRevision, setPraiseGrantsRevision] = useState(0)
   const [arrivalOpen, setArrivalOpen] = useState(false)
   const [stickerFabImgOk, setStickerFabImgOk] = useState(true)
   /** 클라이언트 마운트 후에만 커스텀 FAB 이미지 사용 → SSR HTML 과 첫 페인트를 맞춤 */
@@ -74,9 +84,34 @@ export default function HomeTab({
     if (data) setPlacements(data as PraiseStickerPlacement[])
   }, [childId])
 
-  /** 서버 reset-board 직후: 부모 placements 를 [] 로 두어 자식 effect 가 옛 배열로 되살리지 않게 함 */
-  const clearPraiseStickerBoard = useCallback(() => {
+  /** DB 의 발행 목록을 다시 읽습니다(다른 기기·서버에서 grants 가 통째로 삭제됐을 때 등) */
+  const refreshGrantsOnly = useCallback(async () => {
+    const supabase = createClient()
+    const { data } = await supabase
+      .from('praise_sticker_grants')
+      .select('*')
+      .eq('child_id', childId)
+      .order('created_at', { ascending: false })
+    if (data) {
+      setGrants(data as PraiseStickerGrant[])
+      setPraiseGrantsRevision((r) => r + 1)
+    }
+  }, [childId])
+
+  /**
+   * 서버 reset-board 직후: placements 비움 + 가능하면 stats 에 판 비움 시각을 넣어
+   * BearStickerSheet 가 닫혔다 열려도 서버와 같은 필터를 유지합니다.
+   * 20칸 완주로 리셋된 경우(grantsDeleted) 발행 기록도 비우고 시트 merge 를 끊습니다.
+   */
+  const clearPraiseStickerBoard = useCallback((clearedAt?: string, meta?: { grantsDeleted?: boolean }) => {
     setPlacements([])
+    if (meta?.grantsDeleted) {
+      setGrants([])
+      setPraiseGrantsRevision((r) => r + 1)
+    }
+    if (clearedAt) {
+      setStats((prev) => (prev ? { ...prev, praise_board_cleared_at: clearedAt } : prev))
+    }
   }, [])
 
   useEffect(() => {
@@ -105,6 +140,57 @@ export default function HomeTab({
       void supabase.removeChannel(ch)
     }
   }, [childId])
+
+  /**
+   * 20칸 완주 등으로 grants 행이 DB 에서 지워지면, INSERT 채널은 안 오므로 DELETE 구독으로 목록을 다시 맞춥니다.
+   */
+  useEffect(() => {
+    const supabase = createClient()
+    const ch = supabase
+      .channel(`praise_grants_delete:${childId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'praise_sticker_grants',
+          filter: `child_id=eq.${childId}`,
+        },
+        () => {
+          void refreshGrantsOnly()
+        },
+      )
+      .subscribe()
+    return () => {
+      void supabase.removeChannel(ch)
+    }
+  }, [childId, refreshGrantsOnly])
+
+  /**
+   * 부모가 「스티커판 비우기」로 placements 를 지우면, 아이 앱이 새로고침 없이도 칸이 비어 보이게 합니다.
+   * (INSERT/UPDATE/DELETE 어떤 변화든 다시 읽어 오면 됩니다.)
+   */
+  useEffect(() => {
+    const supabase = createClient()
+    const ch = supabase
+      .channel(`praise_placements:${childId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'praise_sticker_placements',
+          filter: `child_id=eq.${childId}`,
+        },
+        () => {
+          void refreshStickerPlacementsOnly()
+        },
+      )
+      .subscribe()
+    return () => {
+      void supabase.removeChannel(ch)
+    }
+  }, [childId, refreshStickerPlacementsOnly])
 
   useEffect(() => {
     const supabase = createClient()
@@ -180,8 +266,11 @@ export default function HomeTab({
         childId={childId}
         initialGrants={grants}
         initialPlacements={placements}
+        /** DB에 저장된 「마지막 판 비움」시각 — 새 탭에서도 예전 스티커가 종이에 안 쌓이게 함 */
+        serverPraiseBoardClearedAt={stats?.praise_board_cleared_at ?? null}
         onInventoryChange={() => void refreshStickerPlacementsOnly()}
         onBoardCleared={clearPraiseStickerBoard}
+        praiseGrantsRevision={praiseGrantsRevision}
       />
     </>
   )
@@ -249,7 +338,7 @@ export default function HomeTab({
                 <div className="absolute right-0 top-0 z-20 pr-0.5 pt-3 sm:pr-1 sm:pt-4">
                   <TodayWeatherBadge />
                 </div>
-                <ChildHomeIslandStage density="flex" />
+                <ChildHomeIslandStage density="flex" homeAvatarUrl={childAvatarUrl} />
               </div>
             </div>
           </ChildHomeSceneryBand>
@@ -287,7 +376,7 @@ export default function HomeTab({
             <div className="absolute right-0 top-0 z-20 pr-0.5 pt-3 sm:pr-1 sm:pt-4">
               <TodayWeatherBadge />
             </div>
-            <ChildHomeIslandStage density="flex" />
+            <ChildHomeIslandStage density="flex" homeAvatarUrl={childAvatarUrl} />
           </div>
           {stats.promotion_pending && (
             <div className="flex items-center gap-2 rounded-xl border border-brand-yellow bg-brand-yellow/40 px-4 py-2">
@@ -308,25 +397,20 @@ export default function HomeTab({
   )
 }
 
-/** 슬롯 한 칸 — 마켓 연동 시 썸네일로 교체 예정 */
-function DecorInventorySlot({ label = '비어 있음' }: { label?: string }) {
-  /** `flex-1` + `min-h`: 아래 40% 영역 높이를 2행이 나눠 써서 하단 빈 공간이 덜 보이게 함 */
-  return (
-    <li className="flex min-h-[44px] flex-1 basis-0 w-full items-center justify-center rounded-xl border border-amber-100/80 bg-[#f7f4eb] text-center text-[10px] font-medium text-gray-400 shadow-sm">
-      {label}
-    </li>
-  )
-}
+/** 꾸미기 썸네일 개수·열 개수 — `ASSETS.characters.decorItemImages` 와 길이가 같아야 합니다. */
+const DECOR_ITEM_COUNT = ASSETS.characters.decorItemImages.length
+
+/** 위·아래 두 줄이면 열 개수는 아이템 수의 절반입니다. */
+const DECOR_GRID_COLS = DECOR_ITEM_COUNT / 2
 
 /**
- * 꾸미기 인벤토리 — 제목 아래 **2행 고정**, 열 방향으로 가로 스냅 스크롤(미션 카드와 유사).
- * 8칸 = 4열(가로 스크롤) × 2행(고정): 열 c 는 인덱스 c(위)·c+4(아래).
+ * 꾸미기 인벤토리 — 아이템을 **위·아래 2줄**로 두고, **한 번의 가로 스크롤**로 두 줄이 같이 밀립니다.
+ * (열 단위 `snap-center`: 한 칸에 위·아래 카드가 묶여서 스냅됩니다.)
+ * 지금은 전부 비활성(준비중)만 보여 줍니다.
  */
 function CharacterDecorInventoryPlaceholder() {
-  const cols = 4
-
   return (
-    /** 하단 패널 안에서 제목은 고정 높이, 슬롯 줄만 남는 세로 공간을 씀(세로 스크롤 없음). */
+    /** 하단 패널 안에서 제목은 고정 높이, 슬롯 영역만 남는 세로 공간을 씀(세로 스크롤 없음). */
     <div className="flex min-h-0 w-full flex-1 flex-col pt-0.5" aria-labelledby="child-decor-heading">
       {/** 제목·부제는 미션 「오늘의 미션」 줄과 같은 글자 크기·굵기 체계(`font-black`, `leading-tight`) */}
       <div className="mb-1 flex shrink-0 flex-wrap items-center gap-x-2 gap-y-1">
@@ -335,21 +419,57 @@ function CharacterDecorInventoryPlaceholder() {
         </h2>
         <p className="text-[8px] font-black leading-tight text-gray-500">나만의 캐릭터를 꾸며요. &gt;</p>
       </div>
+      {/**
+       * 바깥만 가로 스크롤 — 안쪽은 `flex` 로 “열”마다 `grid-rows-2` 를 쌓아 두 줄이 항상 같이 움직입니다.
+       * `pointer-events-none`: 준비중이라 눌러도 반응하지 않게 막아 두었어요.
+       */}
       <div
         className="-mx-1 min-h-0 flex-1 overflow-x-auto overflow-y-hidden px-2 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden snap-x snap-mandatory"
         style={{ WebkitOverflowScrolling: 'touch' }}
+        role="region"
+        aria-label="캐릭터 꾸미기 아이템 목록, 위아래 두 줄"
       >
-        <div className="flex h-full min-h-0 w-max gap-1.5" role="presentation">
-          {Array.from({ length: cols }).map((_, c) => (
-            <ul
-              key={c}
-              className="flex h-full min-h-0 w-[min(28vw,112px)] shrink-0 snap-center list-none flex-col gap-1.5 p-0"
-              aria-label={`꾸미기 슬롯 열 ${c + 1}`}
+        <div className="flex h-full min-h-0 w-max items-center gap-2 pr-1">
+          {Array.from({ length: DECOR_GRID_COLS }).map((_, col) => (
+            <div
+              key={`decor-col-${col}`}
+              role="group"
+              aria-label={`꾸미기 아이템 ${col * 2 + 1}번·${col * 2 + 2}번`}
+              className="grid w-[min(22vw,92px)] shrink-0 snap-center grid-rows-2 gap-y-1"
             >
-              {[c, c + cols].map((idx) => (
-                <DecorInventorySlot key={`decor-slot-${idx}`} />
-              ))}
-            </ul>
+              {[0, 1].map((rowInCol) => {
+                const index = col * 2 + rowInCol
+                return (
+                  <div
+                    key={`decor-item-${index}`}
+                    aria-disabled="true"
+                    aria-label={`꾸미기 아이템 ${index + 1}번, 준비 중`}
+                    className="pointer-events-none aspect-square w-full"
+                  >
+                    {/**
+                     * 정사각형 썸네일 — `public/.../items/` 폴더의 PNG 를 번호 순으로 한 장씩 넣습니다.
+                     * `object-contain`: 비율을 유지한 채 블록 안에 맞춥니다.
+                     */}
+                    <div className="relative size-full overflow-hidden rounded-xl border border-amber-100/90 bg-[#f7f4eb] shadow-sm">
+                      <Image
+                        src={ASSETS.characters.decorItemImages[index]}
+                        alt=""
+                        fill
+                        sizes="(max-width: 448px) 22vw, 92px"
+                        className="object-contain p-0.5 grayscale opacity-[0.55]"
+                        draggable={false}
+                      />
+                      <div className="pointer-events-none absolute inset-0 bg-white/35" aria-hidden />
+                      <div className="pointer-events-none absolute inset-x-0 bottom-0.5 flex justify-center px-0.5">
+                        <span className="rounded-md bg-slate-700/85 px-1 py-px text-[8px] font-black tracking-tight text-white shadow-sm">
+                          준비중
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
           ))}
         </div>
       </div>

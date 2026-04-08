@@ -54,6 +54,11 @@ export type ChildStats = {
   longest_streak: number
   promotion_pending: boolean
   promotion_eligible_at: string | null
+  /**
+   * 스티커 판 20칸 완주 후 서버에서 판을 비울 때 갱신됨.
+   * 이보다 먼저 받은 칭찬 스티커(grant)는 팝업 종이 위 「새로 붙일 스티커」에서 제외(새 사이클만 표시).
+   */
+  praise_board_cleared_at?: string | null
   created_at: string
   updated_at: string
 }

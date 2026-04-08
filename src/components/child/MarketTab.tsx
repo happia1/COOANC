@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { StoreItem, PurchaseRequest } from '@/types/database'
 import SpriteImage from '@/components/common/SpriteImage'
-import { MARKET_ITEMS, SHOP_ANIMATIONS, ICONS } from '@/constants/sprites'
+import MarketItemImage from '@/components/common/MarketItemImage'
+import { SHOP_ANIMATIONS, ICONS } from '@/constants/sprites'
 import MarketPurchaseConfirmDialog from '@/components/child/MarketPurchaseConfirmDialog'
 import MarketPurchaseSuccessOverlay from '@/components/child/MarketPurchaseSuccessOverlay'
 import MarketRequestsBottomSheet from '@/components/child/MarketRequestsBottomSheet'
@@ -200,12 +201,23 @@ export default function MarketTab({
       items: StoreItem[]
     }
     const sections: Block[] = []
-    for (const sec of PARENT_MARKET_MENU_SECTIONS) {
-      const items = buckets[sec.id]
+    /**
+     * 요청사항: 자녀 마켓 선반 순서를 고정
+     * 1) 이벤트 2) 간식 3) 장난감
+     */
+    const sectionMetaById: Record<ParentMarketSectionId, { title: string }> = {
+      snack: { title: '간식' },
+      toy: { title: '장난감' },
+      event: { title: '이벤트' },
+      other: { title: '기타' },
+    }
+    const ordered: ParentMarketSectionId[] = ['event', 'snack', 'toy']
+    for (const id of ordered) {
+      const items = buckets[id]
       if (items.length === 0) continue
       sections.push({
-        sectionKey: sec.id,
-        title: sec.title,
+        sectionKey: id,
+        title: sectionMetaById[id].title,
         items,
       })
     }
@@ -755,21 +767,17 @@ export default function MarketTab({
         </div>
       ) : (
         <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-1 pb-2 [scrollbar-width:thin]">
+          {/* 요청사항: 이벤트 → 간식 → 장난감 3단 선반을 동시에 노출 */}
           {marketSectionsWithShelves.map((block) => (
             <section key={block.sectionKey} className="shrink-0">
               <h3 className="mb-1.5 flex items-center gap-1.5 border-b border-amber-900/10 px-2 pb-1 text-[11px] font-black tracking-tight text-amber-950/90">
                 {block.title}
-                <span className="ml-auto tabular-nums text-[9px] font-bold text-amber-900/40">
-                  {block.items.length}개
-                </span>
+                <span className="ml-auto tabular-nums text-[9px] font-bold text-amber-900/40">{block.items.length}개</span>
               </h3>
-              {/*
-                한 줄에 최대 4칸(grid-cols-4). 5번째 상품부터는 다음 줄에 이어집니다.
-              */}
-              <div className="grid grid-cols-4 gap-1.5 px-1 py-0.5">
+              {/* 선반 내부만 좌우 슬라이드 */}
+              <div className="flex snap-x snap-mandatory gap-1.5 overflow-x-auto px-1 py-0.5 [-ms-overflow-style:none] [scrollbar-width:none]">
                 {block.items.map((item) => {
                   const frameKey = marketFrameKeyForItemId(item.id, item.name)
-                  const canAfford = currentWallet >= item.credit_price
                   const meetsLevel = level >= item.level_required
                   const isPending = shelfBlockedItemIds.has(item.id)
                   /**
@@ -785,7 +793,7 @@ export default function MarketTab({
                       key={item.id}
                       type="button"
                       onClick={() => handleItemClick(item, frameKey)}
-                      className={`relative flex min-w-0 w-full flex-col rounded-xl bg-white/95 p-1 pt-1.5 shadow-md ring-1 ring-black/[0.06] transition-transform active:scale-[0.98] ${
+                      className={`relative flex w-[4.7rem] shrink-0 snap-start flex-col rounded-xl bg-white/95 p-1 pt-1.5 shadow-md ring-1 ring-black/[0.06] transition-transform active:scale-[0.98] ${
                         isDimmed ? 'grayscale brightness-[0.72]' : ''
                       }`}
                     >
@@ -800,10 +808,7 @@ export default function MarketTab({
                         </span>
                       )}
 
-                      <div
-                        className="relative flex w-full items-end justify-center overflow-visible"
-                        style={{ height: SHELF_IMG_AREA_PX }}
-                      >
+                      <div className="relative flex w-full items-end justify-center overflow-visible" style={{ height: SHELF_IMG_AREA_PX }}>
                         <div className="flex max-h-full max-w-full items-end justify-center">
                           {item.image_url ? (
                             // eslint-disable-next-line @next/next/no-img-element -- 외부/스토리지 URL, 동적
@@ -815,7 +820,7 @@ export default function MarketTab({
                               draggable={false}
                             />
                           ) : (
-                            <SpriteImage sheet={MARKET_ITEMS} frame={frameKey} height={SHELF_SPRITE_H} clipRotated={false} />
+                            <MarketItemImage frame={frameKey} height={SHELF_SPRITE_H} />
                           )}
                         </div>
                       </div>
@@ -964,12 +969,7 @@ export default function MarketTab({
                     draggable={false}
                   />
                 ) : (
-                  <SpriteImage
-                    sheet={MARKET_ITEMS}
-                    frame={shelfActionFor.frame}
-                    height={60}
-                    clipRotated={false}
-                  />
+                  <MarketItemImage frame={shelfActionFor.frame} height={60} />
                 )}
               </div>
             </div>
@@ -1132,7 +1132,7 @@ export default function MarketTab({
                   draggable={false}
                 />
               ) : (
-                <SpriteImage sheet={MARKET_ITEMS} frame={delivery.frame} height={96} clipRotated={false} />
+                <MarketItemImage frame={delivery.frame} height={96} />
               )}
             </div>
             <p className="mt-2 text-center text-sm font-bold text-gray-600">{delivery.request.item_name}</p>

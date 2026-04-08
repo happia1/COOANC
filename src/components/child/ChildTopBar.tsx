@@ -3,7 +3,6 @@ import Link from 'next/link'
 import { AUTH_LOGO_SRC, TOPBAR_LOGO_CLASSNAME, TOPBAR_LOGO_HEIGHT, TOPBAR_LOGO_WIDTH } from '@/constants/branding'
 
 type Props = {
-  childName: string
   /**
    * 부모가 자녀 화면을 미리볼 때 true — 나가기는 쿠키를 지우는 API 로 연결합니다.
    * 자녀 본인 로그인이면 false 이고, 나가기는 부모 홈으로만 갑니다.
@@ -14,9 +13,9 @@ type Props = {
 /**
  * 자녀 앱 공통 상단바
  * - 좌: COOANC 로고
- * - 우: 자녀 이름 칩 + 나가기
+ * - 우: 나가기(이미지 아이콘)
  */
-export default function ChildTopBar({ childName, isParentPreview = false }: Props) {
+export default function ChildTopBar({ isParentPreview = false }: Props) {
   const exitHref = isParentPreview ? '/api/parent/exit-child-ui' : '/parent/home'
 
   return (
@@ -30,15 +29,14 @@ export default function ChildTopBar({ childName, isParentPreview = false }: Prop
           className={TOPBAR_LOGO_CLASSNAME}
           priority
         />
-        <div className="flex flex-wrap items-center justify-end gap-2 max-w-[min(100%,14rem)]">
-          <span className="bg-teal-100 text-teal-700 text-xs font-bold px-3 py-1.5 rounded-full truncate max-w-[9rem]">
-            {childName}
-          </span>
+        <div className="flex items-center justify-end max-w-[min(100%,14rem)]">
           <Link
             href={exitHref}
-            className="bg-teal-500 text-white text-xs font-bold px-4 py-1.5 rounded-full shadow-sm active:scale-95 transition-all shrink-0"
+            className="flex h-8 w-8 items-center justify-center shrink-0 transition-opacity hover:opacity-80"
+            aria-label="나가기"
           >
-            나가기
+            {/* 텍스트 버튼 대신 exit 아이콘 사용, 알약 배경 제거 */}
+            <Image src="/assets/img/common/ui/exit.png" alt="" width={20} height={20} className="h-5 w-5 object-contain" />
           </Link>
         </div>
       </div>

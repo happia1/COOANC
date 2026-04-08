@@ -7,12 +7,18 @@ import { createClient } from '@/lib/supabase/client'
 import { birthDateInputBounds, getAgeFromBirthDateIso } from '@/lib/ageFromBirthDate'
 import { parseJsonFromResponse } from '@/lib/parseJsonResponse'
 import RoutineOnboarding from '@/components/onboarding/RoutineOnboarding'
+import { ChildProfileAvatarPicker } from '@/components/common/ChildProfileAvatarPicker'
+import { CHILD_PROFILE_AVATAR_OPTIONS_ONBOARDING_ROW } from '@/lib/childProfileAvatar'
 
 export default function OnboardingPage() {
   const dateBounds = useMemo(() => birthDateInputBounds(), [])
 
   const [childName, setChildName] = useState('')
   const [birthDate, setBirthDate] = useState('')
+  /** 온보딩에서는 첫 칸(여우)을 기본 선택 — 홈 섬 캐릭터·프로필 사진이 항상 일치합니다 */
+  const [childAvatarUrl, setChildAvatarUrl] = useState<string | null>(
+    () => CHILD_PROFILE_AVATAR_OPTIONS_ONBOARDING_ROW[0]?.url ?? null,
+  )
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -49,7 +55,12 @@ export default function OnboardingPage() {
     const res = await fetch('/api/child/create', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: childName, birthDate, parentId: user.id }),
+      body: JSON.stringify({
+        name: childName,
+        birthDate,
+        parentId: user.id,
+        ...(childAvatarUrl ? { avatarUrl: childAvatarUrl } : {}),
+      }),
     })
 
     const { data: json, parseError } = await parseJsonFromResponse<{
@@ -147,6 +158,13 @@ export default function OnboardingPage() {
             만 나이는 생일을 기준으로 자동으로 맞춰져요. (등록 가능: 만 1~18세)
           </p>
         </div>
+
+        <ChildProfileAvatarPicker
+          mode="onboarding"
+          value={childAvatarUrl}
+          onChange={setChildAvatarUrl}
+          id="onboarding-avatar"
+        />
 
         {error && (
           <p className="text-xs text-red-500 bg-red-50 rounded-lg px-3 py-2">{error}</p>

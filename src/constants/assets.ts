@@ -35,6 +35,20 @@ export const ASSETS = {
     base: `${ASSETS_IMG_BASE}/characters/base`,
     modes: `${ASSETS_IMG_BASE}/characters/modes`,
     onboarding: `${ASSETS_IMG_BASE}/characters/onboarding`,
+    /**
+     * 홈 「내 캐릭터 꾸미기」용 아이템 PNG — `public/assets/img/characters/items/` 안 파일을 1번부터 순서대로 씁니다.
+     * (파일명에 공백이 있어도 웹 경로로는 그대로 사용 가능합니다.)
+     */
+    decorItemImages: [
+      assetImg('characters', 'items', 'items (1).png'),
+      assetImg('characters', 'items', 'items (2).png'),
+      assetImg('characters', 'items', 'items (3).png'),
+      assetImg('characters', 'items', 'items (4).png'),
+      assetImg('characters', 'items', 'items (5).png'),
+      assetImg('characters', 'items', 'items (6).png'),
+      assetImg('characters', 'items', 'items (7).png'),
+      assetImg('characters', 'items', 'items (8).png'),
+    ] as const,
   },
 
   /** 농장·미니게임·이펙트·콘페티·지도 */
@@ -51,6 +65,8 @@ export const ASSETS = {
   items: {
     root: `${ASSETS_IMG_BASE}/items`,
     shop: `${ASSETS_IMG_BASE}/items/shop`,
+    /** 마켓 기본 일러스트 PNG 모음 (`marketItemImages.ts` 와 동일 폴더) */
+    shopItems: `${ASSETS_IMG_BASE}/items/shop/items`,
     piggyBank: `${ASSETS_IMG_BASE}/items/piggy-bank`,
     rewards: `${ASSETS_IMG_BASE}/items/rewards`,
   },

@@ -1,19 +1,224 @@
 'use client'
 
 import Link from 'next/link'
-import { useId } from 'react'
+import { createPortal } from 'react-dom'
+import { useEffect, useId, useState } from 'react'
 import type { ChildStats } from '@/types/database'
 import type { WeeklyRoutineDay } from '@/lib/childWeeklyRoutine'
-import {
-  buildPlaceholderCoachingGuide,
-  buildPlaceholderEqDataFeedback,
-} from '@/lib/childEqAiPlaceholders'
 
 /** 차트·피드백에 필요한 `child_stats` 일부만 받습니다(부모 홈 요약 객체와 맞춤). */
 export type EconomicEqStatsSlice = Pick<
   ChildStats,
   'eq_routine_rate' | 'eq_delay_score' | 'eq_save_ratio' | 'streak_days' | 'credits'
 >
+
+/**
+ * 상단 「AI 인사이트 리포트」본문 — RAG·LLM 연동 전 템플릿입니다.
+ * - 성장 단계·루틴·만족 지연·저축 비중은 `child_stats` 숫자를 그대로 넣습니다.
+ * - 루틴·만족 지연은 수치 구간에 따라 문장만 살짝 바뀝니다(낮을 때는 안내 톤).
+ * - 문단 사이에는 줄바꿈 한 번만 넣고, 빈 줄은 넣지 않습니다(화면이 과하게 벌어지지 않게).
+ */
+function formatAiInsightReport(growthStageName: string, stats: EconomicEqStatsSlice): string {
+  const routine = stats.eq_routine_rate
+  const delay = stats.eq_delay_score
+  const save = Math.min(100, Math.max(0, stats.eq_save_ratio))
+
+  const routineSentence =
+    routine >= 55
+      ? `루틴 완주율은 ${routine}%로 안정적인 루틴달성율을 보입니다.`
+      : routine >= 30
+        ? `루틴 완주율은 ${routine}%예요. 조금씩 꾸준히 완료해 나가면 좋아요.`
+        : `루틴 완주율은 ${routine}%예요. 배정 미션을 함께 맞춰 가면 숫자가 함께 올라갑니다.`
+
+  const delaySentence =
+    delay < 45
+      ? `만족지연지수는 ${delay}%로 다소 낮은 편입니다. 미션을 통해 얻은 보상을 나누어 저금하기 시작하면 지수는 높아집니다.`
+      : delay < 65
+        ? `만족지연지수는 ${delay}%예요. 보상을 저금통으로 나누어 두는 연습을 더하면 좋아요.`
+        : `만족지연지수는 ${delay}%로 양호한 편입니다.`
+
+  const saveSentence = `저축비중이 ${save}%이네요. 아이가 원하는 보상을 달성하기 위해서 어떤 목표를 가지고 있는지 일상속 대화를 통해 동력을 심어주세요!`
+
+  // 각 줄은 `\n`으로만 이어 빈 줄 없이 붙입니다(`whitespace-pre-wrap` 표시용).
+  return [
+    '[AI 연동 전 임시 요약]',
+    `자녀는 현재 ${growthStageName} 단계에요.`,
+    routineSentence,
+    delaySentence,
+    saveSentence,
+  ].join('\n')
+}
+
+/** 만족 지연 지수 값으로 짧은 코멘트를 만듭니다(모달 「현재 상태」용). 문장 사이는 줄바꿈 한 번만 넣고 빈 줄은 넣지 않습니다. */
+function delayScoreReview(score: number, childName: string): string {
+  if (score >= 60) {
+    return `${childName}의 지표를 보면, 보유 크레딧 중 많은 부분이 저금통에 있어요.\n당장 쓰지 않고 모으는 습관이 잘 보입니다.`
+  }
+  if (score >= 35) {
+    return `저금통 비율이 중간쯤이에요.\n가용(섬)이나 지갑에만 두지 않고 저금통으로 옮기면 같은 총액에서도 이 수치가 함께 올라갑니다.`
+  }
+  return `아직 가용·지갑 쪽 비중이 크면 수치가 낮게 보일 수 있어요.\n작은 목표부터 저금통으로 옮기는 연습을 보면 좋아요.`
+}
+
+/** 소비·저축 비중(저축 %)으로 짧은 코멘트를 만듭니다(모달 「현재 상태」용). */
+function saveSpendReview(savePct: number, childName: string): string {
+  if (savePct >= 50) {
+    return `${childName}의 지표를 보면, 지갑과 저금통을 합친 금액 중 절반 넘게 저금통에 두고 있어요. 저축과 소비의 균형이 좋은 편입니다.`
+  }
+  if (savePct >= 30) {
+    return `저축과 소비가 함께 보이는 구간이에요. 상황에 맞게 저축 비중을 조금씩 키워볼 수 있습니다.`
+  }
+  return `지금은 지갑(바로 쓸 돈) 비중이 더 큽니다. 구매 전에 일부만 저금통으로 옮겨 보는 것도 습관 형성에 도움이 됩니다.`
+}
+
+type EqChartModalKind = 'delay' | 'saveSpend'
+
+type EqChartExplainModalProps = {
+  kind: EqChartModalKind
+  onClose: () => void
+  childName: string
+  delayScore: number
+  savePct: number
+  spendPct: number
+}
+
+/**
+ * 그래프 카드를 눌렀을 때 뜨는 설명 모달입니다.
+ * - 내용: 무엇을 나타내는지, 현재 값 해석, DB 가 쓰는 계산식, 높음/낮음·목표 가이드
+ * - `document.body`에 포털로 붙여 부모 레이아웃의 z-index·overflow 에 안 가리게 합니다.
+ */
+function EqChartExplainModal({
+  kind,
+  onClose,
+  childName,
+  delayScore,
+  savePct,
+  spendPct,
+}: EqChartExplainModalProps) {
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  if (!mounted) return null
+
+  const title = kind === 'delay' ? '만족 지연 지수' : '소비 vs 저축 비중'
+
+  const body =
+    kind === 'delay' ? (
+      <div className="space-y-3 text-xs text-gray-700 leading-relaxed">
+        <div>
+          <p className="font-bold text-gray-900 mb-1">이 그래프는?</p>
+          <p>
+            전체 보유 크레딧(가용 섬 + 지갑 + 저금통) 중 <strong>저금통에 묶인 비율</strong>을 0~100%로 보여 줍니다.
+            당장 쓰지 않고 나중을 위해 모아 두는 비중을 한눈에 볼 수 있어요.
+          </p>
+        </div>
+        <div>
+          <p className="font-bold text-gray-900 mb-1">지금 상태</p>
+          <p className="whitespace-pre-line">{delayScoreReview(delayScore, childName)}</p>
+        </div>
+        <div>
+          <p className="font-bold text-gray-900 mb-1">계산 방식</p>
+          <p className="tabular-nums">
+            만족 지연 지수 = 반올림((저금통 크레딧 ÷ 총 크레딧) × 100), 최대 100%. 서버 함수{' '}
+            <code className="rounded bg-gray-100 px-1 text-[10px]">recalculate_eq</code>가 지갑·저금통이 바뀔 때마다
+            같은 식으로 다시 계산해요.
+          </p>
+        </div>
+        <div>
+          <p className="font-bold text-gray-900 mb-1">높으면 좋을까요?</p>
+          <p>
+            일반적으로 <strong>높을수록</strong> &quot;나중에 쓰기&quot;·만족 지연 습관이 잘 잡혀 있다고 볼 수 있어요.
+            다만 미션 보상이 가용(섬)에만 쌓이고 저금통으로 옮기지 않으면 총액은 많은데 수치는 낮게 나올 수 있습니다.
+          </p>
+        </div>
+        <div>
+          <p className="font-bold text-gray-900 mb-1">목표는?</p>
+          <p>
+            연령·성장 단계마다 앱에서 기대하는 구간이 달라질 수 있어요(예: 단계별로 30%, 50% 이상 등).
+            한 번에 목표를 올리기보다, <strong>저금통으로 조금씩 옮기는 습관</strong>을 만드는 것이 실천에 가깝습니다.
+          </p>
+        </div>
+      </div>
+    ) : (
+      <div className="space-y-3 text-xs text-gray-700 leading-relaxed">
+        <div>
+          <p className="font-bold text-gray-900 mb-1">이 그래프는?</p>
+          <p>
+            <strong>지갑(바로 쓸 돈)</strong>과 <strong>저금통(모아 둔 돈)</strong>만 놓고, 저축이 차지하는 비율을
+            도넛으로 보여 줍니다. 아직 어디에 둘지 정하지 않은 가용(섬) 크레딧은 &quot;결정 전&quot;이라 이 비교의
+            분모에 넣지 않아요.
+          </p>
+        </div>
+        <div>
+          <p className="font-bold text-gray-900 mb-1">지금 상태</p>
+          <p>
+            {saveSpendReview(savePct, childName)} (현재: 저축 {savePct}%, 소비 {spendPct}%)
+          </p>
+        </div>
+        <div>
+          <p className="font-bold text-gray-900 mb-1">계산 방식</p>
+          <p className="tabular-nums">
+            저축 비중 = 반올림((저금통 ÷ (지갑 + 저금통)) × 100), 최대 100%. 지갑+저금통 합이 0이면 0%로 둡니다. 화면의
+            소비 %는 100 − 저축 %예요. 역시 <code className="rounded bg-gray-100 px-1 text-[10px]">recalculate_eq</code>
+            가 갱신합니다.
+          </p>
+        </div>
+        <div>
+          <p className="font-bold text-gray-900 mb-1">높으면 좋을까요?</p>
+          <p>
+            저축 비중이 <strong>너무 낮지만 않으면</strong> 좋고, 반대로 100% 저축만 있는 것도 현실적으로 어려울 수 있어요.
+            지갑에 쓸 돈과 저금통에 모을 돈이 <strong>함께</strong> 있는 상태가 균형에 가깝습니다.
+          </p>
+        </div>
+        <div>
+          <p className="font-bold text-gray-900 mb-1">비율은 어느 정도?</p>
+          <p>
+            성장 단계에 따라 &quot;저축 비중 ○% 이상&quot; 같은 기준이 달라질 수 있어요(문서 기준 예: 고단계에서 저축 비중
+            30% 이상 등). 아이 상황에 맞게, 지나친 소비보다는 <strong>저축 습관이 자연스럽게 쌓이게</strong> 하는 것을
+            목표로 두면 됩니다.
+          </p>
+        </div>
+      </div>
+    )
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[95] flex items-end justify-center bg-black/45 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:items-center sm:p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="eq-chart-modal-title"
+    >
+      <button type="button" className="absolute inset-0 cursor-default" aria-label="닫기" onClick={onClose} />
+      <div className="relative z-[1] flex max-h-[min(88dvh,32rem)] w-full max-w-md flex-col overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-black/[0.06] sm:rounded-3xl">
+        <div className="shrink-0 border-b border-gray-100 px-4 py-3">
+          <h2 id="eq-chart-modal-title" className="text-center text-sm font-bold text-gray-900">
+            {title}
+          </h2>
+          <p className="mt-0.5 text-center text-[10px] text-gray-500">자세한 설명 · 계산 · 해석</p>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">{body}</div>
+        <div className="shrink-0 border-t border-gray-100 px-4 py-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-full rounded-xl bg-[#4A90E2] py-2.5 text-sm font-bold text-white active:scale-[0.99]"
+          >
+            확인
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  )
+}
 
 type Props = {
   stats: EconomicEqStatsSlice
@@ -27,11 +232,11 @@ type Props = {
 /**
  * 부모 홈 「우리아이 경제 EQ 지수」 카드
  *
- * - **순서**: 먼저 AI 데이터 피드백(그라데이션 박스), 그다음 차트 묶음(제목+반원·도넛·주간 막대), 마지막 코칭 가이드
+ * - **순서**: 먼저 AI 인사이트 리포트(코칭 가이드와 같은 카드·글꼴 스타일), 그다음 차트 묶음, 마지막 코칭 가이드
  * - 만족 지연(반원) + 소비/저축(도넛)은 **한 줄 두 칸**, 그 아래 요일별 막대
  * - **데이터**: `eq_delay_score`·`eq_save_ratio` 는 DB 의 `recalculate_eq()` 가
  *   `child_stats`(지갑·저금통·총액)와 `mission_logs` 로 채웁니다. 섬(가용)=총액−지갑−저금통 은 도넛 분모에 넣지 않습니다.
- * - AI 인사이트는 분석 문구만 두고, **행동 유도 링크는 코칭 가이드 아래 2개**(스페셜 미션·마켓 보상)만 둡니다.
+ * - AI 인사이트는 요약 문단만 두고, **행동 유도 링크는 코칭 가이드 아래 2개**(스페셜 미션·마켓 보상)만 둡니다.
  */
 export default function EconomicEqPanel({
   stats,
@@ -40,22 +245,10 @@ export default function EconomicEqPanel({
   childName,
 }: Props) {
   const gradId = useId().replace(/:/g, '')
+  /** 어떤 그래프 설명 모달을 열었는지 — null 이면 닫힘 */
+  const [eqChartModal, setEqChartModal] = useState<EqChartModalKind | null>(null)
 
-  const insightInput = {
-    stats: {
-      eq_routine_rate: stats.eq_routine_rate,
-      eq_delay_score: stats.eq_delay_score,
-      eq_save_ratio: stats.eq_save_ratio,
-      streak_days: stats.streak_days,
-      credits: stats.credits,
-    },
-    growthStageName,
-    childName,
-    weeklyRoutine,
-  }
-
-  const dataFeedback = buildPlaceholderEqDataFeedback(insightInput)
-  const coachingGuide = buildPlaceholderCoachingGuide(insightInput)
+  const aiInsightReport = formatAiInsightReport(growthStageName, stats)
 
   // eq_save_ratio: 지갑+저금통 중 저금통 비중(0~100). 소비(파랑)=지갑, 저축(노랑)=저금통.
   const savePct = Math.min(100, Math.max(0, stats.eq_save_ratio))
@@ -63,10 +256,10 @@ export default function EconomicEqPanel({
 
   return (
     <section className="bg-white rounded-2xl p-4 shadow-sm space-y-4">
-      {/* AI가 숫자를 바탕으로 요약한 피드백 — 카드 상단에 두어 먼저 읽히게 함 */}
-      <div className="rounded-2xl border border-[#4A90E2]/15 bg-gradient-to-r from-[#4A90E2]/10 to-[#7ED321]/10 px-3.5 py-3">
-        <p className="text-[10px] font-bold text-[#4A90E2] mb-1">AI 인사이트 (데이터 피드백)</p>
-        <p className="text-xs text-gray-700 leading-relaxed whitespace-pre-wrap">{dataFeedback}</p>
+      {/* AI 리포트: 코칭 가이드와 동일한 카드·타이포(제목 text-sm 볼드, 본문 text-xs) */}
+      <div className="rounded-2xl border border-amber-200/60 bg-amber-50/50 px-3.5 py-3">
+        <p className="text-sm font-bold text-gray-700 mb-2">AI 인사이트 리포트</p>
+        <p className="text-xs text-gray-700 leading-relaxed whitespace-pre-wrap">{aiInsightReport}</p>
       </div>
 
       <p className="text-sm font-bold text-gray-700">우리아이 경제 EQ 지수</p>
@@ -74,28 +267,39 @@ export default function EconomicEqPanel({
       <div className="flex flex-col gap-5">
         {/* 만족 지연 + 소비/저축: 한 줄에 좌·우 두 블록 */}
         <div className="grid grid-cols-2 gap-2">
-          <div className="rounded-xl bg-gray-50/80 px-2 py-2.5 flex flex-col min-w-0">
-            <p className="text-[10px] font-bold text-gray-600 mb-0.5 text-center leading-tight">
+          {/* 카드 전체를 버튼으로 두어 탭·스크린 리더에서도 「설명 열기」가 분명합니다 */}
+          <button
+            type="button"
+            onClick={() => setEqChartModal('delay')}
+            className="rounded-xl bg-gray-50/80 px-2 py-2.5 flex flex-col min-w-0 text-left cursor-pointer transition-transform active:scale-[0.99] ring-0 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4A90E2] focus-visible:ring-offset-2"
+            aria-haspopup="dialog"
+            aria-label="만족 지연 지수 설명 보기"
+          >
+            <p className="text-[10px] font-bold text-gray-600 mb-0.5 text-center leading-tight pointer-events-none">
               만족 지연 지수
             </p>
-            <DelayHalfGauge value={stats.eq_delay_score} gradientId={`delay-${gradId}`} compact />
-            <p className="text-center text-[11px] font-bold text-[#4A90E2] tabular-nums -mt-0.5">
+            <div className="pointer-events-none">
+              <DelayHalfGauge value={stats.eq_delay_score} gradientId={`delay-${gradId}`} compact />
+            </div>
+            <p className="text-center text-[11px] font-bold text-[#4A90E2] tabular-nums -mt-0.5 pointer-events-none">
               {stats.eq_delay_score}%
             </p>
-            <p className="text-[8px] text-gray-400 text-center mt-1 leading-tight px-0.5">
-              총 크레딧 중 저금통에 둔 비율이에요. 섬(가용)만 많으면 낮게 보일 수 있어요.
-            </p>
-          </div>
+          </button>
 
-          <div className="rounded-xl bg-gray-50/80 px-2 py-2.5 flex flex-col min-w-0">
-            <p className="text-[10px] font-bold text-gray-600 mb-0.5 text-center leading-tight">
+          <button
+            type="button"
+            onClick={() => setEqChartModal('saveSpend')}
+            className="rounded-xl bg-gray-50/80 px-2 py-2.5 flex flex-col min-w-0 text-left cursor-pointer transition-transform active:scale-[0.99] ring-0 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4A90E2] focus-visible:ring-offset-2"
+            aria-haspopup="dialog"
+            aria-label="소비 vs 저축 비중 설명 보기"
+          >
+            <p className="text-[10px] font-bold text-gray-600 mb-0.5 text-center leading-tight pointer-events-none">
               소비 vs 저축 비중
             </p>
-            <SaveSpendDonut savePercent={savePct} spendPercent={spendPct} compact />
-            <p className="text-[7px] text-gray-400 text-center mt-0.5 leading-tight px-0.5">
-              지갑·저금통으로 나눈 금액만 비교(섬·가용 제외)
-            </p>
-          </div>
+            <div className="pointer-events-none">
+              <SaveSpendDonut savePercent={savePct} spendPercent={spendPct} compact />
+            </div>
+          </button>
         </div>
 
         <div className="rounded-xl bg-gray-50/80 px-2 py-3">
@@ -105,8 +309,16 @@ export default function EconomicEqPanel({
       </div>
 
       <div className="rounded-2xl border border-amber-200/60 bg-amber-50/50 px-3.5 py-3">
-        <p className="text-[10px] font-bold text-amber-800 mb-1">경제 습관 코칭 가이드 (부모님용)</p>
-        <p className="text-xs text-gray-700 leading-relaxed whitespace-pre-wrap">{coachingGuide}</p>
+        {/* 제목 스타일은 홈 「최근 활동」과 동일: text-sm + font-bold + gray-700 */}
+        <p className="text-sm font-bold text-gray-700 mb-2">경제 습관 코칭가이드</p>
+        <p className="text-xs text-gray-700 leading-relaxed whitespace-pre-wrap">
+          [이 단락은 RAG·LLM 연동 전 템플릿이며, 나중에 자녀 연령·기관 유형·미션 태그에 맞는 문서를 검색해 바꿔 끼우면
+          됩니다.]
+          {'\n\n'}
+          최근 7일간 누적 700크레딧을 저축했어요.{'\n'}
+          &apos;오늘은 사고싶은걸 바로 사지않고 저금통에 넣어둔거 정말 대단해!&apos;{'\n'}
+          같은 문장으로 아이에게 자기조절을 구체적으로 칭찬해주세요!
+        </p>
 
         {/* 코칭 다음 행동: 한 줄짜리 문구만 두어 줄바꿈이 어색해지지 않게 함(탭 이동은 링크 목적지로 처리) */}
         <div
@@ -128,6 +340,17 @@ export default function EconomicEqPanel({
           </Link>
         </div>
       </div>
+
+      {eqChartModal ? (
+        <EqChartExplainModal
+          kind={eqChartModal}
+          onClose={() => setEqChartModal(null)}
+          childName={childName}
+          delayScore={stats.eq_delay_score}
+          savePct={savePct}
+          spendPct={spendPct}
+        />
+      ) : null}
     </section>
   )
 }

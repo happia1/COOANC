@@ -5,12 +5,11 @@
  * - 선택한 자녀에게 보일 store_items 만 토글로 켜고 끕니다.
  * - 「상품 추가하기」로 가족 전용 상품을 새로 넣을 수 있습니다(API).
  * - 추가 시트는 하단 독(z-50)보다 위(z-[60])에 두고, 내용이 길면 스크롤됩니다.
- * - 사진이 없는 기본 상품은 `market_items.png` 스프라이트를 씁니다(자녀 마켓과 같은 규칙).
+ * - 사진이 없는 기본 상품은 `items/shop/items/*.png` 를 씁니다(자녀 마켓과 같은 규칙).
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import SpriteImage from '@/components/common/SpriteImage'
-import { MARKET_ITEMS } from '@/constants/sprites'
+import MarketItemImage from '@/components/common/MarketItemImage'
 import { marketFrameKeyForItemId } from '@/lib/marketItemFrame'
 import type { StoreItem } from '@/types/database'
 import {
@@ -30,6 +29,8 @@ export type ParentMarketMenuControlProps = {
   familyLinkIdForChild: string | null
   /** 숨김 목록이 바뀔 때(토글 후) */
   onHiddenChange: (next: Set<string>) => void
+  /** 메뉴 제어 탭 전체 초기화(숨김 목록/DB/목록 재로딩)를 요청합니다 */
+  onResetMenu?: () => Promise<void>
   /** 가족 전용 상품이 추가되면 목록에 합칩니다 */
   onItemCreated: (item: StoreItem) => void
 }
@@ -74,6 +75,7 @@ export default function ParentMarketMenuControl({
   hiddenItemIds,
   familyLinkIdForChild,
   onHiddenChange,
+  onResetMenu,
   onItemCreated,
 }: ParentMarketMenuControlProps) {
   const [addOpen, setAddOpen] = useState(false)
@@ -89,6 +91,7 @@ export default function ParentMarketMenuControl({
   const [addCategory, setAddCategory] = useState<string>('food')
   /** 마켓 보이기/숨기기 토글 API 실패 시 잠깐 보여 줄 메시지 */
   const [toggleSaveErr, setToggleSaveErr] = useState<string | null>(null)
+  const [resetLoading, setResetLoading] = useState(false)
 
   const cameraInputRef = useRef<HTMLInputElement>(null)
   const galleryInputRef = useRef<HTMLInputElement>(null)
@@ -230,17 +233,44 @@ export default function ParentMarketMenuControl({
     <section className="mt-1">
       <div className="mb-1 flex items-start justify-between gap-2">
         <h2 className="text-sm font-bold text-brand-text">메뉴 제어</h2>
-        <button
-          type="button"
-          disabled={!childId}
-          onClick={() => {
-            setAddErr(null)
-            setAddOpen(true)
-          }}
-          className="shrink-0 text-[11px] font-bold text-gray-400 underline-offset-2 hover:text-gray-500 hover:underline disabled:opacity-30"
-        >
-          상품 추가하기
-        </button>
+        <div className="flex items-center gap-2">
+          {onResetMenu && (
+            <button
+              type="button"
+              disabled={!childId || resetLoading}
+              onClick={async () => {
+                if (!childId) return
+                setToggleSaveErr(null)
+                if (!confirm('메뉴 제어를 모두 초기화하고(전체 표시) 다시 불러올까요?')) return
+                setResetLoading(true)
+                try {
+                  setAddOpen(false)
+                  setAddErr(null)
+                  await onResetMenu()
+                } catch (e) {
+                  const msg = e instanceof Error ? e.message : '초기화에 실패했어요'
+                  setToggleSaveErr(msg)
+                } finally {
+                  setResetLoading(false)
+                }
+              }}
+              className="shrink-0 text-[11px] font-bold text-gray-400 underline-offset-2 hover:text-gray-500 hover:underline disabled:opacity-30"
+            >
+              {resetLoading ? '초기화 중...' : '초기화'}
+            </button>
+          )}
+          <button
+            type="button"
+            disabled={!childId}
+            onClick={() => {
+              setAddErr(null)
+              setAddOpen(true)
+            }}
+            className="shrink-0 text-[11px] font-bold text-gray-400 underline-offset-2 hover:text-gray-500 hover:underline disabled:opacity-30"
+          >
+            상품 추가하기
+          </button>
+        </div>
       </div>
       <p className="mb-3 text-[11px] leading-snug text-gray-400">
         자녀의 마켓에 올라갈 상품을 구성해보세요.
@@ -270,23 +300,23 @@ export default function ParentMarketMenuControl({
                 {block.items.map((it) => {
                   const hidden = hiddenItemIds.has(it.id)
                   const visible = !hidden
-                  // 자녀 마켓(MarketTab)과 동일: id·이름으로 항상 같은 스프라이트 조각이 나오게 함
+                  // 자녀 마켓(MarketTab)과 동일: id·이름으로 항상 같은 PNG 가 나오게 함
                   const spriteFrame = marketFrameKeyForItemId(it.id, it.name)
                   return (
                     <div key={it.id} className="flex min-w-0 flex-col items-center gap-1.5">
                       <div className="flex h-14 w-full items-center justify-center overflow-hidden rounded-lg bg-gray-50 ring-1 ring-gray-100">
                         {it.image_url ? (
-                          // 가족 전용으로 올린 사진이 있으면 그걸 그대로 썸(자녀 화면도 같은 URL)
+                          // 가족 전용으로 올린 사진도 블록 안에 들어오도록 contain + 축소 표시
                           // eslint-disable-next-line @next/next/no-img-element
-                          <img src={it.image_url} alt="" className="h-full w-full object-cover" />
-                        ) : (
-                          // DB에 사진이 없으면 공용 아틀라스 `items/shop/market_items.png` 한 칸을 표시
-                          <SpriteImage
-                            sheet={MARKET_ITEMS}
-                            frame={spriteFrame}
-                            height={48}
-                            clipRotated={false}
+                          <img
+                            src={it.image_url}
+                            alt=""
+                            className="max-h-[42px] max-w-[42px] object-contain object-center"
+                            draggable={false}
                           />
+                        ) : (
+                          // 기본 이미지도 기존보다 살짝 줄여 블록 안쪽 여백을 확보
+                          <MarketItemImage frame={spriteFrame} height={42} />
                         )}
                       </div>
                       <p

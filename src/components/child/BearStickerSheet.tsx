@@ -30,6 +30,16 @@ const MAGNET_RADIUS_SCALE = 1.45
 const MIN_FLOAT_STICKER_SEP_PCT = 9
 
 /**
+ * ISO 시각 문자열 둘 중 더 늦은 값(최근 판 비움 시각).
+ * DB·sessionStorage·API 응답을 한 기준으로 맞출 때 사용합니다.
+ */
+function maxIsoTime(a: string | null | undefined, b: string | null | undefined): string | null {
+  if (!a) return b ?? null
+  if (!b) return a
+  return a >= b ? a : b
+}
+
+/**
  * grant id 를 0~1 두 실수로 바꿉니다. 랜덤이 잘 안 될 때도 건마다 다른 대체 좌표를 쓰기 위함입니다.
  */
 function spreadFromGrantId(id: string): { u: number; v: number } {
@@ -42,6 +52,8 @@ function spreadFromGrantId(id: string): { u: number; v: number } {
 /**
  * 아틀라스의 sticker_board.png 한 장을 컨테이너에 맞게 꽉 채웁니다(캡처 PNG 대신 JSON 좌표로 파싱).
  * 로딩 전에는 연한 회색만 깔아 두어, 예전처럼 하늘색 큰 카드가 보이지 않게 합니다.
+ *
+ * 비개발자용 설명: 배경은 마켓용 스프라이트 시트(`animations.png`) 안의 한 장짜리 그림을 통째로 늘려 보여 줍니다.
  */
 function BearBoardFromAtlas({ atlas }: { atlas: AnimationsAtlasFile | null }) {
   const wrapRef = useRef<HTMLDivElement>(null)
@@ -120,8 +132,17 @@ type Props = {
   /**
    * 서버에서 판을 비운 뒤 부모 `placements` 도 즉시 [] 로 맞춰야 합니다.
    * 그렇지 않으면 `initialPlacements` 가 옛 데이터로 남아 effect 가 스티커를 다시 채웁니다.
+   * `clearedAt` 은 reset-board 가 돌려준 ISO 시각(선택) — 홈 stats 의 praise_board_cleared_at 과 동기화용
+   * `grantsDeleted`: 20칸 완주 후 리셋이면 true — 발행(grants)까지 DB 에서 지워졌으니 홈의 grants 목록도 비웁니다.
    */
-  onBoardCleared?: () => void
+  onBoardCleared?: (clearedAt?: string, meta?: { grantsDeleted?: boolean }) => void
+  /** child_stats.praise_board_cleared_at — 새로고침·다른 기기에서도 이전 사이클 스티커 숨김 */
+  serverPraiseBoardClearedAt?: string | null
+  /**
+   * grants 가 서버와 통째로 바뀌었을 때(20칸 완주 후 전부 삭제 등) merge 대신 목록을 그대로 덮어씁니다.
+   * 숫자가 바뀔 때마다 BearStickerSheet 내부 grants 를 `initialGrants` 로 맞춥니다.
+   */
+  praiseGrantsRevision?: number
 }
 
 /**
@@ -138,6 +159,8 @@ export default function BearStickerSheet({
   initialPlacements,
   onInventoryChange,
   onBoardCleared,
+  serverPraiseBoardClearedAt = null,
+  praiseGrantsRevision = 0,
 }: Props) {
   const { atlas } = useShopAnimationsAtlas()
   const [grants, setGrants] = useState(initialGrants)
@@ -153,10 +176,13 @@ export default function BearStickerSheet({
   const [overlayVisible, setOverlayVisible] = useState(false)
   /**
    * 판을 비운 시각(ISO 문자열). 이 시각 이전에 지급된 스티커는 종이 위 미배치 목록에서 숨깁니다.
-   * - 20칸 완주 후 자동으로 판을 비운 뒤에도 grant 행은 DB에 남으므로, 숨기지 않으면 종이에 예전 스티커가 다시 가득 보입니다.
-   * - 새로 부모가 지급한 스티커는 created_at 이 더 뒤라서 그대로 보입니다.
+   * - 20칸 완주 후에는 서버가 grants 까지 지우므로, 숨김 필터 없이도 종이가 비어 있습니다.
+   * - 부분 비우기만 한 경우에만 예전 grant 가 남고, clearedAt 기준으로 종이에서 숨깁니다.
    */
   const [lastBoardClearedAt, setLastBoardClearedAt] = useState<string | null>(null)
+
+  /** `praiseGrantsRevision` 이 오르면 merge 없이 `initialGrants` 로 grants state 를 덮어씁니다 */
+  const grantsRevisionAppliedRef = useRef(0)
 
   /**
    * 부모 앱 `parent_sticker_board:${childId}` 채널로 브로드캐스트를 보낼 때 씁니다.
@@ -181,24 +207,32 @@ export default function BearStickerSheet({
   const boardRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
+    if (praiseGrantsRevision > grantsRevisionAppliedRef.current) {
+      grantsRevisionAppliedRef.current = praiseGrantsRevision
+      setGrants(initialGrants)
+      return
+    }
     setGrants((prev) => mergePraiseStickerGrantsFromServer(initialGrants, prev))
-  }, [initialGrants])
+  }, [initialGrants, praiseGrantsRevision])
 
   useEffect(() => {
     setPlacements(initialPlacements)
   }, [initialPlacements])
 
-  /** 시트를 열 때마다 sessionStorage 에서 "판 비움" 시각을 읽어, 새로고침 후에도 이전 사이클 스티커를 숨깁니다 */
+  /**
+   * 시트를 열 때마다 sessionStorage + 서버(child_stats) 중 더 늦은 「판 비움」시각을 씁니다.
+   * 예전에는 탭 저장만 해서 새 탭이면 예전 스티커가 전부 종이에 다시 나왔습니다.
+   */
   useEffect(() => {
     if (!open) return
+    let stored: string | null = null
     try {
-      const k = `praise_board_cleared_at:${childId}`
-      const v = sessionStorage.getItem(k)
-      setLastBoardClearedAt(v)
+      stored = sessionStorage.getItem(`praise_board_cleared_at:${childId}`)
     } catch {
       /* 비공개 모드 등에서 sessionStorage 가 막혀 있으면 무시 */
     }
-  }, [open, childId])
+    setLastBoardClearedAt(maxIsoTime(stored, serverPraiseBoardClearedAt))
+  }, [open, childId, serverPraiseBoardClearedAt])
 
   const placedGrantIds = useMemo(() => new Set(placements.map((p) => p.grant_id)), [placements])
   /** grant 목록에 실제로 존재하는 id 집합 — 칸 썸네일용(고아 배치는 tag.png 로 표시) */
@@ -276,16 +310,18 @@ export default function BearStickerSheet({
   }, [open])
 
   /**
-   * 판 비우기 직후 타임스탬프를 저장합니다. sessionStorage 에 넣어 같은 탭에서 시트를 다시 열어도 유지됩니다.
+   * 판 비우기 직후 타임스탬프를 저장합니다.
+   * - API 가 준 `clearedAt` 과 서버 DB 가 일치하도록 우선 사용합니다.
+   * - sessionStorage 는 같은 브라우저에서 빠른 재오픈용 보조 저장입니다.
    */
-  const bumpBoardCycle = useCallback(() => {
-    const ts = new Date().toISOString()
+  const bumpBoardCycle = useCallback((clearedAtIso?: string) => {
+    const ts = clearedAtIso ?? new Date().toISOString()
     try {
       sessionStorage.setItem(`praise_board_cleared_at:${childId}`, ts)
     } catch {
       /* noop */
     }
-    setLastBoardClearedAt(ts)
+    setLastBoardClearedAt((prev) => maxIsoTime(prev, ts))
   }, [childId])
 
   useEffect(() => {
@@ -494,15 +530,22 @@ export default function BearStickerSheet({
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ childId }),
             })
+            const resetJson = (await resetRes.json().catch(() => ({}))) as {
+              error?: string
+              clearedAt?: string
+              grantsDeleted?: boolean
+            }
             if (!resetRes.ok) {
-              const resetJson = (await resetRes.json().catch(() => ({}))) as { error?: string }
               console.error('[bear sticker reset]', resetJson.error ?? resetRes.statusText)
             } else {
               setPlacements([])
+              if (resetJson.grantsDeleted) setGrants([])
               /** 부모 state 를 먼저 비워야 `initialPlacements` effect 가 옛 행을 다시 넣지 않음 */
-              onBoardCleared?.()
-              /** 종이 위 예전 지급 스티커도 숨기고, sessionStorage 에 사이클 시각을 남깁니다 */
-              bumpBoardCycle()
+              onBoardCleared?.(resetJson.clearedAt, {
+                grantsDeleted: Boolean(resetJson.grantsDeleted),
+              })
+              /** 종이 위 예전 지급 스티커 숨김 + sessionStorage — clearedAt 은 DB와 동일 */
+              bumpBoardCycle(resetJson.clearedAt)
               /** 리셋 직후 Supabase 재조회는 가끔 삭제 전 스냅샷을 주어 덮어쓸 수 있어 호출하지 않음 */
             }
           } catch (e) {

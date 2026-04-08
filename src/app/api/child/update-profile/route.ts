@@ -2,12 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient as createServerClient } from '@/lib/supabase/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { getAgeFromBirthDateIso } from '@/lib/ageFromBirthDate'
+import { isAllowedChildProfileAvatarUrl } from '@/lib/childProfileAvatar'
 
 const INSTITUTIONS = new Set(['home', 'daycare', 'kindergarten', 'school'])
 
 /**
  * POST /api/child/update-profile
- * 연결된 부모가 자녀 profiles(이름·생년월일·나이·보육/통학 형태)를 수정합니다.
+ * 연결된 부모가 자녀 profiles(이름·생년월일·나이·보육/통학 형태·프로필 이미지 URL)를 수정합니다.
  * - RLS 는 자녀 행을 부모가 직접 못 고치므로 service_role 로 갱신합니다.
  * - 자녀 로그인 시 표시용으로 auth.user_metadata 도 같이 맞춥니다.
  */
@@ -20,6 +21,8 @@ export async function POST(req: NextRequest) {
   let institutionType: string | undefined
   /** 루틴 온보딩 등에서만 넘깁니다 — profiles.age_group 갱신 */
   let ageGroup: string | undefined
+  /** undefined = 안 바꿈, null = 사진 제거(DB null), 문자열 = 허용된 경로만 */
+  let avatarUrlPatch: string | null | undefined
   try {
     const body = await req.json()
     childId = body?.childId
@@ -27,6 +30,20 @@ export async function POST(req: NextRequest) {
     birthDate = typeof body?.birthDate === 'string' ? body.birthDate.trim() : undefined
     institutionType = typeof body?.institutionType === 'string' ? body.institutionType.trim() : undefined
     ageGroup = typeof body?.ageGroup === 'string' ? body.ageGroup.trim() : undefined
+    if (Object.prototype.hasOwnProperty.call(body ?? {}, 'avatarUrl')) {
+      const raw = (body as { avatarUrl?: unknown }).avatarUrl
+      if (raw === null || raw === '') {
+        avatarUrlPatch = null
+      } else if (typeof raw === 'string') {
+        const t = raw.trim()
+        if (!isAllowedChildProfileAvatarUrl(t)) {
+          return NextResponse.json({ error: '허용되지 않은 프로필 이미지예요.' }, { status: 400 })
+        }
+        avatarUrlPatch = t
+      } else {
+        return NextResponse.json({ error: '프로필 이미지 값이 올바르지 않아요.' }, { status: 400 })
+      }
+    }
   } catch {
     return NextResponse.json({ error: '요청 형식이 올바르지 않아요.' }, { status: 400 })
   }
@@ -35,7 +52,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'childId가 필요해요.' }, { status: 400 })
   }
 
-  if (name === undefined && birthDate === undefined && institutionType === undefined && ageGroup === undefined) {
+  if (
+    name === undefined &&
+    birthDate === undefined &&
+    institutionType === undefined &&
+    ageGroup === undefined &&
+    avatarUrlPatch === undefined
+  ) {
     return NextResponse.json({ error: '수정할 항목이 없어요.' }, { status: 400 })
   }
 
@@ -111,6 +134,7 @@ export async function POST(req: NextRequest) {
   }
   if (institutionType !== undefined) patch.institution_type = institutionType
   if (ageGroup !== undefined) patch.age_group = ageGroup
+  if (avatarUrlPatch !== undefined) patch.avatar_url = avatarUrlPatch
 
   const { error: upErr } = await admin.from('profiles').update(patch).eq('id', childId)
   if (upErr) {

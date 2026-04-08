@@ -4,6 +4,7 @@
  */
 import { createClient } from '@/lib/supabase/server'
 import { getActorChildContext } from '@/lib/getActorChildContext'
+import { isRetriableMissingColumnError } from '@/lib/supabase/childProfileSelect'
 import HomeTab from '@/components/child/HomeTab'
 import type { ChildStats, BadgeRow, PraiseStickerGrant, PraiseStickerPlacement } from '@/types/database'
 
@@ -22,7 +23,7 @@ export default async function ChildHomePage() {
   const [statsRes, profileRes, earnedRes, allBadgesRes, grantsRes, placementsRes] = await Promise.all([
     supabase.from('child_stats').select('*').eq('child_id', childId).maybeSingle(),
 
-    supabase.from('profiles').select('name, role').eq('id', childId).maybeSingle(),
+    supabase.from('profiles').select('name, role, avatar_url').eq('id', childId).maybeSingle(),
 
     supabase.from('child_badges').select('badge_id, earned_at').eq('child_id', childId),
 
@@ -58,17 +59,30 @@ export default async function ChildHomePage() {
   const praiseGrants = (grantsRes.data ?? []) as PraiseStickerGrant[]
   const praisePlacements = (placementsRes.data ?? []) as PraiseStickerPlacement[]
 
+  /** `avatar_url` 컬럼이 없는 구형 DB 는 name 만 다시 읽습니다 */
+  let profileRow = profileRes.data
+  if (profileRes.error && isRetriableMissingColumnError(profileRes.error)) {
+    const fallback = await supabase.from('profiles').select('name, role').eq('id', childId).maybeSingle()
+    profileRow = fallback.data
+  }
+
   const meta = user?.user_metadata as { name?: string } | undefined
   const childName =
-    profileRes.data?.name?.trim() ||
+    profileRow?.name?.trim() ||
     (ctx.sessionUserId === childId && typeof meta?.name === 'string' ? meta.name.trim() : '') ||
     '쿠앵이'
+
+  const childAvatarUrl =
+    profileRow && typeof (profileRow as { avatar_url?: string | null }).avatar_url === 'string'
+      ? (profileRow as { avatar_url: string }).avatar_url.trim() || null
+      : null
 
   return (
     <HomeTab
       childId={childId}
       initialStats={initialStats}
       childName={childName}
+      childAvatarUrl={childAvatarUrl}
       growthMapData={growthMapData}
       initialPraiseGrants={praiseGrants}
       initialPraisePlacements={praisePlacements}

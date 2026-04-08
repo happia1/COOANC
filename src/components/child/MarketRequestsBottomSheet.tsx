@@ -10,8 +10,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import type { PurchaseRequest, StoreItem } from '@/types/database'
-import SpriteImage from '@/components/common/SpriteImage'
-import { MARKET_ITEMS } from '@/constants/sprites'
+import MarketItemImage from '@/components/common/MarketItemImage'
 import { marketFrameKeyForItemId, type MarketItemFrameKey } from '@/lib/marketItemFrame'
 import {
   addSeoulCalendarDays,
@@ -82,7 +81,7 @@ function RequestRow({
             draggable={false}
           />
         ) : (
-          <SpriteImage sheet={MARKET_ITEMS} frame={frame} height={28} clipRotated={false} />
+          <MarketItemImage frame={frame} height={28} />
         )}
       </div>
       <div className="min-w-0 flex-1">

@@ -4,17 +4,12 @@ import Image from 'next/image'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import SpriteImage from '@/components/common/SpriteImage'
 import { CharacterSprite } from '@/components/sprites/CharacterSprite'
+import { resolveHomeIslandStageSprite, type HomeIslandStageSprite } from '@/lib/childHomeCharacterFromAvatar'
 import FloatingCreditsStackVisual from '@/components/child/FloatingCreditsStackVisual'
 import PiggyBankStageVisual from '@/components/child/PiggyBankStageVisual'
 import { piggyBankStageCount } from '@/constants/piggyBankStages'
 import { EFFECT_LIGHTS, ICONS } from '@/constants/sprites'
 type LightFx = { leftPct: number; topPct: number; size: number; delayMs: number; durationMs: number; opacity: number }
-
-/**
- * bunny.png 아틀라스에서 정면에 가까운 프레임.
- * (레이어 21 은 옆모습이었고, 19 를 정면으로 씁니다.)
- */
-const BUNNY_FRONT_FRAME = '레이어 19' as const
 
 /**
  * 홈·미션 공통: 섬을 카드 쪽으로 당김 (`default`·`viewportFit`).
@@ -171,6 +166,42 @@ type Props = {
    * 미션 탭처럼 잔디 느낌만 빼고 저금통·지갑·크레딧 UI 는 그대로 둘 때 씁니다.
    */
   showIslandArt?: boolean
+  /**
+   * 홈(`scene="bunny"`)일 때만: 자녀 프로필에 저장된 `*_profile.png` URL 과 맞춰
+   * 섬 위 정면 캐릭터(여우·토끼·곰 등)를 바꿉니다. 없거나 알 수 없으면 토끼 기본.
+   */
+  homeAvatarUrl?: string | null
+}
+
+/** `HomeIslandStageSprite` 는 캐릭터마다 frame 타입이 달라 분기로 `CharacterSprite` 에 넘깁니다 */
+function HomeIslandHeroSprite({
+  sprite,
+  className,
+}: {
+  sprite: HomeIslandStageSprite
+  className?: string
+}) {
+  const cls = className ?? 'drop-shadow-[0_8px_16px_rgba(0,0,0,0.14)]'
+  switch (sprite.character) {
+    case 'bears':
+      return (
+        <CharacterSprite character="bears" frame={sprite.frame} width={sprite.width} height={sprite.height} className={cls} />
+      )
+    case 'bunny':
+      return (
+        <CharacterSprite character="bunny" frame={sprite.frame} width={sprite.width} height={sprite.height} className={cls} />
+      )
+    case 'chicks':
+      return (
+        <CharacterSprite character="chicks" frame={sprite.frame} width={sprite.width} height={sprite.height} className={cls} />
+      )
+    case 'fox':
+      return <CharacterSprite character="fox" frame={sprite.frame} width={sprite.width} height={sprite.height} className={cls} />
+    case 'hamster':
+      return (
+        <CharacterSprite character="hamster" frame={sprite.frame} width={sprite.width} height={sprite.height} className={cls} />
+      )
+  }
 }
 
 /**
@@ -184,7 +215,9 @@ export default function ChildHomeIslandStage({
   missionPiggy,
   missionCredits,
   showIslandArt = true,
+  homeAvatarUrl = null,
 }: Props) {
+  const homeStageSprite = resolveHomeIslandStageSprite(homeAvatarUrl)
   const src = ISLAND_IMAGE_SRC[scene]
   const box =
     density === 'viewportFit' ? BOX_VIEWPORT_FIT : density === 'flex' ? BOX_FLEX : BOX_DEFAULT
@@ -275,13 +308,7 @@ export default function ChildHomeIslandStage({
               aria-label="나의 쿠앵이 캐릭터"
               className="origin-bottom [transform:translateY(0.125rem)_scale(0.9)]"
             >
-              <CharacterSprite
-                character="bunny"
-                frame={BUNNY_FRONT_FRAME}
-                width={108}
-                height={238}
-                className="drop-shadow-[0_8px_16px_rgba(0,0,0,0.14)]"
-              />
+              <HomeIslandHeroSprite sprite={homeStageSprite} />
             </div>
           ) : (
             /**
@@ -292,13 +319,7 @@ export default function ChildHomeIslandStage({
               aria-label="나의 쿠앵이 캐릭터"
               className="origin-bottom [transform:translateY(0.25rem)_scale(calc(clamp(0.72,calc(min(100vw,20rem)/300),1.08)*0.9))]"
             >
-              <CharacterSprite
-                character="bunny"
-                frame={BUNNY_FRONT_FRAME}
-                width={108}
-                height={238}
-                className="drop-shadow-[0_8px_16px_rgba(0,0,0,0.14)]"
-              />
+              <HomeIslandHeroSprite sprite={homeStageSprite} />
             </div>
           )}
         </div>

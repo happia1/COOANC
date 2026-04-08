@@ -458,13 +458,15 @@ export default function MissionTab({
 
   /**
    * 상단 영역: `flexFill` 로 레이아웃이 주는 높이만 씀(고정 dvh 아님).
-   * 잔디 풍경 PNG 는 쓰지 않음(`showBackground={false}`) — 섬 일러스트도 `showIslandArt={false}`.
+   * 배경 이미지는 사용하지 않고(`showBackground={false}`), 기존 투명 상단 밴드만 유지합니다.
+   * 저금통/크레딧/지갑 위치는 기존 레이아웃 그대로 유지됩니다.
    */
   const heroBand = (
     <ChildHomeSceneryBand
       flexFill
+      /** 상단 배경 이미지를 완전히 비활성화합니다. */
       showBackground={false}
-      /** 상단 밴드가 흰색으로 배경을 덮지 않도록 투명 처리합니다. */
+      /** 밴드 자체 바탕색은 투명으로 두어 이미지 외 배경 덮임을 막습니다. */
       className="bg-transparent"
       ariaLabel="미션 상단"
     >
@@ -530,7 +532,8 @@ export default function MissionTab({
                 aria-label={`${m.title} 미션 완료하기`}
                 className={[
                   // 카드 하단 빈 여백을 줄이기 위해 최소 높이를 더 낮춰 내용 높이에 가깝게 맞춤
-                  'snap-center flex min-h-[9 rem] w-[min(42vw,168px)] shrink-0 flex-col rounded-xl border bg-white p-2 text-left font-sans text-brand-text shadow-md transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue focus-visible:ring-offset-2 active:scale-[0.97]',
+                  // 가로: 화면 너비의 32%와 최대 140px 중 작은 값 — 한눈에 카드가 더 많이 보이도록 이전(42vw/168px)보다 좁게 유지
+                  'snap-center flex min-h-[9rem] w-[min(32vw,140px)] shrink-0 flex-col rounded-xl border bg-white p-2 text-left font-sans text-brand-text shadow-md transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue focus-visible:ring-offset-2 active:scale-[0.97]',
                   special ? 'border-amber-300 ring-2 ring-amber-200/60' : 'border-gray-200/90',
                 ].join(' ')}
               >
@@ -683,7 +686,7 @@ export default function MissionTab({
   ) : null
 
   if (isFullRestDay) {
-    /** 휴식일 미션 탭도 전용 배경 없음 — 자녀 레이아웃 배경과 동일 */
+    /** 휴식일은 전체 배경을 건드리지 않고, 위 `heroBand`(상단)에서만 이미지가 보입니다. */
     return (
       <div className="relative -mx-4 -mb-[calc(60px+0.35rem)] -mt-4 flex min-h-0 flex-1 flex-col bg-transparent">
         <MissionSleepMorningLayer
@@ -725,7 +728,7 @@ export default function MissionTab({
     )
   }
 
-  /** 미션 탭 전용 배경 이미지 없음 — 자녀 레이아웃의 배경이 그대로 보입니다 */
+  /** 일반일도 전체 배경은 투명 유지, 상단 영역(`heroBand`)에서만 새 이미지를 표시합니다. */
   return (
     <div className="relative -mx-4 -mb-[calc(60px+0.35rem)] -mt-4 flex min-h-0 flex-1 flex-col bg-transparent">
       <MissionSleepMorningLayer

@@ -1,7 +1,6 @@
 import type { ReactNode } from 'react'
 import ChildNavBar from '@/components/child/ChildNavBar'
 import ChildTopBar from '@/components/child/ChildTopBar'
-import { createClient } from '@/lib/supabase/server'
 import { getActorChildContext } from '@/lib/getActorChildContext'
 
 /**
@@ -16,18 +15,6 @@ import { getActorChildContext } from '@/lib/getActorChildContext'
  */
 export default async function ChildLayout({ children }: { children: ReactNode }) {
   const ctx = await getActorChildContext()
-  const supabase = await createClient()
-
-  const { data: childProfile } = await supabase
-    .from('profiles')
-    .select('name')
-    .eq('id', ctx.actorChildId)
-    .maybeSingle()
-
-  let childName = '쿠앵이'
-  if (childProfile?.name?.trim()) {
-    childName = childProfile.name.trim()
-  }
 
   /**
    * `h-dvh` 로 한 화면 높이를 맞춥니다.
@@ -37,7 +24,7 @@ export default async function ChildLayout({ children }: { children: ReactNode })
    */
   return (
     <div className="relative flex h-dvh max-h-dvh min-h-0 flex-col overflow-visible bg-gradient-to-b from-sky-100/90 via-amber-50/50 to-green-50/80">
-      <ChildTopBar childName={childName} isParentPreview={ctx.isParentPreview} />
+      <ChildTopBar isParentPreview={ctx.isParentPreview} />
       {/**
        * `min-h-0` + `flex` 로 자식이 뷰포트 높이를 넘지 않게 할 수 있음(홈·미션 한 화면).
        * 세로 스크롤이 필요한 탭(마켓·스티커)은 각 탭 루트에 `overflow-y-auto` 를 둠.

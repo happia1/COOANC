@@ -21,14 +21,22 @@ export type AnimationsAtlasFile = {
 export const PRAISE_STICKER_FRAME_KEYS = ['tag.png', 'reward.png', 'message.png'] as const
 export type PraiseStickerFrameKey = (typeof PRAISE_STICKER_FRAME_KEYS)[number]
 
-/** 곰돌이 스티커 판 배경 프레임 */
+/** 곰돌이 스티커 판 배경 프레임(animations.png 안 조각) */
 export const STICKER_BOARD_FRAME_KEY = 'sticker_board.png'
 
 const SHEET_BASE = '/assets/img/items/shop'
 
+/**
+ * 스프라이트 PNG(animations.png)를 바꿀 때마다 숫자를 올려 주세요.
+ * 그래야 브라우저가 옛 이미지를 디스크 캐시에서 그대로 쓰지 않고 새 파일을 받습니다.
+ * (배경만 고쳤는데도 화면이 안 바뀐다고 하면 대부분 이 캐시 때문입니다.)
+ */
+export const SHOP_ANIMATIONS_SHEET_CACHE_KEY = '5'
+
 /** TexturePacker 가보낸 스프라이트 이미지 URL(저장소에 파일이 있어야 보입니다) */
 export function animationsSheetUrl(atlas: AnimationsAtlasFile): string {
-  return `${SHEET_BASE}/${atlas.meta.image}`
+  const q = new URLSearchParams({ v: SHOP_ANIMATIONS_SHEET_CACHE_KEY })
+  return `${SHEET_BASE}/${atlas.meta.image}?${q.toString()}`
 }
 
 /**

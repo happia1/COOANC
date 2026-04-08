@@ -9,6 +9,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { birthDateInputBounds, getAgeFromBirthDateIso, resolveDisplayAge } from '@/lib/ageFromBirthDate'
+import { ChildProfileAvatarPicker } from '@/components/common/ChildProfileAvatarPicker'
+import { isAllowedChildProfileAvatarUrl } from '@/lib/childProfileAvatar'
 
 export type LinkedChildForEdit = {
   id: string
@@ -18,6 +20,8 @@ export type LinkedChildForEdit = {
   institution_type: string | null
   /** DB 에 있으면 생일 추정보다 우선해 연령대 칩을 맞춥니다 */
   age_group: string | null
+  /** 저장된 값이 허용 목록에 없으면(예: 옛 데이터) UI 에서는 「기본」으로 보입니다 */
+  avatar_url: string | null
 }
 
 type AgeGroup = 'preschool' | 'school'
@@ -59,6 +63,8 @@ export default function ChildProfileEditModal({ open, child, onClose, onSaved }:
   const [draftBirth, setDraftBirth] = useState('')
   const [ageGroup, setAgeGroup] = useState<AgeGroup>('preschool')
   const [institution, setInstitution] = useState<InstitutionType>('home')
+  /** 허용된 URL 만 두고, DB 값이 이상하면 null 로 맞춰 「기본」과 동일하게 동작 */
+  const [draftAvatarUrl, setDraftAvatarUrl] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -76,6 +82,8 @@ export default function ChildProfileEditModal({ open, child, onClose, onSaved }:
     const ag: AgeGroup = fromDb ?? (a !== null && a >= 7 ? 'school' : 'preschool')
     setAgeGroup(ag)
     setInstitution(normalizeInstitutionForGroup(ag, child.institution_type))
+    const av = child.avatar_url?.trim() ?? ''
+    setDraftAvatarUrl(av && isAllowedChildProfileAvatarUrl(av) ? av : null)
     setError(null)
   }, [open, child])
 
@@ -110,6 +118,8 @@ export default function ChildProfileEditModal({ open, child, onClose, onSaved }:
           institutionType: institution,
           /** 카드·루틴에 표시할 연령대를 DB 와 맞춥니다 */
           ageGroup,
+          /** null 이면 프로필 사진 칸을 비웁니다 */
+          avatarUrl: draftAvatarUrl,
         }),
       })
       const j = await res.json().catch(() => ({}))
@@ -149,6 +159,8 @@ export default function ChildProfileEditModal({ open, child, onClose, onSaved }:
 
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
           <div className="flex flex-col gap-4">
+            <ChildProfileAvatarPicker value={draftAvatarUrl} onChange={setDraftAvatarUrl} />
+
             <div>
               <label className="mb-1 block text-[11px] font-bold text-gray-500" htmlFor="edit-child-name">
                 자녀 이름 (닉네임)

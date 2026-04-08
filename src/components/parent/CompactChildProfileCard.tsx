@@ -1,11 +1,11 @@
 /**
  * 부모 앱용 컴팩트 자녀 프로필 카드 (홈·자녀 상세 공통)
- * - 왼쪽: 아바타 + 이름 + 크레딧·하트·연속일 + (나이) — 오른쪽 레벨 블록과 비슷한 높이로 맞춤
- * - 오른쪽: Lv·단계 이름(이모지 없이 텍스트만)
+ * - 왼쪽: 아바타
+ * - 가운데(세로): **이름 + Lv**(Lv 는 얇은 글씨·회색) → **미취학·유치원·나이** — 아바타 원과 **세로 가운데** 맞춤
+ * - 오른쪽(예전 레벨 칸): 크레딧·하트·연속일을 **2열 그리드**(고정 아이콘 칸 + 숫자 우측 정렬)
  * - 홈에서만: 하단 전체 너비로 오늘 미션 달성률
  *
- * 통계 줄(크레딧·하트·연속)의 그림은 `public/assets/img/common/ui/icons.png` 한 장을 잘라 쓰는
- * 스프라이트입니다. 자녀 홈 알약·미션 카드와 같은 자산을 써서 화면 전체 톤을 맞춥니다.
+ * 통계: 크레딧·하트는 `icons.png` 스프라이트, 연속 일은 불꽃 SVG(스트릭).
  */
 
 import SpriteImage from '@/components/common/SpriteImage'
@@ -13,8 +13,10 @@ import { ICONS } from '@/constants/sprites'
 
 const LEVEL_NAMES = ['씨앗', '새싹', '교환사', '저축왕', '나눔이', '투자가']
 
-/** 프로필 한 줄에 맞게 아이콘만 살짝 작게(숫자 옆 데코용) */
-const STAT_ICON_PX = 18
+/** 통계 숫자가 `text-[11px]` 일 때 옆 아이콘 높이를 글자 크기에 맞춤 */
+const STAT_ICON_PX_MOBILE = 11
+/** `sm:text-sm`(14px) 구간에서 동일하게 맞춤 */
+const STAT_ICON_PX_SM = 14
 
 /** 홈 탭에서만 넘기면 카드 안에 오늘 미션 달성률 바가 붙습니다 */
 export type ProfileMissionSummary = {
@@ -54,19 +56,26 @@ export function CompactChildProfileCard({
 }: CompactChildProfileCardProps) {
   const lv = Math.min(Math.max(level, 0), LEVEL_NAMES.length - 1)
   const stageName = LEVEL_NAMES[lv]
-  /** 연령대와 보육 문구를 한 줄로 이어 붙입니다(둘 다 없으면 행 자체를 숨깁니다) */
+  /** 둘째 줄: 연령대·보육·나이를 `·`로 이은 문장(비어 있으면 해당 행 숨김) */
   const metaParts = [ageGroupLabel?.trim(), childcareLabel?.trim()].filter(Boolean) as string[]
-  const metaLine = metaParts.length > 0 ? metaParts.join(' · ') : null
+  const secondaryParts = [...metaParts, ...(age != null ? [`${age}세`] : [])]
+  const secondaryLine = secondaryParts.length > 0 ? secondaryParts.join('·') : null
 
   return (
     <div className={`bg-white rounded-xl px-2.5 py-2 shadow-sm ring-1 ring-black/[0.04] ${className}`.trim()}>
-      {/* 상단: 좌·우 블록이 같은 시각 높이를 갖도록 min-h + 세로 가운데 정렬 */}
-      <div className="flex min-h-[4.75rem] items-center gap-2.5">
-        <div className="flex min-h-[4.75rem] min-w-0 flex-1 items-center gap-3">
+      {/** 한 행 전체를 세로 가운데 정렬 — 자녀 정보 텍스트 블록이 프로필 사진(원)의 중앙과 맞도록 합니다 */}
+      <div className="flex items-center gap-2.5">
+        <div className="flex min-w-0 min-h-0 flex-1 items-center gap-3">
           <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-full bg-gradient-to-br from-sky-100 to-sky-200 shadow-inner ring-2 ring-white">
             {avatarUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
+              /**
+               * 프로필 PNG 는 귀·턱이 길어 `object-cover` 만 쓰면 원 밖으로 잘려 보입니다.
+               * 안쪽 여백(`p-2`) + `object-contain` 으로 그림 전체가 원 안에 들어가고, 상대적으로 작게 보입니다.
+               */
+              <div className="flex h-full w-full items-center justify-center p-2">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={avatarUrl} alt="" className="h-full w-full object-contain object-center" />
+              </div>
             ) : (
               <span className="flex h-full w-full items-center justify-center px-1 text-center text-[11px] font-black leading-tight text-sky-800">
                 {stageName}
@@ -74,66 +83,134 @@ export function CompactChildProfileCard({
             )}
           </div>
 
-          <div className="flex min-w-0 flex-1 flex-col justify-center gap-1">
-            {/* 이름과 나이를 한 줄에 배치 (홈·루틴 카드 공통) */}
-            <div className="flex min-w-0 flex-wrap items-baseline gap-x-1.5 gap-y-0">
-              <p className="truncate text-base font-black leading-tight text-gray-900">{name}</p>
-              {age != null && (
-                <span className="shrink-0 text-xs font-bold tabular-nums text-gray-400">{age}세</span>
-              )}
+          <div className="flex min-w-0 flex-1 flex-col justify-center gap-1 py-0.5">
+            {/**
+             * 첫 줄: 이름은 진한 제목, Lv 는 보조 정보처럼 얇은 글씨·회색(단계 별칭은 title 만).
+             */}
+            <div className="flex min-w-0 flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
+              <p className="min-w-0 truncate text-base font-black leading-tight text-gray-900">{name}</p>
+              <span
+                className="shrink-0 text-xs font-light tabular-nums leading-none text-gray-500"
+                title={`레벨 ${lv} · ${stageName}`}
+              >
+                Lv.{lv}
+              </span>
             </div>
-
-            {metaLine && (
-              <p className="text-[11px] font-bold leading-tight text-gray-500 truncate" title={metaLine}>
-                {metaLine}
-              </p>
-            )}
 
             {/**
-             * 크레딧·하트·연속: 글자 대신 icons.png 안의 `credits`·`heart`·`timer` 조각을 보여 줍니다.
-             * (연속은 불 아이콘이 시트에 없어, ‘매일 이어짐’에 가깝게 타이머 프레임을 사용합니다.)
-             * 읽기 도구용 설명은 아래 `aria-label`에 그대로 한글로 남깁니다.
+             * 둘째 줄: 미취학·유치원·나이 순으로 있으면 모두 `·`로 연결합니다.
              */}
-            <div
-              className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[11px] font-bold tabular-nums leading-tight sm:gap-x-3 sm:text-sm"
-              aria-label={`크레딧 ${credits.toLocaleString()}, 하트 ${hearts}, 연속 미션 ${streakDays}일`}
-            >
-              <span className="inline-flex items-center gap-1 text-[#4A90E2]" title="크레딧">
-                <span className="inline-flex shrink-0" aria-hidden>
-                  <SpriteImage
-                    sheet={ICONS}
-                    frame="credits"
-                    width={STAT_ICON_PX}
-                    clipRotated={false}
-                    className="select-none"
-                  />
-                </span>
-                {credits.toLocaleString()}
-              </span>
-              <span className="inline-flex items-center gap-1 text-rose-500" title="하트(경험치)">
-                <span className="inline-flex shrink-0" aria-hidden>
-                  <SpriteImage sheet={ICONS} frame="heart" width={STAT_ICON_PX} className="select-none" />
-                </span>
-                {hearts}
-              </span>
-              <span className="inline-flex items-center gap-1 text-amber-600" title="연속 미션 일수">
-                <span className="inline-flex shrink-0" aria-hidden>
-                  <SpriteImage sheet={ICONS} frame="timer" width={STAT_ICON_PX} className="select-none" />
-                </span>
-                {streakDays}일
-              </span>
-            </div>
+            {secondaryLine && (
+              <p
+                className="text-[11px] font-bold leading-tight text-gray-500 truncate"
+                title={secondaryLine}
+              >
+                {secondaryLine}
+              </p>
+            )}
           </div>
         </div>
 
-        <div className="flex min-h-[4.75rem] w-[52px] shrink-0 flex-col items-center justify-center gap-0.5 text-center">
+        {/**
+         * 크레딧 → 하트 → 연속일: **CSS Grid** 2열(아이콘 칸 | 숫자)로 묶습니다.
+         * 예전처럼 행마다 `inline-flex`만 쓰면 글자 길이에 따라 행 너비가 달라져 아이콘이 들쭉날쭉합니다.
+         * 1열 너비를 고정하고 안에서 아이콘만 가운데 두면 동전·하트·불꽃이 한 세로선에 맞습니다.
+         */}
+        <div
+          className="grid shrink-0 grid-cols-[14px_auto] items-center gap-x-1.5 gap-y-1 text-[11px] font-bold tabular-nums leading-none sm:grid-cols-[18px_auto] sm:text-sm"
+          aria-label={`크레딧 ${credits.toLocaleString()}, 하트 ${hearts}, 연속 미션 ${streakDays}일`}
+        >
+          {/**
+           * 아이콘 높이를 숫자 글자 크기(11px / sm:14px)에 맞춤 — `sm:hidden`·`hidden sm:flex` 로
+           * 서버 컴포넌트에서도 미디어쿼리만으로 두 크기를 전환합니다.
+           */}
           <span
-            className="rounded-full bg-[#4A90E2]/12 px-2 py-0.5 text-[10px] font-black leading-none text-[#4A90E2] tabular-nums"
-            title={`레벨 ${lv} ${stageName}`}
+            className="flex h-[11px] w-full shrink-0 items-center justify-center justify-self-center sm:h-3.5"
+            aria-hidden
           >
-            Lv.{lv}
+            <span className="flex sm:hidden">
+              <SpriteImage
+                sheet={ICONS}
+                frame="credits"
+                width={STAT_ICON_PX_MOBILE}
+                clipRotated={false}
+                className="select-none"
+              />
+            </span>
+            <span className="hidden sm:flex">
+              <SpriteImage
+                sheet={ICONS}
+                frame="credits"
+                width={STAT_ICON_PX_SM}
+                clipRotated={false}
+                className="select-none"
+              />
+            </span>
           </span>
-          <span className="text-[11px] font-bold leading-tight text-gray-600">{stageName}</span>
+          <span className="text-right text-[#4A90E2]" title="크레딧">
+            {credits.toLocaleString()}
+          </span>
+
+          <span
+            className="flex h-[11px] w-full shrink-0 items-center justify-center justify-self-center sm:h-3.5"
+            aria-hidden
+          >
+            <span className="flex sm:hidden">
+              <SpriteImage sheet={ICONS} frame="heart" width={STAT_ICON_PX_MOBILE} className="select-none" />
+            </span>
+            <span className="hidden sm:flex">
+              <SpriteImage sheet={ICONS} frame="heart" width={STAT_ICON_PX_SM} className="select-none" />
+            </span>
+          </span>
+          <span className="text-right text-rose-500" title="하트(경험치·EXP)">
+            {hearts}
+          </span>
+
+          {/** 불꽃: 연속 일수 — 글자 크기에 맞춘 두 벌 SVG */}
+          <span
+            className="flex h-[11px] w-full shrink-0 items-center justify-center justify-self-center sm:h-3.5"
+            aria-hidden
+          >
+            <span className="flex sm:hidden">
+              <svg
+                width={STAT_ICON_PX_MOBILE}
+                height={STAT_ICON_PX_MOBILE}
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+                className="shrink-0 text-orange-500"
+              >
+                <path
+                  d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"
+                  stroke="currentColor"
+                  strokeWidth="1.75"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </span>
+            <span className="hidden sm:flex">
+              <svg
+                width={STAT_ICON_PX_SM}
+                height={STAT_ICON_PX_SM}
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+                className="shrink-0 text-orange-500"
+              >
+                <path
+                  d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </span>
+          </span>
+          <span className="text-right text-amber-600" title="연속 미션 일수">
+            {streakDays}일
+          </span>
         </div>
       </div>
 

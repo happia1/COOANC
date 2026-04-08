@@ -23,6 +23,8 @@ type LinkedChildRow = {
   age: number | null
   institution_type: string | null
   age_group: string | null
+  /** 캐릭터 프로필 PNG 공개 경로 — 없으면 홈 카드에 레벨 이름이 대신 나옵니다 */
+  avatar_url: string | null
 }
 
 export default function SettingsPage() {
@@ -111,7 +113,7 @@ export default function SettingsPage() {
     }
     const { data: rows, error: profErr } = await supabase
       .from('profiles')
-      .select('id, name, role, birth_date, age, institution_type, age_group')
+      .select('id, name, role, birth_date, age, institution_type, age_group, avatar_url')
       .in('id', ids)
       .eq('role', 'child')
     if (profErr) {
@@ -126,6 +128,10 @@ export default function SettingsPage() {
         age: typeof (r as { age?: number | null }).age === 'number' ? (r as { age: number }).age : null,
         institution_type: (r as { institution_type?: string | null }).institution_type ?? null,
         age_group: (r as { age_group?: string | null }).age_group ?? null,
+        avatar_url:
+          typeof (r as { avatar_url?: string | null }).avatar_url === 'string'
+            ? (r as { avatar_url: string }).avatar_url
+            : null,
       })),
     )
     setChildrenLoading(false)

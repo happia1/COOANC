@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient as createServerClient } from '@/lib/supabase/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { getAgeFromBirthDateIso } from '@/lib/ageFromBirthDate'
+import { isAllowedChildProfileAvatarUrl } from '@/lib/childProfileAvatar'
 import { isRetriableMissingColumnError } from '@/lib/supabase/childProfileSelect'
 
 /** Supabase 비밀번호 — UI에서 PIN 을 받지 않으므로 서버만 아는 난수로 둡니다. */
@@ -23,17 +24,24 @@ export async function POST(req: NextRequest) {
   let name: string
   let birthDate: string
   let parentId: string
+  /** 선택 사항 — `public` 캐릭터 프로필 PNG 의 공개 경로만 허용 */
+  let avatarUrl: string | undefined
   try {
     const body = await req.json()
     name = body?.name
     birthDate = body?.birthDate
     parentId = body?.parentId
+    avatarUrl = typeof body?.avatarUrl === 'string' ? body.avatarUrl.trim() : undefined
   } catch {
     return NextResponse.json({ error: '요청 형식이 올바르지 않아요.' }, { status: 400 })
   }
 
   if (!name || !birthDate || !parentId) {
     return NextResponse.json({ error: '필수 항목이 누락됐어요.' }, { status: 400 })
+  }
+
+  if (avatarUrl !== undefined && avatarUrl !== '' && !isAllowedChildProfileAvatarUrl(avatarUrl)) {
+    return NextResponse.json({ error: '허용되지 않은 프로필 이미지예요.' }, { status: 400 })
   }
 
   const age = getAgeFromBirthDateIso(birthDate)
@@ -124,6 +132,20 @@ export async function POST(req: NextRequest) {
   }
   if (lastProfileErr) {
     console.error('profiles update (모든 폴백 실패):', lastProfileErr.message)
+  }
+
+  // 프로필 사진은 컬럼이 없는 구형 DB 에서는 조용히 건너뜁니다
+  const safeAvatar =
+    avatarUrl && avatarUrl.length > 0 && isAllowedChildProfileAvatarUrl(avatarUrl) ? avatarUrl : null
+  if (safeAvatar) {
+    const av = await admin.from('profiles').update({ avatar_url: safeAvatar }).eq('id', childId)
+    if (av.error) {
+      if (isRetriableMissingColumnError(av.error)) {
+        console.warn('[child/create] profiles.avatar_url 컬럼 없음 — 이미지 저장 생략')
+      } else {
+        console.error('[child/create] avatar_url update:', av.error)
+      }
+    }
   }
 
   return NextResponse.json({ childId, name }, { status: 201 })

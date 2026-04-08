@@ -1,13 +1,13 @@
 import SpriteImage from '@/components/common/SpriteImage'
-import {
-  PIGGY_BANK, SHOP_ANIMATIONS, MARKET_ITEMS,
-  type PiggyBankFrameName,
-  type ShopAnimFrameName,
-  type MarketItemFrameName,
-} from '@/constants/sprites'
+import MarketItemImage from '@/components/common/MarketItemImage'
+import { PIGGY_BANK, SHOP_ANIMATIONS } from '@/constants/sprites'
+import type { MarketItemImageKey } from '@/constants/marketItemImages'
+import type { PiggyBankFrameName, ShopAnimFrameName } from '@/constants/sprites'
 import type { CSSProperties } from 'react'
 
-export type { PiggyBankFrameName, ShopAnimFrameName, MarketItemFrameName }
+export type { PiggyBankFrameName, ShopAnimFrameName }
+/** 예전 이름 호환 — 마켓 PNG 키와 동일합니다 */
+export type MarketItemFrameName = MarketItemImageKey
 
 interface PiggyBankSpriteProps {
   frame: PiggyBankFrameName
@@ -34,13 +34,14 @@ export function ShopAnimSprite({ frame, ...rest }: ShopAnimSpriteProps) {
 }
 
 interface MarketItemSpriteProps {
-  frame: MarketItemFrameName
+  frame: MarketItemImageKey
   width?: number
   height?: number
   className?: string
   style?: CSSProperties
 }
 
+/** 마켓 상품 기본 그림 — `items/shop/items/*.png` 단일 파일 */
 export function MarketItemSprite({ frame, ...rest }: MarketItemSpriteProps) {
-  return <SpriteImage sheet={MARKET_ITEMS} frame={frame} {...rest} />
+  return <MarketItemImage frame={frame} {...rest} />
 }

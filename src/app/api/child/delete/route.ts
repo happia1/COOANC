@@ -10,8 +10,9 @@ import { createClient as createAdminClient } from '@supabase/supabase-js'
  * 1. 요청자가 로그인된 부모인지 확인
  * 2. family_links로 본인-해당 자녀 연결 여부 확인
  * 3. profiles.role === 'child' 검증 (부모 계정 등 오삭제 방지)
- * 4. Admin API로 auth.users 삭제 → profiles·child_stats·mission_logs·family_links 등
- *    FK CASCADE로 함께 정리됩니다.
+ * 4. Service role로 자녀 전용 미션 템플릿 정리: mission_logs → daily_missions → missions
+ *    (DB에 FK CASCADE가 없어도 삭제되도록 순서 보장)
+ * 5. Admin API로 auth.users 삭제 → profiles·나머지 연쇄는 FK CASCADE로 정리
  */
 export async function POST(req: NextRequest) {
   let childId: string
@@ -67,13 +68,49 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: '자녀 계정만 삭제할 수 있어요.' }, { status: 403 })
   }
 
-  const admin = createAdminClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } },
-  )
+  // 서비스 롤 키가 없으면 Admin 클라이언트로 DB 정리·auth 삭제를 할 수 없음
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!url || !serviceKey) {
+    console.error('[child/delete] SUPABASE_SERVICE_ROLE_KEY 또는 URL 누락')
+    return NextResponse.json({ error: '서버 설정 오류로 삭제할 수 없어요.' }, { status: 500 })
+  }
 
-  // 5a. 이 자녀에만 묶인 미션 템플릿 행을 먼저 제거 (FK 미적용·지연 환경에서도 루틴 탭 잔상 방지)
+  const admin = createAdminClient(url, serviceKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  })
+
+  // 5a. 이 자녀 전용 미션 템플릿(id 목록) 조회 — 공용 풀(linked_child_id NULL)은 건드리지 않음
+  const { data: childMissionRows, error: childMissionsErr } = await admin
+    .from('missions')
+    .select('id')
+    .eq('linked_child_id', childId)
+
+  if (childMissionsErr) {
+    console.error('[child/delete] missions select:', childMissionsErr)
+    return NextResponse.json({ error: '연결된 미션 정리 중 오류가 났어요. 잠시 후 다시 시도해 주세요.' }, { status: 500 })
+  }
+
+  const templateIds = (childMissionRows ?? []).map((r) => r.id as string).filter(Boolean)
+
+  // 5a-1. mission_logs / daily_missions 가 missions 를 참조할 때
+  // DB에 마이그레이션 026(CASCADE)이 아직 없으면, missions 만 지우면 FK 오류가 남.
+  // 그래서 자식 행을 먼저 지운 뒤 템플릿 행을 지움.
+  if (templateIds.length > 0) {
+    const { error: logsErr } = await admin.from('mission_logs').delete().in('mission_id', templateIds)
+    if (logsErr) {
+      console.error('[child/delete] mission_logs delete:', logsErr)
+      return NextResponse.json({ error: '연결된 미션 정리 중 오류가 났어요. 잠시 후 다시 시도해 주세요.' }, { status: 500 })
+    }
+
+    const { error: dailyErr } = await admin.from('daily_missions').delete().in('mission_template_id', templateIds)
+    if (dailyErr) {
+      console.error('[child/delete] daily_missions delete:', dailyErr)
+      return NextResponse.json({ error: '연결된 미션 정리 중 오류가 났어요. 잠시 후 다시 시도해 주세요.' }, { status: 500 })
+    }
+  }
+
+  // 5a-2. 자녀에만 귀속된 미션 템플릿 행 제거
   const { error: missionDelErr } = await admin.from('missions').delete().eq('linked_child_id', childId)
   if (missionDelErr) {
     console.error('[child/delete] missions delete:', missionDelErr)

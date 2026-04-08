@@ -5,20 +5,8 @@
  */
 
 import { useState } from 'react'
+import Image from 'next/image'
 import RoutineAlarmSettingsSheet from '@/components/parent/RoutineAlarmSettingsSheet'
-
-function BellIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-      <path
-        d="M18 8A6 6 0 0 0 6 8c0 7-3 7-3 14h18c0-7-3-7-3-14"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path d="M13.73 21a2 2 0 0 1-3.46 0" strokeLinecap="round" />
-    </svg>
-  )
-}
 
 export default function ParentRoutineAlarmButton() {
   const [open, setOpen] = useState(false)
@@ -28,10 +16,11 @@ export default function ParentRoutineAlarmButton() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex h-8 w-8 items-center justify-center rounded-xl bg-gray-100 text-gray-500 transition-colors hover:bg-gray-200"
+        className="flex h-8 w-8 items-center justify-center transition-opacity hover:opacity-80"
         aria-label="루틴 알람 설정"
       >
-        <BellIcon className="h-[18px] w-[18px]" />
+        {/* 알약 배경 없이 이미지 아이콘만 노출 */}
+        <Image src="/assets/img/common/ui/alarm.png" alt="" width={20} height={20} className="h-5 w-5 object-contain" />
       </button>
       <RoutineAlarmSettingsSheet open={open} onClose={() => setOpen(false)} />
     </>
