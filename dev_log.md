@@ -303,6 +303,38 @@
 
 ---
 
+## [2026-04-10] - 홈 꾸미기 그리드·레벨 플래그 정리·지갑 next/image·루틴/마켓·DB 마이그레이션 묶음
+- **Status:** ✅ 완료
+- **Git:** `9b94917` — `feat: 루틴 미션·에셋·홈 UI·promotion 제거·지갑·마켓/크레딧 반영` (`main` push)
+- **Files Created:**
+  - `src/lib/walletStages.ts` — 지갑 9단계 URL·캐시 버스트(`?v=`, `next.config` 의 `WALLET_IMAGE_CACHE_BUST` 와 동기)
+  - `src/lib/routineMissionThumbnail.ts` — 루틴 미션 썸네일 경로 헬퍼
+  - `src/app/api/mission/patch-rewards/route.ts` — 미션 보상 패치 API
+  - `public/assets/img/missions/routine/**` — 오전/오후/스페셜 루틴 PNG 일괄
+  - `public/assets/img/items/rewards/wallet/wallet6.png` ~ `wallet9.png`, `piggy_bank14.png`
+  - `supabase/migrations/046_reset_missions_routine_image_pack.sql` ~ `052_disable_promotion_pending.sql` — 루틴 이미지 팩·부모 삭제 연쇄·로그 CASCADE·특수 미션 문구·퇴역 템플릿 제거·`promotion_pending` 비활성화 및 기존 행 초기화
+- **Files Modified (핵심):**
+  - `src/components/child/HomeTab.tsx` — 「내 캐릭터 꾸미기」그리드: 하단 여백·셀 축소·세로 `items-start`로 상단 잘림 완화; `promotion_pending` 배너 제거
+  - `src/components/child/MissionTab.tsx` — `promotion_pending` 뱃지 제거
+  - `src/app/api/mission/complete/route.ts`, `src/app/api/daily-mission/complete/route.ts` — `promotion_pending` 항상 false·`promotion_eligible_at` null
+  - `next.config.mjs` — `images.localPatterns` 로 지갑 `?v=` 허용(Next 16)
+  - `src/components/child/ChildHomeIslandStage.tsx`, `MarketTab.tsx`, `MarketWishlistBottomSheet.tsx`, `MissionCreditMoveDialog.tsx` — `walletStages` 기반 지갑 이미지
+  - `src/components/parent/RoutineTab.tsx` 및 `routineChips.ts` / `specialMissionChips.ts` / `sprites.ts` / `routineMissionThumbnail.ts` — 루틴·스페셜 칩·스프라이트·썸네일 정합
+  - `src/components/child/MissionTab.tsx`, `FloatingCreditsStackVisual.tsx`, `piggyBankStages.ts`, `childCreditsSplit.ts` 등 — 미션 섬·크레딧·저금통 단계 연동
+  - `src/app/api/child/credits/transfer/route.ts`, `market/approve`, `market/request`, `ApprovalTab.tsx`, `ParentNewPurchaseRequestModal.tsx` — 마켓·승인·크레딧 흐름 보강
+  - `src/lib/childHomeCharacterFromAvatar.ts`, `src/app/(child)/market/page.tsx`, `PraiseStickerPanel.tsx`, `RoutineOnboarding.tsx` 등 동반 수정
+- **Files Deleted:**
+  - `public/assets/img/items/rewards/wallet/레이어 30.png` — 정리(지갑 단계 PNG 명명 통일)
+- **Summary:**
+  - 자녀 홈에서 꾸미기 슬롯이 위에 잘리던 문제를 여백·크기·정렬로 줄이고, 부모 승인 없이도 레벨이 오르는데 남아 있던 `promotion_pending` 안내·플래그를 DB/API/UI에서 제거했습니다.
+  - Next.js 16 `next/image` 규칙에 맞춰 지갑 URL에 `?v=` 를 두고 `localPatterns` 로 허용해 새 지갑 PNG가 캐시에 묶이지 않게 했습니다.
+  - 루틴 미션 이미지 팩·관련 마이그레이션(046~052)·부모 루틴 탭·마켓/크레딧 API를 한 번에 반영했습니다.
+- **Next Steps:**
+  - Supabase에 `046`~`052` 마이그레이션 순서대로 적용 후 루틴 미션·자녀 스탯·삭제 연쇄 동작 확인
+  - 지갑 PNG를 다시 갈아끼울 때는 `walletStages.ts` 의 `WALLET_IMAGE_CACHE_BUST` 와 `next.config.mjs` 의 동명 상수를 같이 올릴 것
+
+---
+
 ## 📑 Commit Message Protocol
 1. 모든 커밋 메시지는 이 로그의 최신 기록을 바탕으로 작성한다.
 2. **형식**: `type: [작업명] #이슈번호(선택)`
