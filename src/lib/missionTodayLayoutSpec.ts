@@ -2,12 +2,29 @@ import type { CSSProperties } from 'react'
 
 /**
  * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
- * 오늘의 미션(미션 탭 하단) 레이아웃 스펙 — 확정값
+ * 오늘의 미션(미션 탭 하단) — **픽스(확정) UI 스펙**
  *
- * - 세로 분할(상단 풍경 vs 하단 카드 영역), 하단 패널 여백·겹침, 카드 안의
- *   이미지 영역·제목·부제·크레딧(EXP) 알약의 비율·간격이 여기에 모여 있습니다.
- * - 기획·디자인 합의 없이 이 파일의 클래스·숫자를 바꾸지 마세요.
- * - `MissionTab` 은 이 모듈에서 가져온 값만 쓰도록 유지하세요(임의 Tailwind 추가 지양).
+ * 기획·디자인 합의 없이 아래에 해당하는 **클래스·픽셀·간격**을 바꾸지 마세요.
+ * 코드 리뷰·AI 도구도 이 파일만 단일 출처로 보고, `MissionTab` 에 임의 Tailwind 를
+ * 추가하지 않도록 유지하세요.
+ *
+ * ── 바깥·패딩(겹침·클리핑과 연동) ──
+ * • 하단 섹션 `MISSION_TODAY_BOTTOM_SECTION_CLASSNAME`
+ *   - 가로 px-3, 세로 pt-0.5 pb-2.5, 블록 간 gap-0.5, 위로 -mt-12, overflow-x-hidden
+ * • 제목·EXP 줄 `MISSION_TODAY_TITLE_ROW_OUTER/INNER` + EXP 트랙·글자 클래스
+ *   - 제목 래퍼 가로 pl-2 pr-2 (섹션 px-3 과 합쳐 기준선 고정)
+ *   - 한 행 gap-2, 막대 높이 11px·max-w-[14rem], ♥ 쪽 글자 10px(sm 11px) 등
+ * • 카드 가로 스크롤 `MISSION_CARD_SCROLLER_CLASSNAME`
+ *   - 카드 간 gap-1, 스크롤 안쪽 pl-2 pr-2 (= 제목 래퍼와 동일, 그림자 잘림 방지)
+ *
+ * ── 미션 카드 본문 비율·간격 ──
+ * • 카드 버튼 `MISSION_CARD_BUTTON_BASE_CLASSNAME`
+ *   - 너비 w-[min(24vw,104px)], 최소 높이 min-h-[7rem], 세로 gap-y-1.5, 안쪽 p-1.5, 그림자·링
+ * • 이미지 영역 `MISSION_CARD_IMAGE_AREA_CLASSNAME` + `MISSION_CARD_ROUTINE_SPRITE_WIDTH_PX` (=42)
+ * • 텍스트 `MISSION_CARD_TEXT_BLOCK/TITLE/SUBTITLE` — 줄 수·글자 크기(8px/7px)·space-y-0.5
+ * • 보상 알약 `MISSION_CARD_REWARD_*` — px-1.5 py-0.5, gap-x-0.5, 아이콘 12px
+ *
+ * (예전 상·하 flex 비율 5.5:4.5 는 `MISSION_TAB_VERTICAL_SPLIT` 참고용·현 미션 탭 미사용.)
  * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
  */
 
@@ -33,17 +50,13 @@ export function missionTabLowerPanelFlexStyle(): CSSProperties {
   }
 }
 
-/**
- * 「오늘의 미션」 카드들을 담는 하단 섹션 — 겹침·안쪽 여백 고정.
- * 세로 스크롤은 미션 탭 루트(`MissionTab` 의 `overflow-y-auto`)에서만 처리합니다.
- */
-/** 가로는 부모와 탭 전체가 스크롤되지 않게 막고, 카드 행만 내부에서 가로 스크롤 */
+/** 「오늘의 미션」 하단 섹션 — 픽스 패딩·겹침. 세로 스크롤은 `MissionTab` 루트가 담당. (상단 스펙 목록 준수) */
 export const MISSION_TODAY_BOTTOM_SECTION_CLASSNAME =
-  'relative z-10 -mt-12 flex min-w-0 shrink-0 flex-col gap-0.5 overflow-x-hidden overflow-y-visible px-2 pb-2.5 pt-0.5 sm:-mt-12' as const
+  'relative z-10 -mt-12 flex min-w-0 shrink-0 flex-col gap-0.5 overflow-x-hidden overflow-y-visible px-3 pb-2.5 pt-0.5 sm:-mt-12' as const
 
-/** 제목·EXP 막대 한 줄 바깥 래퍼 */
+/** 제목·EXP 줄 바깥 — 픽스 pl-2 pr-2 (카드 스크롤러와 기준선 동일). */
 export const MISSION_TODAY_TITLE_ROW_OUTER_CLASSNAME =
-  'w-full min-w-0 shrink-0 px-2 pb-0.5 pt-0.5' as const
+  'w-full min-w-0 shrink-0 pl-2 pr-2 pb-0.5 pt-0.5' as const
 
 /** 제목·EXP 를 한 행에 넣는 flex 컨테이너 */
 export const MISSION_TODAY_TITLE_ROW_INNER_CLASSNAME =
@@ -73,16 +86,11 @@ export const MISSION_TODAY_EXP_TEXT_IN_BAR_CLASSNAME =
 export const MISSION_TODAY_EXP_TO_NEXT_CLASSNAME =
   'flex shrink-0 items-center gap-0.5 pr-0.5 text-[10px] font-black tabular-nums text-pink-700 sm:text-[11px]' as const
 
-/**
- * 가로 스크롤 미션 카드 행 — 스와이프는 유지하되 **스크롤바(슬라이드바)는 숨김**.
- */
+/** 가로 카드 행 — 픽스 gap-1·pl-2 pr-2, 스크롤바 숨김. (상단 스펙 목록 준수) */
 export const MISSION_CARD_SCROLLER_CLASSNAME =
-  'flex min-h-0 min-w-0 w-full flex-none snap-x snap-mandatory items-start gap-1 overflow-x-auto py-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden' as const
+  'flex min-h-0 min-w-0 w-full flex-none snap-x snap-mandatory items-start gap-1 overflow-x-auto py-0 pl-2 pr-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden' as const
 
-/**
- * 미션 카드 버튼 — 테두리(일반/특별)만 컴포넌트에서 덧붙입니다.
- * 너비·최소 높이·내부 세로 간격(gap-y)·패딩이 카드 비율의 핵심입니다.
- */
+/** 미션 카드 버튼 본체 — 픽스 너비·높이·gap·p (테두리만 일반/특별 분기). */
 export const MISSION_CARD_BUTTON_BASE_CLASSNAME =
   'snap-center flex w-[min(24vw,104px)] min-h-[7rem] shrink-0 flex-col items-stretch gap-y-1.5 overflow-hidden rounded-lg border bg-white p-1.5 text-left font-sans text-brand-text shadow-md transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue focus-visible:ring-offset-1 active:scale-[0.97]' as const
 

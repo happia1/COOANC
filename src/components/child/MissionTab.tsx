@@ -148,7 +148,7 @@ function isMissionRolledBackPayload(v: unknown): v is { dailyMissionId: string; 
 /**
  * 미션 탭
  * - 배경: 미션 상단 잔디 PNG 는 쓰지 않고, 자녀 레이아웃 배경만 보입니다.
- * - **오늘의 미션** 카드 내부 비율·간격은 `missionTodayLayoutSpec.ts` 에 고정되어 있습니다. 임의 수정 금지.
+ * - **오늘의 미션** 바깥·제목·카드 줄 **패딩**, 카드 **비율·간격** 모두 `missionTodayLayoutSpec.ts` 픽스. 임의 수정 금지.
  * - 미션 탭 본문은 세로 스크롤로 상단(섬)·하단(카드)을 이어서 볼 수 있습니다.
  * - 카드 썸네일: `public/.../routines_01.png` 아틀라스(`missionRoutineIconFrame`)
  * - 부모 Realtime 「다시 하기」: DB 는 서버에서 이미 되돌아가고, 여기서는 카드만 슬라이더에 다시 보이게 맞춥니다.
@@ -652,7 +652,7 @@ export default function MissionTab({
   )
 
   /**
-   * 하단 「오늘의 미션」 블록 — 카드·여백 클래스는 `missionTodayLayoutSpec.ts` 고정.
+   * 하단 「오늘의 미션」 블록 — 패딩·카드 비율·간격은 `missionTodayLayoutSpec.ts` 픽스(상단 스펙 목록).
    * 높이는 내용만큼(`shrink-0`)이고, 탭 전체 세로 스크롤은 상위 래퍼가 담당합니다.
    */
   const bottomPanel = (
