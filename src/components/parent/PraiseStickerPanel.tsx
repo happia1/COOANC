@@ -13,7 +13,8 @@ type Props = {
 }
 
 /**
- * 승인 탭 — 아이콘을 누르면 확인 후 자녀에게 칭찬 스티커를 보냅니다.
+ * 승인 탭 — 스티커를 누르면 확인 후 자녀에게 칭찬 스티커를 보냅니다.
+ * 스티커 목록은 기본으로 펼쳐 두며, 필요하면 「접기」로 접을 수 있습니다.
  * (스티커판 비우기·보낸 기록 일괄 삭제는 이 패널에서 제공하지 않습니다.)
  */
 export default function PraiseStickerPanel({ childId, childName }: Props) {
@@ -23,12 +24,15 @@ export default function PraiseStickerPanel({ childId, childName }: Props) {
   const [loading, setLoading] = useState(false)
   /** 전송 실패 시에만 아래 한 줄로 오류를 보여 줍니다(성공 메시지는 표시하지 않음). */
   const [toast, setToast] = useState<{ text: string; ok: boolean } | null>(null)
-  /** 스티커 그리드는 기본 접힘 — 「펼치기」로 하트·별 스티커 10종을 봅니다. */
-  const [stickersOpen, setStickersOpen] = useState(false)
+  /**
+   * 스티커 그리드(하트·별 10종)를 처음부터 보이게 할지 여부입니다.
+   * 기본은 펼침 — 부모가 바로 스티커를 고를 수 있고, 「접기」로 숨길 수 있습니다.
+   */
+  const [stickersOpen, setStickersOpen] = useState(true)
 
-  /** 다른 자녀를 고르면 다시 접어 두어 첫 화면을 맞춥니다. */
+  /** 자녀를 바꾸면 이 패널도 다시 「처음 열었을 때」처럼 펼쳐 둡니다(기본값과 동일). */
   useEffect(() => {
-    setStickersOpen(false)
+    setStickersOpen(true)
   }, [childId])
 
   const send = useCallback(

@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getActorChildContext } from '@/lib/getActorChildContext'
 import MarketTab from '@/components/child/MarketTab'
 import { applyStoreItemCreditOverrides } from '@/lib/applyStoreItemCreditOverrides'
+import { readChildStatInt } from '@/lib/childCreditsSplit'
 import { isCategoryExcludedFromMarket } from '@/lib/parentMarketMenuSections'
 import type { StoreItem, PurchaseRequest } from '@/types/database'
 
@@ -50,8 +51,7 @@ export default async function MarketPage() {
 
   const level = statsRes.data?.current_level ?? 0
   const credits = statsRes.data?.credits ?? 0
-  const creditsWallet =
-    typeof statsRes.data?.credits_wallet === 'number' ? statsRes.data.credits_wallet : 0
+  const creditsWallet = readChildStatInt(statsRes.data?.credits_wallet)
   const initialWishlistEntries = wishRes.error
     ? []
     : (wishRes.data ?? []).map((r: { store_item_id: string; quantity?: number | null }) => ({

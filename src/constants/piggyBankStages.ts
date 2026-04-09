@@ -87,6 +87,7 @@ function parseGoldPiggyFramesFromAtlas(
 
 /**
  * `SpriteImage` / 렌더에 쓰는 아틀라스 프레임 목록 (좌표는 JSON 과 1:1).
+ * 참고: 이번 미션 탭은 아래 `PIGGY_BANK_STAGE_URLS`(14단계 PNG)를 우선 사용합니다.
  */
 export const GOLD_PIGGY_BANK_FRAMES: ReadonlyArray<PiggyAtlasFrame> = parseGoldPiggyFramesFromAtlas(
   atlas,
@@ -100,12 +101,31 @@ export const GOLD_PIGGY_BANK_FRAMES: ReadonlyArray<PiggyAtlasFrame> = parseGoldP
 export const PIGGY_BANK_STAGE_RECTS: ReadonlyArray<{ x: number; y: number; w: number; h: number }> = []
 
 /**
- * 단계별 개별 파일 URL (`public` 기준). 예: `/assets/img/items/piggy-bank/stages/0.png`
- * `null` 이면 사용 안 함. 길이가 1이면 단계와 관계없이 항상 그 한 장만 보입니다.
+ * 단계별 개별 파일 URL (`public` 기준) — 미션 탭 돼지저금통은 총 14단계로 표시합니다.
+ * 비개발자 관점에서 쉽게 보면:
+ * - `piggy_bank1.png` 이 가장 초기 모습(0단계)
+ * - `piggy_bank14.png` 이 가장 가득 찬 모습(13단계)
+ * 코드에서는 배열 인덱스(0부터 시작)로 단계를 고르기 때문에, 파일을 순서대로 나열해 두면
+ * 진행도 비율에 맞춰 자동으로 14단계가 자연스럽게 바뀝니다.
  */
-export const PIGGY_BANK_STAGE_URLS: ReadonlyArray<string> | null = null
+export const PIGGY_BANK_STAGE_URLS: ReadonlyArray<string> = [
+  '/assets/img/items/rewards/piggybank/piggy_bank1.png',
+  '/assets/img/items/rewards/piggybank/piggy_bank2.png',
+  '/assets/img/items/rewards/piggybank/piggy_bank3.png',
+  '/assets/img/items/rewards/piggybank/piggy_bank4.png',
+  '/assets/img/items/rewards/piggybank/piggy_bank5.png',
+  '/assets/img/items/rewards/piggybank/piggy_bank6.png',
+  '/assets/img/items/rewards/piggybank/piggy_bank7.png',
+  '/assets/img/items/rewards/piggybank/piggy_bank8.png',
+  '/assets/img/items/rewards/piggybank/piggy_bank9.png',
+  '/assets/img/items/rewards/piggybank/piggy_bank10.png',
+  '/assets/img/items/rewards/piggybank/piggy_bank11.png',
+  '/assets/img/items/rewards/piggybank/piggy_bank12.png',
+  '/assets/img/items/rewards/piggybank/piggy_bank13.png',
+  '/assets/img/items/rewards/piggybank/piggy_bank14.png',
+] as const
 
-/** 현재 설정으로 몇 단계인지(미션·저금통 비율을 `0 .. (n-1)` 로 나눔). 지금은 9단계 고정 흐름과 동일한 길이 */
+/** 현재 설정으로 몇 단계인지(미션·저금통 비율을 `0 .. (n-1)` 로 나눔). 지금은 URL 목록 길이(14단계)를 우선 사용 */
 export function piggyBankStageCount(): number {
   if (PIGGY_BANK_STAGE_URLS != null && PIGGY_BANK_STAGE_URLS.length > 0) {
     return PIGGY_BANK_STAGE_URLS.length

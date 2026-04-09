@@ -7,6 +7,7 @@
  */
 
 import {
+  BEARS,
   BEAR_HOME_ISLAND_FRONT_FRAME,
   type BearFrameName,
   type BunnyFrameName,
@@ -31,6 +32,19 @@ const DEFAULT_STAGE: HomeIslandStageSprite = {
   height: 238,
 }
 
+/**
+ * 곰 홈 캐릭터는 토끼 높이에 맞추지 않고, `bears.png`의 bear1(Bears (1)) 프레임 자체를 기준으로 계산합니다.
+ * - rotated 프레임은 시각상 가로/세로가 뒤집히므로 natural width/height 를 보정합니다.
+ * - 스케일은 곰 전용 상수로만 제어합니다.
+ */
+const BEAR1_FRAME = BEARS.frames[BEAR_HOME_ISLAND_FRONT_FRAME]
+const BEAR1_NATURAL_WIDTH = BEAR1_FRAME.rotated ? BEAR1_FRAME.h : BEAR1_FRAME.w
+const BEAR1_NATURAL_HEIGHT = BEAR1_FRAME.rotated ? BEAR1_FRAME.w : BEAR1_FRAME.h
+// 곰이 홈 섬에서 과하게 커 보이지 않도록 스케일을 한 단계 줄입니다.
+const BEAR_HOME_ISLAND_SCALE = 0.42
+const BEAR_HOME_ISLAND_WIDTH = Math.round(BEAR1_NATURAL_WIDTH * BEAR_HOME_ISLAND_SCALE)
+const BEAR_HOME_ISLAND_HEIGHT = Math.round(BEAR1_NATURAL_HEIGHT * BEAR_HOME_ISLAND_SCALE)
+
 /** 프로필 URL → 홈 무대용 스프라이트(정면 프레임) */
 const STAGE_BY_AVATAR_URL: Record<string, HomeIslandStageSprite> = {
   [publicUrlForChildProfileAvatar('fox_profile.png')]: {
@@ -46,14 +60,14 @@ const STAGE_BY_AVATAR_URL: Record<string, HomeIslandStageSprite> = {
     height: 238,
   },
   /**
-   * 곰: 스프라이트 키는 `BEAR_HOME_ISLAND_FRONT_FRAME` (= `bears.json` 의 `"Bears (1).png"`, 시트 오른쪽 위).
-   * 표시 크기: 회전 프레임 펼친 뒤 자연 비율 495:280 유지, 토끼 등과 맞추려 높이 238px → 가로 ≈421px.
+   * 곰: `bears.png`의 bear1(`Bears (1)`)을 홈 대표 캐릭터로 사용합니다.
+   * 표시 크기는 곰 프레임 자연 크기 × `BEAR_HOME_ISLAND_SCALE`로 계산합니다.
    */
   [publicUrlForChildProfileAvatar('bear_profile.png')]: {
     character: 'bears',
     frame: BEAR_HOME_ISLAND_FRONT_FRAME,
-    width: 421,
-    height: 238,
+    width: BEAR_HOME_ISLAND_WIDTH,
+    height: BEAR_HOME_ISLAND_HEIGHT,
   },
   [publicUrlForChildProfileAvatar('hamster_profile.png')]: {
     character: 'hamster',

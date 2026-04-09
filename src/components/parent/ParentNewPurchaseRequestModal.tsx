@@ -3,21 +3,28 @@
 /**
  * 부모 앱 전역: 자녀가 마켓에서 구매 요청을 넣으면(Realtime INSERT) 알림 팝업을 띄우고
  * 「구매 요청 확인하기」로 승인 탭의 구매 요청 구역으로 이동합니다.
+ *
+ * 팝업 중앙에는 요청한 상품 사진(또는 기본 일러스트)을 보여 줘서, 글만 봐도 헷갈리지 않게 합니다.
  */
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import MarketItemImage from '@/components/common/MarketItemImage'
+import { marketFrameKeyForItemId } from '@/lib/marketItemFrame'
 import { useParentStore } from '@/store/parentStore'
 
+/** 모달이 닫혀 있을 때 / 열려 있을 때(자녀·상품 정보) */
 type ModalState =
   | { open: false }
-  | { open: true; childId: string; itemName: string | null }
+  | { open: true; childId: string; itemId: string | null; itemName: string | null }
 
 export default function ParentNewPurchaseRequestModal() {
   const router = useRouter()
   const setSelectedChildId = useParentStore((s) => s.setSelectedChildId)
   const [modal, setModal] = useState<ModalState>({ open: false })
+  /** DB `store_items.image_url` — 있으면 실제 상품 사진을 팝업에 씁니다 */
+  const [itemImageUrl, setItemImageUrl] = useState<string | null>(null)
   const channelRef = useRef<ReturnType<ReturnType<typeof createClient>['channel']> | null>(null)
 
   useEffect(() => {
@@ -43,10 +50,21 @@ export default function ParentNewPurchaseRequestModal() {
           'postgres_changes',
           { event: 'INSERT', schema: 'public', table: 'purchase_requests' },
           (payload) => {
-            const row = payload.new as { child_id?: string; status?: string; item_name?: string | null }
+            // Realtime 이 넘기는 새 행: 상품 id·이름이 있으면 이미지 조회에 씁니다
+            const row = payload.new as {
+              child_id?: string
+              status?: string
+              item_id?: string | null
+              item_name?: string | null
+            }
             if (!row.child_id || !childIds.has(row.child_id)) return
             if (row.status !== 'pending') return
-            setModal({ open: true, childId: row.child_id, itemName: row.item_name ?? null })
+            setModal({
+              open: true,
+              childId: row.child_id,
+              itemId: row.item_id ?? null,
+              itemName: row.item_name ?? null,
+            })
           },
         )
         .subscribe()
@@ -61,6 +79,26 @@ export default function ParentNewPurchaseRequestModal() {
       if (ch) void supabase.removeChannel(ch)
     }
   }, [])
+
+  // 모달이 뜬 뒤 상품 id 로 마켓 테이블에서 사진 URL 만 가져옵니다(없으면 아래에서 기본 그림 사용)
+  useEffect(() => {
+    if (!modal.open || !modal.itemId) {
+      setItemImageUrl(null)
+      return
+    }
+    let cancelled = false
+    const supabase = createClient()
+    void (async () => {
+      const { data } = await supabase.from('store_items').select('image_url').eq('id', modal.itemId).maybeSingle()
+      if (!cancelled) {
+        const url = data?.image_url
+        setItemImageUrl(typeof url === 'string' && url.trim() !== '' ? url.trim() : null)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [modal])
 
   /** 승인 탭의 구매 요청 블록으로 스크롤(탭 전환·새로고침 직후 DOM 타이밍을 두 번 잡습니다) */
   function scrollToPurchaseSection() {
@@ -108,6 +146,27 @@ export default function ParentNewPurchaseRequestModal() {
         <p id="parent-new-purchase-title" className="text-center text-lg font-black leading-snug text-brand-text">
           자녀가 구매를 요청했어요!
         </p>
+        {/* 어떤 상품인지 한눈에 — 사진이 있으면 URL, 없으면 다른 화면과 같은 규칙의 기본 일러스트 */}
+        <div
+          className="mx-auto mt-3 flex h-[120px] w-[120px] items-end justify-center overflow-hidden rounded-2xl bg-gray-50 ring-1 ring-gray-100"
+          aria-hidden
+        >
+          {itemImageUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element -- Supabase 등 외부 저장소 URL
+            <img
+              src={itemImageUrl}
+              alt=""
+              className="max-h-full max-w-full object-contain object-bottom"
+              draggable={false}
+            />
+          ) : (
+            <MarketItemImage
+              frame={marketFrameKeyForItemId(modal.itemId, modal.itemName ?? '')}
+              height={100}
+              className="pb-1"
+            />
+          )}
+        </div>
         {modal.itemName && (
           <p className="mt-2 text-center text-sm font-bold text-gray-600">&ldquo;{modal.itemName}&rdquo;</p>
         )}

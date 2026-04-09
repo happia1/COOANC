@@ -55,7 +55,20 @@ export async function POST(req: NextRequest) {
 
   if (error) {
     console.error('[mission/delete-keyword-routine]', error)
-    return NextResponse.json({ error: '루틴 템플릿을 지우지 못했어요' }, { status: 500 })
+    const hint =
+      error.code === '42501' || String(error.message ?? '').toLowerCase().includes('row-level security')
+        ? 'DB에 부모용 미션 삭제 정책이 없을 수 있어요. supabase/migrations/047_missions_parent_delete_update_linked.sql 을 적용해 주세요.'
+        : error.code === '23503'
+          ? 'mission_logs 가 미션을 참조해 삭제가 막혔어요. supabase/migrations/048_mission_logs_mission_id_on_delete_cascade.sql 을 적용해 주세요.'
+          : ''
+    return NextResponse.json(
+      {
+        error: '루틴 템플릿을 지우지 못했어요',
+        detail: error.message,
+        hint: hint || undefined,
+      },
+      { status: 500 },
+    )
   }
 
   return NextResponse.json({ ok: true }, { status: 200 })

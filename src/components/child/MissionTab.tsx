@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo, useCallback, useRef, type MouseEvent } from 'react'
+import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/client'
@@ -8,7 +9,7 @@ import type { ChildStats, DailyMission, DailyMissionWithTemplate } from '@/types
 import ChildHomeIslandStage from '@/components/child/ChildHomeIslandStage'
 import ChildHomeSceneryBand from '@/components/child/ChildHomeSceneryBand'
 import { parseSpecialMissionPopup } from '@/lib/specialMissionDescription'
-import { isSpecialSectionMission } from '@/lib/specialMissionChips'
+import { isRetiredSpecialMissionTitle, isSpecialSectionMission } from '@/lib/specialMissionChips'
 import { parseAlarmFromMissionDescription } from '@/lib/missionAlarmDescription'
 import { scaledMissionRewards, type RewardMultiplier } from '@/lib/missionRewardMultiplier'
 import MissionSleepMorningLayer from '@/components/child/MissionSleepMorningLayer'
@@ -16,6 +17,8 @@ import SpriteImage from '@/components/common/SpriteImage'
 import { BANNERS, ICONS } from '@/constants/sprites'
 import { MISSION_ROUTINES_ATLAS } from '@/constants/missionRoutineAtlas'
 import { missionRoutineIconFrame } from '@/lib/missionRoutineIconFrame'
+import { resolveRoutineMissionPngUrl } from '@/lib/routineMissionThumbnail'
+
 import MissionCreditToPiggyOverlay from '@/components/child/MissionCreditToPiggyOverlay'
 import MissionCreditMoveDialog, {
   MissionCreditActionSheet,
@@ -122,6 +125,7 @@ function trySpecialDeliveryPopupFields(
   if (typeof window === 'undefined') return null
   const m = dm.missions
   if (!m || !isSpecialSectionMission(m)) return null
+  if (isRetiredSpecialMissionTitle(m.title)) return null
   if (m.repeat_type !== 'event') return null
   const { isSpecial } = parseSpecialMissionPopup(m.description)
   if (!isSpecial) return null
@@ -150,7 +154,7 @@ function isMissionRolledBackPayload(v: unknown): v is { dailyMissionId: string; 
  * - 배경: 미션 상단 잔디 PNG 는 쓰지 않고, 자녀 레이아웃 배경만 보입니다.
  * - **오늘의 미션** 바깥·제목·카드 줄 **패딩**, 카드 **비율·간격** 모두 `missionTodayLayoutSpec.ts` 픽스. 임의 수정 금지.
  * - 미션 탭 본문은 세로 스크롤로 상단(섬)·하단(카드)을 이어서 볼 수 있습니다.
- * - 카드 썸네일: `public/.../routines_01.png` 아틀라스(`missionRoutineIconFrame`)
+ * - 카드 썸네일: `resolveRoutineMissionPngUrl`(제목 우선) 또는 `routines_01` 아틀라스(`missionRoutineIconFrame`)
  * - 부모 Realtime 「다시 하기」: DB 는 서버에서 이미 되돌아가고, 여기서는 카드만 슬라이더에 다시 보이게 맞춥니다.
  * - 칭찬 스티커(곰돌이) 단추는 **홈** 화면 플로팅 버튼으로만 엽니다.
  */
@@ -221,7 +225,22 @@ export default function MissionTab({
   })
   const endCreditFx = useCallback(() => setCreditFxOn(false), [])
 
-  const ordered = useMemo(() => orderedMissionsForSlider(missionList), [missionList])
+  /**
+   * 폐지된 스페셜 템플릿(설거지·방청소·심부름 등)은 오늘 행이 남아 있어도 슬라이더·달성 수에 넣지 않음
+   * (부모 루틴 탭과 동일 제목 집합 — `isRetiredSpecialMissionTitle`)
+   */
+  const visibleMissionList = useMemo(
+    () =>
+      missionList.filter((dm) => {
+        const m = dm.missions
+        if (!m) return true
+        if (!isSpecialSectionMission(m)) return true
+        return !isRetiredSpecialMissionTitle(m.title)
+      }),
+    [missionList],
+  )
+
+  const ordered = useMemo(() => orderedMissionsForSlider(visibleMissionList), [visibleMissionList])
 
   /** 완료한 카드는 가로 슬라이더에서 제거해 바로 「사라진」 느낌을 줍니다 */
   const incompleteOrdered = useMemo(() => ordered.filter((dm) => !done.has(dm.id)), [ordered, done])
@@ -435,7 +454,7 @@ export default function MissionTab({
 
   useEffect(() => {
     if (typeof window === 'undefined') return
-    for (const dm of missionList) {
+    for (const dm of visibleMissionList) {
       const m = dm.missions
       if (!m || !isSpecialSectionMission(m)) continue
       const { isSpecial } = parseSpecialMissionPopup(m.description)
@@ -455,7 +474,7 @@ export default function MissionTab({
       })
       break
     }
-  }, [missionList, today])
+  }, [visibleMissionList, today])
 
   function dismissSpecialPopup() {
     if (specialPopup && typeof window !== 'undefined') {
@@ -533,11 +552,13 @@ export default function MissionTab({
   const floatingCredits = stNorm ? creditsFloating(stNorm) : 0
   const exp = stats?.exp ?? 0
   const expToNext = Math.max(1, stats?.exp_to_next_level ?? 1)
-  const promotionPending = Boolean(stats?.promotion_pending)
   const expPct = Math.min(100, (exp / expToNext) * 100)
 
-  const completedCount = done.size
-  const total = missionList.length
+  const completedCount = useMemo(
+    () => visibleMissionList.filter((dm) => done.has(dm.id)).length,
+    [visibleMissionList, done],
+  )
+  const total = visibleMissionList.length
 
   /** 크레딧 옮기기 팝업 제목만(본문 힌트는 레이아웃·겹침 이슈로 팝업에서 제거함) */
   const transferCopy: Record<CreditTransferKind, { title: string }> = {
@@ -579,11 +600,6 @@ export default function MissionTab({
       <div className={MISSION_TODAY_TITLE_ROW_INNER_CLASSNAME}>
         <div className="flex min-w-0 flex-[0_1_auto] items-center gap-2 overflow-hidden">
           <h2 className={MISSION_TODAY_TITLE_HEADING_CLASSNAME}>오늘의 미션</h2>
-          {promotionPending && (
-            <span className="shrink-0 rounded-full bg-amber-300/95 px-2 py-0.5 text-[9px] font-black text-amber-950 shadow-sm">
-              Level up
-            </span>
-          )}
         </div>
         <div
           className={MISSION_TODAY_EXP_GROUP_CLASSNAME}
@@ -696,6 +712,7 @@ export default function MissionTab({
             const special = isSpecialSectionMission(m)
             const sub = cardSubtitle(m.description)
             const routineFrame = missionRoutineIconFrame(m.title, m.description)
+            const routineImagePath = resolveRoutineMissionPngUrl({ title: m.title, iconEmoji: m.icon_emoji })
             return (
               <button
                 key={dm.id}
@@ -704,7 +721,9 @@ export default function MissionTab({
                 aria-label={`${m.title} 미션 완료하기`}
                 className={[
                   MISSION_CARD_BUTTON_BASE_CLASSNAME,
-                  special ? 'border-amber-300 ring-2 ring-amber-200/60' : 'border-gray-200/90',
+                  special
+                    ? 'border-amber-300 ring-2 ring-amber-200/60 bg-gradient-to-b from-amber-50 via-amber-100 to-yellow-200'
+                    : 'border-gray-200/90',
                 ].join(' ')}
               >
                 {/**
@@ -714,13 +733,24 @@ export default function MissionTab({
                 {/** 배경색 없음 — 아틀라스 일러스트만 흰 카드 위에 표시 */}
                 {/** `min-h` + 세로 중앙: 짧은 카드에서도 루틴 일러스트가 잘리지 않게(이전 `flex-1`+낮은 `aspect` 조합이 상단 클리핑 유발) */}
                 <div className={MISSION_CARD_IMAGE_AREA_CLASSNAME}>
-                  <SpriteImage
-                    sheet={MISSION_ROUTINES_ATLAS}
-                    frame={routineFrame}
-                    width={MISSION_CARD_ROUTINE_SPRITE_WIDTH_PX}
-                    clipRotated={false}
-                    className="select-none drop-shadow-[0_2px_8px_rgba(0,0,0,0.08)]"
-                  />
+                  {routineImagePath ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- public 정적 경로, 미션 카드 이미지 직접 표시
+                    <img
+                      src={routineImagePath}
+                      alt=""
+                      className="select-none object-contain drop-shadow-[0_2px_8px_rgba(0,0,0,0.08)]"
+                      style={{ width: MISSION_CARD_ROUTINE_SPRITE_WIDTH_PX, height: MISSION_CARD_ROUTINE_SPRITE_WIDTH_PX }}
+                      draggable={false}
+                    />
+                  ) : (
+                    <SpriteImage
+                      sheet={MISSION_ROUTINES_ATLAS}
+                      frame={routineFrame}
+                      width={MISSION_CARD_ROUTINE_SPRITE_WIDTH_PX}
+                      clipRotated={false}
+                      className="select-none drop-shadow-[0_2px_8px_rgba(0,0,0,0.08)]"
+                    />
+                  )}
                 </div>
 
                 <div className={MISSION_CARD_TEXT_BLOCK_CLASSNAME}>
@@ -805,47 +835,56 @@ export default function MissionTab({
         </div>
         <p className="mt-2 text-center text-sm font-bold text-amber-800">{specialPopup.missionTitle}</p>
         {/**
-         * 보너스(2·3배)일 때 banners.png의 강조 마크(special_mark)와 ×N배를 알약 왼쪽에 붙여 보상이 커졌음을 알립니다.
+         * 보너스(2·3배)일 때 분홍 뾰족 배지 위에 xN배 텍스트를 얹어 보여 줍니다.
          * 미션 카드 하단과 같은 아이콘: 크레딧 · 경험치(EXP는 하트 스프라이트).
          */}
-        <div className="mt-4 flex flex-wrap items-center justify-center gap-2 px-1">
-          {specialPopup.rewardMultiplier > 1 ? (
-            <div className="flex shrink-0 items-center gap-1.5 rounded-full bg-white/85 px-2 py-1 shadow-sm ring-1 ring-amber-400/50">
-              <SpriteImage
-                sheet={BANNERS}
-                frame="special_mark"
-                width={42}
-                clipRotated={false}
-                className="shrink-0 select-none drop-shadow-sm"
-              />
-              <span className="pr-0.5 text-sm font-black tabular-nums text-amber-950">
-                ×{specialPopup.rewardMultiplier}배
+        <div className="mt-4 flex items-center justify-center px-1">
+          {/**
+           * 배율 배지(분홍 뾰족 원)는 보상 알약의 우상단 모서리에 "걸쳐" 보여야 해서
+           * 알약 래퍼를 relative 로 두고 배지를 absolute 로 겹쳐 배치합니다.
+           */}
+          <div className="relative inline-block">
+            <div
+              className="inline-flex max-w-full flex-nowrap items-center justify-center gap-x-2 rounded-full px-3 py-2 text-sm font-black tabular-nums tracking-tight text-gray-800 shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] ring-1 ring-black/[0.06] bg-amber-100/90"
+              role="group"
+              aria-label={
+                specialPopup.rewardMultiplier > 1
+                  ? `보너스 ${specialPopup.rewardMultiplier}배, 크레딧 ${specialPopup.creditReward}, 경험치 ${specialPopup.expReward}`
+                  : `미션 보상: 크레딧 ${specialPopup.creditReward}, 경험치 ${specialPopup.expReward}`
+              }
+            >
+              <span className="inline-flex items-center gap-1">
+                <SpriteImage
+                  sheet={ICONS}
+                  frame="credit"
+                  width={18}
+                  clipRotated={false}
+                  className="shrink-0 select-none"
+                />
+                <span>{specialPopup.creditReward}</span>
+              </span>
+              <span className="inline-flex items-center gap-1" title="경험치(EXP)">
+                <SpriteImage sheet={ICONS} frame="heart" width={18} className="shrink-0 select-none" />
+                <span>{specialPopup.expReward}</span>
               </span>
             </div>
-          ) : null}
-          <div
-            className="inline-flex max-w-full flex-nowrap items-center justify-center gap-x-2 rounded-full px-3 py-2 text-sm font-black tabular-nums tracking-tight text-gray-800 shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] ring-1 ring-black/[0.06] bg-amber-100/90"
-            role="group"
-            aria-label={
-              specialPopup.rewardMultiplier > 1
-                ? `보너스 ${specialPopup.rewardMultiplier}배, 크레딧 ${specialPopup.creditReward}, 경험치 ${specialPopup.expReward}`
-                : `미션 보상: 크레딧 ${specialPopup.creditReward}, 경험치 ${specialPopup.expReward}`
-            }
-          >
-            <span className="inline-flex items-center gap-1">
-              <SpriteImage
-                sheet={ICONS}
-                frame="credit"
-                width={18}
-                clipRotated={false}
-                className="shrink-0 select-none"
-              />
-              <span>{specialPopup.creditReward}</span>
-            </span>
-            <span className="inline-flex items-center gap-1" title="경험치(EXP)">
-              <SpriteImage sheet={ICONS} frame="heart" width={18} className="shrink-0 select-none" />
-              <span>{specialPopup.expReward}</span>
-            </span>
+            {specialPopup.rewardMultiplier > 1 ? (
+              <div className="pointer-events-none absolute -right-10 -top-4 z-[2] h-12 w-12">
+                <SpriteImage
+                  sheet={BANNERS}
+                  frame="special"
+                  width={42}
+                  clipRotated={false}
+                  className="absolute inset-0 m-auto shrink-0 select-none drop-shadow-sm"
+                />
+                {/** 텍스트를 배지 박스 정중앙에 고정하고, 가독성을 위해 흰색으로 표시 */}
+                <span className="absolute inset-0 flex -translate-x-[3.5px] -translate-y-[1px] items-center justify-center text-[13px] font-black tabular-nums leading-none text-white">
+                  x{specialPopup.rewardMultiplier}
+                  {/** 요청사항: '배' 글자만 절반 크기로 축소 */}
+                  <span className="text-[0.6em]">배</span>
+                </span>
+              </div>
+            ) : null}
           </div>
         </div>
         <button
@@ -951,6 +990,7 @@ export default function MissionTab({
           maxAmount={creditMoveKind ? maxAmountForKind(creditMoveKind) : 0}
           title={creditMoveKind ? transferCopy[creditMoveKind].title : ''}
           piggyBalance={piggyCredits}
+          walletBalance={walletCredits}
           onSuccess={applyCreditTransferSuccess}
         />
       </div>
@@ -969,11 +1009,25 @@ export default function MissionTab({
       />
       {popupBlock}
       {rollbackPopupBlock}
-      {toast && (
-        <div className="fixed top-6 left-1/2 z-[110] -translate-x-1/2 animate-bounce rounded-full bg-brand-blue px-5 py-2.5 text-sm font-bold text-white shadow-lg">
-          {toast}
-        </div>
-      )}
+      {/**
+       * 토스트는 `main`(z-10) 안에 두면 상단바(z-40)·하단 독(z-50)보다 뒤 레이어라 가려집니다.
+       * `document.body`로 포털을 열고 화면 정중앙에 두어 항상 위에 보이게 합니다.
+       * 바깥은 `pointer-events-none` — 짧은 표시 동안에도 탭은 아래로 통과합니다.
+       */}
+      {toast &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[200] flex items-center justify-center px-5 pointer-events-none"
+            role="status"
+            aria-live="polite"
+          >
+            <div className="max-w-[min(22rem,calc(100vw-2.5rem))] rounded-2xl bg-brand-blue px-5 py-3 text-center text-sm font-bold leading-snug text-white shadow-2xl ring-2 ring-white/25 pointer-events-auto">
+              {toast}
+            </div>
+          </div>,
+          document.body,
+        )}
       {creditFxOn ? (
         <MissionCreditToPiggyOverlay
           playId={creditFxNonce}
@@ -1010,6 +1064,7 @@ export default function MissionTab({
         maxAmount={creditMoveKind ? maxAmountForKind(creditMoveKind) : 0}
         title={creditMoveKind ? transferCopy[creditMoveKind].title : ''}
         piggyBalance={piggyCredits}
+        walletBalance={walletCredits}
         onSuccess={applyCreditTransferSuccess}
       />
     </div>

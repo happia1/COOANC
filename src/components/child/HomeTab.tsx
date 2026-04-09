@@ -282,9 +282,10 @@ export default function HomeTab({
    * 곰 스티커 단추를 무대 **오른쪽 상단**(기존 날씨 자리)으로 옮깁니다.
    * - 원형 배경 래퍼를 제거해 아이콘 자체만 보이게 합니다.
    * - 바깥은 `pointer-events-none`, 버튼만 `pointer-events-auto` 로 눌리게 유지합니다.
+   * - `pt-5`/`sm:pt-6`: 아이콘을 한 단계 더 아래로(상단 여유).
    */
   const stickerTopRightButton = (
-    <div className="pointer-events-none absolute right-0 top-0 z-20 pr-0.5 pt-3 sm:pr-1 sm:pt-4">
+    <div className="pointer-events-none absolute right-0 top-0 z-20 pr-0.5 pt-5 sm:pr-1 sm:pt-6">
       <div className="pointer-events-auto shrink-0">
         <StickerActionPill
           useCustomImage={clientReady && stickerFabImgOk}
@@ -297,9 +298,11 @@ export default function HomeTab({
 
   /**
    * 하단 꾸미기 영역: 위 풍경과 **6:4**(`flex-[6]` / `flex-[4]`).
+   * `mt-5` / `sm:mt-6`: 섬·풍경과 간격을 넉넉히 두어 아이템 그리드 상단이 잘리거나 겹쳐 보이지 않게 합니다.
+   * `pt-2`: 패널 안에서 제목·그리드가 위 경계에 붙지 않게 여유를 둡니다.
    */
   const homeBottomPanelClass =
-    'relative z-10 -mt-8 flex min-h-0 flex-[4] basis-0 flex-col gap-1 overflow-hidden px-1 pb-2 pt-1 sm:-mt-10'
+    'relative z-10 mt-5 flex min-h-0 flex-[4] basis-0 flex-col gap-1 overflow-hidden px-1 pb-2 pt-2 sm:mt-6'
 
   if (!stats) {
     return (
@@ -316,13 +319,17 @@ export default function HomeTab({
                * 성장 지도 단추만 무대 **왼쪽** 세로 가운데 — 곰 스티커는 화면 오른쪽 아래 플로팅으로 옮겼습니다.
                * `pointer-events-none` 으로 빈 곳 탭은 통과하고 지도 단추만 눌리게 합니다.
                */}
-              <div className="relative mx-auto flex min-h-0 w-full max-w-sm flex-1 flex-col items-center justify-end -mt-6 sm:-mt-8">
+              {/**
+               * 섬·잔디·캐릭터 묶음: `-mt` 를 더 줄여 한 칸 더 아래로 보이게(곰 단추와 맞춤).
+               */}
+              <div className="relative mx-auto flex min-h-0 w-full max-w-sm flex-1 flex-col items-center justify-end -mt-2 sm:-mt-4">
                 {/**
                  * 성장 지도(지도 아이콘) 단추 위치
                  * - 요청사항: "왼쪽 상단" 배치
                  * - `pointer-events-none` 으로 빈 영역 탭은 통과시키고, 버튼만 `pointer-events-auto` 로 눌리게 합니다.
+                 * - `pt-5`/`sm:pt-6`: 곰 스티커 단추와 같은 높이감으로 맞춤
                  */}
-                <div className="pointer-events-none absolute left-0 top-0 z-20 flex items-start pl-0.5 pt-3 sm:pl-1 sm:pt-4">
+                <div className="pointer-events-none absolute left-0 top-0 z-20 flex items-start pl-0.5 pt-5 sm:pl-1 sm:pt-6">
                   <div className="pointer-events-auto shrink-0">
                     <MapActionPill onClick={() => setMapOpen(true)} />
                   </div>
@@ -346,15 +353,16 @@ export default function HomeTab({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <ChildHomeSceneryBand flexFill showBackground={false} ariaLabel="홈 상단">
-        {/** 토끼·섬 무대만 `-mt` 로 살짝 위로 당겨 하단 꾸미기와 맞물리게 합니다. */}
+        {/** 토끼·섬 무대: `-mt` 는 하단 꾸미기와 살짝 겹치게만 두고, 과하게 당기지 않아 잔디·섬이 조금 더 아래에 보입니다. */}
         <div className="flex min-h-0 flex-1 flex-col justify-end gap-1.5">
-          <div className="relative mx-auto flex min-h-0 w-full max-w-sm flex-1 flex-col items-center justify-end -mt-6 sm:-mt-8">
+          <div className="relative mx-auto flex min-h-0 w-full max-w-sm flex-1 flex-col items-center justify-end -mt-2 sm:-mt-4">
             {/**
              * 성장 지도(지도 아이콘) 단추 위치
              * - 요청사항: "왼쪽 상단" 배치
              * - 로딩/정상 화면에서 동일한 좌표를 사용해 UX 를 일관되게 합니다.
+             * - `pt-5`/`sm:pt-6`: 우측 곰 스티커 단추와 세로 위치를 맞춤
              */}
-            <div className="pointer-events-none absolute left-0 top-0 z-20 flex items-start pl-0.5 pt-3 sm:pl-1 sm:pt-4">
+            <div className="pointer-events-none absolute left-0 top-0 z-20 flex items-start pl-0.5 pt-5 sm:pl-1 sm:pt-6">
               <div className="pointer-events-auto shrink-0">
                 <MapActionPill onClick={() => setMapOpen(true)} />
               </div>
@@ -366,24 +374,8 @@ export default function HomeTab({
         </div>
       </ChildHomeSceneryBand>
 
-      {/**
-       * 레벨 업 대기 안내는 **하단 꾸미기 섹션**으로 옮깁니다.
-       * - 예전에는 상단 풍경 밴드 안에 있어서, 하단 패널의 `-mt` 때문에 「내 캐릭터 꾸미기」 제목과 겹쳐 보였습니다.
-       * - 그리드 아래 `shrink-0` 로 고정해 항상 한 줄로 읽히게 합니다.
-       */}
       <section className={homeBottomPanelClass} aria-label="내 캐릭터 꾸미기">
         <CharacterDecorInventoryPlaceholder />
-        {stats.promotion_pending && (
-          <div
-            className="shrink-0 rounded-xl border border-brand-yellow bg-brand-yellow/40 px-3 py-2 sm:px-4"
-            role="status"
-            aria-live="polite"
-          >
-            <span className="text-xs font-bold text-brand-text">
-              레벨 업 대기 중! 부모님 확인을 기다려요
-            </span>
-          </div>
-        )}
       </section>
 
       {sheets}
@@ -406,31 +398,32 @@ const DECOR_GRID_COLS = DECOR_ITEM_COUNT / 2
 function CharacterDecorInventoryPlaceholder() {
   return (
     /** 하단 패널 안에서 제목은 고정 높이, 슬롯 영역만 남는 세로 공간을 씀(세로 스크롤 없음). */
-    <div className="flex min-h-0 w-full flex-1 flex-col pt-0.5" aria-labelledby="child-decor-heading">
-      {/** 제목·부제는 미션 「오늘의 미션」 줄과 같은 글자 크기·굵기 체계(`font-black`, `leading-tight`) */}
-      <div className="mb-1 flex shrink-0 flex-wrap items-center gap-x-2 gap-y-1">
+    <div className="flex min-h-0 w-full flex-1 flex-col pt-1" aria-labelledby="child-decor-heading">
+      {/** 제목만 표시 — 부제 문구는 화면을 단순하게 하기 위해 제거했습니다. */}
+      <div className="mb-2 flex shrink-0 flex-wrap items-center gap-x-2 gap-y-1">
         <h2 id="child-decor-heading" className="text-base font-black leading-tight text-brand-text">
           내 캐릭터 꾸미기
         </h2>
-        <p className="text-[8px] font-black leading-tight text-gray-500">나만의 캐릭터를 꾸며요. &gt;</p>
       </div>
       {/**
        * 바깥만 가로 스크롤 — 안쪽은 `flex` 로 “열”마다 `grid-rows-2` 를 쌓아 두 줄이 항상 같이 움직입니다.
        * `pointer-events-none`: 준비중이라 눌러도 반응하지 않게 막아 두었어요.
+       * 각 열 너비(`18vw`·최대 76px): 한 열 높이(위+아래 정사각형)가 줄어들어 짧은 화면에서도 위줄이 잘리지 않기 쉽습니다.
+       * `items-start` + `pt-1`: 세로 가운데 정렬이면 남는 높이보다 그리드가 클 때 위·아래가 잘리는데, 위부터 채우면 상단 모서리가 보입니다.
        */}
       <div
-        className="-mx-1 min-h-0 flex-1 overflow-x-auto overflow-y-hidden px-2 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden snap-x snap-mandatory"
+        className="-mx-1 min-h-0 flex-1 overflow-x-auto overflow-y-hidden px-2 pb-0.5 pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden snap-x snap-mandatory"
         style={{ WebkitOverflowScrolling: 'touch' }}
         role="region"
         aria-label="캐릭터 꾸미기 아이템 목록, 위아래 두 줄"
       >
-        <div className="flex h-full min-h-0 w-max items-center gap-2 pr-1">
+        <div className="flex h-full min-h-0 w-max items-start gap-1.5 pt-0.5 pr-1">
           {Array.from({ length: DECOR_GRID_COLS }).map((_, col) => (
             <div
               key={`decor-col-${col}`}
               role="group"
               aria-label={`꾸미기 아이템 ${col * 2 + 1}번·${col * 2 + 2}번`}
-              className="grid w-[min(22vw,92px)] shrink-0 snap-center grid-rows-2 gap-y-1"
+              className="grid w-[min(18vw,76px)] shrink-0 snap-center grid-rows-2 gap-y-1"
             >
               {[0, 1].map((rowInCol) => {
                 const index = col * 2 + rowInCol
@@ -450,7 +443,7 @@ function CharacterDecorInventoryPlaceholder() {
                         src={ASSETS.characters.decorItemImages[index]}
                         alt=""
                         fill
-                        sizes="(max-width: 448px) 22vw, 92px"
+                        sizes="(max-width: 448px) 18vw, 76px"
                         className="object-contain p-0.5 grayscale opacity-[0.55]"
                         draggable={false}
                       />

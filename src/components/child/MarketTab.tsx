@@ -1,6 +1,8 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
+import Image from 'next/image'
 import type { StoreItem, PurchaseRequest } from '@/types/database'
 import SpriteImage from '@/components/common/SpriteImage'
 import MarketItemImage from '@/components/common/MarketItemImage'
@@ -12,6 +14,8 @@ import MarketWishlistBottomSheet from '@/components/child/MarketWishlistBottomSh
 import { createClient } from '@/lib/supabase/client'
 import { marketFrameKeyForItemId, type MarketItemFrameKey } from '@/lib/marketItemFrame'
 import { formatMarketCreditLabel } from '@/lib/applyStoreItemCreditOverrides'
+import { readChildStatInt } from '@/lib/childCreditsSplit'
+import { walletImageSrcByStage, walletStageIndexByCredits } from '@/lib/walletStages'
 import {
   PARENT_MARKET_MENU_SECTIONS,
   parentMarketSectionIdForItem,
@@ -94,6 +98,12 @@ export default function MarketTab({
   level,
 }: Props) {
   const [currentWallet, setCurrentWallet] = useState(creditsWallet)
+  /**
+   * 마켓탭 지갑도 미션탭과 같이 9단계 PNG를 쓰고, 잔액 변화 시 한 단계씩 따라가게 합니다.
+   */
+  const walletTargetIdx = walletStageIndexByCredits(currentWallet)
+  const [animatedWalletIdx, setAnimatedWalletIdx] = useState(walletTargetIdx)
+  const animatedWalletIdxRef = useRef(animatedWalletIdx)
   /** 상품별 장바구니 수량(1 이상) */
   const [wishlistQuantities, setWishlistQuantities] = useState<Record<string, number>>(() => {
     const base: Record<string, number> = {}
@@ -117,6 +127,22 @@ export default function MarketTab({
     setHiddenStoreItemIds([...initialHiddenStoreItemIds].sort())
     // eslint-disable-next-line react-hooks/exhaustive-deps -- initialHiddenStoreItemIds 는 hiddenBootstrapKey 에 반영됨
   }, [hiddenBootstrapKey])
+
+  useEffect(() => {
+    animatedWalletIdxRef.current = animatedWalletIdx
+  }, [animatedWalletIdx])
+
+  useEffect(() => {
+    if (walletTargetIdx === animatedWalletIdxRef.current) return
+    /** 목표 단계까지 1칸씩 이동해 지갑 이미지가 자연스럽게 바뀌게 합니다. */
+    const tick = setInterval(() => {
+      setAnimatedWalletIdx((prev) => {
+        if (prev === walletTargetIdx) return prev
+        return prev + (walletTargetIdx > prev ? 1 : -1)
+      })
+    }, 160)
+    return () => clearInterval(tick)
+  }, [walletTargetIdx])
 
   const wishlistBootstrapKey = useMemo(
     () =>
@@ -159,7 +185,7 @@ export default function MarketTab({
         (payload) => {
           const patch = payload.new as Record<string, unknown>
           setCurrentWallet((w0) =>
-            typeof patch.credits_wallet === 'number' ? patch.credits_wallet : w0,
+            'credits_wallet' in patch ? readChildStatInt(patch.credits_wallet) : w0,
           )
         },
       )
@@ -676,7 +702,7 @@ export default function MarketTab({
         showToast(json.error ?? '요청에 실패했어요', false)
         return false
       }
-      if (typeof json.credits_wallet === 'number') setCurrentWallet(json.credits_wallet)
+      if ('credits_wallet' in json) setCurrentWallet(readChildStatInt(json.credits_wallet))
       else setCurrentWallet((w) => w - item.credit_price)
       if (json.request) setMyRequests((prev) => [json.request as PurchaseRequest, ...prev])
       showToast('부모님께 요청했어요!')
@@ -736,15 +762,28 @@ export default function MarketTab({
       style={{ background: '#FAF5EF' }}
     >
 
-      {toast && (
-        <div
-          className={`fixed left-1/2 top-6 z-50 -translate-x-1/2 rounded-full px-5 py-2.5 text-sm font-bold shadow-lg ${
-            toast.ok ? 'bg-brand-blue text-white' : 'bg-red-500 text-white'
-          }`}
-        >
-          {toast.msg}
-        </div>
-      )}
+      {/**
+       * 자녀 레이아웃 `main`은 z-10 이라, 여기서 `fixed top-6` 토스트는 상단바(z-40)에 가려질 수 있습니다.
+       * `body` 포털 + 화면 중앙으로 옮겨 항상 읽을 수 있게 합니다.
+       */}
+      {toast &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[200] flex items-center justify-center px-5 pointer-events-none"
+            role="status"
+            aria-live="polite"
+          >
+            <div
+              className={`max-w-[min(22rem,calc(100vw-2.5rem))] rounded-2xl px-5 py-3 text-center text-sm font-bold leading-snug text-white shadow-2xl ring-2 ring-white/25 pointer-events-auto ${
+                toast.ok ? 'bg-brand-blue' : 'bg-red-500'
+              }`}
+            >
+              {toast.msg}
+            </div>
+          </div>,
+          document.body,
+        )}
 
       {/* 가게 지붕: 높이 상한을 두어 그 아래 선반 3단이 한 뷰포트에 들어오기 쉽게 함 */}
       <div className="shrink-0 w-full overflow-hidden leading-none">
@@ -857,7 +896,14 @@ export default function MarketTab({
       >
         <div className="flex items-center gap-2 sm:gap-2.5">
           <span className="flex shrink-0 items-center" aria-hidden>
-            <SpriteImage sheet={ICONS} frame="wallet" height={34} clipRotated={false} />
+            <Image
+              src={walletImageSrcByStage(animatedWalletIdx)}
+              alt=""
+              width={40}
+              height={40}
+              className="h-auto w-10 select-none object-contain"
+              draggable={false}
+            />
           </span>
           <div className="flex min-w-0 flex-1 items-baseline gap-1.5 text-gray-700">
             {/* 요청사항: '지갑(마켓)' 텍스트 대신 크레딧 아이콘으로 의미를 표시 */}

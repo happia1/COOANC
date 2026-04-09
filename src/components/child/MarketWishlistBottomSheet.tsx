@@ -7,14 +7,18 @@
  */
 
 import Link from 'next/link'
+import Image from 'next/image'
 import type { StoreItem } from '@/types/database'
 import SpriteImage from '@/components/common/SpriteImage'
 import MarketItemImage from '@/components/common/MarketItemImage'
 import { ICONS } from '@/constants/sprites'
 import { formatMarketCreditLabel } from '@/lib/applyStoreItemCreditOverrides'
 import { marketFrameKeyForItemId } from '@/lib/marketItemFrame'
+import { walletImageSrcByStage, walletStageIndexByCredits } from '@/lib/walletStages'
 /** 요청사항: 물건이 담긴 장바구니 아이콘(공용 정적 이미지) */
 const BASKET_FILLED_SRC = '/assets/img/common/ui/basket_filled.png'
+
+/** 지갑 일러스트: `walletStages`(9단계)와 미션·마켓과 동일 규칙 */
 
 type Props = {
   /** 시트를 열지 닫지 */
@@ -160,7 +164,14 @@ export default function MarketWishlistBottomSheet({
             <div className="rounded-2xl bg-white p-3 text-center shadow-sm ring-1 ring-black/[0.06]">
               {/* 요청사항: 마켓 탭과 동일한 지갑 스프라이트 사용 */}
               <div className="flex justify-center" aria-hidden>
-                <SpriteImage sheet={ICONS} frame="wallet" height={34} clipRotated={false} />
+                <Image
+                  src={walletImageSrcByStage(walletStageIndexByCredits(currentWallet))}
+                  alt=""
+                  width={40}
+                  height={40}
+                  className="h-auto w-9 select-none object-contain"
+                  draggable={false}
+                />
               </div>
               <p className="mt-1 text-[11px] font-black text-brand-blue">내 지갑</p>
               <p className="mt-0.5 text-base font-black tabular-nums text-brand-blue">

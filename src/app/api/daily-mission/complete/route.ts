@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { addSeoulCalendarDays } from '@/lib/koreaDate'
 import { scaledMissionRewards } from '@/lib/missionRewardMultiplier'
 import { resolveApiActorChildId } from '@/lib/resolveApiActorChildId'
+import { readChildStatInt } from '@/lib/childCreditsSplit'
 import type { Mission } from '@/types/database'
 
 /**
@@ -68,7 +69,12 @@ export async function POST(req: NextRequest) {
     .eq('id', dm.mission_template_id)
     .maybeSingle()
 
-  if (!mission || !mission.is_active) {
+  /**
+   * 템플릿 행이 없으면(삭제·FK 불일치 등)만 막습니다.
+   * 부모가 루틴에서 미션을 끈 뒤(is_active=false)에도 오늘 이미 배정된 daily_missions 는
+   * 화면에 남을 수 있으므로, 그 경우에도 완료·보상 처리가 되게 합니다.
+   */
+  if (!mission) {
     return NextResponse.json({ error: '미션 템플릿을 찾을 수 없어요' }, { status: 404 })
   }
 
@@ -79,6 +85,9 @@ export async function POST(req: NextRequest) {
 
   /** daily_missions.date 와 동일한 배정일을 써야 승인 탭 「오늘 완료」 필터·부모 목록과 일치합니다 */
   const assignedDate = dm.date
+  /** 스트릭·last_mission_date 는 요청 body 의 today 가 아니라 실제 배정일 기준으로 맞춥니다 */
+  const completionDay =
+    typeof assignedDate === 'string' ? assignedDate.slice(0, 10) : String(assignedDate ?? '').slice(0, 10)
 
   const logData = {
     child_id: childId,
@@ -120,29 +129,28 @@ export async function POST(req: NextRequest) {
   let newExp = stats.exp + expEarned
   let newLevel = stats.current_level
   let newExpToNext = stats.exp_to_next_level
-  let promoPending = stats.promotion_pending
 
   if (newExp >= newExpToNext && newLevel < 5) {
     newExp -= newExpToNext
     newLevel += 1
     newExpToNext = Math.round(newExpToNext * 1.5)
-    if (newLevel === 5) promoPending = true
   }
 
-  const yesterday = addSeoulCalendarDays(today, -1)
+  const yesterday = addSeoulCalendarDays(completionDay, -1)
   let newStreak = stats.streak_days
-  if (stats.last_mission_date !== today) {
+  if (stats.last_mission_date !== completionDay) {
     newStreak = stats.last_mission_date === yesterday ? newStreak + 1 : 1
   }
 
   /** 보상 크레딧은 총액만 증가 → 잔디(가용)에 쌓임. 지갑·저금통 숫자는 그대로 둡니다. */
-  const keepWallet = typeof stats.credits_wallet === 'number' ? stats.credits_wallet : 0
-  const keepPiggy = typeof stats.credits_piggy === 'number' ? stats.credits_piggy : 0
+  const keepWallet = readChildStatInt(stats.credits_wallet)
+  const keepPiggy = readChildStatInt(stats.credits_piggy)
+  const baseCredits = readChildStatInt(stats.credits)
 
   await supabase
     .from('child_stats')
     .update({
-      credits: stats.credits + creditEarned,
+      credits: baseCredits + creditEarned,
       credits_wallet: keepWallet,
       credits_piggy: keepPiggy,
       hearts: stats.hearts + heartEarned,
@@ -152,8 +160,9 @@ export async function POST(req: NextRequest) {
       exp_to_next_level: newExpToNext,
       streak_days: newStreak,
       longest_streak: Math.max(stats.longest_streak, newStreak),
-      last_mission_date: today,
-      promotion_pending: promoPending,
+      last_mission_date: completionDay,
+      promotion_pending: false,
+      promotion_eligible_at: null,
       updated_at: completedAt,
     })
     .eq('child_id', childId)

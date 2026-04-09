@@ -25,7 +25,6 @@ export const AM_CHIPS: ChipDef[] = [
   { id: 'am-water', title: '물마시기', emoji: '', type: 'recommended', apiBlock: 'morning' },
   { id: 'am-dress', title: '옷 갈아입기', emoji: '', type: 'recommended', apiBlock: 'morning' },
   { id: 'am-bag', title: '가방 챙기기', emoji: '', type: 'optional', apiBlock: 'morning' },
-  { id: 'am-shoes', title: '신발신기', emoji: '', type: 'optional', apiBlock: 'morning' },
   { id: 'am-school', title: '등원하기', emoji: '', type: 'optional', hideWhenNoSchool: true, apiBlock: 'morning' },
 ]
 
@@ -386,8 +385,10 @@ export async function postRoutineKeywordMissions(
     body: JSON.stringify({ childId: input.linkedChildId }),
   })
   if (!wipe.ok) {
-    const j = await wipe.json().catch(() => ({}))
-    throw new Error(typeof j.error === 'string' ? j.error : '기존 키워드 루틴을 정리하지 못했어요')
+    const j = (await wipe.json().catch(() => ({}))) as { error?: string; hint?: string }
+    const base = typeof j.error === 'string' ? j.error : '기존 키워드 루틴을 정리하지 못했어요'
+    const hint = typeof j.hint === 'string' && j.hint.trim() ? `\n\n${j.hint.trim()}` : ''
+    throw new Error(`${base}${hint}`)
   }
 
   const returnAnchor = /^\d{2}:\d{2}$/.test(input.returnHomeTime.trim())

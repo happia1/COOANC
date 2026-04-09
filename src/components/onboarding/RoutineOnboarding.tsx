@@ -36,7 +36,6 @@ const AM_CHIPS: ChipDef[] = [
   { id: 'am-water', title: '물마시기', emoji: '', type: 'recommended', apiBlock: 'morning' },
   { id: 'am-dress', title: '옷 갈아입기', emoji: '', type: 'recommended', apiBlock: 'morning' },
   { id: 'am-bag', title: '가방 챙기기', emoji: '', type: 'optional', apiBlock: 'morning' },
-  { id: 'am-shoes', title: '신발신기', emoji: '', type: 'optional', apiBlock: 'morning' },
   { id: 'am-school', title: '등원하기', emoji: '', type: 'optional', hideWhenNoSchool: true, apiBlock: 'morning' },
 ]
 

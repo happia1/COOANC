@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { addSeoulCalendarDays } from '@/lib/koreaDate'
 import { scaledMissionRewards } from '@/lib/missionRewardMultiplier'
 import type { Mission } from '@/types/database'
+import { readChildStatInt } from '@/lib/childCreditsSplit'
 
 /**
  * POST /api/mission/complete
@@ -87,13 +88,11 @@ export async function POST(req: NextRequest) {
   let newExp = stats.exp + expEarned
   let newLevel = stats.current_level
   let newExpToNext = stats.exp_to_next_level
-  let promotionPending = stats.promotion_pending
 
   if (newExp >= newExpToNext && newLevel < 5) {
     newExp -= newExpToNext
     newLevel += 1
     newExpToNext = Math.round(newExpToNext * 1.5)
-    if (newLevel === 5) promotionPending = true
   }
 
   // 스트릭 계산
@@ -103,13 +102,14 @@ export async function POST(req: NextRequest) {
     newStreak = stats.last_mission_date === yesterday ? newStreak + 1 : 1
   }
 
-  const keepWallet = typeof stats.credits_wallet === 'number' ? stats.credits_wallet : 0
-  const keepPiggy = typeof stats.credits_piggy === 'number' ? stats.credits_piggy : 0
+  const keepWallet = readChildStatInt(stats.credits_wallet)
+  const keepPiggy = readChildStatInt(stats.credits_piggy)
+  const baseCredits = readChildStatInt(stats.credits)
 
   await supabase
     .from('child_stats')
     .update({
-      credits: stats.credits + creditEarned,
+      credits: baseCredits + creditEarned,
       credits_wallet: keepWallet,
       credits_piggy: keepPiggy,
       hearts: stats.hearts + heartEarned,
@@ -120,7 +120,9 @@ export async function POST(req: NextRequest) {
       streak_days: newStreak,
       longest_streak: Math.max(stats.longest_streak, newStreak),
       last_mission_date: today,
-      promotion_pending: promotionPending,
+      /** 예전에는 레벨5 진입 시 부모 확인용 플래그를 켰으나, 앱에 승인 흐름이 없어 사용하지 않습니다. */
+      promotion_pending: false,
+      promotion_eligible_at: null,
       updated_at: new Date().toISOString(),
     })
     .eq('child_id', user.id)

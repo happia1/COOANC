@@ -9,10 +9,12 @@
  * - 알람은 온보딩·상단 「루틴 알람」에서만 설정해 충돌을 막습니다.
  * - 스페셜 「오늘 하루만」미션은 「일정 추가」→ 보너스 배율 시트에서 저장한 뒤 오늘 일정에 넣습니다.
  * - 매일 스페셜은 「보상 배율」로만 배율을 바꿉니다(카드에 「보상 N배」 문구는 넣지 않음).
+ * - 상단 자녀 프로필 카드를 누르면 홈 탭과 같이 「부모가 이 자녀 앱 화면 보기」로 들어갑니다(API 쿠키 후 /home).
  */
 
 import { useState, useEffect, useLayoutEffect, useMemo, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
+import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useParentStore } from '@/store/parentStore'
 import { createClient } from '@/lib/supabase/client'
@@ -29,21 +31,85 @@ import { uuidStringsEqual } from '@/lib/normalizeUuid'
 import { ROUTINE_HAS_SCHOOL_KEY } from '@/lib/routineAlarmLocalPrefs'
 import {
   displaySpecialMissionTitle,
+  isRetiredSpecialMissionTitle,
   isRoutineSectionMission,
   isSpecialSectionMission,
 } from '@/lib/specialMissionChips'
 import { sortMissionsByRoutineFlow } from '@/lib/routineChips'
+import SpriteImage from '@/components/common/SpriteImage'
+import { ICONS } from '@/constants/sprites'
+import { MISSION_ROUTINES_ATLAS } from '@/constants/missionRoutineAtlas'
+import { missionRoutineIconFrame } from '@/lib/missionRoutineIconFrame'
+import { resolveRoutineMissionPngUrl } from '@/lib/routineMissionThumbnail'
 
+/**
+ * 루틴·스페셜 카드 상단 그림을 그립니다.
+ * - `resolveRoutineMissionPngUrl`: **제목**으로 맞는 PNG 를 먼저 고릅니다(DB 에 잘못된 경로가 있어도 덮어씀).
+ * - PNG 가 없으면 `routines_01` 아틀라스에서 제목·설명으로 프레임을 고릅니다.
+ */
+function MissionIconThumb({ mission, size = 36 }: { mission: Mission; size?: number }) {
+  const png = resolveRoutineMissionPngUrl({ title: mission.title, iconEmoji: mission.icon_emoji })
+  if (png) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element -- public 정적 경로, 미션 이미지 직접 표시
+      <img
+        src={png}
+        alt=""
+        className="h-full w-full object-contain"
+        style={{ width: size, height: size }}
+        draggable={false}
+      />
+    )
+  }
+  const frame = missionRoutineIconFrame(mission.title, mission.description)
+  return (
+    <SpriteImage
+      sheet={MISSION_ROUTINES_ATLAS}
+      frame={frame}
+      width={size}
+      clipRotated={false}
+      className="h-full w-full select-none object-contain"
+    />
+  )
+}
 
-/** HH:MM → "오전/오후 H:MM" */
-function formatTime(t: string | null | undefined): string {
-  if (!t) return ''
-  const [hStr, mStr] = t.split(':')
-  const h = parseInt(hStr, 10)
-  const m = mStr ?? '00'
-  const period = h < 12 ? '오전' : '오후'
-  const h12 = h % 12 === 0 ? 12 : h % 12
-  return `${period} ${h12}:${m}`
+/** 카드 보상 한 줄: 동전+숫자 / 하트+숫자 두 묶음, 묶음 사이는 gap-x-px 로 최소 간격. */
+const ROUTINE_CARD_REWARD_ICON_PX = 12
+
+function RoutineMissionRewardIcons({
+  credit,
+  exp,
+  textClassName,
+  marginClassName,
+}: {
+  credit: number
+  exp: number
+  textClassName: string
+  marginClassName: string
+}) {
+  return (
+    <div
+      className={`${marginClassName} flex flex-wrap items-center justify-center gap-x-px gap-y-0.5 text-[9px] font-black tabular-nums ${textClassName}`}
+      role="group"
+      aria-label={`크레딧 ${credit}, 경험치 ${exp}`}
+    >
+      {/* gap-0 에 더해 숫자를 살짝 당겨 아이콘과 시각적으로 더 밀착 */}
+      <span className="inline-flex items-center gap-0">
+        <SpriteImage
+          sheet={ICONS}
+          frame="credit"
+          width={ROUTINE_CARD_REWARD_ICON_PX}
+          clipRotated={false}
+          className="shrink-0 select-none"
+        />
+        <span className="-ml-0.2 leading-none">{credit}</span>
+      </span>
+      <span className="inline-flex items-center gap-0" title="경험치(EXP)">
+        <SpriteImage sheet={ICONS} frame="heart" width={ROUTINE_CARD_REWARD_ICON_PX} className="shrink-0 select-none" />
+        <span className="-ml-0.2 leading-none">{exp}</span>
+      </span>
+    </div>
+  )
 }
 
 function sortByTime(missions: Mission[]): Mission[] {
@@ -100,12 +166,14 @@ const SLIDE_SECTION_WITH_CARDS = 'border-t border-gray-100 pt-2 pb-2'
 /**
  * 일상 미션용 가로 슬라이드 카드(스페셜 SpecialMissionRow 와 같은 폭·스크롤 패턴)
  */
-function RoutineMissionSlideCard({ mission: m }: { mission: Mission }) {
-  const timeLabel = formatTime(m.scheduled_time)
-
+function RoutineMissionSlideCard({ mission: m, onOpenRewardEditor }: { mission: Mission; onOpenRewardEditor: (m: Mission) => void }) {
   return (
-    <div
-      className={`flex h-full min-h-[4.25rem] flex-col items-center justify-center gap-1 rounded-xl bg-white px-1.5 py-2 text-center shadow-sm ring-1 ${
+    // w-full: li 칸 폭(min(25vw,88px))을 꽉 채워, 카드 옆에 빈 여백이 생기지 않게 함(간격이 넓어 보이는 착시 방지)
+    <button
+      type="button"
+      onClick={() => onOpenRewardEditor(m)}
+      aria-label={`${m.title} 보상(크레딧, 경험치) 수정`}
+      className={`flex h-full w-full min-h-[4.25rem] flex-col items-center justify-center gap-1.5 rounded-xl bg-white px-1.5 py-2 text-center shadow-sm ring-1 ${
         m.is_active ? 'ring-gray-200' : 'ring-gray-100 opacity-80'
       }`}
     >
@@ -114,28 +182,32 @@ function RoutineMissionSlideCard({ mission: m }: { mission: Mission }) {
         className="flex h-9 w-9 shrink-0 items-center justify-center text-lg font-black leading-none text-gray-600"
         aria-hidden
       >
-        {m.icon_emoji?.trim() ? m.icon_emoji : m.title.slice(0, 1)}
+        <MissionIconThumb mission={m} />
       </span>
       <div className="w-full min-w-0 px-0.5">
-        <p className="line-clamp-2 text-[11px] font-bold leading-tight text-gray-800">{m.title}</p>
-        {timeLabel ? (
-          <p className="mt-0.5 text-[9px] font-medium tabular-nums text-gray-500">{timeLabel}</p>
-        ) : null}
+        <p className="line-clamp-2 text-[9px] font-bold leading-snug text-gray-800">{m.title}</p>
+        <RoutineMissionRewardIcons
+          credit={m.credit_reward}
+          exp={m.exp_reward}
+          textClassName="text-brand-blue"
+          marginClassName="mt-0.5"
+        />
       </div>
-    </div>
+    </button>
   )
 }
 
-function renderRoutineMissionStrip(list: Mission[], emptyHint: string) {
+function renderRoutineMissionStrip(list: Mission[], emptyHint: string, onOpenRewardEditor: (m: Mission) => void) {
   if (list.length === 0) {
     return <p className="px-3 py-3 text-center text-[11px] text-gray-400">{emptyHint}</p>
   }
   return (
     <div className="-mx-1 overflow-x-auto pb-0.5 [scrollbar-width:thin]">
-      <ul className="m-0 flex w-max min-w-full list-none snap-x snap-mandatory gap-2 px-2 pb-1 pt-1">
+      {/* gap-0.5·px-1.5: 미션 카드 사이 가로 간격을 줄여 한 화면에 더 밀집되게 */}
+      <ul className="m-0 flex w-max min-w-full list-none snap-x snap-mandatory gap-0.5 px-1.5 pb-1 pt-1">
         {list.map((m) => (
-          <li key={m.id} className="w-[min(26vw,92px)] shrink-0 snap-start py-px">
-            <RoutineMissionSlideCard mission={m} />
+          <li key={m.id} className="w-[min(25vw,88px)] shrink-0 snap-start py-px">
+            <RoutineMissionSlideCard mission={m} onOpenRewardEditor={onOpenRewardEditor} />
           </li>
         ))}
       </ul>
@@ -155,6 +227,7 @@ function AmPmRoutineBlock({
   onTogglePm,
   emptyAmHint,
   emptyPmHint,
+  onOpenRewardEditor,
 }: {
   am: Mission[]
   pm: Mission[]
@@ -164,6 +237,7 @@ function AmPmRoutineBlock({
   onTogglePm: () => void
   emptyAmHint: string
   emptyPmHint: string
+  onOpenRewardEditor: (m: Mission) => void
 }) {
   return (
     <div className="overflow-x-hidden rounded-xl border border-gray-100 bg-white shadow-sm">
@@ -178,7 +252,7 @@ function AmPmRoutineBlock({
       </button>
       {openAm ? (
         <div className={am.length === 0 ? 'border-t border-gray-100' : SLIDE_SECTION_WITH_CARDS}>
-          {renderRoutineMissionStrip(am, emptyAmHint)}
+          {renderRoutineMissionStrip(am, emptyAmHint, onOpenRewardEditor)}
         </div>
       ) : null}
       <button
@@ -192,7 +266,7 @@ function AmPmRoutineBlock({
       </button>
       {openPm ? (
         <div className={pm.length === 0 ? 'border-t border-gray-100' : SLIDE_SECTION_WITH_CARDS}>
-          {renderRoutineMissionStrip(pm, emptyPmHint)}
+          {renderRoutineMissionStrip(pm, emptyPmHint, onOpenRewardEditor)}
         </div>
       ) : null}
     </div>
@@ -217,6 +291,7 @@ function SpecialDailyEventBlock({
   assigningId,
   onStartEventAssignWithBonus,
   onOpenDailyBonusSettings,
+  onOpenRewardEditor,
 }: {
   dailyMissions: Mission[]
   eventMissions: Mission[]
@@ -229,15 +304,19 @@ function SpecialDailyEventBlock({
   onStartEventAssignWithBonus: (m: Mission) => void
   /** 매일(daily) 스페셜 — 보너스 배율만 설정(오늘 배정 API는 호출하지 않음) */
   onOpenDailyBonusSettings: (m: Mission) => void
+  /** 카드 탭으로 보상(크레딧·EXP) 편집 팝업을 엽니다. */
+  onOpenRewardEditor: (m: Mission) => void
 }) {
   const renderHorizontalCards = (list: Mission[], isEventList: boolean) => (
     <div className="-mx-1 overflow-x-auto pb-0.5 [scrollbar-width:thin]">
-      <ul className="m-0 flex w-max min-w-full list-none snap-x snap-mandatory gap-2 px-2 pb-0.5 pt-0.5">
+      {/* 일상 슬라이드와 동일하게 카드 간 가로 간격·좌우 패딩 축소 */}
+      <ul className="m-0 flex w-max min-w-full list-none snap-x snap-mandatory gap-0.5 px-1.5 pb-0.5 pt-0.5">
         {list.map((m) => (
-          <li key={m.id} className="w-[min(26vw,92px)] shrink-0 snap-start py-px">
+          <li key={m.id} className="w-[min(25vw,88px)] shrink-0 snap-start py-px">
             <SpecialMissionRow
               mission={m}
               assigning={isEventList && assigningId === m.id}
+              onOpenRewardEditor={() => onOpenRewardEditor(m)}
               onStartEventAssignWithBonus={isEventList ? () => onStartEventAssignWithBonus(m) : undefined}
               onOpenDailyBonusSettings={!isEventList ? () => onOpenDailyBonusSettings(m) : undefined}
             />
@@ -255,7 +334,11 @@ function SpecialDailyEventBlock({
         aria-expanded={openDaily}
         className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left transition-colors hover:bg-gray-50"
       >
-        <span className="text-xs font-bold text-gray-700">매일 일정</span>
+        {/* 제목 옆 보조 안내 문구를 작은 회색 글씨로 함께 표시 */}
+        <div className="flex min-w-0 items-center gap-1.5">
+          <span className="text-xs font-bold text-gray-700">매일 일정</span>
+          <span className="truncate text-[10px] font-medium text-gray-400">매일 스페셜 일정으로 추가 완료</span>
+        </div>
         <ChevronToggleIcon open={openDaily} className="text-gray-400" />
       </button>
       {openDaily ? (
@@ -273,7 +356,11 @@ function SpecialDailyEventBlock({
         aria-expanded={openEvent}
         className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left transition-colors hover:bg-gray-50"
       >
-        <span className="text-xs font-bold text-gray-700">오늘 하루만</span>
+        {/* 오늘 하루만 블록은 일정 추가 행동을 유도하는 안내 문구를 함께 표시 */}
+        <div className="flex min-w-0 items-center gap-1.5">
+          <span className="text-xs font-bold text-gray-700">오늘 하루만</span>
+          <span className="truncate text-[10px] font-medium text-gray-400">일정 추가를 눌러 오늘의 미션으로 추가</span>
+        </div>
         <ChevronToggleIcon open={openEvent} className="text-gray-400" />
       </button>
       {openEvent ? (
@@ -362,6 +449,8 @@ export default function RoutineTab({ missions: initial, children, todayDailyMiss
   /** 오늘 일정에서 이미 완료된 미션에 보너스·일정 추가 시 */
   const [alreadyCompletedModalOpen, setAlreadyCompletedModalOpen] = useState(false)
   const [assigningId, setAssigningId] = useState<string | null>(null)
+  /** 카드 클릭 시 열리는 보상(크레딧·EXP) 편집 팝업 대상 미션 */
+  const [rewardEditMission, setRewardEditMission] = useState<Mission | null>(null)
 
   /** 오전/오후 접기 — 기본 접힘 */
   const [openWeekdayAm, setOpenWeekdayAm] = useState(false)
@@ -463,7 +552,11 @@ export default function RoutineTab({ missions: initial, children, todayDailyMiss
   }, [scopedInitial])
 
   const routineOnly = useMemo(() => missions.filter(isRoutineMission), [missions])
-  const specialOnly = useMemo(() => missions.filter(isSpecialMission), [missions])
+  /** 폐지된 스페셜 키워드(설거지·방청소·심부름 등)는 DB 에 남아 있어도 목록에서 제외 — `051` 마이그레이션으로 행 삭제 권장 */
+  const specialOnly = useMemo(
+    () => missions.filter(isSpecialMission).filter((m) => !isRetiredSpecialMissionTitle(m.title)),
+    [missions],
+  )
 
   const filteredRoutine = useMemo(
     () => sortMissionsByRoutineFlow(routineOnly.filter((m) => m.level_required <= childLevel)),
@@ -568,6 +661,22 @@ export default function RoutineTab({ missions: initial, children, todayDailyMiss
     setMissions((prev) => prev.map((x) => (x.id === updated.id ? updated : x)))
   }
 
+  async function handleSaveMissionRewards(missionId: string, credit: number, exp: number) {
+    const res = await fetch('/api/mission/patch-rewards', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ missionId, credit_reward: credit, exp_reward: exp }),
+    })
+    const json = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      throw new Error(typeof json.error === 'string' ? json.error : '보상 저장에 실패했어요')
+    }
+    const mission = json.mission as Mission | undefined
+    if (!mission) throw new Error('저장된 미션 정보를 읽지 못했어요')
+    mergeMission(mission)
+    showToast('보상을 저장했어요')
+  }
+
   return (
     <div className="flex flex-col gap-3">
       {toast && (
@@ -584,21 +693,32 @@ export default function RoutineTab({ missions: initial, children, todayDailyMiss
         </div>
       )}
 
-      {/* 홈과 동일한 자녀 프로필 카드(미션 달성률 줄 없음) + 다자녀 전환 */}
+      {/* 홈과 동일: 프로필 카드 탭 → 자녀용 앱(미션·홈 등), 다자녀는 아래 ◀▶ 로만 전환 */}
       {currentChild && (
         <div className="flex flex-col gap-2">
-          <CompactChildProfileCard
-            name={currentChild.name}
-            age={currentChild.age}
-            avatarUrl={currentChild.avatarUrl}
-            level={childLevel}
-            credits={currentChild.credits}
-            hearts={currentChild.hearts}
-            streakDays={currentChild.streakDays}
-            ageGroupLabel={currentChild.ageGroupLabel}
-            childcareLabel={currentChild.childcareLabel}
-            mission={null}
-          />
+          {/**
+           * `enter-child-ui` 가 「이 자녀 화면을 부모가 본다」는 쿠키를 심고 자녀 홈으로 보냅니다.
+           * 클릭 시 선택 id 를 맞춰 두면 부모 탭을 돌아왔을 때도 같은 아이가 선택된 상태로 유지됩니다.
+           */}
+          <Link
+            href={`/api/parent/enter-child-ui?childId=${encodeURIComponent(currentChild.id)}`}
+            className="block cursor-pointer rounded-xl transition-opacity active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4A90E2] focus-visible:ring-offset-2"
+            aria-label={`${currentChild.name} 자녀용 앱 화면으로 들어가기`}
+            onClick={() => setSelectedChildId(currentChild.id)}
+          >
+            <CompactChildProfileCard
+              name={currentChild.name}
+              age={currentChild.age}
+              avatarUrl={currentChild.avatarUrl}
+              level={childLevel}
+              credits={currentChild.credits}
+              hearts={currentChild.hearts}
+              streakDays={currentChild.streakDays}
+              ageGroupLabel={currentChild.ageGroupLabel}
+              childcareLabel={currentChild.childcareLabel}
+              mission={null}
+            />
+          </Link>
           <ChildProfileNav tabs={tabs} compact />
         </div>
       )}
@@ -650,6 +770,7 @@ export default function RoutineTab({ missions: initial, children, todayDailyMiss
                   onTogglePm={() => setOpenWeekdayPm((v) => !v)}
                   emptyAmHint="오전 미션이 없어요"
                   emptyPmHint="오후 미션이 없어요"
+                  onOpenRewardEditor={setRewardEditMission}
                 />
               )}
             </div>
@@ -670,6 +791,7 @@ export default function RoutineTab({ missions: initial, children, todayDailyMiss
                   onTogglePm={() => setOpenWeekendPm((v) => !v)}
                   emptyAmHint="오전 미션이 없어요"
                   emptyPmHint="오후 미션이 없어요"
+                  onOpenRewardEditor={setRewardEditMission}
                 />
               )}
             </div>
@@ -692,6 +814,7 @@ export default function RoutineTab({ missions: initial, children, todayDailyMiss
                 onTogglePm={() => setOpenWeekdayInactivePm((v) => !v)}
                 emptyAmHint="없음"
                 emptyPmHint="없음"
+                onOpenRewardEditor={setRewardEditMission}
               />
             </div>
             <div className="space-y-1.5">
@@ -705,6 +828,7 @@ export default function RoutineTab({ missions: initial, children, todayDailyMiss
                 onTogglePm={() => setOpenWeekendInactivePm((v) => !v)}
                 emptyAmHint="없음"
                 emptyPmHint="없음"
+                onOpenRewardEditor={setRewardEditMission}
               />
             </div>
           </div>
@@ -738,7 +862,7 @@ export default function RoutineTab({ missions: initial, children, todayDailyMiss
               스페셜 미션 추가하기
             </button>
             <p className="mt-2 text-[11px] text-gray-400">
-              운동하기, 설거지, 빨래 정리 등 특별한 날의 이벤트 미션
+              운동하기, 야채먹기, 외투 걸어두기 등 특별한 날의 이벤트 미션
             </p>
           </div>
         ) : (
@@ -766,6 +890,7 @@ export default function RoutineTab({ missions: initial, children, todayDailyMiss
               setAssignTodayAfterBonusMissionId(null)
               setBonusMission(m)
             }}
+            onOpenRewardEditor={setRewardEditMission}
           />
         )}
       </section>
@@ -812,6 +937,12 @@ export default function RoutineTab({ missions: initial, children, todayDailyMiss
         }}
         showToast={showToast}
       />
+
+      <MissionRewardEditModal
+        mission={rewardEditMission}
+        onClose={() => setRewardEditMission(null)}
+        onSave={handleSaveMissionRewards}
+      />
     </div>
   )
 }
@@ -830,28 +961,41 @@ function PencilIcon({ className }: { className?: string }) {
 }
 
 /**
- * 스페셜 미션 카드 — 이모지·제목·(선택) 시각만 표시.
+ * 스페셜 미션 카드 — 썸네일·제목·보상·하단 액션 버튼.
  * - event: 「일정 추가」→ 보너스 시트 후 오늘 넣기
  * - daily: 「보상 배율」만(매일 자동 반영되므로 별도 일정 추가 없음)
  */
 function SpecialMissionRow({
   mission: m,
   assigning,
+  onOpenRewardEditor,
   onStartEventAssignWithBonus,
   onOpenDailyBonusSettings,
 }: {
   mission: Mission
   assigning: boolean
+  /** 카드 탭 시 보상 편집 팝업 열기 */
+  onOpenRewardEditor: () => void
   /** 오늘 하루만(event) — 보너스 적용 흐름으로 이어짐 */
   onStartEventAssignWithBonus?: () => void
   /** 매일(daily) 스페셜 — 배율만 편집 */
   onOpenDailyBonusSettings?: () => void
 }) {
-  const timeLabel = formatTime(m.scheduled_time)
   const titleShort = displaySpecialMissionTitle(m.title)
   return (
+    // w-full: 일상 슬라이드와 같이 li 폭을 채워 카드 사이 간격만 gap 으로 보이게 함
     <div
-      className={`flex flex-col items-center justify-center gap-0.5 rounded-xl bg-white px-1 py-1 text-center shadow-sm ring-1 ${
+      role="button"
+      tabIndex={0}
+      onClick={onOpenRewardEditor}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          onOpenRewardEditor()
+        }
+      }}
+      aria-label={`${m.title} 보상(크레딧, 경험치) 수정`}
+      className={`flex min-h-[5.5rem] w-full flex-col items-center justify-center gap-1.5 rounded-xl bg-white px-1 py-1 text-center shadow-sm ring-1 ${
         m.is_active ? 'ring-violet-100' : 'ring-gray-100 opacity-80'
       }`}
     >
@@ -859,18 +1003,26 @@ function SpecialMissionRow({
         className="flex h-9 w-9 shrink-0 items-center justify-center text-sm font-black leading-none text-violet-800"
         aria-hidden
       >
-        {m.icon_emoji?.trim() ? m.icon_emoji : m.title.slice(0, 1)}
+        <MissionIconThumb mission={m} />
       </span>
       <div className="w-full min-w-0 px-0.5">
-        <p className="line-clamp-2 text-[11px] font-bold leading-tight text-gray-800">{titleShort}</p>
-        {timeLabel ? <p className="mt-px text-[9px] text-gray-500 tabular-nums">{timeLabel}</p> : null}
+        <p className="line-clamp-2 text-[9px] font-bold leading-snug text-gray-800">{titleShort}</p>
+        <RoutineMissionRewardIcons
+          credit={m.credit_reward}
+          exp={m.exp_reward}
+          textClassName="text-violet-700"
+          marginClassName="mt-px"
+        />
       </div>
       <div className="mt-px flex w-full flex-col gap-0.5">
         {m.repeat_type === 'event' && onStartEventAssignWithBonus ? (
           <button
             type="button"
             disabled={!m.is_active || assigning}
-            onClick={onStartEventAssignWithBonus}
+            onClick={(e) => {
+              e.stopPropagation()
+              onStartEventAssignWithBonus()
+            }}
             className="w-full rounded-md border border-violet-200 bg-violet-50 py-0.5 text-[8px] font-bold leading-tight text-violet-800 disabled:opacity-40"
           >
             {assigning ? '넣는 중…' : '일정 추가'}
@@ -880,7 +1032,10 @@ function SpecialMissionRow({
           <button
             type="button"
             disabled={!m.is_active}
-            onClick={onOpenDailyBonusSettings}
+            onClick={(e) => {
+              e.stopPropagation()
+              onOpenDailyBonusSettings()
+            }}
             aria-label="완료 보상 보너스 배율 설정"
             className="w-full rounded-md border border-violet-200/80 bg-violet-50/60 py-0.5 text-[8px] font-bold leading-tight text-violet-900 disabled:opacity-40"
           >
@@ -928,6 +1083,104 @@ function RoutineSimpleAlertModal({
         >
           확인
         </button>
+      </div>
+    </div>,
+    document.body,
+  )
+}
+
+function MissionRewardEditModal({
+  mission,
+  onClose,
+  onSave,
+}: {
+  mission: Mission | null
+  onClose: () => void
+  onSave: (missionId: string, credit: number, exp: number) => Promise<void>
+}) {
+  const [portalReady, setPortalReady] = useState(false)
+  const [credit, setCredit] = useState('0')
+  const [exp, setExp] = useState('0')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+
+  useLayoutEffect(() => {
+    setPortalReady(true)
+  }, [])
+
+  useEffect(() => {
+    if (!mission) return
+    setCredit(String(Math.max(0, mission.credit_reward)))
+    setExp(String(Math.max(0, mission.exp_reward)))
+    setErr(null)
+    setBusy(false)
+  }, [mission])
+
+  if (!mission || !portalReady) return null
+
+  const parsedCredit = Math.max(0, Math.floor(Number(credit) || 0))
+  const parsedExp = Math.max(0, Math.floor(Number(exp) || 0))
+
+  async function submit() {
+    setBusy(true)
+    setErr(null)
+    try {
+      await onSave(mission.id, parsedCredit, parsedExp)
+      onClose()
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : '저장에 실패했어요')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return createPortal(
+    <div className="fixed inset-0 z-[90] flex items-center justify-center p-4" role="dialog" aria-modal="true">
+      <button type="button" className="absolute inset-0 bg-black/45" aria-label="닫기" onClick={onClose} />
+      <div className="relative z-10 w-full max-w-sm rounded-2xl bg-white p-4 shadow-xl">
+        <p className="text-center text-sm font-black text-gray-900">보상 수정</p>
+        <p className="mt-1 text-center text-xs font-semibold text-gray-600">{mission.title}</p>
+
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <label className="flex flex-col gap-1 text-[11px] font-bold text-gray-600">
+            크레딧
+            <input
+              type="number"
+              min={0}
+              step={1}
+              value={credit}
+              onChange={(e) => setCredit(e.target.value)}
+              className="rounded-lg border border-gray-200 px-2 py-2 text-sm font-black tabular-nums text-sky-900"
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-[11px] font-bold text-gray-600">
+            경험치(EXP)
+            <input
+              type="number"
+              min={0}
+              step={1}
+              value={exp}
+              onChange={(e) => setExp(e.target.value)}
+              className="rounded-lg border border-gray-200 px-2 py-2 text-sm font-black tabular-nums text-violet-900"
+            />
+          </label>
+        </div>
+
+        {err ? <p className="mt-2 text-center text-[11px] font-bold text-red-600">{err}</p> : null}
+
+        <div className="mt-3 flex gap-2">
+          <button type="button" onClick={onClose} className="flex-1 rounded-xl bg-gray-100 py-2 text-sm font-bold text-gray-600">
+            취소
+          </button>
+          <button
+            type="button"
+            onClick={() => void submit()}
+            disabled={busy}
+            className="flex-1 rounded-xl bg-[#4A90E2] py-2 text-sm font-black text-white disabled:opacity-50"
+          >
+            {busy ? '저장 중…' : '저장'}
+          </button>
+        </div>
       </div>
     </div>,
     document.body,

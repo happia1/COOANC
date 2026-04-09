@@ -15,11 +15,11 @@ import type { CSSProperties } from 'react'
  *   - 제목 래퍼 가로 pl-2 pr-2 (섹션 px-3 과 합쳐 기준선 고정)
  *   - 한 행 gap-2, 막대 높이 11px·max-w-[14rem], ♥ 쪽 글자 10px(sm 11px) 등
  * • 카드 가로 스크롤 `MISSION_CARD_SCROLLER_CLASSNAME`
- *   - 카드 간 gap-1, 스크롤 안쪽 pl-2 pr-2 (= 제목 래퍼와 동일, 그림자 잘림 방지)
+ *   - 카드 간 gap-0.5(조밀), 스크롤 안쪽 pl-2 pr-2 (= 제목 래퍼와 동일, 그림자 잘림 방지)
  *
  * ── 미션 카드 본문 비율·간격 ──
  * • 카드 버튼 `MISSION_CARD_BUTTON_BASE_CLASSNAME`
- *   - 너비 w-[min(24vw,104px)], 최소 높이 min-h-[7rem], 세로 gap-y-1.5, 안쪽 p-1.5, 그림자·링
+ *   - 너비 w-[min(23vw,98px)], 최소 높이 min-h-[7rem], 세로 gap-y-1.5, 안쪽 p-1.5, 그림자·링
  * • 이미지 영역 `MISSION_CARD_IMAGE_AREA_CLASSNAME` + `MISSION_CARD_ROUTINE_SPRITE_WIDTH_PX` (=42)
  * • 텍스트 `MISSION_CARD_TEXT_BLOCK/TITLE/SUBTITLE` — 줄 수·글자 크기(8px/7px)·space-y-0.5
  * • 보상 알약 `MISSION_CARD_REWARD_*` — px-1.5 py-0.5, gap-x-0.5, 아이콘 12px
@@ -86,13 +86,13 @@ export const MISSION_TODAY_EXP_TEXT_IN_BAR_CLASSNAME =
 export const MISSION_TODAY_EXP_TO_NEXT_CLASSNAME =
   'flex shrink-0 items-center gap-0.5 pr-0.5 text-[10px] font-black tabular-nums text-pink-700 sm:text-[11px]' as const
 
-/** 가로 카드 행 — 픽스 gap-1·pl-2 pr-2, 스크롤바 숨김. (상단 스펙 목록 준수) */
+/** 가로 카드 행 — gap-0.5 로 카드 사이 간격 축소, pl-2 pr-2 유지(제목 줄과 기준선 정렬). 스크롤바 숨김. */
 export const MISSION_CARD_SCROLLER_CLASSNAME =
-  'flex min-h-0 min-w-0 w-full flex-none snap-x snap-mandatory items-start gap-1 overflow-x-auto py-0 pl-2 pr-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden' as const
+  'flex min-h-0 min-w-0 w-full flex-none snap-x snap-mandatory items-start gap-0.5 overflow-x-auto py-0 pl-2 pr-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden' as const
 
 /** 미션 카드 버튼 본체 — 픽스 너비·높이·gap·p (테두리만 일반/특별 분기). */
 export const MISSION_CARD_BUTTON_BASE_CLASSNAME =
-  'snap-center flex w-[min(24vw,104px)] min-h-[7rem] shrink-0 flex-col items-stretch gap-y-1.5 overflow-hidden rounded-lg border bg-white p-1.5 text-left font-sans text-brand-text shadow-md transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue focus-visible:ring-offset-1 active:scale-[0.97]' as const
+  'snap-center flex w-[min(23vw,98px)] min-h-[7rem] shrink-0 flex-col items-stretch gap-y-1.5 overflow-hidden rounded-lg border bg-white p-1.5 text-left font-sans text-brand-text shadow-md transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue focus-visible:ring-offset-1 active:scale-[0.97]' as const
 
 /** 카드 상단 루틴 일러스트 영역(높이 하한 = 이미지·텍스트 비율 고정) */
 export const MISSION_CARD_IMAGE_AREA_CLASSNAME =

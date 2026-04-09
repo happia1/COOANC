@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { resolveApiActorChildId } from '@/lib/resolveApiActorChildId'
+import { readChildStatInt } from '@/lib/childCreditsSplit'
 import { isCategoryExcludedFromMarket } from '@/lib/parentMarketMenuSections'
 
 /**
@@ -79,7 +80,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: '스탯 정보를 찾을 수 없어요' }, { status: 404 })
   }
 
-  const wallet = typeof stats.credits_wallet === 'number' ? stats.credits_wallet : 0
+  const wallet = readChildStatInt(stats.credits_wallet)
 
   if (wallet < effectivePrice) {
     return NextResponse.json(

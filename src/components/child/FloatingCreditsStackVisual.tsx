@@ -21,16 +21,17 @@ type Props = {
   centerInFrame?: boolean
 }
 
-/** 저금통 단계와 맞춘 상한(`piggyBankStages`) — 넘치면 마지막(`credit10`) 그림·크기로 고정 */
+/** 저금통 단계와 맞춘 상한(`piggyBankStages`) — 넘치면 마지막(`home_credit10`) 그림·크기로 고정 */
 const MAX_FLOATING_FOR_STAGE = MISSION_CREDITS_STAGE_CAP
 
 /**
- * 시각 단계 1~10 → `public/assets/img/items/rewards/creditN.png` (아틀라스 없이 개별 파일).
- * 인덱스 0 = credit1 … 9 = credit10.
+ * 시각 단계 1~10 → `public/assets/img/items/rewards/home/home_creditN.png` (아틀라스 없이 개별 파일).
+ * 인덱스 0 = home_credit1 … 9 = home_credit10.
+ * 비개발자 관점으로 보면, 크레딧이 늘수록 1번 그림에서 10번 그림으로 천천히 바뀝니다.
  */
 const COIN_STAGE_IMAGE_URLS: ReadonlyArray<string> = Array.from({ length: 10 }, (_, i) => {
   const n = i + 1
-  return `/assets/img/items/rewards/credit${n}.png`
+  return `/assets/img/items/rewards/home/home_credit${n}.png`
 })
 
 const COIN_STAGE_COUNT = COIN_STAGE_IMAGE_URLS.length
@@ -65,35 +66,15 @@ type LightFx = {
 }
 
 /**
- * 0크레딧 → 단계 0 → `credit1`(가장 작은 더미 느낌).
- * 1~MAX → `ceil(amount * 10 / MAX) - 1` 로 0~9 (예: 1~100 → credit1, 901~1000 → credit10).
+ * 0크레딧 → 단계 0 → `home_credit1`(가장 작은 더미 느낌).
+ * 1~MAX → `ceil(amount * 10 / MAX) - 1` 로 0~9
+ * (예: 1~100 → home_credit1, 901~1000 → home_credit10, MAX는 현재 1000).
  */
 function coinStageIndex(amount: number): number {
   if (amount <= 0) return 0
   const a = Math.min(Math.floor(amount), MAX_FLOATING_FOR_STAGE)
   return Math.min(COIN_STAGE_COUNT - 1, Math.ceil((a * COIN_STAGE_COUNT) / MAX_FLOATING_FOR_STAGE) - 1)
 }
-
-/**
- * 같은 단계 안에서 금액이 늘수록 0→1로 커지게 함.
- * 단계 s 구간: [floor(s*MAX/10)+1, floor((s+1)*MAX/10)].
- */
-function intraStageProgress(amount: number, stage: number): number {
-  if (amount <= 0) return 0
-  const max = MAX_FLOATING_FOR_STAGE
-  const low = Math.floor((stage * max) / COIN_STAGE_COUNT) + 1
-  const high = Math.floor(((stage + 1) * max) / COIN_STAGE_COUNT)
-  const a = Math.min(amount, high)
-  if (high < low) return 1
-  return Math.min(1, Math.max(0, (a - low) / (high - low)))
-}
-
-/**
- * 단계별(인덱스 0=credit1 … 9=credit10) 최소·최대 배율(`displayWidth` 기준).
- * 단계가 올라갈수록 더 크게, 같은 단계 안에서는 t로 min→max 보간.
- */
-const STAGE_SCALE_MIN = [0.4, 0.45, 0.51, 0.57, 0.63, 0.69, 0.76, 0.82, 0.9, 0.98] as const
-const STAGE_SCALE_MAX = [0.5, 0.58, 0.66, 0.74, 0.82, 0.9, 0.99, 1.08, 1.18, 1.28] as const
 
 /**
  * 가운데 가용 크레딧: 동전 PNG 10단계, 구간 안에서는 크기만 부드럽게 증가.
@@ -125,7 +106,6 @@ export default function FloatingCreditsStackVisual({
   const prevCreditRef = useRef(targetCredit)
   const [sparkleOn, setSparkleOn] = useState(false)
   const [lightFx, setLightFx] = useState<LightFx[]>([])
-  const [isMorphing, setIsMorphing] = useState(false)
 
   /** 크레딧이 늘어났을 때만 짧은 반짝임(빛 스프라이트) */
   useEffect(() => {
@@ -152,12 +132,17 @@ export default function FloatingCreditsStackVisual({
   const clamped = Math.max(0, Math.min(displayedCredit, MAX_FLOATING_FOR_STAGE))
   const stage = coinStageIndex(clamped)
   const creditImageSrc = COIN_STAGE_IMAGE_URLS[stage]!
-  const t = intraStageProgress(clamped, stage)
-
-  const smin = STAGE_SCALE_MIN[stage]
-  const smax = STAGE_SCALE_MAX[stage]
-  const mul = smin + (smax - smin) * t
-  const coinSpriteWidth = Math.max(22, Math.round(displayWidth * mul))
+  /**
+   * 요청사항 반영:
+   * - 돈이 많아질수록 가운데 크레딧이 점점 커지게 합니다.
+   * - `displayWidth`를 기준 크기로 두고, 0~MAX(1000) 비율에 따라 부드럽게 확대합니다.
+   * - 너무 작거나 너무 커 보이지 않게 최소/최대 배율을 제한합니다.
+   */
+  const creditRatio = clamped / Math.max(1, MAX_FLOATING_FOR_STAGE)
+  const scaleMin = 0.72
+  const scaleMax = 1.2
+  const sizeMul = scaleMin + (scaleMax - scaleMin) * creditRatio
+  const coinSpriteWidth = Math.max(22, Math.round(displayWidth * sizeMul))
 
   const rh = estimatedCreditImageHeightPx(coinSpriteWidth)
   const rw = coinSpriteWidth
@@ -168,24 +153,18 @@ export default function FloatingCreditsStackVisual({
 
   const opacityClass = targetCredit <= 0 && dimWhenEmpty ? 'opacity-30' : 'opacity-100'
 
-  /** 동전 그림이 바뀔 때(단계 전환) 짧게 살짝 줄었다가 돌아오는 느낌 */
-  const visualKey = `coin-${stage}-${creditImageSrc}`
-
-  useEffect(() => {
-    setIsMorphing(true)
-    const off = setTimeout(() => setIsMorphing(false), 240)
-    return () => clearTimeout(off)
-  }, [visualKey])
-
-  const morphClass = `transition-[opacity,transform] duration-300 ease-out ${isMorphing ? 'opacity-70' : 'opacity-100'}`
-  const morphTransform = (extra: string) =>
-    `${extra} ${isMorphing ? 'scale(0.98)' : 'scale(1)'}`
+  /**
+   * 요청사항:
+   * - 처음 렌더링 시 흐리게 보였다가 진해지는(opacity/scale 모핑) 느낌을 제거합니다.
+   * - 따라서 동전 이미지는 항상 `opacity-100` + 고정 스케일로 즉시 표시합니다.
+   */
+  const morphClass = 'opacity-100'
 
   const anchorYClass = centerInFrame ? 'top-1/2' : 'bottom-0'
   const anchorTransform = (extra: string) =>
     centerInFrame
-      ? morphTransform(`translate(-50%, -50%) ${extra}`.trim())
-      : morphTransform(`translateX(-50%) translateY(${CREDIT_NUDGE_DOWN_PX}px) ${extra}`.trim())
+      ? `translate(-50%, -50%) ${extra}`.trim()
+      : `translateX(-50%) translateY(${CREDIT_NUDGE_DOWN_PX}px) ${extra}`.trim()
 
   const outerShellClass = [
     'relative inline-flex max-w-none shrink-0 flex-col items-center overflow-visible px-1.5 pb-2 pt-1.5',

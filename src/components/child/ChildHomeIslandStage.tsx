@@ -8,7 +8,8 @@ import { resolveHomeIslandStageSprite, type HomeIslandStageSprite } from '@/lib/
 import FloatingCreditsStackVisual from '@/components/child/FloatingCreditsStackVisual'
 import PiggyBankStageVisual from '@/components/child/PiggyBankStageVisual'
 import { MISSION_CREDITS_STAGE_CAP, piggyBankStageCount } from '@/constants/piggyBankStages'
-import { EFFECT_LIGHTS, ICONS } from '@/constants/sprites'
+import { EFFECT_LIGHTS } from '@/constants/sprites'
+import { walletImageSrcByStage, walletStageIndexByCredits } from '@/lib/walletStages'
 type LightFx = { leftPct: number; topPct: number; size: number; delayMs: number; durationMs: number; opacity: number }
 
 /**
@@ -20,8 +21,12 @@ const LIFT_CLASS = '-translate-y-[9rem] sm:-translate-y-[12rem]'
  * Tailwind 가 빌드 시 인식하도록 **문자열 리터럴**만 사용.
  * `320×280` 기준 캔버스에 섬·토끼·돼지를 두고, `cqw`/`cqh` 로 **한 번에** 축소·확대(최소 0.38 ~ 최대 1.18).
  */
+/**
+ * 홈 flex 무대: 섬·잔디·캐릭터를 아래쪽에 두되, 위로 너무 끌어올리지 않도록 `translateY` 상한을 조금 줄입니다.
+ * (숫자를 키우면 다시 위로 붙어 보입니다. 한 칸 더 내릴 때는 rem/cqh 를 함께 소폭 낮춥니다.)
+ */
 const FLEX_UNIFIED_SCALE_CLASS =
-  'pointer-events-none absolute bottom-0 left-1/2 h-[280px] w-[320px] max-w-full origin-bottom overflow-visible [transform:translateX(-50%)_translateY(calc(-1*min(11rem,24cqh)))_scale(clamp(0.38,min(1.18,calc(100cqw/320px),calc(100cqh/280px)),1.18))]'
+  'pointer-events-none absolute bottom-0 left-1/2 h-[280px] w-[320px] max-w-full origin-bottom overflow-visible [transform:translateX(-50%)_translateY(calc(-1*min(7rem,16cqh)))_scale(clamp(0.38,min(1.18,calc(100cqw/320px),calc(100cqh/280px)),1.18))]'
 
 /**
  * 미션(저금통·지갑 UI): 왕관 등 키 큰 스프라이트가 280px 캔버스 위로 넘칠 수 있어
@@ -55,15 +60,18 @@ const ISLAND_IMAGE_SRC = {
 const MISSION_MAP_UNIFIED_SRC = '/assets/img/games/map/map.png'
 
 /**
- * 맵 PNG(뒤): 아주 약한 블러 + 밝기 더 올림 — 지도가 또렷하게 보이게 합니다.
+ * 맵 PNG(뒤): 요청사항에 맞춰 흐림(blur) 효과를 제거하고 기본 선명도로 표시합니다.
  */
-const MISSION_MAP_BACKDROP_SOFTEN_CLASS = 'blur-[0.7px] brightness-124.5'
+const MISSION_MAP_BACKDROP_SOFTEN_CLASS = ''
 
 /**
  * 3열 그리드 전체 너비 안에서 맵을 **가로·세로 가운데(아래쪽 기준)** 에 맞춥니다.
  * `object-contain`: 맵 비율을 유지한 채 박스 안에 들어가게 합니다.
+ * 비개발자용 설명:
+ * - 이전 `w-full`은 부모 가로폭에 딱 맞아 높이만 바꿔도 변화가 거의 안 보일 수 있었어요.
+ * - `w-[124%]`로 맵 자체 폭을 키워 실제 화면에서 확대/축소 변화가 바로 보이게 합니다.
  */
-const MISSION_MAP_UNIFIED_IMG_CLASS = `h-full w-full max-h-[11rem] select-none object-contain object-bottom ${MISSION_MAP_BACKDROP_SOFTEN_CLASS}`
+const MISSION_MAP_UNIFIED_IMG_CLASS = `h-full w-[110%] max-w-none max-h-[13rem] select-none object-contain object-bottom ${MISSION_MAP_BACKDROP_SOFTEN_CLASS}`
 
 /**
  * 돼지·크레딧 더미·지갑 — 위치는 밀지 않고(오프셋 0), **주변으로만 번지는** 그림자.
@@ -72,14 +80,18 @@ const MISSION_MAP_UNIFIED_IMG_CLASS = `h-full w-full max-h-[11rem] select-none o
 const MISSION_CREDIT_SPRITE_POP_SHADOW_CLASS =
   '[filter:drop-shadow(0_0_22px_rgba(15,23,42,0))_drop-shadow(0_0_12px_rgba(15,23,42,0))_drop-shadow(0_0_6px_rgba(0,0,0,0.32))]'
 
-/** 가운데 가용 크레딧 더미만 — 맵보다 살짝 아래 */
-const MISSION_CREDIT_SPRITE_NUDGE_DOWN_CLASS = 'translate-y-5 sm:translate-y-6'
+/** 가운데 가용 크레딧 더미만 — 요청사항에 맞춰 한 단계 더 아래 */
+const MISSION_CREDIT_SPRITE_NUDGE_DOWN_CLASS = 'translate-y-10'
 
-/** 지갑: 돼지·가운데와 맞추되 요청에 따라 한 번 더 아래로 */
-const MISSION_CREDIT_WALLET_SPRITE_NUDGE_DOWN_CLASS = 'translate-y-8 sm:translate-y-10'
+/**
+ * 지갑 위치:
+ * - `translate-y-19` 같은 값은 Tailwind 기본 스케일에 없어 클래스가 무시될 수 있습니다.
+ * - 그래서 미세 조정이 필요할 때는 `translate-y-[...]`(arbitrary value)로 고정합니다.
+ */
+const MISSION_CREDIT_WALLET_SPRITE_NUDGE_DOWN_CLASS = '-translate-x-4 translate-y-[3.6rem]'
 
-/** 저금통(돼지): 맵과 겹침을 줄이며 아래로 — 지갑과 함께 더 내릴 때 이 값만 키움 */
-const MISSION_CREDIT_PIG_SPRITE_NUDGE_DOWN_CLASS = 'translate-y-16 sm:translate-y-20'
+/** 저금통(돼지): 미세 조정이 쉽도록 동일하게 arbitrary value 사용 */
+const MISSION_CREDIT_PIG_SPRITE_NUDGE_DOWN_CLASS = 'translate-x-4 translate-y-[5rem]'
 
 /**
  * 오늘 미션 완료 개수와 전체 개수로, 단계 인덱스를 고릅니다.
@@ -128,7 +140,9 @@ type SlotNumberProps = {
 
 function SlotDigit({ digit, sizeClass }: { digit: string; sizeClass: string }) {
   if (digit === ',') {
-    return <span className={`${sizeClass} leading-none`}>,</span>
+    return (
+      <span className={`inline-flex h-[1.15em] items-center justify-center ${sizeClass} leading-none`}>,</span>
+    )
   }
   const n = Number(digit)
   return (
@@ -174,7 +188,17 @@ function SlotNumber({ value, toneClass, sizeClass, className = '' }: SlotNumberP
   return (
     <span className={`${className} inline-flex items-center gap-[0.04em] font-black tabular-nums ${toneClass}`}>
       {chars.map((ch, idx) => (
-        <SlotDigit key={`digit-${idx}-${ch}`} digit={ch} sizeClass={sizeClass} />
+        /**
+         * 요청사항:
+         * - 슬롯머신처럼 움직이는 각 자리(숫자/쉼표) 뒤에 흰색 네모 블록을 깔아
+         *   자리 구분이 또렷하게 보이도록 합니다.
+         */
+        <span
+          key={`digit-${idx}-${ch}`}
+          className="inline-flex min-w-[0.9em] items-center justify-center rounded-[0.22em] border border-white/90 bg-white/95 px-[0.14em] py-[0.06em] shadow-[0_1px_2px_rgba(15,23,42,0.18)]"
+        >
+          <SlotDigit digit={ch} sizeClass={sizeClass} />
+        </span>
       ))}
     </span>
   )
@@ -275,6 +299,14 @@ export default function ChildHomeIslandStage({
   const animatedPiggyIdxRef = useRef(animatedPiggyIdx)
   const [piggySparkleOn, setPiggySparkleOn] = useState(false)
   const [piggyLightFx, setPiggyLightFx] = useState<LightFx[]>([])
+  /**
+   * 지갑도 목표 단계까지 한 칸씩 따라가게 해서
+   * 크레딧/저금통처럼 서서히 바뀌는 느낌을 맞춥니다.
+   */
+  const walletTargetIdx =
+    scene === 'gippybank' && missionCredits ? walletStageIndexByCredits(missionCredits.wallet) : 0
+  const [animatedWalletIdx, setAnimatedWalletIdx] = useState(walletTargetIdx)
+  const animatedWalletIdxRef = useRef(animatedWalletIdx)
 
   /** 9단계 중 마지막 두 칸은 왕관 돼지(343) — 위로 길어 `min-h`·`pt` 로 잘림을 줄입니다. */
   const piggyStageCount = piggyBankStageCount()
@@ -283,6 +315,10 @@ export default function ChildHomeIslandStage({
   useEffect(() => {
     animatedPiggyIdxRef.current = animatedPiggyIdx
   }, [animatedPiggyIdx])
+
+  useEffect(() => {
+    animatedWalletIdxRef.current = animatedWalletIdx
+  }, [animatedWalletIdx])
 
   useEffect(() => {
     /** 저금통 단계가 올라갈 때만 3초 반짝임 */
@@ -316,6 +352,18 @@ export default function ChildHomeIslandStage({
     }, 170)
     return () => clearInterval(tick)
   }, [piggyIdx])
+
+  useEffect(() => {
+    if (walletTargetIdx === animatedWalletIdxRef.current) return
+    /** 지갑도 목표 단계까지 한 칸씩 이동해 급격한 점프를 줄입니다. */
+    const tick = setInterval(() => {
+      setAnimatedWalletIdx((prev) => {
+        if (prev === walletTargetIdx) return prev
+        return prev + (walletTargetIdx > prev ? 1 : -1)
+      })
+    }, 160)
+    return () => clearInterval(tick)
+  }, [walletTargetIdx])
 
   /**
    * DEBUG(세션 22d9a1): 넓은 화면에서 숫자·맵 겹침 원인 추적
@@ -445,13 +493,13 @@ export default function ChildHomeIslandStage({
              * `bottom-[26%]`: 맵·아이콘 덩어리를 무대 안쪽으로 두고, 열 `min-h` 는 `cqh` 상한으로 잘림 방지.
              */}
             <div className="pointer-events-none absolute inset-x-0 bottom-[26%] flex flex-col items-center">
-              <div className="relative grid w-full max-w-[320px] grid-cols-3 items-end gap-x-2 px-1 sm:max-w-[340px] sm:gap-x-3 sm:px-2">
+              <div className="relative grid w-full max-w-[320px] grid-cols-3 items-end gap-x-2 px-0 sm:max-w-[340px] sm:gap-x-3 sm:px-0">
               {/**
                * `map.png` 한 장 — 3열 그리드 안 `absolute` 슬롯.
                * `bottom-0` 대신 `bottom-2` 등: 그리드 **바닥에서 띄운 만큼** 맵 전체가 위로 올라감(돼지·지갑은 그대로).
                */}
               <div
-                className="pointer-events-none absolute inset-x-0 bottom-2 z-0 flex h-[8.5rem] items-end justify-center sm:bottom-2 sm:h-[9rem]"
+                className="pointer-events-none absolute inset-x-0 bottom-2 z-0 flex h-[12rem] items-end justify-center sm:bottom-2 sm:h-[12.5rem]"
                 aria-hidden
               >
                 <Image
@@ -543,7 +591,8 @@ export default function ChildHomeIslandStage({
                     <FloatingCreditsStackVisual
                       floating={missionCredits.floating}
                       dimWhenEmpty={false}
-                      displayWidth={52}
+                      /** 요청사항: 가운데 크레딧 이미지를 한 단계 더 크게 표시 */
+                      displayWidth={100}
                       className={MISSION_CREDIT_SPRITE_POP_SHADOW_CLASS}
                     />
                   </div>
@@ -557,13 +606,14 @@ export default function ChildHomeIslandStage({
                   aria-label={`지갑 크레딧 ${missionCredits.wallet}. 눌러서 옮기기`}
                   className={`relative z-[1] flex flex-col items-center rounded-2xl p-1 transition-transform active:scale-[0.97] ${MISSION_CREDIT_WALLET_SPRITE_NUDGE_DOWN_CLASS}`}
                 >
-                  <div className="relative z-0 flex h-[72px] w-[72px] items-end justify-center overflow-visible sm:h-[76px] sm:w-[76px]">
-                    <SpriteImage
-                      sheet={ICONS}
-                      frame="wallet"
-                      width={56}
-                      clipRotated={false}
-                      className={MISSION_CREDIT_SPRITE_POP_SHADOW_CLASS}
+                  <div className="relative z-0 flex h-[92px] w-[92px] items-end justify-center overflow-visible sm:h-[96px] sm:w-[96px]">
+                    <Image
+                      src={walletImageSrcByStage(animatedWalletIdx)}
+                      alt=""
+                      width={74}
+                      height={74}
+                      className={`select-none object-contain ${MISSION_CREDIT_SPRITE_POP_SHADOW_CLASS}`}
+                      draggable={false}
                     />
                   </div>
                 </button>

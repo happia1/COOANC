@@ -2,7 +2,7 @@
 
 /**
  * 부모 앱 — 승인 탭
- * - 상단은 루틴 탭과 같은 자녀 프로필 카드 + 다자녀 전환(스토어 selectedChildId 공유).
+ * - 상단은 루틴 탭과 같은 자녀 프로필 카드 + 다자녀 전환(스토어 selectedChildId 공유); 프로필 카드 탭 시 자녀 앱 화면으로 진입(홈과 동일 API).
  * - 구매 요청·미션 롤백은 선택 중인 자녀 기준으로만 표시합니다.
  * - 구매 요청: 대기·외부구매 중 카드 아래에 승인 내역 진입 카드(탭 시 하단 시트, 최근 3건 + 더보기, 이미지 없음).
  * - 미션 롤백: 카드 탭 시 하단 시트(스크롤, 10건까지 + 더보기). 「다시하기」는 API 즉시 롤백 후 자녀에게 브로드캐스트 알림.
@@ -10,6 +10,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useParentStore } from '@/store/parentStore'
 import ChildProfileNav, { type ChildTab } from '@/components/parent/ChildProfileNav'
@@ -310,6 +311,19 @@ export default function ApprovalTab({
   }, [historyForChild, purchaseHistoryShowAll])
 
   const purchaseHistoryHasMore = historyForChild.length > PURCHASE_HISTORY_PREVIEW_COUNT
+
+  /**
+   * 구매 요청 카드 썸네일용 맵입니다.
+   * - 예전에는 UUID만으로 그림 키를 뽑아(해시) 젤리인데 곰 그림처럼 **이름과 안 맞는** 일이 잦았습니다.
+   * - 마켓과 같이 `store_items.image_url`이 있으면 그 주소를 쓰고, 없을 때만 기본 PNG를 씁니다.
+   */
+  const storeItemById = useMemo(() => {
+    const m = new Map<string, StoreItem>()
+    for (const it of storeItems) {
+      m.set(it.id, it)
+    }
+    return m
+  }, [storeItems])
 
   const logsForChild = useMemo(
     () => (currentId ? logs.filter((l) => l.child_id === currentId) : []),
@@ -820,21 +834,31 @@ export default function ApprovalTab({
         </>
       )}
 
-      {/* 루틴 탭과 동일: 프로필 카드 + 다자녀 화살표 */}
+      {/* 루틴·홈과 동일: 프로필 카드 탭 → 자녀 앱, 아래 줄은 다자녀 ◀▶ */}
       {currentChild && (
         <div className="flex flex-col gap-2">
-          <CompactChildProfileCard
-            name={currentChild.name}
-            age={currentChild.age}
-            avatarUrl={currentChild.avatarUrl}
-            level={childLevel}
-            credits={currentChild.credits}
-            hearts={currentChild.hearts}
-            streakDays={currentChild.streakDays}
-            ageGroupLabel={currentChild.ageGroupLabel}
-            childcareLabel={currentChild.childcareLabel}
-            mission={null}
-          />
+          {/**
+           * 부모 홈의 프로필 카드와 같은 동선 — 서버가 쿠키를 설정한 뒤 자녀용 `/home` 으로 이동합니다.
+           */}
+          <Link
+            href={`/api/parent/enter-child-ui?childId=${encodeURIComponent(currentChild.id)}`}
+            className="block cursor-pointer rounded-xl transition-opacity active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4A90E2] focus-visible:ring-offset-2"
+            aria-label={`${currentChild.name} 자녀용 앱 화면으로 들어가기`}
+            onClick={() => setSelectedChildId(currentChild.id)}
+          >
+            <CompactChildProfileCard
+              name={currentChild.name}
+              age={currentChild.age}
+              avatarUrl={currentChild.avatarUrl}
+              level={childLevel}
+              credits={currentChild.credits}
+              hearts={currentChild.hearts}
+              streakDays={currentChild.streakDays}
+              ageGroupLabel={currentChild.ageGroupLabel}
+              childcareLabel={currentChild.childcareLabel}
+              mission={null}
+            />
+          </Link>
           <ChildProfileNav tabs={tabs} compact />
         </div>
       )}
@@ -852,6 +876,10 @@ export default function ApprovalTab({
         ) : (
           <div className="flex flex-col gap-3">
             {requestsForChild.map((req) => {
+              const linked = req.item_id ? storeItemById.get(req.item_id) : undefined
+              const rawUrl = linked?.image_url
+              const thumbUrl =
+                typeof rawUrl === 'string' && rawUrl.trim() !== '' ? rawUrl.trim() : null
               const frame = marketFrameKeyForItemId(req.item_id, req.item_name)
               const isParentBuying = req.status === 'parent_buying'
               return (
@@ -863,11 +891,21 @@ export default function ApprovalTab({
                     <div className="flex min-w-0 flex-1 gap-2 sm:gap-3">
                       <div
                         /** 요청사항 반영: 이전보다 이미지를 조금 키워 가독성 보완 */
-                        className={`flex h-[52px] w-[52px] shrink-0 items-end justify-center overflow-visible rounded-xl ring-1 ${
+                        className={`flex h-[52px] w-[52px] shrink-0 items-end justify-center overflow-hidden rounded-xl ring-1 ${
                           isParentBuying ? 'bg-sky-50/80 ring-sky-100' : 'bg-amber-50/80 ring-amber-100'
                         }`}
                       >
-                        <MarketItemImage frame={frame} height={44} />
+                        {thumbUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element -- 스토리지·외부 URL
+                          <img
+                            src={thumbUrl}
+                            alt=""
+                            className="max-h-full max-w-full object-contain object-bottom"
+                            draggable={false}
+                          />
+                        ) : (
+                          <MarketItemImage frame={frame} height={44} />
+                        )}
                       </div>
                       <div className="min-w-0 flex-1">
                         {/** 요청사항 반영: 텍스트 크기를 한 단계 더 줄여 카드 밀도 개선 */}

@@ -20,24 +20,25 @@ export interface SpriteSheet {
 
 /**
  * 곰 베이스 스프라이트 — 좌표·크기는 `public/assets/img/characters/base/bears.json` 과 동일합니다.
- * JSON `meta.size`(829×560) 안에서 각 프레임의 `frame.x`, `frame.y` 로 **시트상 위치**를 보면 카메라 방향이 갈립니다.
+ * JSON `meta.size`(807×501) 안에서 각 프레임의 `frame.x`, `frame.y` 로 **시트상 위치**를 보면 카메라 방향이 갈립니다.
  *
  * | JSON 키 / 스프라이트 키 | frame (x,y) | 아틀라스에서의 칸 | 내용 |
  * |---|---|---|---|
- * | `Bears (1).png` / `'Bears (1)'` | (333, 1) | 오른쪽 **위** | **정면** (눈·코·리본). `rotated: true` 로 시트에 눕혀 저장됨 |
- * | `Bears (2).png` / `'Bears (2)'` | (1, 1) | **왼쪽**(큰 세로) | **뒷모습** (가방 끈·꼬리) |
- * | `Bears (3).png` / `'Bears (3)'` | (333, 283) | 오른쪽 **아래** | **옆모습** |
+ * | `Bears (1).png` / `'Bears (1)'` | (285, 2) | 가운데~오른쪽 | **정면** (홈 캐릭터 기본) |
+ * | `Bears (2).png` / `'Bears (2)'` | (2, 2) | **왼쪽** | **뒷모습** |
+ * | `Bears (3).png` / `'Bears (3)'` | (567, 2) | 오른쪽 | **옆모습** |
  *
  * 정면만 써야 하는 UI(예: 홈 섬)는 `BEAR_HOME_ISLAND_FRONT_FRAME` 을 사용하세요.
  */
 export const BEARS: SpriteSheet = {
   image: 'characters/base/bears.png',
-  atlasW: 829,
-  atlasH: 560,
+  atlasW: 807,
+  atlasH: 501,
   frames: {
-    'Bears (1)': { x: 333, y: 1,   w: 280, h: 495, rotated: true  },
-    'Bears (2)': { x: 1,   y: 1,   w: 330, h: 558, rotated: false },
-    'Bears (3)': { x: 333, y: 283, w: 238, h: 495, rotated: true  },
+    // bears.json 원본 기준: bear1~3 모두 rotated=false
+    'Bears (1)': { x: 285, y: 2, w: 280, h: 495, rotated: false },
+    'Bears (2)': { x: 2, y: 2, w: 281, h: 497, rotated: false },
+    'Bears (3)': { x: 567, y: 2, w: 238, h: 495, rotated: false },
   },
 }
 

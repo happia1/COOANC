@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { readChildStatInt } from '@/lib/childCreditsSplit'
 
 /**
  * POST /api/market/approve
@@ -110,9 +111,9 @@ export async function POST(req: NextRequest) {
       .eq('child_id', request.child_id)
       .maybeSingle()
     if (preStats) {
-      const credits = typeof preStats.credits === 'number' ? preStats.credits : 0
-      const wallet = typeof preStats.credits_wallet === 'number' ? preStats.credits_wallet : 0
-      const piggy = typeof preStats.credits_piggy === 'number' ? preStats.credits_piggy : 0
+      const credits = readChildStatInt(preStats.credits)
+      const wallet = readChildStatInt(preStats.credits_wallet)
+      const piggy = readChildStatInt(preStats.credits_piggy)
       const creditsAfterApprove = Math.max(0, credits - request.item_price)
       // 승인 후 credits가 item_price만큼 줄어드는 경로를 기준으로 제약식을 미리 맞춥니다.
       if (wallet + piggy > creditsAfterApprove) {
@@ -156,12 +157,13 @@ export async function POST(req: NextRequest) {
     .maybeSingle()
 
   if (stats) {
-    const w = typeof stats.credits_wallet === 'number' ? stats.credits_wallet : 0
-    const p = typeof stats.credits_piggy === 'number' ? stats.credits_piggy : 0
+    const w = readChildStatInt(stats.credits_wallet)
+    const p = readChildStatInt(stats.credits_piggy)
+    const baseCredits = readChildStatInt(stats.credits)
     await supabase
       .from('child_stats')
       .update({
-        credits: stats.credits + request.item_price,
+        credits: baseCredits + request.item_price,
         credits_wallet: w + request.item_price,
         credits_piggy: p,
       })

@@ -2,11 +2,14 @@
 
 import { useCallback, useEffect, useLayoutEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
+import Image from 'next/image'
 import SpriteImage from '@/components/common/SpriteImage'
 import FloatingCreditsStackVisual from '@/components/child/FloatingCreditsStackVisual'
 import PiggyBankStageVisual from '@/components/child/PiggyBankStageVisual'
 import { MISSION_CREDITS_STAGE_CAP, piggyBankStageCount } from '@/constants/piggyBankStages'
 import { ICONS } from '@/constants/sprites'
+import { readChildStatInt } from '@/lib/childCreditsSplit'
+import { walletImageSrcByStage, walletStageIndexByCredits } from '@/lib/walletStages'
 
 /**
  * 미션 섬·옮기기 UI 와 동일 규칙: 저금통 잔액(0~`MISSION_CREDITS_STAGE_CAP`)으로 단계 인덱스를 고릅니다.
@@ -18,6 +21,8 @@ function piggyBankStepIndexForBalance(currentPiggy: number): number {
   const clamped = Math.max(0, Math.min(currentPiggy, cap))
   return Math.round((clamped / cap) * (n - 1))
 }
+
+/** 지갑 그림은 `@/lib/walletStages` 와 미션 섬·마켓과 동일(9단계)입니다. */
 
 export type CreditTransferKind =
   | 'float_to_wallet'
@@ -37,14 +42,10 @@ export type CreditTransferApiSuccess = {
 function parseTransferSuccessJson(raw: unknown): CreditTransferApiSuccess | null {
   if (!raw || typeof raw !== 'object') return null
   const o = raw as Record<string, unknown>
-  const credits = typeof o.credits === 'number' && Number.isFinite(o.credits) ? o.credits : NaN
-  const credits_wallet =
-    typeof o.credits_wallet === 'number' && Number.isFinite(o.credits_wallet) ? o.credits_wallet : NaN
-  const credits_piggy =
-    typeof o.credits_piggy === 'number' && Number.isFinite(o.credits_piggy) ? o.credits_piggy : NaN
-  if (!Number.isFinite(credits) || !Number.isFinite(credits_wallet) || !Number.isFinite(credits_piggy)) {
-    return null
-  }
+  if (!('credits' in o && 'credits_wallet' in o && 'credits_piggy' in o)) return null
+  const credits = readChildStatInt(o.credits)
+  const credits_wallet = readChildStatInt(o.credits_wallet)
+  const credits_piggy = readChildStatInt(o.credits_piggy)
   return { credits, credits_wallet, credits_piggy }
 }
 
@@ -60,6 +61,8 @@ type Props = {
   onSuccess: (result: CreditTransferApiSuccess) => void
   /** 저금통 미리보기(`float_to_piggy` 등)에 쓸 현재 저금통 잔액 — 섬과 같은 단계 그림 */
   piggyBalance: number
+  /** 지갑 미리보기(`float_to_wallet` 등)에 쓸 현재 지갑 잔액 — 섬과 같은 단계 그림 */
+  walletBalance: number
 }
 
 /**
@@ -75,6 +78,7 @@ export default function MissionCreditMoveDialog({
   title,
   onSuccess,
   piggyBalance,
+  walletBalance,
 }: Props) {
   /** 화면에 보이는 숫자(문자열). 빈 문자열이면 표시는 0, 아직 숫자 패드로만 채웁니다. */
   const [amount, setAmount] = useState('')
@@ -212,7 +216,14 @@ export default function MissionCreditMoveDialog({
                 →
               </span>
               {kind === 'float_to_wallet' ? (
-                <SpriteImage sheet={ICONS} frame="wallet" width={36} clipRotated={false} className="drop-shadow-md" />
+                <Image
+                  src={walletImageSrcByStage(walletStageIndexByCredits(walletBalance))}
+                  alt=""
+                  width={44}
+                  height={44}
+                  className="h-auto w-9 select-none object-contain drop-shadow-md"
+                  draggable={false}
+                />
               ) : (
                 <div className="flex min-h-[64px] min-w-[56px] shrink-0 items-end justify-center overflow-visible px-0.5 pb-0.5">
                   <PiggyBankStageVisual
@@ -452,7 +463,14 @@ export function MissionCreditActionSheet({ open, onClose, bucket, floating, wall
                   >
                     {visual.icon === 'wallet' ? (
                       <div className={iconAreaClass}>
-                        <SpriteImage sheet={ICONS} frame="wallet" width={52} clipRotated={false} className="drop-shadow-lg" />
+                        <Image
+                          src={walletImageSrcByStage(walletStageIndexByCredits(wallet))}
+                          alt=""
+                          width={56}
+                          height={56}
+                          className="h-auto w-[52px] select-none object-contain drop-shadow-lg"
+                          draggable={false}
+                        />
                       </div>
                     ) : visual.icon === 'piggy' ? (
                       <div className={iconAreaClass}>
@@ -467,7 +485,8 @@ export function MissionCreditActionSheet({ open, onClose, bucket, floating, wall
                         <FloatingCreditsStackVisual
                           floating={floating}
                           dimWhenEmpty={false}
-                          displayWidth={44}
+                          /** 옵션 카드에서도 돼지저금통(52px)과 같은 기준 크기로 맞춤 */
+                          displayWidth={52}
                           centerInFrame
                         />
                       </div>

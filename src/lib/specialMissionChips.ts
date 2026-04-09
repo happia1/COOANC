@@ -18,12 +18,6 @@ export type SpecialMissionChipDef = {
 /** 부모가 고를 수 있는 스페셜 키워드 목록 (제목은 카드·칩에 짧게 표시) */
 export const SPECIAL_MISSION_CHIPS: SpecialMissionChipDef[] = [
   {
-    id: 'sp-errand',
-    title: '심부름',
-    emoji: '🛒',
-    defaultPopupMessage: '오늘 맡은 심부름을 잘 해보아요!',
-  },
-  {
     id: 'sp-meal',
     title: '식사준비',
     emoji: '🥗',
@@ -48,22 +42,10 @@ export const SPECIAL_MISSION_CHIPS: SpecialMissionChipDef[] = [
     defaultPopupMessage: '분리수거를 정확히 해보아요.',
   },
   {
-    id: 'sp-room',
-    title: '방청소',
-    emoji: '🧹',
-    defaultPopupMessage: '내 방을 깔끔하게 정리해요.',
-  },
-  {
     id: 'sp-exercise',
     title: '운동하기',
     emoji: '🏃',
     defaultPopupMessage: '오늘은 몸을 조금 움직여 보아요!',
-  },
-  {
-    id: 'sp-balanced-meal',
-    title: '골고루먹기',
-    emoji: '🍱',
-    defaultPopupMessage: '여러 가지 음식을 골고루 먹어 보아요.',
   },
   {
     id: 'sp-veggies',
@@ -73,9 +55,9 @@ export const SPECIAL_MISSION_CHIPS: SpecialMissionChipDef[] = [
   },
   {
     id: 'sp-finish-meal',
-    title: '밥 다먹기',
-    emoji: '🍚',
-    defaultPopupMessage: '밥을 남기지 않고 다 먹어 보아요.',
+    title: '식사후 정리',
+    emoji: '🍽️',
+    defaultPopupMessage: '식사가 끝나면 자리와 그릇을 정리해요.',
   },
   {
     id: 'sp-laundry-basket',
@@ -85,15 +67,9 @@ export const SPECIAL_MISSION_CHIPS: SpecialMissionChipDef[] = [
   },
   {
     id: 'sp-laundry-tidy',
-    title: '빨래 정리',
-    emoji: '👕',
-    defaultPopupMessage: '개어 놓인 빨래를 정리해요.',
-  },
-  {
-    id: 'sp-dishes',
-    title: '설거지',
-    emoji: '🍽️',
-    defaultPopupMessage: '설거지를 함께 해요.',
+    title: '외투 걸어두기',
+    emoji: '🧥',
+    defaultPopupMessage: '다녀온 외투를 옷걸이나 지정한 곳에 걸어 두어요.',
   },
   {
     id: 'sp-bag-tidy',
@@ -114,20 +90,42 @@ export const SPECIAL_MISSION_CHIPS: SpecialMissionChipDef[] = [
  * DB에 옛 짧은 이름(인사, 어깨)이 남아 있어도 시트·카드에서 새 이름으로 이어집니다.
  */
 const LEGACY_SPECIAL_TITLE_TO_SHORT: Record<string, string> = {
-  심부름하기: '심부름',
   '식사준비 돕기': '식사준비',
   '인사 잘하기': '인사잘하기',
   인사: '인사잘하기',
   '부모님 어깨 주물러드리기': '어깨마사지',
   어깨: '어깨마사지',
   분리수거하기: '분리수거',
-  '방 청소하기': '방청소',
+  /** 예전 칩 이름 → 지금 시트에 맞는 짧은 제목(썸네일·시트 매칭) */
+  '밥 다먹기': '식사후 정리',
+  빨래정리: '외투 걸어두기',
+  '빨래 정리': '외투 걸어두기',
 }
 
 /** 루틴 탭 스페셜 카드 등에 표시할 짧은 제목 */
 export function displaySpecialMissionTitle(storedTitle: string): string {
   const t = storedTitle.trim()
   return LEGACY_SPECIAL_TITLE_TO_SHORT[t] ?? t
+}
+
+/**
+ * 스페셜 칩에서 **완전히 뺀** 미션 제목 — DB 에 옛 템플릿이 남아 있어도 카드·시트에서 숨깁니다.
+ * (마이그레이션 `051_remove_retired_special_mission_templates.sql` 로 행 삭제 권장)
+ */
+const RETIRED_SPECIAL_DISPLAY_TITLES = new Set<string>([
+  '설거지',
+  '방청소',
+  '심부름',
+  '심부름하기',
+  '방 청소하기',
+  '골고루먹기',
+])
+
+/** 저장된 제목이 폐지된 스페셜 키워드인지 (레거시 별칭을 짧은 제목으로 푼 뒤에도 검사) */
+export function isRetiredSpecialMissionTitle(storedTitle: string): boolean {
+  const raw = storedTitle.trim()
+  const resolved = displaySpecialMissionTitle(raw).trim()
+  return RETIRED_SPECIAL_DISPLAY_TITLES.has(raw) || RETIRED_SPECIAL_DISPLAY_TITLES.has(resolved)
 }
 
 /** 스페셜 UI·자녀 앱 스페셜 구역에 넣을 미션인지 (event 템플릿 또는 매일 자동 스페셜 키워드) */

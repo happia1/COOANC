@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { resolveApiActorChildId } from '@/lib/resolveApiActorChildId'
-import { creditsFloating } from '@/lib/childCreditsSplit'
+import { creditsFloating, readChildStatInt } from '@/lib/childCreditsSplit'
 
 /**
  * POST /api/child/credits/transfer
@@ -68,9 +68,9 @@ export async function POST(req: NextRequest) {
   }
   if (!stats) return NextResponse.json({ error: '스탯 정보를 찾을 수 없어요' }, { status: 404 })
 
-  const w = typeof stats.credits_wallet === 'number' ? stats.credits_wallet : 0
-  const p = typeof stats.credits_piggy === 'number' ? stats.credits_piggy : 0
-  const row = { credits: stats.credits, credits_wallet: w, credits_piggy: p }
+  const w = readChildStatInt(stats.credits_wallet)
+  const p = readChildStatInt(stats.credits_piggy)
+  const row = { credits: readChildStatInt(stats.credits), credits_wallet: w, credits_piggy: p }
   const float = creditsFloating(row)
 
   let nw = w
@@ -123,10 +123,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: '저장에 실패했어요' }, { status: 500 })
   }
 
+  const totalC = row.credits
   return NextResponse.json({
-    credits: stats.credits,
+    credits: totalC,
     credits_wallet: nw,
     credits_piggy: np,
-    credits_floating: stats.credits - nw - np,
+    credits_floating: totalC - nw - np,
   })
 }
