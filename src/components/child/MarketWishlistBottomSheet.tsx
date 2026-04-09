@@ -11,6 +11,7 @@ import type { StoreItem } from '@/types/database'
 import SpriteImage from '@/components/common/SpriteImage'
 import MarketItemImage from '@/components/common/MarketItemImage'
 import { ICONS } from '@/constants/sprites'
+import { formatMarketCreditLabel } from '@/lib/applyStoreItemCreditOverrides'
 import { marketFrameKeyForItemId } from '@/lib/marketItemFrame'
 /** 요청사항: 물건이 담긴 장바구니 아이콘(공용 정적 이미지) */
 const BASKET_FILLED_SRC = '/assets/img/common/ui/basket_filled.png'
@@ -130,7 +131,7 @@ export default function MarketWishlistBottomSheet({
                       +
                     </button>
                     <span className="ml-1 font-black tabular-nums text-gray-800">
-                      {(item.credit_price * quantity).toLocaleString('ko-KR')}
+                      {formatMarketCreditLabel(item.credit_price * quantity)}
                     </span>
                     {/* X 버튼: 상품 행 자체 삭제 */}
                     <button
@@ -149,7 +150,7 @@ export default function MarketWishlistBottomSheet({
             <div className="my-2 border-t border-dashed border-amber-300" />
             <div className="flex items-center justify-between text-[11px] font-black text-amber-950">
               <span>합계 ({wishlistCount}개)</span>
-              <span className="tabular-nums">{wishlistTotalCredits.toLocaleString('ko-KR')}</span>
+              <span className="tabular-nums">{formatMarketCreditLabel(wishlistTotalCredits)}</span>
             </div>
           </section>
 

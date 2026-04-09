@@ -61,13 +61,13 @@ values
   ('그림 그리기', '자유롭게 그림을 그리는 활동이에요.', '/assets/img/items/shop/items/drawing.png', 90, 'real', 'activity', 1, true),
   ('책 읽기 시간', '집중해서 책 읽는 시간이예요.', '/assets/img/items/shop/items/read_book.png', 80, 'real', 'activity', 1, true),
   ('책 선물', '새 책을 선물받아요.', '/assets/img/items/shop/items/book.png', 120, 'real', 'activity', 1, true),
-  ('영화 보기', '가족과 함께 영화 보는 시간이에요.', '/assets/img/items/shop/items/movie.png', 160, 'real', 'activity', 1, true),
+  ('영화 보기', '가족과 함께 영화 보는 시간이에요.', '/assets/img/items/shop/items/movie_ticket.png', 160, 'real', 'activity', 1, true),
   ('안아주기 쿠폰', '따뜻하게 안아주는 쿠폰이에요.', '/assets/img/items/shop/items/hug.png', 60, 'real', 'activity', 1, true),
   ('꽃 선물', '예쁜 꽃을 선물해요.', '/assets/img/items/shop/items/flower.png', 80, 'real', 'activity', 1, true),
 
   -- 특별 체험 (experience)
-  ('엄마 츄 쿠폰', '엄마와 특별한 시간을 보내요.', '/assets/img/items/shop/items/mom_chu.png', 90, 'digital', 'experience', 1, true),
-  ('아빠 츄 쿠폰', '아빠와 특별한 시간을 보내요.', '/assets/img/items/shop/items/papa_chu.png', 90, 'digital', 'experience', 1, true),
+  ('엄마 츄 쿠폰', '엄마와 뽀뽀.', '/assets/img/items/shop/items/mom_chu.png', 90, 'digital', 'experience', 1, true),
+('아빠 츄 쿠폰', '아빠와 뽀뽀.', '/assets/img/items/shop/items/papa_chu.png', 90, 'digital', 'experience', 1, true),
   ('미용실 체험', '머리 손질 체험이에요.', '/assets/img/items/shop/items/hairshop.png', 180, 'real', 'experience', 1, true),
   ('드레스업 체험', '예쁘게 꾸며보는 체험이에요.', '/assets/img/items/shop/items/dress.png', 170, 'real', 'experience', 1, true);
 

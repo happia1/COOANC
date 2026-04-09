@@ -3,6 +3,7 @@
 /**
  * 부모 승인 탭 — 자녀 마켓 메뉴 제어
  * - 선택한 자녀에게 보일 store_items 만 토글로 켜고 끕니다.
+ * - 상품마다 이 자녀에게만 적용할 크레딧을 바꿀 수 있습니다(덮어쓰기 API).
  * - 「상품 추가하기」로 가족 전용 상품을 새로 넣을 수 있습니다(API).
  * - 추가 시트는 하단 독(z-50)보다 위(z-[60])에 두고, 내용이 길면 스크롤됩니다.
  * - 사진이 없는 기본 상품은 `items/shop/items/*.png` 를 씁니다(자녀 마켓과 같은 규칙).
@@ -12,6 +13,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import MarketItemImage from '@/components/common/MarketItemImage'
 import { marketFrameKeyForItemId } from '@/lib/marketItemFrame'
 import type { StoreItem } from '@/types/database'
+import { formatMarketCreditLabel } from '@/lib/applyStoreItemCreditOverrides'
 import {
   PARENT_ADD_ITEM_CATEGORY_OPTIONS,
   PARENT_MARKET_MENU_SECTIONS,
@@ -31,6 +33,10 @@ export type ParentMarketMenuControlProps = {
   onHiddenChange: (next: Set<string>) => void
   /** 가족 전용 상품이 추가되면 목록에 합칩니다 */
   onItemCreated: (item: StoreItem) => void
+  /** 자녀별 크레딧 덮어쓰기(없으면 storeItems[].credit_price 가 그대로 적용) */
+  creditOverrides: Record<string, number>
+  /** 크레딧 저장 성공 시 — null 이면 덮어쓰기 제거(기본가로 복귀) */
+  onCreditOverrideSaved: (itemId: string, nextOverride: number | null) => void
 }
 
 /** 토글 스위치 — 켜짐=자녀에게 보임, 꺼짐=숨김 */
@@ -74,6 +80,8 @@ export default function ParentMarketMenuControl({
   familyLinkIdForChild,
   onHiddenChange,
   onItemCreated,
+  creditOverrides,
+  onCreditOverrideSaved,
 }: ParentMarketMenuControlProps) {
   const [addOpen, setAddOpen] = useState(false)
   const [addName, setAddName] = useState('')
@@ -88,6 +96,11 @@ export default function ParentMarketMenuControl({
   const [addCategory, setAddCategory] = useState<string>('food')
   /** 마켓 보이기/숨기기 토글 API 실패 시 잠깐 보여 줄 메시지 */
   const [toggleSaveErr, setToggleSaveErr] = useState<string | null>(null)
+  /** 크레딧 변경 시트 — 어떤 상품을 고치는지 */
+  const [creditEditItem, setCreditEditItem] = useState<StoreItem | null>(null)
+  const [creditEditValue, setCreditEditValue] = useState('')
+  const [creditEditLoading, setCreditEditLoading] = useState(false)
+  const [creditEditErr, setCreditEditErr] = useState<string | null>(null)
   /**
    * 구역마다 상품 타일 영역을 **접기/펼치기** 합니다.
    * 디폴트는 **전부 접힘**(첫 줄도 숨김) — `true` 인 구역만 타일을 그립니다. 자녀 변경 시 전부 접힘으로 리셋합니다.
@@ -97,6 +110,12 @@ export default function ParentMarketMenuControl({
   /** 선택 자녀가 바뀌면 펼쳐 두었던 구역을 초기화해, 항상 첫 진입은 모두 접힌 상태가 되게 합니다. */
   useEffect(() => {
     setMenuSectionExpanded({})
+  }, [childId])
+
+  /** 자녀 전환 시 열려 있던 크레딧 편집 시트를 닫습니다 */
+  useEffect(() => {
+    setCreditEditItem(null)
+    setCreditEditErr(null)
   }, [childId])
 
   const cameraInputRef = useRef<HTMLInputElement>(null)
@@ -198,13 +217,60 @@ export default function ParentMarketMenuControl({
     [childId, hiddenItemIds, onHiddenChange],
   )
 
-  /** 한 칸(썸네일·이름·토글) — 가로 스크롤 줄에서 재사용합니다. */
+  /** 이 자녀에게 실제로 적용되는 크레딧(덮어쓰기 우선) */
+  function effectiveCreditPrice(it: StoreItem): number {
+    const o = creditOverrides[it.id]
+    return o !== undefined ? o : it.credit_price
+  }
+
+  /** 크레딧 편집 시트 열기 — 입력칸에 현재 적용가를 넣습니다 */
+  function openCreditEdit(it: StoreItem) {
+    setCreditEditErr(null)
+    setCreditEditItem(it)
+    setCreditEditValue(String(effectiveCreditPrice(it)))
+  }
+
+  /** 시트에서 저장 — API 가 기본가와 같으면 덮어쓰기 행을 지웁니다 */
+  async function submitCreditEdit() {
+    if (!childId || !creditEditItem) return
+    const v = Math.floor(Number(creditEditValue))
+    if (!Number.isFinite(v) || v < 0 || v > 999_999) {
+      setCreditEditErr('0~999999 사이 숫자로 입력해 주세요')
+      return
+    }
+    setCreditEditErr(null)
+    setCreditEditLoading(true)
+    try {
+      const res = await fetch('/api/market/child-item-credit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ childId, storeItemId: creditEditItem.id, creditPrice: v }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setCreditEditErr(typeof json.error === 'string' ? json.error : '저장하지 못했어요')
+        return
+      }
+      const usedOverride = json.usedOverride === true
+      const nextPrice = typeof json.creditPrice === 'number' ? json.creditPrice : v
+      onCreditOverrideSaved(creditEditItem.id, usedOverride ? nextPrice : null)
+      setCreditEditItem(null)
+    } catch {
+      setCreditEditErr('네트워크 오류가 났어요')
+    } finally {
+      setCreditEditLoading(false)
+    }
+  }
+
+  /** 한 칸(썸네일·이름·크레딧·토글) — 가로 스크롤 줄에서 재사용합니다. */
   function renderMenuItemTile(it: StoreItem) {
     const hidden = hiddenItemIds.has(it.id)
     const visible = !hidden
     const spriteFrame = marketFrameKeyForItemId(it.id, it.name)
+    const price = effectiveCreditPrice(it)
+    const hasOverride = creditOverrides[it.id] !== undefined
     return (
-      <div key={it.id} className="flex min-w-0 snap-start flex-col items-center gap-1">
+      <div key={it.id} className="flex min-w-0 snap-start flex-col items-center gap-0.5">
         {/** 이미지 블록 가로를 줄여 한 화면에 더 많은 칸이 들어가게 합니다. */}
         <div className="flex h-12 w-full max-w-[3.25rem] items-center justify-center overflow-hidden rounded-lg bg-gray-50 ring-1 ring-gray-100 sm:max-w-[3.5rem]">
           {it.image_url ? (
@@ -225,6 +291,16 @@ export default function ParentMarketMenuControl({
         >
           {it.name}
         </p>
+        {/** 이 자녀 기준 실제 가격 + 탭하면 숫자를 바꿀 수 있음 */}
+        <button
+          type="button"
+          onClick={() => openCreditEdit(it)}
+          title={hasOverride ? `기본 ${it.credit_price}크레딧 → 이 자녀만 ${price}` : '크레딧 바꾸기'}
+          className="max-w-full truncate rounded-md px-0.5 text-[8px] font-black leading-tight text-brand-blue underline-offset-2 hover:underline"
+        >
+          {formatMarketCreditLabel(price)}
+          {hasOverride ? '·맞춤' : ''}
+        </button>
         <VisibilityToggle
           on={visible}
           ariaLabel={visible ? `${it.name} 마켓에서 숨기기` : `${it.name} 마켓에 표시하기`}
@@ -400,10 +476,10 @@ export default function ParentMarketMenuControl({
               />
             </label>
             <label className="mb-3 block text-xs font-bold text-gray-600">
-              크레딧
+              크레딧 (0 = 무료)
               <input
                 type="number"
-                min={1}
+                min={0}
                 value={addPrice}
                 onChange={(e) => setAddPrice(e.target.value)}
                 className="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm"
@@ -488,11 +564,70 @@ export default function ParentMarketMenuControl({
               </button>
               <button
                 type="button"
-                disabled={addLoading || !addName.trim() || !addPrice}
+                disabled={(() => {
+                  if (addLoading || !addName.trim()) return true
+                  const n = Number(addPrice)
+                  return !Number.isFinite(n) || n < 0 || n > 999_999
+                })()}
                 onClick={submitAdd}
                 className="flex-1 rounded-2xl bg-brand-blue py-3 text-sm font-bold text-white shadow-md disabled:opacity-50"
               >
                 {addLoading ? '저장 중...' : '추가'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {creditEditItem && (
+        <div
+          className="fixed inset-0 z-[60] flex items-end justify-center bg-black/40"
+          role="presentation"
+          onClick={() => setCreditEditItem(null)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="credit-edit-title"
+            className="w-full max-w-md max-h-[min(70dvh,calc(100vh-0.5rem))] overflow-y-auto rounded-t-3xl bg-white p-6 shadow-2xl"
+            style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom, 0px))' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p id="credit-edit-title" className="mb-1 font-black text-brand-text text-base">
+              크레딧 설정
+            </p>
+            <p className="mb-4 text-xs font-bold text-gray-700">{creditEditItem.name}</p>
+            <label className="mb-2 block text-xs font-bold text-gray-600">
+              크레딧 수정
+              <input
+                type="number"
+                min={0}
+                max={999999}
+                value={creditEditValue}
+                onChange={(e) => setCreditEditValue(e.target.value)}
+                className="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm"
+              />
+            </label>
+            {creditEditErr && (
+              <p className="mb-3 text-xs font-bold text-red-500" role="alert">
+                {creditEditErr}
+              </p>
+            )}
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setCreditEditItem(null)}
+                className="flex-1 rounded-2xl border border-gray-200 py-3 text-sm font-bold text-gray-500"
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                disabled={creditEditLoading}
+                onClick={() => void submitCreditEdit()}
+                className="flex-1 rounded-2xl bg-brand-blue py-3 text-sm font-bold text-white shadow-md disabled:opacity-50"
+              >
+                {creditEditLoading ? '저장 중...' : '저장'}
               </button>
             </div>
           </div>

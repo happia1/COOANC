@@ -1,7 +1,6 @@
 'use client'
 
-import SpriteImage from '@/components/common/SpriteImage'
-import { REWARD_CREDITS } from '@/constants/sprites'
+import Image from 'next/image'
 
 type Props = {
   /** 팝업을 열지 닫지 */
@@ -41,13 +40,14 @@ export default function BearBoardCompleteModal({ open, onDismiss, onNotifyParent
 
         {/* 미션 홈과 같은 크레딧 보상 시트의 금색 상자 — 「랜덤 선물 박스」로 보여 줍니다 */}
         <div className="mt-5 flex flex-col items-center gap-2">
+          {/** 예전 `credits.png` 아틀라스의 `gold_box` 프레임 대신 개별 PNG 사용 */}
           <div className="relative flex h-[120px] w-full items-end justify-center">
-            <SpriteImage
-              sheet={REWARD_CREDITS}
-              frame="gold_box"
-              width={96}
-              clipRotated={false}
-              className="select-none drop-shadow-[0_6px_18px_rgba(0,0,0,0.2)]"
+            <Image
+              src="/assets/img/items/rewards/gold_box.png"
+              alt=""
+              width={205}
+              height={190}
+              className="h-auto w-[96px] max-w-full select-none object-contain drop-shadow-[0_6px_18px_rgba(0,0,0,0.2)]"
             />
           </div>
           <p className="text-center text-sm font-bold text-brand-blue">랜덤박스</p>

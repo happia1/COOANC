@@ -6,7 +6,14 @@
  * - URL 이 없거나 허용 목록에 없으면 예전과 같이 토끼 정면을 씁니다.
  */
 
-import type { BearFrameName, BunnyFrameName, ChicksFrameName, FoxFrameName, HamsterFrameName } from '@/constants/sprites'
+import {
+  BEAR_HOME_ISLAND_FRONT_FRAME,
+  type BearFrameName,
+  type BunnyFrameName,
+  type ChicksFrameName,
+  type FoxFrameName,
+  type HamsterFrameName,
+} from '@/constants/sprites'
 import { publicUrlForChildProfileAvatar, isAllowedChildProfileAvatarUrl } from '@/lib/childProfileAvatar'
 
 /** 홈 섬(`scene="bunny"`)에 올릴 스프라이트 한 장 — 캐릭터 종류마다 frame 타입이 다릅니다 */
@@ -38,11 +45,15 @@ const STAGE_BY_AVATAR_URL: Record<string, HomeIslandStageSprite> = {
     width: 108,
     height: 238,
   },
+  /**
+   * 곰: 스프라이트 키는 `BEAR_HOME_ISLAND_FRONT_FRAME` (= `bears.json` 의 `"Bears (1).png"`, 시트 오른쪽 위).
+   * 표시 크기: 회전 프레임 펼친 뒤 자연 비율 495:280 유지, 토끼 등과 맞추려 높이 238px → 가로 ≈421px.
+   */
   [publicUrlForChildProfileAvatar('bear_profile.png')]: {
     character: 'bears',
-    frame: 'Bears (2)',
-    width: 100,
-    height: 248,
+    frame: BEAR_HOME_ISLAND_FRONT_FRAME,
+    width: 421,
+    height: 238,
   },
   [publicUrlForChildProfileAvatar('hamster_profile.png')]: {
     character: 'hamster',

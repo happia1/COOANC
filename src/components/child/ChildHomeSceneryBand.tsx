@@ -28,10 +28,12 @@ type Props = {
    */
   backgroundImageClassName?: string
   /**
-   * true: 부모 안에서 위쪽 **6** 몫 — 아래 패널 **4** 몫과 합쳐 6:4(60%:40%) 한 화면.
+   * true: 부모 안에서 위쪽 flex 몫 — 아래 패널과 합 맞춤(기본 6, 미션은 5.5 등).
    * false: 고정 `60dvh`(옛 비율; 스크롤이 생길 수 있음).
    */
   flexFill?: boolean
+  /** `flexFill` 일 때 위 밴드의 `flex-grow` 비율. 미션 탭은 5.5(하단 4.5와 합), 홈은 기본 6. */
+  flexFillWeight?: 5 | 5.5 | 6
   /**
    * true(기본): 하늘·잔디가 그려진 큰 풍경 그림을 깔아요(`backgroundSrc` 또는 기본 PNG).
    * false: 그 그림은 빼고, 앱 페이지의 기본 배경색만 보이게 해요(홈·미션에서 사용).
@@ -57,7 +59,7 @@ type Props = {
 /**
  * 자녀 앱 상단 풍경 밴드 — 홈·미션 동일
  *
- * - 높이: `flexFill` 이면 `flex-[6] min-h-0`(아래 패널은 `flex-[4]`), 아니면 `h-[60dvh]` + `min-h-[220px]`
+ * - 높이: `flexFill` 이면 `flex-[6]` 또는 `flexFillWeight`(아래 패널과 합 맞춤), 아니면 `h-[60dvh]` + `min-h-[220px]`
  * - 배경: `showBackground` 가 true 일 때만 `object-cover` 풍경 PNG + 기본 `CHILD_HOME_SCENERY_BG_LIFT_CLASS`.
  *   `backgroundSrc` 를 주면 그 경로의 PNG 를 쓰고, 없으면 홈과 같은 `kids_background.png` 를 씁니다.
  */
@@ -70,6 +72,7 @@ export default function ChildHomeSceneryBand({
   className = '',
   backgroundImageClassName = CHILD_HOME_SCENERY_BG_LIFT_CLASS,
   flexFill = false,
+  flexFillWeight = 6,
   showBackground = true,
   backgroundSrc,
   backgroundObjectClassName = 'object-cover object-center',
@@ -81,7 +84,11 @@ export default function ChildHomeSceneryBand({
   const backgroundImageClass =
     backgroundLayout === 'circleContain' ? 'object-contain object-center' : backgroundObjectClassName
   const heightClass = flexFill
-    ? 'min-h-0 flex-[6] basis-0'
+    ? flexFillWeight === 5.5
+      ? 'min-h-0 flex-[5.5] basis-0'
+      : flexFillWeight === 5
+        ? 'min-h-0 flex-[5] basis-0'
+        : 'min-h-0 flex-[6] basis-0'
     : 'h-[60dvh] min-h-[220px] shrink-0'
 
   /**

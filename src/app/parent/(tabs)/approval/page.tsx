@@ -37,7 +37,7 @@ export default async function ApprovalPage() {
   }
   const profiles = profileBundle.rows ?? []
 
-  const [statsRes, requestsRes, historyRes, logsRes, storeRes, hiddenRes] = await Promise.all([
+  const [statsRes, requestsRes, historyRes, logsRes, storeRes, hiddenRes, creditOvRes] = await Promise.all([
     childIds.length > 0
       ? supabase
           .from('child_stats')
@@ -89,6 +89,13 @@ export default async function ApprovalPage() {
     childIds.length > 0
       ? supabase.from('child_market_hidden_items').select('child_id, store_item_id').in('child_id', childIds)
       : Promise.resolve({ data: [], error: null }),
+
+    childIds.length > 0
+      ? supabase
+          .from('child_store_item_credit_overrides')
+          .select('child_id, store_item_id, credit_price')
+          .in('child_id', childIds)
+      : Promise.resolve({ data: [], error: null }),
   ])
 
   type StatRow = {
@@ -134,6 +141,24 @@ export default async function ApprovalPage() {
 
   const storeItems = (storeRes.data ?? []) as StoreItem[]
 
+  /** 메뉴 제어에서 쓰는 자녀별 크레딧 덮어쓰기(서버 스냅샷) */
+  const initialCreditOverridesByChild: Record<string, Record<string, number>> = {}
+  for (const cid of childIds) {
+    initialCreditOverridesByChild[cid] = {}
+  }
+  if (!creditOvRes.error && creditOvRes.data) {
+    for (const row of creditOvRes.data as {
+      child_id: string
+      store_item_id: string
+      credit_price: number
+    }[]) {
+      if (!initialCreditOverridesByChild[row.child_id]) initialCreditOverridesByChild[row.child_id] = {}
+      initialCreditOverridesByChild[row.child_id][row.store_item_id] = row.credit_price
+    }
+  } else if (creditOvRes.error) {
+    console.warn('[parent approval] child_store_item_credit_overrides:', creditOvRes.error.message)
+  }
+
   if (historyRes.error) {
     console.warn('[parent approval] purchase_requests history:', historyRes.error.message)
   }
@@ -147,6 +172,7 @@ export default async function ApprovalPage() {
       storeItems={storeItems}
       linkByChild={linkByChild}
       hiddenItemIdsByChild={hiddenItemIdsByChild}
+      initialCreditOverridesByChild={initialCreditOverridesByChild}
     />
   )
 }

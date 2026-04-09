@@ -55,6 +55,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: '이 상품은 마켓에서 요청할 수 없어요' }, { status: 400 })
   }
 
+  /** 자녀별 덮어쓰기가 있으면 그 크레딧으로 결제합니다(없거나 테이블 미적용 시 기본가). */
+  let effectivePrice = item.credit_price
+  const { data: creditOverride, error: creditOvErr } = await supabase
+    .from('child_store_item_credit_overrides')
+    .select('credit_price')
+    .eq('child_id', childId)
+    .eq('store_item_id', itemId)
+    .maybeSingle()
+
+  if (!creditOvErr && typeof creditOverride?.credit_price === 'number') {
+    effectivePrice = creditOverride.credit_price
+  }
+
   // 스탯 조회 — 마켓 결제는 지갑(credits_wallet)에서만 차감합니다
   const { data: stats } = await supabase
     .from('child_stats')
@@ -68,7 +81,7 @@ export async function POST(req: NextRequest) {
 
   const wallet = typeof stats.credits_wallet === 'number' ? stats.credits_wallet : 0
 
-  if (wallet < item.credit_price) {
+  if (wallet < effectivePrice) {
     return NextResponse.json(
       { error: '지갑 크레딧이 부족해요. 미션 탭에서 섬의 크레딧을 지갑으로 옮겨 주세요.' },
       { status: 400 },
@@ -93,8 +106,8 @@ export async function POST(req: NextRequest) {
   }
 
   const piggy = typeof stats.credits_piggy === 'number' ? stats.credits_piggy : 0
-  const nextWallet = wallet - item.credit_price
-  const nextCredits = stats.credits - item.credit_price
+  const nextWallet = wallet - effectivePrice
+  const nextCredits = stats.credits - effectivePrice
 
   // 총액·지갑에서 동시 차감(섬·저금통에 둔 분량은 그대로)
   const { error: deductErr } = await supabase
@@ -118,7 +131,7 @@ export async function POST(req: NextRequest) {
       child_id: childId,
       item_id: itemId,
       item_name: item.name,
-      item_price: item.credit_price,
+      item_price: effectivePrice,
       item_type: item.item_type,
       status: 'pending',
       child_message: childMessage,

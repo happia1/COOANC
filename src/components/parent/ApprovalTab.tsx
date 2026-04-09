@@ -103,6 +103,8 @@ type Props = {
   linkByChild: Record<string, string>
   /** 숨김 행: 자녀별로 가려진 상품 id */
   hiddenItemIdsByChild: Record<string, string[]>
+  /** 자녀별 마켓 상품 크레딧 덮어쓰기(메뉴 제어에서 수정 가능) */
+  initialCreditOverridesByChild: Record<string, Record<string, number>>
 }
 
 export default function ApprovalTab({
@@ -113,6 +115,7 @@ export default function ApprovalTab({
   storeItems: initialStoreItems,
   linkByChild,
   hiddenItemIdsByChild: initialHidden,
+  initialCreditOverridesByChild,
 }: Props) {
   const pathname = usePathname()
   const { selectedChildId, setSelectedChildId } = useParentStore()
@@ -174,6 +177,28 @@ export default function ApprovalTab({
     }
     return m
   })
+
+  /** 메뉴 제어 — 선택한 자녀마다 다른 크레딧 덮어쓰기(서버와 맞추기 위해 초기 스냅샷 키로 동기화) */
+  const creditOverridesInitialKey = useMemo(
+    () => JSON.stringify(initialCreditOverridesByChild),
+    [initialCreditOverridesByChild],
+  )
+  const [creditOverridesByChild, setCreditOverridesByChild] = useState<Record<string, Record<string, number>>>(() => {
+    const m: Record<string, Record<string, number>> = {}
+    for (const c of childrenProfiles) {
+      m[c.id] = { ...(initialCreditOverridesByChild[c.id] ?? {}) }
+    }
+    return m
+  })
+  // creditOverridesInitialKey 에 자녀별 맵 전체가 들어 있으므로 키만 의존합니다(페이지 RSC 갱신 시 서버와 맞춤).
+  useEffect(() => {
+    const m: Record<string, Record<string, number>> = {}
+    for (const c of childrenProfiles) {
+      m[c.id] = { ...(initialCreditOverridesByChild[c.id] ?? {}) }
+    }
+    setCreditOverridesByChild(m)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 초기 맵은 JSON 키에 전부 직렬화됨
+  }, [creditOverridesInitialKey])
 
   const [rejectModal, setRejectModal] = useState<{ requestId: string; itemName: string } | null>(null)
   const [rejectNote, setRejectNote] = useState('')
@@ -460,6 +485,26 @@ export default function ApprovalTab({
     (next: Set<string>) => {
       if (!currentId) return
       setHiddenByChild((prev) => ({ ...prev, [currentId]: next }))
+    },
+    [currentId],
+  )
+
+  /** 선택 자녀에 적용 중인 크레딧 덮어쓰기(없는 상품 id 는 DB 기본가 사용) */
+  const creditOverridesForCurrent = useMemo(() => {
+    if (!currentId) return {}
+    return creditOverridesByChild[currentId] ?? {}
+  }, [creditOverridesByChild, currentId])
+
+  /** 메뉴 제어에서 크레딧 저장 API 성공 후 로컬 맵 갱신 */
+  const onCreditOverrideSaved = useCallback(
+    (itemId: string, nextOverride: number | null) => {
+      if (!currentId) return
+      setCreditOverridesByChild((prev) => {
+        const row = { ...(prev[currentId] ?? {}) }
+        if (nextOverride === null) delete row[itemId]
+        else row[itemId] = nextOverride
+        return { ...prev, [currentId]: row }
+      })
     },
     [currentId],
   )
@@ -1115,6 +1160,8 @@ export default function ApprovalTab({
           familyLinkIdForChild={currentId ? linkByChild[currentId] ?? null : null}
           onHiddenChange={onHiddenChangeForCurrent}
           onItemCreated={(item) => setStoreItems((prev) => [...prev, item])}
+          creditOverrides={creditOverridesForCurrent}
+          onCreditOverrideSaved={onCreditOverrideSaved}
         />
       </section>
 

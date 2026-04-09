@@ -27,6 +27,27 @@ import {
   mergeChildStatsPatch,
   normalizeChildStatsCreditsSplit,
 } from '@/lib/childCreditsSplit'
+import {
+  MISSION_CARD_BUTTON_BASE_CLASSNAME,
+  MISSION_CARD_IMAGE_AREA_CLASSNAME,
+  MISSION_CARD_REWARD_ICON_WIDTH_PX,
+  MISSION_CARD_REWARD_PILL_BASE_CLASSNAME,
+  MISSION_CARD_REWARD_ROW_CLASSNAME,
+  MISSION_CARD_ROUTINE_SPRITE_WIDTH_PX,
+  MISSION_CARD_SCROLLER_CLASSNAME,
+  MISSION_CARD_SUBTITLE_CLASSNAME,
+  MISSION_CARD_TEXT_BLOCK_CLASSNAME,
+  MISSION_CARD_TITLE_CLASSNAME,
+  MISSION_TODAY_BOTTOM_SECTION_CLASSNAME,
+  MISSION_TODAY_EXP_FILL_CLASSNAME,
+  MISSION_TODAY_EXP_GROUP_CLASSNAME,
+  MISSION_TODAY_EXP_TEXT_IN_BAR_CLASSNAME,
+  MISSION_TODAY_EXP_TO_NEXT_CLASSNAME,
+  MISSION_TODAY_EXP_TRACK_CLASSNAME,
+  MISSION_TODAY_TITLE_HEADING_CLASSNAME,
+  MISSION_TODAY_TITLE_ROW_INNER_CLASSNAME,
+  MISSION_TODAY_TITLE_ROW_OUTER_CLASSNAME,
+} from '@/lib/missionTodayLayoutSpec'
 
 type Props = {
   childId: string
@@ -127,7 +148,8 @@ function isMissionRolledBackPayload(v: unknown): v is { dailyMissionId: string; 
 /**
  * 미션 탭
  * - 배경: 미션 상단 잔디 PNG 는 쓰지 않고, 자녀 레이아웃 배경만 보입니다.
- * - **6:4**: 상단 풍경 `flex-[6]` + 하단 카드 `flex-[4]` — 세로 스크롤 없음, 카드는 가로 스크롤
+ * - **오늘의 미션** 카드 내부 비율·간격은 `missionTodayLayoutSpec.ts` 에 고정되어 있습니다. 임의 수정 금지.
+ * - 미션 탭 본문은 세로 스크롤로 상단(섬)·하단(카드)을 이어서 볼 수 있습니다.
  * - 카드 썸네일: `public/.../routines_01.png` 아틀라스(`missionRoutineIconFrame`)
  * - 부모 Realtime 「다시 하기」: DB 는 서버에서 이미 되돌아가고, 여기서는 카드만 슬라이더에 다시 보이게 맞춥니다.
  * - 칭찬 스티커(곰돌이) 단추는 **홈** 화면 플로팅 버튼으로만 엽니다.
@@ -545,14 +567,18 @@ export default function MissionTab({
 
   /**
    * 카드 바로 위 **한 행**: 왼쪽 제목 · 오른쪽 EXP.
-   * - EXP 영역: 왼쪽 **스페이서 `flex-1`** + 오른쪽 **막대·♥·숫자 `shrink-0`** → 묶음이 행 오른쪽에 붙음
-   * - 막대 너비는 `clamp`(뷰포트에 따라 길이 변함, 상한 `18rem`)
+   * 레이아웃·간격은 `missionTodayLayoutSpec.ts` 고정값을 씁니다.
    */
   const missionTitleAboveCards = (
-    <div className="shrink-0 px-3 pb-0.5 pt-0">
-      <div className="flex min-w-0 flex-nowrap items-center gap-2">
+    /**
+     * 음수 margin-top 은 금지: `bottomPanel` 이 세로 스크롤/클립을 쓰므로
+     * 「오늘의 미션」·EXP 막대 윗부분이 잘려 보일 수 있습니다.
+     * 위로 붙이고 싶을 때는 스펙 파일의 하단 섹션 클래스만 기획 합의 후 조정하세요.
+     */
+    <div className={MISSION_TODAY_TITLE_ROW_OUTER_CLASSNAME}>
+      <div className={MISSION_TODAY_TITLE_ROW_INNER_CLASSNAME}>
         <div className="flex min-w-0 flex-[0_1_auto] items-center gap-2 overflow-hidden">
-          <h2 className="min-w-0 truncate text-base font-black leading-tight text-brand-text">오늘의 미션</h2>
+          <h2 className={MISSION_TODAY_TITLE_HEADING_CLASSNAME}>오늘의 미션</h2>
           {promotionPending && (
             <span className="shrink-0 rounded-full bg-amber-300/95 px-2 py-0.5 text-[9px] font-black text-amber-950 shadow-sm">
               Level up
@@ -560,44 +586,35 @@ export default function MissionTab({
           )}
         </div>
         <div
-          className="flex min-w-0 min-h-[18px] flex-1 flex-nowrap items-center gap-1"
+          className={MISSION_TODAY_EXP_GROUP_CLASSNAME}
           role="group"
           aria-label={`경험치 ${exp}, 목표 ${expToNext}`}
         >
-          {/* 남는 가로를 여기서만 먹어서 막대·♥·숫자 묶음이 행의 오른쪽(패딩 안쪽)에 붙음 */}
-          <div className="min-h-0 min-w-0 flex-1 shrink" aria-hidden />
-          <div className="flex shrink-0 items-center gap-1">
-            {/**
-             * `clamp`: 좁은 화면은 최소 폭만, 넓어질수록 길어지다 `18rem` 에서 멈춤.
-             * 묶음은 `shrink-0` 이라 ♥·목표 숫자가 오른쪽 끝에 고정된 채 막대만 길이가 변함.
-             */}
-            <div className="relative h-[18px] min-w-[3.25rem] w-[clamp(3.25rem,32vw,18rem)] overflow-hidden rounded-full bg-white/50 shadow-inner ring-1 ring-pink-300/50 sm:w-[clamp(3.25rem,36vw,18rem)]">
-              <div
-                className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-pink-300 to-pink-500 transition-all duration-500"
-                style={{ width: `${expPct}%` }}
-              />
-              <span className="absolute left-1.5 top-1/2 z-10 -translate-y-1/2 text-[10px] font-black tabular-nums leading-none text-pink-950 drop-shadow-[0_0_2px_rgba(255,255,255,0.95)]">
-                {exp}
-              </span>
-            </div>
-            <span className="flex shrink-0 items-center gap-0.5 text-[10px] font-black tabular-nums text-pink-700 sm:text-[11px]">
-              <span aria-hidden>♥</span>
-              <span>{expToNext}</span>
+          <div className={MISSION_TODAY_EXP_TRACK_CLASSNAME}>
+            <div
+              className={MISSION_TODAY_EXP_FILL_CLASSNAME}
+              style={{ width: `${expPct}%` }}
+            />
+            <span className={MISSION_TODAY_EXP_TEXT_IN_BAR_CLASSNAME}>
+              {exp}
             </span>
           </div>
+          <span className={MISSION_TODAY_EXP_TO_NEXT_CLASSNAME}>
+            <span aria-hidden>♥</span>
+            <span>{expToNext}</span>
+          </span>
         </div>
       </div>
     </div>
   )
 
   /**
-   * 상단 영역: `flexFill` 로 레이아웃이 주는 높이만 씀(고정 dvh 아님).
-   * 요청하신 `grass_background.png`를 상단 배경으로 적용합니다.
-   * 저금통/크레딧/지갑 위치는 기존 레이아웃 그대로 유지됩니다.
+   * 상단 영역: `flexFill={false}` 로 `60dvh`·최소 높이를 쓰고, 미션 탭 전체는 아래 래퍼에서 세로 스크롤됩니다.
+   * (예전처럼 상·하 flex 비율로 뷰포트만 꽉 채우면 내용이 잘리고 한꺼번에 밀리는 느낌이 납니다.)
    */
   const heroBand = (
     <ChildHomeSceneryBand
-      flexFill
+      flexFill={false}
       /** 상단 배경 이미지를 완전히 비활성화합니다. */
       showBackground={false}
       /** 요청하신 잔디 배경 이미지 경로를 상단 영역에 적용합니다. */
@@ -611,7 +628,8 @@ export default function MissionTab({
       {/** `flex-1 min-h-0`: 홈과 같이 섬 무대가 풍경 밴드 안 남는 공간에 맞춰 줄어듦 */}
       {/** `overflow-visible`: 섬·저금통 스프라이트가 세로로 삐져나와도 잘리지 않게 */}
       <div className="flex min-h-0 flex-1 flex-col justify-end overflow-visible">
-        <div className="relative mx-auto flex min-h-0 w-full max-w-sm flex-1 flex-col items-center justify-end overflow-visible -mt-10 sm:-mt-12">
+        {/** 짧은 화면에서 위로 너무 당기면 부모 밖으로 삐져 나와 페이지 스크롤이 생길 수 있어 `-mt` 를 한 단계 줄였습니다. */}
+        <div className="relative mx-auto flex min-h-0 w-full max-w-sm flex-1 flex-col items-center justify-end overflow-visible -mt-8 sm:-mt-10">
           <ChildHomeIslandStage
             scene="gippybank"
             density="flex"
@@ -633,26 +651,44 @@ export default function MissionTab({
     </ChildHomeSceneryBand>
   )
 
+  /**
+   * 하단 「오늘의 미션」 블록 — 카드·여백 클래스는 `missionTodayLayoutSpec.ts` 고정.
+   * 높이는 내용만큼(`shrink-0`)이고, 탭 전체 세로 스크롤은 상위 래퍼가 담당합니다.
+   */
   const bottomPanel = (
-    <section
-      className="relative z-10 -mt-9 flex min-h-0 flex-[4.4] basis-0 flex-col gap-1 overflow-hidden px-1 pb-0 pt-0.5 sm:-mt-10"
-      aria-label="오늘의 미션 카드"
-    >
+    <section className={MISSION_TODAY_BOTTOM_SECTION_CLASSNAME} aria-label="오늘의 미션 카드">
       {missionTitleAboveCards}
       {ordered.length === 0 ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 py-8 text-center">
+        <div className="flex flex-col items-center justify-center gap-2 px-6 py-8 text-center">
           <p className="font-bold text-brand-text">아직 미션이 없어요</p>
           <p className="text-sm text-gray-400">부모님이 미션을 만들어주실 거예요!</p>
         </div>
       ) : incompleteOrdered.length === 0 ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-1 px-6 py-6 text-center">
+        <div className="flex flex-col items-center justify-center gap-1 px-6 py-6 text-center">
           <p className="text-sm font-bold text-gray-500">오늘의 미션을 모두 완료했어요</p>
         </div>
       ) : (
-        <div
-          className="-mx-1 flex min-h-0 flex-1 items-start gap-1.5 overflow-x-auto overflow-y-hidden px-1.5 pb-0 pt-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden snap-x snap-mandatory"
-          style={{ WebkitOverflowScrolling: 'touch' }}
-        >
+        <>
+          {/**
+           * `-mx-1` 제거: 부모 `overflow-hidden` 과 만나 첫 카드 **왼쪽 테두리**가 잘림.
+           * `overflow-auto`: 세로가 모자라면 이 영역만 스크롤(카드 `min-h` 도 낮춤).
+           */}
+          {/**
+           * `items-start`: `stretch` 는 카드 세로 늘림(비율 깨짐), `center` 는 남는 `flex-1` 높이 안에서
+           * 카드를 가운데 두어 「오늘의 미션」과 멀어지고 독바에만 가깝게 보입니다.
+           */}
+          {/**
+           * `overflow-y-hidden` 은 카드가 행 높이보다 조금만 커도 위·아래가 잘려(특히 아이콘 상단) 보입니다.
+           * 가로만 스크롤 — 세로는 카드 본문 높이를 맞춰 잘리지 않게 합니다.
+           */}
+          {/**
+           * `flex-1` 이면 패널 세로가 부족할 때 이 행 높이만 줄어들고, 카드보다 짧아져 하단이 `overflow-hidden` 으로 잘립니다.
+           * `flex-none` 으로 카드 실제 높이만큼만 쓰고, 부족하면 위 `section` 의 `overflow-y-auto` 로만 스크롤합니다.
+           */}
+          <div
+            className={MISSION_CARD_SCROLLER_CLASSNAME}
+            style={{ WebkitOverflowScrolling: 'touch' }}
+          >
           {incompleteOrdered.map((dm) => {
             const m = dm.missions
             if (!m) return null
@@ -667,9 +703,7 @@ export default function MissionTab({
                 onClick={(ev) => handleComplete(dm, ev)}
                 aria-label={`${m.title} 미션 완료하기`}
                 className={[
-                  // 카드 하단 빈 여백을 줄이기 위해 최소 높이를 더 낮춰 내용 높이에 가깝게 맞춤
-                  // 가로: 화면 너비의 32%와 최대 140px 중 작은 값 — 한눈에 카드가 더 많이 보이도록 이전(42vw/168px)보다 좁게 유지
-                  'snap-center flex min-h-[9rem] w-[min(32vw,140px)] shrink-0 flex-col rounded-xl border bg-white p-2 text-left font-sans text-brand-text shadow-md transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue focus-visible:ring-offset-2 active:scale-[0.97]',
+                  MISSION_CARD_BUTTON_BASE_CLASSNAME,
                   special ? 'border-amber-300 ring-2 ring-amber-200/60' : 'border-gray-200/90',
                 ].join(' ')}
               >
@@ -678,21 +712,21 @@ export default function MissionTab({
                  * `routines_01.png` 아틀라스 — `clipRotated={false}` 로 회전 프레임 잘림 완화.
                  */}
                 {/** 배경색 없음 — 아틀라스 일러스트만 흰 카드 위에 표시 */}
-                <div className="flex min-h-[5.6rem] w-full shrink-0 items-center justify-center overflow-visible">
+                {/** `min-h` + 세로 중앙: 짧은 카드에서도 루틴 일러스트가 잘리지 않게(이전 `flex-1`+낮은 `aspect` 조합이 상단 클리핑 유발) */}
+                <div className={MISSION_CARD_IMAGE_AREA_CLASSNAME}>
                   <SpriteImage
                     sheet={MISSION_ROUTINES_ATLAS}
                     frame={routineFrame}
-                    // 요청대로 이미지 크기를 소폭 축소
-                    width={52}
+                    width={MISSION_CARD_ROUTINE_SPRITE_WIDTH_PX}
                     clipRotated={false}
                     className="select-none drop-shadow-[0_2px_8px_rgba(0,0,0,0.08)]"
                   />
                 </div>
 
-                <div className="mt-0 space-y-0 text-center">
-                  <p className="line-clamp-2 text-[10px] font-black leading-tight text-brand-text">{m.title}</p>
+                <div className={MISSION_CARD_TEXT_BLOCK_CLASSNAME}>
+                  <p className={MISSION_CARD_TITLE_CLASSNAME}>{m.title}</p>
                   {sub ? (
-                    <p className="line-clamp-2 text-[9px] font-medium leading-snug text-gray-500">{sub}</p>
+                    <p className={MISSION_CARD_SUBTITLE_CLASSNAME}>{sub}</p>
                   ) : null}
                 </div>
 
@@ -701,11 +735,10 @@ export default function MissionTab({
                  * 여기서는 `ICONS` 상수로 같은 PNG를 가리킵니다(`/assets/img/common/ui/icons.png`).
                  * 시안과 동일하게 한 줄: [크레딧 아이콘+숫자] [하트 아이콘+숫자] — 오른쪽은 EXP(텍스트 없이 하트로 표현).
                  */}
-                <div className="mt-0 flex justify-center">
+                <div className={MISSION_CARD_REWARD_ROW_CLASSNAME}>
                   <div
                     className={[
-                      // 보상 숫자/아이콘이 알약 내부에서 안 잘리도록 간격과 패딩을 타이트하게 조정
-                      'inline-flex max-w-full flex-nowrap items-center justify-center gap-x-1 rounded-full px-2 py-1 text-[11px] font-black tabular-nums tracking-[-0.01em] text-gray-800 shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] ring-1 ring-black/[0.06]',
+                      MISSION_CARD_REWARD_PILL_BASE_CLASSNAME,
                       special ? 'bg-amber-100/90' : 'bg-stone-100/95',
                     ].join(' ')}
                     role="group"
@@ -716,7 +749,7 @@ export default function MissionTab({
                       <SpriteImage
                         sheet={ICONS}
                         frame="credit"
-                        width={16}
+                        width={MISSION_CARD_REWARD_ICON_WIDTH_PX}
                         clipRotated={false}
                         className="shrink-0 select-none"
                       />
@@ -727,7 +760,7 @@ export default function MissionTab({
                       <SpriteImage
                         sheet={ICONS}
                         frame="heart"
-                        width={16}
+                        width={MISSION_CARD_REWARD_ICON_WIDTH_PX}
                         className="shrink-0 select-none"
                       />
                       <span>{rewards.exp}</span>
@@ -740,7 +773,8 @@ export default function MissionTab({
               </button>
             )
           })}
-        </div>
+          </div>
+        </>
       )}
     </section>
   )
@@ -879,7 +913,7 @@ export default function MissionTab({
   if (isFullRestDay) {
     /** 휴식일은 전체 배경을 건드리지 않고, 위 `heroBand`(상단)에서만 이미지가 보입니다. */
     return (
-      <div className="relative -mx-4 -mb-[calc(60px+0.35rem)] -mt-4 flex min-h-0 flex-1 flex-col bg-transparent">
+      <div className="relative -mx-4 -mb-[calc(60px+0.35rem)] -mt-4 flex min-h-0 min-w-0 flex-1 flex-col bg-transparent">
         <MissionSleepMorningLayer
           childId={childId}
           today={today}
@@ -887,12 +921,15 @@ export default function MissionTab({
           completedCount={completedCount}
           totalMissions={total}
         />
-        {heroBand}
-        <section className="flex min-h-0 flex-[4] flex-col items-center justify-center gap-3 overflow-hidden bg-transparent px-6 py-4 text-center">
-          <span className="text-sm font-black text-gray-400">휴식</span>
-          <p className="text-xl font-black text-brand-text">오늘은 쉬는 날이에요!</p>
-          <p className="text-sm text-gray-400">푹 쉬고 내일 또 열심히 해봐요.</p>
-        </section>
+        {/** 휴식일도 미션 탭과 같이 세로 스크롤로 전체를 볼 수 있게 합니다. */}
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto overscroll-y-contain">
+          {heroBand}
+          <section className="flex min-w-0 shrink-0 flex-col items-center justify-center gap-2 overflow-x-hidden bg-transparent px-4 py-2 text-center sm:gap-3 sm:px-6 sm:py-4">
+            <span className="text-sm font-black text-gray-400">휴식</span>
+            <p className="text-lg font-black text-brand-text sm:text-xl">오늘은 쉬는 날이에요!</p>
+            <p className="text-xs text-gray-400 sm:text-sm">푹 쉬고 내일 또 열심히 해봐요.</p>
+          </section>
+        </div>
         {popupBlock}
         {rollbackPopupBlock}
 
@@ -922,7 +959,7 @@ export default function MissionTab({
 
   /** 일반일도 전체 배경은 투명 유지, 상단 영역(`heroBand`)에서만 새 이미지를 표시합니다. */
   return (
-    <div className="relative -mx-4 -mb-[calc(60px+0.35rem)] -mt-4 flex min-h-0 flex-1 flex-col bg-transparent">
+    <div className="relative -mx-4 -mb-[calc(60px+0.35rem)] -mt-4 flex min-h-0 min-w-0 flex-1 flex-col bg-transparent">
       <MissionSleepMorningLayer
         childId={childId}
         today={today}
@@ -945,8 +982,15 @@ export default function MissionTab({
           startY={creditFxStart.y}
         />
       ) : null}
-      {heroBand}
-      {bottomPanel}
+      {/**
+       * 세로 `overflow-y-auto`: 상단·하단을 스크롤로 볼 수 있음.
+       * 가로는 `hidden` — `overflow-y-auto`+`visible` 조합이 브라우저에서 전체 가로 스크롤을 만들기 때문.
+       * 카드 가로 스와이프는 하단 `MISSION_CARD_SCROLLER` 안에서만 됩니다.
+       */}
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto overscroll-y-contain">
+        {heroBand}
+        {bottomPanel}
+      </div>
 
       <MissionCreditActionSheet
         open={creditSheetBucket !== null}

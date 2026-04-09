@@ -18,6 +18,18 @@ export interface SpriteSheet {
 
 // ─── characters/base ───────────────────────────────────────────────
 
+/**
+ * 곰 베이스 스프라이트 — 좌표·크기는 `public/assets/img/characters/base/bears.json` 과 동일합니다.
+ * JSON `meta.size`(829×560) 안에서 각 프레임의 `frame.x`, `frame.y` 로 **시트상 위치**를 보면 카메라 방향이 갈립니다.
+ *
+ * | JSON 키 / 스프라이트 키 | frame (x,y) | 아틀라스에서의 칸 | 내용 |
+ * |---|---|---|---|
+ * | `Bears (1).png` / `'Bears (1)'` | (333, 1) | 오른쪽 **위** | **정면** (눈·코·리본). `rotated: true` 로 시트에 눕혀 저장됨 |
+ * | `Bears (2).png` / `'Bears (2)'` | (1, 1) | **왼쪽**(큰 세로) | **뒷모습** (가방 끈·꼬리) |
+ * | `Bears (3).png` / `'Bears (3)'` | (333, 283) | 오른쪽 **아래** | **옆모습** |
+ *
+ * 정면만 써야 하는 UI(예: 홈 섬)는 `BEAR_HOME_ISLAND_FRONT_FRAME` 을 사용하세요.
+ */
 export const BEARS: SpriteSheet = {
   image: 'characters/base/bears.png',
   atlasW: 829,
@@ -302,33 +314,8 @@ export const PIGGY_BANK: SpriteSheet = {
 }
 
 // ─── items/rewards ─────────────────────────────────────────────────
-
-/** `public/assets/img/items/rewards/credits.png` 아틀라스(크레딧 단계/보상 장식) */
-export const REWARD_CREDITS: SpriteSheet = {
-  image: 'items/rewards/credits.png',
-  atlasW: 504,
-  atlasH: 1165,
-  frames: {
-    credit1: { x: 6, y: 1060, w: 91, h: 91, rotated: false },
-    /**
-     * `credits.json`에서 rotated=true인 프레임은 아틀라스 점유 폭/높이가 서로 바뀐 상태로 해석해야
-     * 실제 배경 크롭이 맞습니다. 그대로 넣으면 오른쪽이 잘린 것처럼 보일 수 있습니다.
-     */
-    credit2: { x: 398, y: 894, w: 100, h: 165, rotated: true },
-    credit3: { x: 345, y: 1071, w: 124, h: 88, rotated: false },
-    credit4: { x: 189, y: 996, w: 144, h: 123, rotated: false },
-    credit8: { x: 6, y: 726, w: 187, h: 176, rotated: false },
-    credit9: { x: 223, y: 715, w: 190, h: 167, rotated: false },
-    credit10: { x: 248, y: 383, w: 223, h: 168, rotated: false },
-    crown: { x: 223, y: 563, w: 203, h: 140, rotated: false },
-    diamond: { x: 6, y: 914, w: 171, h: 134, rotated: false },
-    gold_and_crown: { x: 6, y: 6, w: 406, h: 365, rotated: false },
-    gold_box: { x: 6, y: 524, w: 205, h: 190, rotated: false },
-    goldbar2: { x: 205, y: 894, w: 181, h: 90, rotated: false },
-    goldbar5: { x: 6, y: 383, w: 230, h: 129, rotated: false },
-    goldber1: { x: 424, y: 6, w: 74, h: 130, rotated: true },
-  },
-}
+// 크레딧 단계(credit1~10)·곰돌이 팝업 금상자 등은 `public/assets/img/items/rewards/*.png` 개별 파일로 둡니다.
+// (`FloatingCreditsStackVisual`, `BearBoardCompleteModal` 등에서 직접 경로 로드)
 
 // ─── items/shop ────────────────────────────────────────────────────
 
@@ -419,7 +406,13 @@ export const ROUTINES_01: SpriteSheet = {
 
 // ─── Union types per category ───────────────────────────────────────
 
-export type BearFrameName      = keyof typeof BEARS.frames
+export type BearFrameName = keyof typeof BEARS.frames
+
+/**
+ * 홈 섬 등 **정면 곰**만 필요할 때의 프레임 키.
+ * `bears.json` 의 `"Bears (1).png"`(시트 오른쪽 위, sourceSize 280×495, rotated)에 대응합니다.
+ */
+export const BEAR_HOME_ISLAND_FRONT_FRAME: BearFrameName = 'Bears (1)'
 export type BunnyFrameName     = keyof typeof BUNNY.frames
 export type ChicksFrameName    = keyof typeof CHICKS.frames
 export type FoxFrameName       = keyof typeof FOX.frames
@@ -438,7 +431,6 @@ export type FarmHorseFrameName = keyof typeof FARM_HORSE.frames
 export type FarmPiggyFrameName = keyof typeof FARM_PIGGY.frames
 export type FarmSheepFrameName = keyof typeof FARM_SHEEP.frames
 export type PiggyBankFrameName = keyof typeof PIGGY_BANK.frames
-export type RewardCreditsFrameName = keyof typeof REWARD_CREDITS.frames
 export type ShopAnimFrameName  = keyof typeof SHOP_ANIMATIONS.frames
 export type BannerFrameName    = keyof typeof BANNERS.frames
 export type RoutineFrameName   = keyof typeof ROUTINES_01.frames

@@ -11,6 +11,7 @@ import MarketRequestsBottomSheet from '@/components/child/MarketRequestsBottomSh
 import MarketWishlistBottomSheet from '@/components/child/MarketWishlistBottomSheet'
 import { createClient } from '@/lib/supabase/client'
 import { marketFrameKeyForItemId, type MarketItemFrameKey } from '@/lib/marketItemFrame'
+import { formatMarketCreditLabel } from '@/lib/applyStoreItemCreditOverrides'
 import {
   PARENT_MARKET_MENU_SECTIONS,
   parentMarketSectionIdForItem,
@@ -832,7 +833,7 @@ export default function MarketTab({
                         >
                           <SpriteImage sheet={ICONS} frame="credit" width={11} clipRotated={false} />
                           <span className="truncate text-[8px] font-black tabular-nums text-brand-blue sm:text-[9px]">
-                            {item.credit_price.toLocaleString()}
+                            {formatMarketCreditLabel(item.credit_price)}
                           </span>
                         </div>
                       </div>
@@ -977,7 +978,7 @@ export default function MarketTab({
             <div className="mt-2 text-center text-sm font-bold text-gray-500">
               <SpriteImage sheet={ICONS} frame="credit" width={14} className="inline-block align-[-2px]" clipRotated={false} />{' '}
               <span className="tabular-nums text-lg font-black text-brand-blue">
-                {shelfActionFor.item.credit_price.toLocaleString('ko-KR')}
+                {formatMarketCreditLabel(shelfActionFor.item.credit_price)}
               </span>
             </div>
 

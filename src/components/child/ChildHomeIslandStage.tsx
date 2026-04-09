@@ -36,11 +36,12 @@ const BOX_DEFAULT = 'h-[min(46dvh,400px)] min-h-[280px]'
 /** 예전 한 화면 실험용 — 매우 낮은 박스. */
 const BOX_VIEWPORT_FIT = 'h-[min(17dvh,148px)] min-h-[96px] max-h-[24vh]'
 /**
- * 플렉스 열에 넣을 때: 위쪽 풍경 안에서 **남는 높이**만 쓰되 너무 작거나 크지 않게 상한·하한.
- * (고정 `min-h-[280px]` 대신 줄어들 수 있어 전체 페이지 세로 스크롤을 막기 쉬움.)
+ * 플렉스 열에 넣을 때: 위쪽 풍경 안에서 **남는 높이**만 씀.
+ * - `sm:` 별도 max-h 분기 없음 → 리사이즈 시 % 배치가 덜 튐.
+ * - 그리드 `min-h` 는 **컨테이너(`cqh`)보다 크면** 위로 밀려 상위 `overflow-hidden` 에 잘려 아이콘이 「사라짐」 → `min(…, …cqh)` 로 맞춤.
  */
 const BOX_FLEX =
-  'w-full flex-1 basis-0 min-h-[64px] max-h-[min(40dvh,320px)] overflow-visible sm:max-h-[min(42dvh,360px)]'
+  'w-full flex-1 basis-0 min-h-[64px] max-h-[min(46dvh,380px)] overflow-visible'
 
 const ISLAND_IMAGE_SRC = {
   bunny: '/assets/img/layouts/backgrounds/kids_background_island.png',
@@ -48,42 +49,28 @@ const ISLAND_IMAGE_SRC = {
 } as const
 
 /**
- * 미션 섬 3열(저금통·섬 크레딧·지갑) 아이콘 **뒤**에 깔 맵 일러스트 경로입니다.
- * - `public/assets/img/games/map/` 아래 PNG 를 씁니다.
- * - 레이아웃: 배경은 `z-0` + 오른쪽·아래 모서리 기준으로 겹치고, 돼지·동전·지갑은 그 위(`z-[1]`).
+ * 미션 탭: 예전에는 열마다 은행·집·마켓 PNG 를 깔았고, 지금은 **한 장**의 맵만 씁니다.
+ * 파일 위치: `public/assets/img/games/map/map.png` → 브라우저 경로는 `/assets/...` 로 시작합니다.
  */
-const MISSION_CREDIT_MAP_BACKDROP = {
-  piggy: '/assets/img/games/map/bank2.png',
-  floating: '/assets/img/games/map/home.png',
-  wallet: '/assets/img/games/map/market2.png',
-} as const
+const MISSION_MAP_UNIFIED_SRC = '/assets/img/games/map/map.png'
 
 /**
- * 은행·집·마켓 맵 슬롯 — 세 열 **같은 가로·같은 높이**, 바닥(`bottom-0`) 한 줄 정렬.
+ * 맵 PNG(뒤): 아주 약한 블러 + 밝기 더 올림 — 지도가 또렷하게 보이게 합니다.
  */
-const MISSION_MAP_BACKDROP_SLOT_CLASS =
-  'pointer-events-none absolute bottom-0 left-1/2 z-0 flex h-[9.5rem] w-[10rem] -translate-x-1/2 items-end justify-end sm:h-[10rem] sm:w-[10.75rem]'
+const MISSION_MAP_BACKDROP_SOFTEN_CLASS = 'blur-[0.7px] brightness-124.5'
 
 /**
- * 맵 PNG(뒤): 아주 약한 블러 + 밝기 살짝 낮춤 — 건물이 너무 흐리지 않게(이전 1.5px → 1px).
+ * 3열 그리드 전체 너비 안에서 맵을 **가로·세로 가운데(아래쪽 기준)** 에 맞춥니다.
+ * `object-contain`: 맵 비율을 유지한 채 박스 안에 들어가게 합니다.
  */
-const MISSION_MAP_BACKDROP_SOFTEN_CLASS = 'blur-[1px] brightness-[0.93]'
-
-/** 슬롯 안에서 비율 유지 + 오른쪽·아래 기준 + 뒤쪽 흐림 */
-const MISSION_MAP_BACKDROP_IMG_CLASS = `h-full w-full select-none object-contain object-bottom-right ${MISSION_MAP_BACKDROP_SOFTEN_CLASS}`
-
-/**
- * 마켓(`market2.png`) 전용 — `object-cover` 는 가장자리가 잘려 나가므로 쓰지 않습니다.
- * 집과 같이 **전체가 보이게** `object-contain` 을 쓰고, 살짝만 `scale` 로 키웁니다(기준: 오른쪽·아래).
- */
-const MISSION_MAP_BACKDROP_IMG_MARKET_CLASS = `h-full w-full overflow-visible select-none object-contain object-bottom-right origin-bottom-right scale-[1.12] sm:scale-[1.15] ${MISSION_MAP_BACKDROP_SOFTEN_CLASS}`
+const MISSION_MAP_UNIFIED_IMG_CLASS = `h-full w-full max-h-[11rem] select-none object-contain object-bottom ${MISSION_MAP_BACKDROP_SOFTEN_CLASS}`
 
 /**
  * 돼지·크레딧 더미·지갑 — 위치는 밀지 않고(오프셋 0), **주변으로만 번지는** 그림자.
  * `drop-shadow(dx dy blur)` 에서 dx·dy 를 0으로 두고 blur 만 여러 겹 겹칩니다.
  */
 const MISSION_CREDIT_SPRITE_POP_SHADOW_CLASS =
-  '[filter:drop-shadow(0_0_22px_rgba(15,23,42,0.5))_drop-shadow(0_0_12px_rgba(15,23,42,0.38))_drop-shadow(0_0_6px_rgba(0,0,0,0.32))]'
+  '[filter:drop-shadow(0_0_22px_rgba(15,23,42,0))_drop-shadow(0_0_12px_rgba(15,23,42,0))_drop-shadow(0_0_6px_rgba(0,0,0,0.32))]'
 
 /** 가운데 가용 크레딧 더미만 — 맵보다 살짝 아래 */
 const MISSION_CREDIT_SPRITE_NUDGE_DOWN_CLASS = 'translate-y-5 sm:translate-y-6'
@@ -330,6 +317,46 @@ export default function ChildHomeIslandStage({
     return () => clearInterval(tick)
   }, [piggyIdx])
 
+  /**
+   * DEBUG(세션 22d9a1): 넓은 화면에서 숫자·맵 겹침 원인 추적
+   * - H-A: `sm:` 에서 크레딧 숫자 줄이 `top-[45%]` 로 내려가 건물/맵과 겹침
+   * - H-B: `BOX_FLEX` 의 `sm:max-h` 로 무대가 커지면서 퍼센트 배치가 상대적으로 어긋남
+   */
+  useEffect(() => {
+    if (density !== 'flex' || scene !== 'gippybank' || !missionCredits) return
+    const send = () => {
+      const w = window.innerWidth
+      const h = window.innerHeight
+      const sm640 = window.matchMedia('(min-width: 640px)').matches
+      // #region agent log
+      fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '22d9a1' },
+        body: JSON.stringify({
+          sessionId: '22d9a1',
+          runId: 'post-fix',
+          hypothesisId: 'verify',
+          location: 'ChildHomeIslandStage.tsx:missionLayoutProbe',
+          message: 'gippybank flex layout probe (unified sm/narrow placement)',
+          data: {
+            innerWidth: w,
+            innerHeight: h,
+            sm640,
+            creditNumberRowTopPct: 11,
+            mapRowBottomPct: 26,
+            boxFlexMaxH: 'min(46dvh,380px)',
+            layoutFixVersion: 4,
+          },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {})
+      // #endregion
+    }
+    send()
+    window.addEventListener('resize', send)
+    return () => window.removeEventListener('resize', send)
+  }, [density, scene, missionCredits])
+
   /** 섬·토끼·돼지 레이어 (flex / 비-flex 공통 JSX) */
   const stageLayers = (
     <>
@@ -375,37 +402,73 @@ export default function ChildHomeIslandStage({
       {scene === 'gippybank' && missionCredits ? (
         <>
           {/**
-           * 크레딧 숫자는 **각 열 안**에서 아이콘(저금통·동전·지갑) 바로 위에 둡니다.
-           * (예전처럼 위쪽 한 줄로만 두면 `min-h` 큰 열에서 숫자는 맨 위·건물은 맨 아래라 간격이 너무 벌어짐)
+           * 크레딧 숫자는 **한 줄 그리드**로만 두고, 무대 위쪽에 고정합니다.
+           * 예전 `sm:top-[45%]` 는 넓은 화면에서만 숫자가 한가운데로 떨어져 맵·건물과 겹쳤습니다 → **모든 너비에서 동일 %** 유지.
            */}
-          <div className="pointer-events-none absolute inset-x-0 bottom-[18%] z-[6] flex flex-col items-center sm:bottom-[19%]">
-            <div className="grid w-full max-w-[320px] grid-cols-3 items-end gap-x-2 px-1 sm:max-w-[340px] sm:gap-x-3 sm:px-2">
-              {/**
-               * `min-h`: 왕관 돼지·큰 맵 슬롯까지 감당하고, 맵은 `absolute bottom-0` 으로 세 열 동일선상에 둡니다.
-               * `overflow-visible`: 돼지 그림 하단이 잘리지 않게 합니다.
-               */}
-              <div className="pointer-events-auto relative mx-auto flex min-h-[272px] w-full max-w-[118px] flex-col items-center justify-end justify-self-center overflow-visible sm:min-h-[280px]">
-                {/** 은행 맵 — 가운데·오른쪽 열과 같은 슬롯 크기·같은 바닥 */}
-                <div className={MISSION_MAP_BACKDROP_SLOT_CLASS} aria-hidden>
-                  <Image
-                    src={MISSION_CREDIT_MAP_BACKDROP.piggy}
-                    alt=""
-                    width={200}
-                    height={200}
-                    className={MISSION_MAP_BACKDROP_IMG_CLASS}
-                  />
-                </div>
-                <div
-                  className="pointer-events-none relative z-[2] mb-0.5 flex w-full min-h-[1.25rem] items-center justify-center sm:mb-1"
-                  aria-hidden
-                >
+          <div className="pointer-events-none absolute inset-0 z-[6]">
+            {/**
+             * `top-[11%]` + `-translate-y-1/2`: 숫자 줄 중심이 무대 상단 근처에만 오도록(모바일·sm 동일).
+             * `items-end`: 한 자리·두 자리 숫자도 **밑변**을 맞춤.
+             */}
+            <div className="pointer-events-none absolute inset-x-0 top-[11%] z-[7] flex -translate-y-1/2 justify-center">
+              <div className="grid w-full max-w-[320px] grid-cols-3 items-end justify-items-center gap-x-2 px-1 sm:max-w-[340px] sm:gap-x-3 sm:px-2">
+                <div className="flex min-h-[1.35em] w-full items-end justify-center" aria-hidden>
                   <SlotNumber
                     value={missionCredits.piggy}
                     toneClass="text-sky-900"
-                    sizeClass="text-lg sm:text-xl"
+                    sizeClass="text-lg"
                     className="leading-none"
                   />
                 </div>
+                <div className="flex min-h-[1.35em] w-full items-end justify-center" aria-hidden>
+                  <SlotNumber
+                    value={missionCredits.floating}
+                    toneClass="text-sky-900"
+                    sizeClass="text-lg"
+                    className="leading-none"
+                  />
+                </div>
+                <div className="flex min-h-[1.35em] w-full items-end justify-center" aria-hidden>
+                  <SlotNumber
+                    value={missionCredits.wallet}
+                    toneClass="text-sky-900"
+                    sizeClass="text-lg"
+                    className="leading-none"
+                  />
+                </div>
+              </div>
+            </div>
+            {/**
+             * 통합 맵은 `absolute` 로 3열 가로 한가운데, 돼지·동전·지갑은 `z-[1]` 로 그 위.
+             */}
+            {/**
+             * `bottom-[26%]`: 맵·아이콘 덩어리를 무대 안쪽으로 두고, 열 `min-h` 는 `cqh` 상한으로 잘림 방지.
+             */}
+            <div className="pointer-events-none absolute inset-x-0 bottom-[26%] flex flex-col items-center">
+              <div className="relative grid w-full max-w-[320px] grid-cols-3 items-end gap-x-2 px-1 sm:max-w-[340px] sm:gap-x-3 sm:px-2">
+              {/**
+               * `map.png` 한 장 — 3열 그리드 안 `absolute` 슬롯.
+               * `bottom-0` 대신 `bottom-2` 등: 그리드 **바닥에서 띄운 만큼** 맵 전체가 위로 올라감(돼지·지갑은 그대로).
+               */}
+              <div
+                className="pointer-events-none absolute inset-x-0 bottom-2 z-0 flex h-[8.5rem] items-end justify-center sm:bottom-2 sm:h-[9rem]"
+                aria-hidden
+              >
+                <Image
+                  src={MISSION_MAP_UNIFIED_SRC}
+                  alt=""
+                  width={640}
+                  height={360}
+                  className={MISSION_MAP_UNIFIED_IMG_CLASS}
+                  priority={scene === 'gippybank'}
+                />
+              </div>
+              {/**
+               * `min-h`: 왕관 돼지 등 키 큰 스프라이트까지 세로로 감당합니다.
+               * `overflow-visible`: 돼지 그림 하단이 잘리지 않게 합니다.
+               */}
+              {/** `min-h` 를 `cqh` 로 상한 — 짧은 무대에서 272px 고정이면 전부 클리핑되어 아이콘이 안 보임 */}
+              <div className="pointer-events-auto relative z-[1] mx-auto flex min-h-[min(17rem,72cqh)] w-full max-w-[118px] flex-col items-center justify-end justify-self-center overflow-visible sm:min-h-[min(17.5rem,76cqh)]">
                 <button
                   type="button"
                   onClick={missionCredits.onPiggyTap}
@@ -414,13 +477,13 @@ export default function ChildHomeIslandStage({
                 >
                   <div className="flex w-full flex-col items-center overflow-visible">
                     {/**
-                     * 초기 단계(핑크 돼지)는 회전 스프라이트·그림자로 아래가 잘려 보이기 쉬워 `min-h`·`pb` 를 넉넉히 둡니다.
+                     * 돼지 스프라이트 영역도 무대 높이에 맞춰 상한(`cqh`) — 잘림 방지.
                      */}
                     <div
-                      className={`relative z-0 flex w-[112px] items-end justify-center overflow-visible pb-3 sm:pb-3.5 ${
+                      className={`relative z-0 flex w-[112px] max-h-[min(15rem,58cqh)] items-end justify-center overflow-visible pb-2 sm:pb-2.5 ${
                         animatedPiggyIdx >= tallCrownStartIdx
-                          ? 'min-h-[228px] pt-5 sm:min-h-[236px] sm:pt-6'
-                          : 'min-h-[226px] sm:min-h-[232px]'
+                          ? 'min-h-[min(13.5rem,52cqh)] pt-3 sm:min-h-[min(14rem,54cqh)] sm:pt-4'
+                          : 'min-h-[min(13.25rem,50cqh)] sm:min-h-[min(13.5rem,52cqh)]'
                       }`.trim()}
                     >
                       <PiggyBankStageVisual
@@ -458,32 +521,8 @@ export default function ChildHomeIslandStage({
                 </button>
               </div>
 
-              {/** 맵 슬롯을 왼쪽 열과 동일 바닥에 두어, 동전 더미는 그 위(`z-[1]`)에 올립니다. */}
-              <div className="pointer-events-auto relative mx-auto flex min-h-[272px] w-full max-w-[118px] flex-col items-center justify-end justify-self-center overflow-visible sm:min-h-[280px]">
-                {/** 집 맵: 살짝 위로 + 조금 왼쪽(`-ml`, 가운데 정렬은 유지) */}
-                <div
-                  className={`${MISSION_MAP_BACKDROP_SLOT_CLASS} -translate-y-2 sm:-translate-y-2.5 -ml-1 sm:-ml-1.5`}
-                  aria-hidden
-                >
-                  <Image
-                    src={MISSION_CREDIT_MAP_BACKDROP.floating}
-                    alt=""
-                    width={200}
-                    height={200}
-                    className={MISSION_MAP_BACKDROP_IMG_CLASS}
-                  />
-                </div>
-                <div
-                  className="pointer-events-none relative z-[2] mb-0.5 flex w-full min-h-[1.25rem] items-center justify-center sm:mb-1"
-                  aria-hidden
-                >
-                  <SlotNumber
-                    value={missionCredits.floating}
-                    toneClass="text-sky-900"
-                    sizeClass="text-lg sm:text-xl"
-                    className="leading-none"
-                  />
-                </div>
+              {/** 가운데 열: 통합 맵은 그리드 공통 레이어에서 이미 깔림 */}
+              <div className="pointer-events-auto relative z-[1] mx-auto flex min-h-[min(17rem,72cqh)] w-full max-w-[118px] flex-col items-center justify-end justify-self-center overflow-visible sm:min-h-[min(17.5rem,76cqh)]">
                 <button
                   type="button"
                   disabled={missionCredits.floating <= 0}
@@ -500,42 +539,18 @@ export default function ChildHomeIslandStage({
                   {/**
                    * 가용 크레딧 박스: 단계마다 세로 비율이 달라 `min-h`·`min-w` 를 넉넉히(잘림 방지).
                    */}
-                  <div className="relative z-0 flex min-h-[152px] min-w-[88px] items-end justify-center overflow-visible sm:min-h-[160px] sm:min-w-[92px]">
+                  <div className="relative z-0 flex min-h-[min(8.5rem,34cqh)] min-w-[88px] items-end justify-center overflow-visible sm:min-h-[min(9rem,36cqh)] sm:min-w-[92px]">
                     <FloatingCreditsStackVisual
                       floating={missionCredits.floating}
                       dimWhenEmpty={false}
-                      displayWidth={58}
+                      displayWidth={52}
                       className={MISSION_CREDIT_SPRITE_POP_SHADOW_CLASS}
                     />
                   </div>
                 </button>
               </div>
 
-              <div className="pointer-events-auto relative mx-auto flex min-h-[272px] w-full max-w-[118px] flex-col items-center justify-end justify-self-center overflow-visible sm:min-h-[280px]">
-                {/** 마켓 맵: 살짝 아래로 (`translate-y`). `scale` 여백용 `overflow-visible` */}
-                <div
-                  className={`${MISSION_MAP_BACKDROP_SLOT_CLASS} overflow-visible translate-y-2 sm:translate-y-2.5`}
-                  aria-hidden
-                >
-                  <Image
-                    src={MISSION_CREDIT_MAP_BACKDROP.wallet}
-                    alt=""
-                    width={200}
-                    height={200}
-                    className={MISSION_MAP_BACKDROP_IMG_MARKET_CLASS}
-                  />
-                </div>
-                <div
-                  className="pointer-events-none relative z-[2] mb-0.5 flex w-full min-h-[1.25rem] items-center justify-center sm:mb-1"
-                  aria-hidden
-                >
-                  <SlotNumber
-                    value={missionCredits.wallet}
-                    toneClass="text-sky-900"
-                    sizeClass="text-lg sm:text-xl"
-                    className="leading-none"
-                  />
-                </div>
+              <div className="pointer-events-auto relative z-[1] mx-auto flex min-h-[min(17rem,72cqh)] w-full max-w-[118px] flex-col items-center justify-end justify-self-center overflow-visible sm:min-h-[min(17.5rem,76cqh)]">
                 <button
                   type="button"
                   onClick={missionCredits.onWalletTap}
@@ -554,7 +569,7 @@ export default function ChildHomeIslandStage({
                 </button>
               </div>
             </div>
-
+            </div>
           </div>
         </>
       ) : scene === 'gippybank' && missionPiggy ? (

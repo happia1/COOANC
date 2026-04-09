@@ -23,7 +23,7 @@ export default function PraiseStickerPanel({ childId, childName }: Props) {
   const [loading, setLoading] = useState(false)
   /** 전송 실패 시에만 아래 한 줄로 오류를 보여 줍니다(성공 메시지는 표시하지 않음). */
   const [toast, setToast] = useState<{ text: string; ok: boolean } | null>(null)
-  /** 스티커 그리드는 기본 접힘 — 「펼치기」로 15종 전체를 봅니다. */
+  /** 스티커 그리드는 기본 접힘 — 「펼치기」로 하트·별 스티커 10종을 봅니다. */
   const [stickersOpen, setStickersOpen] = useState(false)
 
   /** 다른 자녀를 고르면 다시 접어 두어 첫 화면을 맞춥니다. */
@@ -86,7 +86,7 @@ export default function PraiseStickerPanel({ childId, childName }: Props) {
       </div>
 
       {/**
-       * 펼침일 때만: 1줄 하트만 · 2줄 별만 · 3줄 기타(라벨 텍스트 없음).
+       * 펼침일 때만: 1줄 하트 → 2줄 별 순서(라벨 텍스트 없음).
        * 키 묶음은 `PRAISE_ASSET_STICKER_PANEL_BODY_ROWS`.
        */}
       {stickersOpen ? (
@@ -106,7 +106,7 @@ export default function PraiseStickerPanel({ childId, childName }: Props) {
                     title={title}
                   >
                     {src ? (
-                      // eslint-disable-next-line @next/next/no-img-element -- public 정적 PNG, next/image 크기 15종 고정보다 단순
+                      // eslint-disable-next-line @next/next/no-img-element -- public 정적 PNG, next/image보다 단순
                       <img src={src} alt="" className="h-8 w-8 object-contain" width={32} height={32} />
                     ) : null}
                   </button>

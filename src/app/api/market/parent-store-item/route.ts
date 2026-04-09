@@ -74,8 +74,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: '상품 이름을 확인해 주세요' }, { status: 400 })
   }
 
-  if (!Number.isFinite(creditPrice) || creditPrice < 1 || creditPrice > 999_999) {
-    return NextResponse.json({ error: '크레딧 가격은 1 이상으로 입력해 주세요' }, { status: 400 })
+  if (!Number.isFinite(creditPrice) || creditPrice < 0 || creditPrice > 999_999) {
+    return NextResponse.json({ error: '크레딧 가격은 0 이상으로 입력해 주세요' }, { status: 400 })
   }
 
   const { data: link, error: linkErr } = await supabase

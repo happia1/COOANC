@@ -18,12 +18,11 @@ export default async function ChildLayout({ children }: { children: ReactNode })
 
   /**
    * `h-dvh` 로 한 화면 높이를 맞춥니다.
-   * `overflow-hidden` 은 자식(미션 저금통 큰 스프라이트)이 위로 나올 때 머리가 잘립니다.
-   * `overflow-x` 와 `overflow-y` 를 섞으면(한쪽만 hidden) 브라우저가 세로를 `auto` 로 바꿔 잘릴 수 있어,
-   * 여기서는 **양축 `visible`** 만 쓰고 가로는 `max-w-md`·`mx-auto` 로 막습니다.
+   * 세로 `overflow-hidden` 은 자식(미션 저금통 큰 스프라이트)이 위로 나올 때 잘릴 수 있어 두지 않습니다.
+   * 가로로만 `overflow-x-hidden` 을 두어 독·패딩 밖으로 삐져 나온 요소 때문에 생기는 **가로 스크롤/스크롤바**를 줄입니다.
    */
   return (
-    <div className="relative flex h-dvh max-h-dvh min-h-0 flex-col overflow-visible bg-gradient-to-b from-sky-100/90 via-amber-50/50 to-green-50/80">
+    <div className="relative flex h-dvh max-h-dvh min-h-0 flex-col overflow-x-hidden bg-gradient-to-b from-sky-100/90 via-amber-50/50 to-green-50/80">
       <ChildTopBar isParentPreview={ctx.isParentPreview} />
       {/**
        * `min-h-0` + `flex` 로 자식이 뷰포트 높이를 넘지 않게 할 수 있음(홈·미션 한 화면).

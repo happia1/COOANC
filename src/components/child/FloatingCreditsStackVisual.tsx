@@ -1,9 +1,10 @@
 'use client'
 
+import Image from 'next/image'
 import { useEffect, useRef, useState } from 'react'
 import SpriteImage from '@/components/common/SpriteImage'
 import { MISSION_CREDITS_STAGE_CAP } from '@/constants/piggyBankStages'
-import { EFFECT_LIGHTS, REWARD_CREDITS } from '@/constants/sprites'
+import { EFFECT_LIGHTS } from '@/constants/sprites'
 
 type Props = {
   /** 섬에 아직 나누지 않은 크레딧(가용) — 많을수록 동전 단계·크기가 올라갑니다 */
@@ -14,47 +15,36 @@ type Props = {
   displayWidth?: number
   className?: string
   /**
-   * true: 스프라이트를 프레임(박스)의 세로·가로 중앙에 둡니다(옮기기 시트 카드 등).
+   * true: 이미지를 프레임(박스)의 세로·가로 중앙에 둡니다(옮기기 시트 카드 등).
    * false(기본): 섬 가운데용으로 아래쪽 기준 + 살짝 내림(`CREDIT_NUDGE_DOWN_PX`).
    */
   centerInFrame?: boolean
 }
 
-/** 저금통과 같은 상한(`piggyBankStages`) — 넘치면 마지막(7번째) 동전 그림·크기로 고정 */
+/** 저금통 단계와 맞춘 상한(`piggyBankStages`) — 넘치면 마지막(`credit10`) 그림·크기로 고정 */
 const MAX_FLOATING_FOR_STAGE = MISSION_CREDITS_STAGE_CAP
 
 /**
- * 시각 단계 1~7에 대응하는 스프라이트(작은 동전 → 큰 더미).
- * 아틀라스(`credits.png`)에 credit5·6·7 프레임이 없어, 5~7단계는 credit8·9·10을 씁니다.
+ * 시각 단계 1~10 → `public/assets/img/items/rewards/creditN.png` (아틀라스 없이 개별 파일).
+ * 인덱스 0 = credit1 … 9 = credit10.
  */
-const COIN_STAGE_FRAMES = [
-  'credit1', // 단계 1
-  'credit2', // 단계 2
-  'credit3', // 단계 3
-  'credit4', // 단계 4
-  'credit8', // 단계 5 (이미지 이름은 8번이지만 “5번째 단계” 그림)
-  'credit9', // 단계 6
-  'credit10', // 단계 7
-] as const
+const COIN_STAGE_IMAGE_URLS: ReadonlyArray<string> = Array.from({ length: 10 }, (_, i) => {
+  const n = i + 1
+  return `/assets/img/items/rewards/credit${n}.png`
+})
 
-/** 단계 개수(1~7 이미지 = 인덱스 0~6) */
-const COIN_STAGE_COUNT = COIN_STAGE_FRAMES.length
+const COIN_STAGE_COUNT = COIN_STAGE_IMAGE_URLS.length
+
+/** PNG 비율이 제각각이라 레이아웃만 맞출 때 쓰는 대략적인 세로/가로 비율(높이 쪽이 조금 더 김) */
+const CREDIT_IMAGE_LAYOUT_HEIGHT_RATIO = 1.12
 
 /**
- * `SpriteImage` 와 동일: rotated 이면 화면상 가로·세로는 아틀라스 w·h 가 뒤바뀜.
- * 여기서 나온 높이로 박스를 맞춰야 가로로 “한 줄 잘림”처럼 보이지 않습니다.
+ * 표시 너비(`coinSpriteWidth`)를 기준으로, 잘리지 않게 잡는 예상 높이(px).
+ * 실제 그림은 `object-contain` 으로 이 박스 안에 들어갑니다.
  */
-function renderedSpritePixelSize(frame: string, targetWidth: number): { w: number; h: number } {
-  const entry = REWARD_CREDITS.frames[frame as keyof typeof REWARD_CREDITS.frames]
-  if (!entry) {
-    const w = Math.max(22, Math.round(targetWidth))
-    return { w, h: w }
-  }
-  const naturalW = entry.rotated ? entry.h : entry.w
-  const naturalH = entry.rotated ? entry.w : entry.h
+function estimatedCreditImageHeightPx(targetWidth: number): number {
   const w = Math.max(22, Math.round(targetWidth))
-  const h = Math.max(1, Math.round((naturalH * w) / naturalW))
-  return { w, h }
+  return Math.max(1, Math.round(w * CREDIT_IMAGE_LAYOUT_HEIGHT_RATIO))
 }
 
 /** 번짐 그림자·아래로 살짝 내린 연출이 박스 밖으로 나가도 잘리지 않게 하는 여백(px) */
@@ -75,8 +65,8 @@ type LightFx = {
 }
 
 /**
- * 0크레딧 → 단계 인덱스 0(그림은 1단계 credit1, 아주 작게).
- * 1~MAX → 7등분 구간으로 단계 0~6(= 시각 1~7번 이미지).
+ * 0크레딧 → 단계 0 → `credit1`(가장 작은 더미 느낌).
+ * 1~MAX → `ceil(amount * 10 / MAX) - 1` 로 0~9 (예: 1~100 → credit1, 901~1000 → credit10).
  */
 function coinStageIndex(amount: number): number {
   if (amount <= 0) return 0
@@ -85,8 +75,8 @@ function coinStageIndex(amount: number): number {
 }
 
 /**
- * 같은 단계(같은 크레딧 이미지) 안에서 금액이 늘수록 0→1로 커지게 함.
- * 구간 경계: 단계 s는 금액 [floor(s*MAX/7)+1, floor((s+1)*MAX/7)].
+ * 같은 단계 안에서 금액이 늘수록 0→1로 커지게 함.
+ * 단계 s 구간: [floor(s*MAX/10)+1, floor((s+1)*MAX/10)].
  */
 function intraStageProgress(amount: number, stage: number): number {
   if (amount <= 0) return 0
@@ -99,14 +89,14 @@ function intraStageProgress(amount: number, stage: number): number {
 }
 
 /**
- * 단계별(인덱스 0=시각1 … 6=시각7) 최소·최대 배율(displayWidth 기준).
- * 단계가 올라갈수록 더 크게, 같은 단계 안에서는 t로 min→max 보간해 “서서히 커짐”.
+ * 단계별(인덱스 0=credit1 … 9=credit10) 최소·최대 배율(`displayWidth` 기준).
+ * 단계가 올라갈수록 더 크게, 같은 단계 안에서는 t로 min→max 보간.
  */
-const STAGE_SCALE_MIN = [0.4, 0.48, 0.56, 0.64, 0.74, 0.86, 0.98] as const
-const STAGE_SCALE_MAX = [0.5, 0.6, 0.7, 0.82, 0.94, 1.08, 1.28] as const
+const STAGE_SCALE_MIN = [0.4, 0.45, 0.51, 0.57, 0.63, 0.69, 0.76, 0.82, 0.9, 0.98] as const
+const STAGE_SCALE_MAX = [0.5, 0.58, 0.66, 0.74, 0.82, 0.9, 0.99, 1.08, 1.18, 1.28] as const
 
 /**
- * 가운데 가용 크레딧: 동전 스프라이트 7단계만, 구간 안에서는 크기만 부드럽게 증가.
+ * 가운데 가용 크레딧: 동전 PNG 10단계, 구간 안에서는 크기만 부드럽게 증가.
  */
 export default function FloatingCreditsStackVisual({
   floating,
@@ -161,7 +151,7 @@ export default function FloatingCreditsStackVisual({
 
   const clamped = Math.max(0, Math.min(displayedCredit, MAX_FLOATING_FOR_STAGE))
   const stage = coinStageIndex(clamped)
-  const creditFrame = COIN_STAGE_FRAMES[stage]
+  const creditImageSrc = COIN_STAGE_IMAGE_URLS[stage]!
   const t = intraStageProgress(clamped, stage)
 
   const smin = STAGE_SCALE_MIN[stage]
@@ -169,8 +159,8 @@ export default function FloatingCreditsStackVisual({
   const mul = smin + (smax - smin) * t
   const coinSpriteWidth = Math.max(22, Math.round(displayWidth * mul))
 
-  /** 프레임마다 가로·세로 비율이 달라 고정 배율(1.88)로는 중간이 잘려 보일 수 있음 → 실제 렌더 크기 기준 */
-  const { w: rw, h: rh } = renderedSpritePixelSize(creditFrame, coinSpriteWidth)
+  const rh = estimatedCreditImageHeightPx(coinSpriteWidth)
+  const rw = coinSpriteWidth
   const layoutWidth = Math.ceil(rw + BLEED_X)
   const displayHeight = centerInFrame
     ? Math.ceil(rh + BLEED_Y_TOP + BLEED_Y_BOTTOM + 10)
@@ -178,8 +168,8 @@ export default function FloatingCreditsStackVisual({
 
   const opacityClass = targetCredit <= 0 && dimWhenEmpty ? 'opacity-30' : 'opacity-100'
 
-  /** 동전 그림이 바뀔 때(단계 전환) 짧게 살짝 줄었다가 돌아오는 느낌 — React key는 쓰지 않아 크기 전환은 CSS로 유지 */
-  const visualKey = `coin-${stage}-${creditFrame}`
+  /** 동전 그림이 바뀔 때(단계 전환) 짧게 살짝 줄었다가 돌아오는 느낌 */
+  const visualKey = `coin-${stage}-${creditImageSrc}`
 
   useEffect(() => {
     setIsMorphing(true)
@@ -187,7 +177,6 @@ export default function FloatingCreditsStackVisual({
     return () => clearTimeout(off)
   }, [visualKey])
 
-  /** 너비·높이를 동시에 트랜지션하면 중간 프레임에서 잘린 듯 보일 수 있어 크기는 즉시, 투명도·스케일만 부드럽게 */
   const morphClass = `transition-[opacity,transform] duration-300 ease-out ${isMorphing ? 'opacity-70' : 'opacity-100'}`
   const morphTransform = (extra: string) =>
     `${extra} ${isMorphing ? 'scale(0.98)' : 'scale(1)'}`
@@ -198,10 +187,6 @@ export default function FloatingCreditsStackVisual({
       ? morphTransform(`translate(-50%, -50%) ${extra}`.trim())
       : morphTransform(`translateX(-50%) translateY(${CREDIT_NUDGE_DOWN_PX}px) ${extra}`.trim())
 
-  /**
-   * `filter`(미션 섬 그림자)는 안쪽 고정 박스가 아니라 바깥 `overflow-visible` 래퍼에 둡니다.
-   * className 이 비면 시트용으로 약한 그림자 기본값.
-   */
   const outerShellClass = [
     'relative inline-flex max-w-none shrink-0 flex-col items-center overflow-visible px-1.5 pb-2 pt-1.5',
     className.trim() || 'drop-shadow-[0_3px_12px_rgba(0,0,0,0.16)]',
@@ -213,46 +198,52 @@ export default function FloatingCreditsStackVisual({
   return (
     <div className={outerShellClass} aria-hidden>
       <div className="relative overflow-visible" style={{ width: layoutWidth, height: displayHeight }}>
-      {sparkleOn ? (
-        <>
-          {lightFx.map((fx, i) => (
-            <span
-              key={`credit-light-${i}`}
-              className="pointer-events-none absolute -translate-x-1/2 animate-ping"
-              style={{
-                left: `${fx.leftPct}%`,
-                top: `${fx.topPct}%`,
-                animationDuration: `${fx.durationMs}ms`,
-                animationDelay: `${fx.delayMs}ms`,
-                animationIterationCount: 3,
-              }}
-            >
-              <SpriteImage
-                sheet={EFFECT_LIGHTS}
-                frame="lights"
-                width={Math.max(14, Math.round(displayWidth * fx.sizeMul))}
-                className="select-none"
-                style={{ opacity: fx.opacity }}
-              />
-            </span>
-          ))}
-        </>
-      ) : null}
+        {sparkleOn ? (
+          <>
+            {lightFx.map((fx, i) => (
+              <span
+                key={`credit-light-${i}`}
+                className="pointer-events-none absolute -translate-x-1/2 animate-ping"
+                style={{
+                  left: `${fx.leftPct}%`,
+                  top: `${fx.topPct}%`,
+                  animationDuration: `${fx.durationMs}ms`,
+                  animationDelay: `${fx.delayMs}ms`,
+                  animationIterationCount: 3,
+                }}
+              >
+                <SpriteImage
+                  sheet={EFFECT_LIGHTS}
+                  frame="lights"
+                  width={Math.max(14, Math.round(displayWidth * fx.sizeMul))}
+                  className="select-none"
+                  style={{ opacity: fx.opacity }}
+                />
+              </span>
+            ))}
+          </>
+        ) : null}
 
-      <span
-        className={`absolute left-1/2 ${anchorYClass} ${morphClass}`}
-        style={{
-          transform: anchorTransform(''),
-        }}
-      >
-        <SpriteImage
-          sheet={REWARD_CREDITS}
-          frame={creditFrame}
-          width={coinSpriteWidth}
-          clipRotated={false}
-          className="select-none"
-        />
-      </span>
+        <span
+          className={`absolute left-1/2 ${anchorYClass} ${morphClass}`}
+          style={{
+            transform: anchorTransform(''),
+          }}
+        >
+          {/**
+           * `width`/`height` 는 Next/Image 필수값 — 실제 표시는 `style.width` + `h-auto` 로 맞춤.
+           * `sizes` 는 뷰포트 대비 이 컴포넌트가 쓰는 대략적인 너비 힌트입니다.
+           */}
+          <Image
+            src={creditImageSrc}
+            alt=""
+            width={256}
+            height={256}
+            sizes={`${coinSpriteWidth}px`}
+            className="h-auto max-w-none select-none object-contain object-bottom"
+            style={{ width: coinSpriteWidth, height: 'auto' }}
+          />
+        </span>
       </div>
     </div>
   )

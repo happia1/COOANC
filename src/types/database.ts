@@ -167,6 +167,14 @@ export type SavingsGoal = {
   updated_at: string
 }
 
+/** 부모 메뉴 제어 — 자녀 한 명에게만 다른 마켓 가격을 쓸 때 */
+export type ChildStoreItemCreditOverride = {
+  child_id: string
+  store_item_id: string
+  credit_price: number
+  updated_at: string
+}
+
 export type StoreItem = {
   id: string
   family_link_id: string | null

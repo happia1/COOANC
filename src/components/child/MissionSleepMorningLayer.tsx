@@ -325,7 +325,11 @@ export default function MissionSleepMorningLayer({
               className="flex justify-center pt-6"
               style={{ animation: 'mission-sun-slide-up 0.55s ease-out forwards' }}
             >
-              <ModeAtlasSprite frame="morning" scale={1.1} alt="아침 해" className="shrink-0" />
+              {/*
+                아침 해 일러스트 크기: `scale` 은 아틀라스(큰 이미지에서 잘라 쓰는 조각)를 몇 배로 키울지입니다.
+                예전 1.1 배에서 절반으로 줄여 팝업이 덜 커 보이게 함 (1.1 × 0.5 = 0.55).
+              */}
+              <ModeAtlasSprite frame="morning" scale={0.55} alt="아침 해" className="shrink-0" />
             </div>
             <div className="px-6 pb-6 pt-2">
               <p id="morning-modal-title" className="text-center text-xl font-black text-amber-950">
