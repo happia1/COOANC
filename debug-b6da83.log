@@ -1,0 +1,4 @@
+{"sessionId":"b6da83","runId":"pre-fix","hypothesisId":"H4","location":"delete-keyword-routine/route.ts:beforeDelete","message":"키워드 루틴 삭제 직전 — 서비스 롤 사용 여부·필터 크기","data":{"hasServiceRole":true,"titleInCount":26,"repeatTypes":["daily","weekly"]},"timestamp":1775750114390}
+{"sessionId":"b6da83","runId":"pre-fix","hypothesisId":"OK","location":"delete-keyword-routine/route.ts:success","message":"키워드 루틴 템플릿 삭제 성공","data":{},"timestamp":1775750114524}
+{"sessionId":"b6da83","runId":"pre-fix","hypothesisId":"H4","location":"delete-keyword-routine/route.ts:beforeDelete","message":"키워드 루틴 삭제 직전 — 서비스 롤 사용 여부·필터 크기","data":{"hasServiceRole":true,"titleInCount":26,"repeatTypes":["daily","weekly"]},"timestamp":1775750126734}
+{"sessionId":"b6da83","runId":"pre-fix","hypothesisId":"OK","location":"delete-keyword-routine/route.ts:success","message":"키워드 루틴 템플릿 삭제 성공","data":{},"timestamp":1775750126771}
