@@ -19,8 +19,9 @@ import type { CSSProperties } from 'react'
  *
  * ── 미션 카드 본문 비율·간격 ──
  * • 카드 버튼 `MISSION_CARD_BUTTON_BASE_CLASSNAME`
- *   - 너비 w-[min(23vw,98px)], 최소 높이 min-h-[7rem], 세로 gap-y-1.5, 안쪽 p-1.5, 그림자·링
- * • 이미지 영역 `MISSION_CARD_IMAGE_AREA_CLASSNAME` + `MISSION_CARD_ROUTINE_SPRITE_WIDTH_PX` (=42)
+ *   - 너비·그림자·링 동일. 안쪽 좌우 px-1.5·상하 py-1. 카드·이미지 영역 min-h 는 일러스트(px 상수)에 맞춤. **(그림+제목) 묶음** ↔ **보상 줄** 은 gap-y-1.5
+ * • 그림↔제목 간격: `MISSION_CARD_IMAGE_TEXT_STACK_CLASSNAME` (gap-y-0 — 이미지 바로 아래에 글 붙임)
+ * • 이미지 영역 `MISSION_CARD_IMAGE_AREA_CLASSNAME` + `MISSION_CARD_ROUTINE_SPRITE_WIDTH_PX` (=78, 42의 2배 84에서 살짝 축소)
  * • 텍스트 `MISSION_CARD_TEXT_BLOCK/TITLE/SUBTITLE` — 줄 수·글자 크기(8px/7px)·space-y-0.5
  * • 보상 알약 `MISSION_CARD_REWARD_*` — px-1.5 py-0.5, gap-x-0.5, 아이콘 12px
  *
@@ -90,16 +91,29 @@ export const MISSION_TODAY_EXP_TO_NEXT_CLASSNAME =
 export const MISSION_CARD_SCROLLER_CLASSNAME =
   'flex min-h-0 min-w-0 w-full flex-none snap-x snap-mandatory items-start gap-0.5 overflow-x-auto py-0 pl-2 pr-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden' as const
 
-/** 미션 카드 버튼 본체 — 픽스 너비·높이·gap·p (테두리만 일반/특별 분기). */
+/**
+ * 미션 카드 버튼 본체 — gap·텍스트·보상 알약·패딩(px-1.5 py-1) 유지.
+ * **min-h** 는 이미지 영역을 낮춘 만큼 함께 줄여 카드가 전체적으로 짧아 보이게 함(내용은 그대로 들어감).
+ * 미션 일러스트 78px + 좌우 12px → 최소 너비는 w max(6.5rem,…) 등으로 여유 있게.
+ */
 export const MISSION_CARD_BUTTON_BASE_CLASSNAME =
-  'snap-center flex w-[min(23vw,98px)] min-h-[7rem] shrink-0 flex-col items-stretch gap-y-1.5 overflow-hidden rounded-lg border bg-white p-1.5 text-left font-sans text-brand-text shadow-md transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue focus-visible:ring-offset-1 active:scale-[0.97]' as const
+  'snap-center flex w-[max(5rem,min(30vw,5.5rem))] min-h-[8.5rem] shrink-0 flex-col items-stretch gap-y-1.5 overflow-hidden rounded-lg border bg-white px-1.5 py-1 text-left font-sans text-brand-text shadow-md transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue focus-visible:ring-offset-1 active:scale-[0.97]' as const
 
-/** 카드 상단 루틴 일러스트 영역(높이 하한 = 이미지·텍스트 비율 고정) */
+/**
+ * 일러스트 블록과 제목·부제 블록을 세로로만 묶습니다.
+ * 버튼의 gap-y-1.5 는 이 묶음 전체와 **보상 알약 줄** 사이에만 적용되고, 그림과 글 사이는 gap-y-0 으로 최대한 붙입니다.
+ */
+export const MISSION_CARD_IMAGE_TEXT_STACK_CLASSNAME =
+  'flex w-full min-w-0 shrink-0 flex-col gap-y-0' as const
+
+/**
+ * 카드 상단 루틴 일러스트 영역 — 78px(약 4.875rem) 정사각이 잘리지 않게 **5.5rem** 정도만 확보(위·아래 여백 최소).
+ */
 export const MISSION_CARD_IMAGE_AREA_CLASSNAME =
-  'flex min-h-[3.35rem] w-full shrink-0 items-center justify-center overflow-visible' as const
+  'flex min-h-[5.5rem] w-full shrink-0 items-center justify-center overflow-visible' as const
 
-/** 루틴 아틀라스 썸네일 가로 크기(px) — 영역 높이와 함께 비율 고정 */
-export const MISSION_CARD_ROUTINE_SPRITE_WIDTH_PX = 42
+/** 루틴 PNG / 아틀라스 썸네일 한 변 길이(px) — 정사각형 렌더(84에서 살짝 축소) */
+export const MISSION_CARD_ROUTINE_SPRITE_WIDTH_PX = 78
 
 /** 제목·부제 묶음 */
 export const MISSION_CARD_TEXT_BLOCK_CLASSNAME = 'shrink-0 space-y-0.5 px-px text-center' as const

@@ -33,6 +33,7 @@ import {
 import {
   MISSION_CARD_BUTTON_BASE_CLASSNAME,
   MISSION_CARD_IMAGE_AREA_CLASSNAME,
+  MISSION_CARD_IMAGE_TEXT_STACK_CLASSNAME,
   MISSION_CARD_REWARD_ICON_WIDTH_PX,
   MISSION_CARD_REWARD_PILL_BASE_CLASSNAME,
   MISSION_CARD_REWARD_ROW_CLASSNAME,
@@ -731,33 +732,41 @@ export default function MissionTab({
                  * `routines_01.png` 아틀라스 — `clipRotated={false}` 로 회전 프레임 잘림 완화.
                  */}
                 {/** 배경색 없음 — 아틀라스 일러스트만 흰 카드 위에 표시 */}
-                {/** `min-h` + 세로 중앙: 짧은 카드에서도 루틴 일러스트가 잘리지 않게(이전 `flex-1`+낮은 `aspect` 조합이 상단 클리핑 유발) */}
-                <div className={MISSION_CARD_IMAGE_AREA_CLASSNAME}>
-                  {routineImagePath ? (
-                    // eslint-disable-next-line @next/next/no-img-element -- public 정적 경로, 미션 카드 이미지 직접 표시
-                    <img
-                      src={routineImagePath}
-                      alt=""
-                      className="select-none object-contain drop-shadow-[0_2px_8px_rgba(0,0,0,0.08)]"
-                      style={{ width: MISSION_CARD_ROUTINE_SPRITE_WIDTH_PX, height: MISSION_CARD_ROUTINE_SPRITE_WIDTH_PX }}
-                      draggable={false}
-                    />
-                  ) : (
-                    <SpriteImage
-                      sheet={MISSION_ROUTINES_ATLAS}
-                      frame={routineFrame}
-                      width={MISSION_CARD_ROUTINE_SPRITE_WIDTH_PX}
-                      clipRotated={false}
-                      className="select-none drop-shadow-[0_2px_8px_rgba(0,0,0,0.08)]"
-                    />
-                  )}
-                </div>
+                {/**
+                 * 그림과 제목 사이는 스택에서 gap-y-0 으로 거의 붙이고, 제목 블록 ↔ 보상 줄은 버튼 gap-y-1.5 유지.
+                 * 일러스트 픽셀·영역 높이·카드 최소 크기는 `missionTodayLayoutSpec.ts` 에서 조정합니다.
+                 */}
+                <div className={MISSION_CARD_IMAGE_TEXT_STACK_CLASSNAME}>
+                  {/**
+                   * `min-h` + 세로 중앙: 짧은 카드에서도 루틴 일러스트가 잘리지 않게(이전 `flex-1`+낮은 `aspect` 조합이 상단 클리핑 유발).
+                   */}
+                  <div className={MISSION_CARD_IMAGE_AREA_CLASSNAME}>
+                    {routineImagePath ? (
+                      // eslint-disable-next-line @next/next/no-img-element -- public 정적 경로, 미션 카드 이미지 직접 표시
+                      <img
+                        src={routineImagePath}
+                        alt=""
+                        className="select-none object-contain drop-shadow-[0_2px_8px_rgba(0,0,0,0.08)]"
+                        style={{ width: MISSION_CARD_ROUTINE_SPRITE_WIDTH_PX, height: MISSION_CARD_ROUTINE_SPRITE_WIDTH_PX }}
+                        draggable={false}
+                      />
+                    ) : (
+                      <SpriteImage
+                        sheet={MISSION_ROUTINES_ATLAS}
+                        frame={routineFrame}
+                        width={MISSION_CARD_ROUTINE_SPRITE_WIDTH_PX}
+                        clipRotated={false}
+                        className="select-none drop-shadow-[0_2px_8px_rgba(0,0,0,0.08)]"
+                      />
+                    )}
+                  </div>
 
-                <div className={MISSION_CARD_TEXT_BLOCK_CLASSNAME}>
-                  <p className={MISSION_CARD_TITLE_CLASSNAME}>{m.title}</p>
-                  {sub ? (
-                    <p className={MISSION_CARD_SUBTITLE_CLASSNAME}>{sub}</p>
-                  ) : null}
+                  <div className={MISSION_CARD_TEXT_BLOCK_CLASSNAME}>
+                    <p className={MISSION_CARD_TITLE_CLASSNAME}>{m.title}</p>
+                    {sub ? (
+                      <p className={MISSION_CARD_SUBTITLE_CLASSNAME}>{sub}</p>
+                    ) : null}
+                  </div>
                 </div>
 
                 {/**
