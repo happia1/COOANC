@@ -7,7 +7,7 @@ import FloatingCreditsStackVisual from '@/components/child/FloatingCreditsStackV
 import { walletImageSrcByCredits } from '@/lib/walletStages'
 import { MISSION_CREDITS_STAGE_CAP, piggyBankStageCount } from '@/constants/piggyBankStages'
 
-/* ─────────────── Slot number (릴 효과) ─────────────── */
+/* ─────────────── 슬롯 숫자 (릴 효과) ─────────────── */
 
 function SlotDigit({ digit, sizeClass }: { digit: string; sizeClass: string }) {
   if (digit === ',') {
@@ -73,6 +73,11 @@ function piggyStepFromCredits(piggy: number): number {
   return Math.round(ratio * (n - 1))
 }
 
+/* ─────────────── 공통 이미지 박스 크기 ─────────────── */
+
+/** 세 이미지 모두 이 정사각형 안에 들어갑니다 */
+const IMG_BOX = 80 as const
+
 /* ─────────────── Props ─────────────── */
 
 export interface MissionCreditCardsProps {
@@ -83,8 +88,6 @@ export interface MissionCreditCardsProps {
   onCenterTap: () => void
   onWalletTap: () => void
 }
-
-/* ─────────────── 메인 컴포넌트 ─────────────── */
 
 export default function MissionCreditCards({
   piggy,
@@ -97,82 +100,89 @@ export default function MissionCreditCards({
   const piggyStep = piggyStepFromCredits(piggy)
 
   return (
-    <div className="px-3 pt-4 pb-2" aria-label="크레딧 현황">
-      <div className="grid grid-cols-3 gap-2">
+    <div className="grid grid-cols-3 gap-2" aria-label="크레딧 현황">
 
-        {/* ── 저금통 ── */}
-        <button
-          type="button"
-          onClick={onPiggyTap}
-          className="flex flex-col items-center gap-1 rounded-2xl bg-rose-50 px-1.5 py-3 text-center shadow-sm ring-1 ring-rose-200/60 transition-transform active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300"
+      {/* ── 저금통 ── */}
+      <button
+        type="button"
+        onClick={onPiggyTap}
+        className="flex flex-col items-center gap-1 rounded-2xl bg-rose-50 px-1.5 py-3 shadow-sm ring-1 ring-rose-200/60 transition-transform active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300"
+      >
+        <div
+          className="flex items-center justify-center overflow-hidden"
+          style={{ width: IMG_BOX, height: IMG_BOX }}
         >
-          <div className="flex h-[72px] w-full items-end justify-center overflow-visible">
-            <PiggyBankStageVisual
-              stepIndex={piggyStep}
-              displayWidth={60}
-              className="select-none"
-            />
-          </div>
-          <SlotNumber value={piggy} toneClass="text-rose-700" sizeClass="text-lg" />
-          <p className="text-[11px] font-black text-rose-800">저금통</p>
-          <p className="text-[9.5px] leading-tight text-rose-500">크레딧 모이는 중</p>
-          <span className="mt-0.5 rounded-full bg-rose-200/70 px-2 py-0.5 text-[9px] font-bold text-rose-700">
-            이자 붙는 중 ✅
-          </span>
-        </button>
+          <PiggyBankStageVisual
+            stepIndex={piggyStep}
+            displayWidth={IMG_BOX - 8}
+            className="select-none"
+          />
+        </div>
+        <SlotNumber value={piggy} toneClass="text-rose-700" sizeClass="text-base" />
+        <p className="text-[11px] font-black text-rose-800">저금통</p>
+        <p className="text-[9.5px] leading-tight text-rose-500">크레딧 모이는 중</p>
+        <span className="mt-0.5 rounded-full bg-rose-200/70 px-2 py-0.5 text-[9px] font-bold text-rose-700">
+          이자 붙는 중 ✅
+        </span>
+      </button>
 
-        {/* ── 가용 크레딧 ── */}
-        <button
-          type="button"
-          disabled={floating <= 0}
-          onClick={onCenterTap}
-          className={[
-            'flex flex-col items-center gap-1 rounded-2xl bg-amber-50 px-1.5 py-3 text-center shadow-sm ring-1 ring-amber-200/60 transition-transform active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300',
-            floating <= 0 ? 'opacity-50' : '',
-          ].join(' ')}
+      {/* ── 가용 크레딧 ── */}
+      <button
+        type="button"
+        disabled={floating <= 0}
+        onClick={onCenterTap}
+        className={[
+          'flex flex-col items-center gap-1 rounded-2xl bg-amber-50 px-1.5 py-3 shadow-sm ring-1 ring-amber-200/60 transition-transform active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300',
+          floating <= 0 ? 'opacity-50' : '',
+        ].join(' ')}
+      >
+        <div
+          className="flex items-center justify-center overflow-hidden"
+          style={{ width: IMG_BOX, height: IMG_BOX }}
         >
-          <div className="flex h-[72px] w-full items-end justify-center overflow-visible">
-            <FloatingCreditsStackVisual
-              floating={floating}
-              dimWhenEmpty={false}
-              centerInFrame
-              displayWidth={60}
-              className="select-none"
-            />
-          </div>
-          <SlotNumber value={floating} toneClass="text-amber-700" sizeClass="text-lg" />
-          <p className="text-[11px] font-black text-amber-800">가용 크레딧</p>
-          <p className="text-[9.5px] leading-tight text-amber-500">미션 완료로 쌓여요</p>
-          <span className="mt-0.5 rounded-full bg-amber-200/70 px-2 py-0.5 text-[9px] font-bold text-amber-700">
-            {floating > 0 ? '눌러서 나누기 →' : '아직 없어요'}
-          </span>
-        </button>
+          <FloatingCreditsStackVisual
+            floating={floating}
+            dimWhenEmpty={false}
+            centerInFrame
+            displayWidth={IMG_BOX - 16}
+            className="select-none"
+          />
+        </div>
+        <SlotNumber value={floating} toneClass="text-amber-700" sizeClass="text-base" />
+        <p className="text-[11px] font-black text-amber-800">가용 크레딧</p>
+        <p className="text-[9.5px] leading-tight text-amber-500">미션 완료로 쌓여요</p>
+        <span className="mt-0.5 rounded-full bg-amber-200/70 px-2 py-0.5 text-[9px] font-bold text-amber-700">
+          {floating > 0 ? '눌러서 나누기 →' : '아직 없어요'}
+        </span>
+      </button>
 
-        {/* ── 내 지갑 ── */}
-        <button
-          type="button"
-          onClick={onWalletTap}
-          className="flex flex-col items-center gap-1 rounded-2xl bg-teal-50 px-1.5 py-3 text-center shadow-sm ring-1 ring-teal-200/60 transition-transform active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-300"
+      {/* ── 내 지갑 ── */}
+      <button
+        type="button"
+        onClick={onWalletTap}
+        className="flex flex-col items-center gap-1 rounded-2xl bg-teal-50 px-1.5 py-3 shadow-sm ring-1 ring-teal-200/60 transition-transform active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-300"
+      >
+        <div
+          className="flex items-center justify-center overflow-hidden"
+          style={{ width: IMG_BOX, height: IMG_BOX }}
         >
-          <div className="flex h-[72px] w-full items-end justify-center overflow-visible">
-            <Image
-              src={walletImageSrcByCredits(wallet)}
-              alt=""
-              width={64}
-              height={64}
-              className="select-none object-contain"
-              draggable={false}
-            />
-          </div>
-          <SlotNumber value={wallet} toneClass="text-teal-700" sizeClass="text-lg" />
-          <p className="text-[11px] font-black text-teal-800">내 지갑</p>
-          <p className="text-[9.5px] leading-tight text-teal-500">쓸 수 있는 크레딧</p>
-          <span className="mt-0.5 rounded-full bg-teal-200/70 px-2 py-0.5 text-[9px] font-bold text-teal-700">
-            지금 사용 가능 ✦
-          </span>
-        </button>
+          <Image
+            src={walletImageSrcByCredits(wallet)}
+            alt=""
+            width={IMG_BOX - 8}
+            height={IMG_BOX - 8}
+            className="select-none object-contain"
+            draggable={false}
+          />
+        </div>
+        <SlotNumber value={wallet} toneClass="text-teal-700" sizeClass="text-base" />
+        <p className="text-[11px] font-black text-teal-800">내 지갑</p>
+        <p className="text-[9.5px] leading-tight text-teal-500">쓸 수 있는 크레딧</p>
+        <span className="mt-0.5 rounded-full bg-teal-200/70 px-2 py-0.5 text-[9px] font-bold text-teal-700">
+          지금 사용 가능 ✦
+        </span>
+      </button>
 
-      </div>
     </div>
   )
 }

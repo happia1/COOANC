@@ -10,7 +10,7 @@ import type { CSSProperties } from 'react'
  *
  * ── 바깥·패딩(겹침·클리핑과 연동) ──
  * • 하단 섹션 `MISSION_TODAY_BOTTOM_SECTION_CLASSNAME`
- *   - 가로 px-3, 세로 pt-0.5 pb-2.5, 블록 간 gap-0.5, 위로 -mt-12, overflow-x-hidden
+ *   - 가로 px-3, 세로 pt-0.5 pb-2.5, 블록 간 gap-0.5, overflow-x-hidden (5.5:4.5 flex 분할 이후 -mt-12 제거)
  * • 제목·EXP 줄 `MISSION_TODAY_TITLE_ROW_OUTER/INNER` + EXP 트랙·글자 클래스
  *   - 제목 래퍼 가로 pl-2 pr-2 (섹션 px-3 과 합쳐 기준선 고정)
  *   - 한 행 gap-2, 막대 높이 11px·max-w-[14rem], ♥ 쪽 글자 10px(sm 11px) 등
@@ -25,23 +25,20 @@ import type { CSSProperties } from 'react'
  * • 텍스트 `MISSION_CARD_TEXT_BLOCK/TITLE/SUBTITLE` — 줄 수·글자 크기(8px/7px)·space-y-0.5
  * • 보상 알약 `MISSION_CARD_REWARD_*` — px-1.5 py-0.5, gap-x-0.5, 아이콘 12px
  *
- * (예전 상·하 flex 비율 5.5:4.5 는 `MISSION_TAB_VERTICAL_SPLIT` 참고용·현 미션 탭 미사용.)
+ * 상·하 flex 비율 5.5:4.5 는 `MISSION_TAB_VERTICAL_SPLIT` 으로 활성 사용 중.
  * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
  */
 
-/**
- * 예전 미션 탭: 상·하를 flex 비율로만 나누던 값(참고·복구용).
- * 현재 `MissionTab` 은 세로 스크롤 레이아웃이라 아래 헬퍼는 사용하지 않습니다.
- */
+/** 미션 탭 상(크레딧 카드)·하(오늘의 미션) flex 비율 — 5.5 : 4.5 */
 export const MISSION_TAB_VERTICAL_SPLIT = {
   upperFlexGrow: 5.5,
   lowerFlexGrow: 4.5,
 } as const
 
-/** @deprecated MissionTab 스크롤 전환 이후 미사용 — `flexFill`+하단 패널 분할 복구 시만 */
+/** 크레딧 카드 상단 영역 flex-grow */
 export const MISSION_TAB_SCENERY_FLEX_WEIGHT: 5.5 = MISSION_TAB_VERTICAL_SPLIT.upperFlexGrow
 
-/** @deprecated MissionTab 스크롤 전환 이후 미사용 */
+/** 오늘의 미션 하단 영역 CSSProperties (flex-[4.5] 상당) */
 export function missionTabLowerPanelFlexStyle(): CSSProperties {
   return {
     flexGrow: MISSION_TAB_VERTICAL_SPLIT.lowerFlexGrow,
@@ -51,9 +48,9 @@ export function missionTabLowerPanelFlexStyle(): CSSProperties {
   }
 }
 
-/** 「오늘의 미션」 하단 섹션 — 픽스 패딩·겹침. 세로 스크롤은 `MissionTab` 루트가 담당. (상단 스펙 목록 준수) */
+/** 「오늘의 미션」 하단 섹션 — 픽스 패딩. 세로 스크롤은 하단 flex 래퍼가 담당. (상단 스펙 목록 준수) */
 export const MISSION_TODAY_BOTTOM_SECTION_CLASSNAME =
-  'relative z-10 -mt-12 flex min-w-0 shrink-0 flex-col gap-0.5 overflow-x-hidden overflow-y-visible px-3 pb-2.5 pt-0.5 sm:-mt-12' as const
+  'relative z-10 flex min-w-0 shrink-0 flex-col gap-0.5 overflow-x-hidden overflow-y-visible px-3 pb-2.5 pt-0.5' as const
 
 /** 제목·EXP 줄 바깥 — 픽스 pl-2 pr-2 (카드 스크롤러와 기준선 동일). */
 export const MISSION_TODAY_TITLE_ROW_OUTER_CLASSNAME =

@@ -329,7 +329,7 @@ export default function HomeTab({
    * `pt-2`: 패널 안에서 제목·그리드가 위 경계에 붙지 않게 여유를 둡니다.
    */
   const homeBottomPanelClass =
-    'relative z-10 mt-5 flex min-h-0 flex-[4] basis-0 flex-col gap-1 overflow-hidden px-1 pb-2 pt-2 sm:mt-6'
+    'relative z-10 mt-5 flex min-h-0 flex-[4] basis-0 flex-col gap-1 overflow-hidden px-3 pb-2 pt-0.5 sm:mt-6'
 
   if (!stats) {
     return (
@@ -386,7 +386,7 @@ export default function HomeTab({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <ChildHomeSceneryBand flexFill showBackground={false} ariaLabel="홈 상단">
+      <ChildHomeSceneryBand flexFill flexFillWeight={5.5} showBackground={false} ariaLabel="홈 상단">
         {/** 토끼·섬 무대: `-mt` 는 하단 꾸미기와 살짝 겹치게만 두고, 과하게 당기지 않아 잔디·섬이 조금 더 아래에 보입니다. */}
         <div className="flex min-h-0 flex-1 flex-col justify-end gap-1.5">
           <div className="relative mx-auto flex min-h-0 w-full max-w-sm flex-1 flex-col items-center justify-end -mt-2 sm:-mt-4">
@@ -437,9 +437,9 @@ const DECOR_GRID_COLS = DECOR_ITEM_COUNT / 2
  */
 function CharacterDecorInventory({ unlockedIndexes }: { unlockedIndexes: number[] }) {
   return (
-    <div className="flex min-h-0 w-full flex-1 flex-col pt-1" aria-labelledby="child-decor-heading">
-      <div className="mb-2 flex shrink-0 flex-wrap items-center gap-x-2 gap-y-1">
-        <h2 id="child-decor-heading" className="text-base font-black leading-tight text-brand-text">
+    <div className="flex min-h-0 w-full flex-1 flex-col" aria-labelledby="child-decor-heading">
+      <div className="mb-2 flex shrink-0 flex-wrap items-center gap-x-2 gap-y-1 pl-2 pr-2 pb-0.5 pt-0.5">
+        <h2 id="child-decor-heading" className="min-w-0 truncate text-sm font-black leading-tight text-brand-text">
           내 캐릭터 꾸미기
         </h2>
       </div>

@@ -192,6 +192,15 @@ export default function MissionTab({
   const todayRef = useRef(today)
   todayRef.current = today
 
+  /** 자정 00:00:00 에 router.refresh() — 하트·완료 집합을 새 날짜 기준으로 리셋합니다 */
+  useEffect(() => {
+    const now = new Date()
+    const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0)
+    const msUntilMidnight = midnight.getTime() - now.getTime()
+    const timer = setTimeout(() => { router.refresh() }, msUntilMidnight)
+    return () => clearTimeout(timer)
+  }, [router])
+
   /**
    * 서버 props 와 동기화하되, 부모 assign 브로드캐스트로 행이 먼저 오면 여기에 합쳐 즉시 카드·팝업을 맞춥니다.
    */
@@ -608,14 +617,18 @@ export default function MissionTab({
   )
 
   const heroBand = (
-    <MissionCreditCards
-      piggy={piggyCredits}
-      floating={floatingCredits}
-      wallet={walletCredits}
-      onPiggyTap={() => setCreditSheetBucket('piggy')}
-      onCenterTap={() => { if (floatingCredits > 0) setCreditSheetBucket('center') }}
-      onWalletTap={() => setCreditSheetBucket('wallet')}
-    />
+    <div className="flex min-h-0 flex-[5.5] basis-0 items-center justify-center px-3">
+      <div className="w-full max-w-sm">
+        <MissionCreditCards
+          piggy={piggyCredits}
+          floating={floatingCredits}
+          wallet={walletCredits}
+          onPiggyTap={() => setCreditSheetBucket('piggy')}
+          onCenterTap={() => { if (floatingCredits > 0) setCreditSheetBucket('center') }}
+          onWalletTap={() => setCreditSheetBucket('wallet')}
+        />
+      </div>
+    </div>
   )
 
   /**
@@ -919,14 +932,13 @@ export default function MissionTab({
           completedCount={completedCount}
           totalMissions={total}
         />
-        {/** 휴식일도 미션 탭과 같이 세로 스크롤로 전체를 볼 수 있게 합니다. */}
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto overscroll-y-contain">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           {heroBand}
-          <section className="flex min-w-0 shrink-0 flex-col items-center justify-center gap-2 overflow-x-hidden bg-transparent px-4 py-2 text-center sm:gap-3 sm:px-6 sm:py-4">
+          <div className="flex min-h-0 flex-[4.5] basis-0 flex-col items-center justify-center gap-2 overflow-y-auto overscroll-contain px-4 py-2 text-center sm:gap-3 sm:px-6 sm:py-4">
             <span className="text-sm font-black text-gray-400">휴식</span>
             <p className="text-lg font-black text-brand-text sm:text-xl">오늘은 쉬는 날이에요!</p>
             <p className="text-xs text-gray-400 sm:text-sm">푹 쉬고 내일 또 열심히 해봐요.</p>
-          </section>
+          </div>
         </div>
         {popupBlock}
         {rollbackPopupBlock}
@@ -1000,9 +1012,11 @@ export default function MissionTab({
        * 가로는 `hidden` — `overflow-y-auto`+`visible` 조합이 브라우저에서 전체 가로 스크롤을 만들기 때문.
        * 카드 가로 스와이프는 하단 `MISSION_CARD_SCROLLER` 안에서만 됩니다.
        */}
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto overscroll-y-contain">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         {heroBand}
-        {bottomPanel}
+        <div className="flex min-h-0 flex-[4.5] basis-0 flex-col overflow-y-auto overscroll-contain">
+          {bottomPanel}
+        </div>
       </div>
 
       <MissionCreditActionSheet
