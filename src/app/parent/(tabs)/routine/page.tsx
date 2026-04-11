@@ -36,10 +36,14 @@ export default async function RoutinePage() {
 
   const { data: links } = await supabase
     .from('family_links')
-    .select('child_id')
+    .select('id, child_id')
     .eq('parent_id', user.id)
 
   const childIds = (links ?? []).map((l) => l.child_id)
+  /** 자녀별 family_links.id — AI 일정 패널의 `/agent-b/parse` 에 넣습니다. */
+  const familyLinkByChild: Record<string, string> = Object.fromEntries(
+    (links ?? []).map((l) => [String((l as { child_id: string }).child_id), String((l as { id: string }).id)]),
+  )
 
   const todaySeoul = getSeoulDateString()
 
@@ -117,6 +121,7 @@ export default async function RoutinePage() {
       missions={(missionsRes.data ?? []) as Mission[]}
       children={children}
       todayDailyMissions={todayDailyMissions}
+      familyLinkByChild={familyLinkByChild}
     />
   )
 }

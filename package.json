@@ -7,6 +7,7 @@
     "doc": "docs"
   },
   "scripts": {
+    "init:env": "node scripts/init-env-local.mjs",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
@@ -27,6 +28,7 @@
     "@supabase/ssr": "^0.10.0",
     "@supabase/supabase-js": "^2.101.1",
     "canvas-confetti": "^1.9.4",
+    "framer-motion": "^11.18.2",
     "next": "^16.2.2",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",

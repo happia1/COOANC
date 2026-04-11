@@ -3,7 +3,7 @@
 /**
  * 부모 앱 「홈」 탭 본문입니다.
  * - 위쪽에서 자녀를 바꾸면(◀▶ 또는 스와이프) 아래 카드·통계가 그 아이 기준으로 바뀝니다.
- * - 「우리아이 경제 EQ 지수」패널은 child_stats 의 eq_* 필드를 쓰며, 지갑·저금통 이동 시 DB 가 recalculate_eq 로 갱신합니다.
+ * - 「우리아이 경제 EQ 지수」패널 상단에는 Railway AI 에이전트 카드(리포트·코칭)가 있고, 아래 차트는 child_stats 의 eq_* 필드를 씁니다.
  * - Realtime 으로 child_stats 를 구독해 부모가 같은 화면에 있을 때 도넛·반원 수치가 바로 따라갑니다.
  * - 미션 완료 시 막대는 daily_missions Realtime 과 동일 패턴입니다.
  * - 프로필 카드를 누르면 그 아이의 「자녀용 앱 화면」(미션·홈 등)으로 들어갑니다(쿠키 설정 후 /home).
@@ -23,16 +23,6 @@ import { useParentStore } from '@/store/parentStore'
 import ChildProfileNav, { type ChildTab } from '@/components/parent/ChildProfileNav'
 import { CompactChildProfileCard } from '@/components/parent/CompactChildProfileCard'
 import EconomicEqPanel from '@/components/parent/EconomicEqPanel'
-
-/** 자녀 레벨 번호 → 성장 단계 한글명(EQ 코칭 문구·차트 설명에 사용) */
-const LEVELS = [
-  { level: 0, name: '씨앗' },
-  { level: 1, name: '새싹' },
-  { level: 2, name: '교환사' },
-  { level: 3, name: '저축왕' },
-  { level: 4, name: '나눔이' },
-  { level: 5, name: '투자가' },
-] as const
 
 /**
  * 최근 활동 카드 헤더용: 펼침이면 화살표가 위(접기), 접힘이면 아래(펼치기) — RoutineTab 의 ChevronToggleIcon 과 동일 패턴입니다.
@@ -306,8 +296,8 @@ export default function HomeTab({ childrenData, pendingCount }: Props) {
               credits: s?.credits ?? 0,
             }}
             weeklyRoutine={weeklyRoutine}
-            growthStageName={LEVELS[Math.min(5, Math.max(0, s?.current_level ?? 0))].name}
             childName={child.name}
+            agentChildId={child.id}
           />
 
           {/* 최근 활동: 토글 헤더(기본 접힘) + 펼칠 때만 미션 완료 로그 목록 */}

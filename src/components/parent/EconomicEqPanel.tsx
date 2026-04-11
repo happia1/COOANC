@@ -1,53 +1,16 @@
 'use client'
 
-import Link from 'next/link'
 import { createPortal } from 'react-dom'
 import { useEffect, useId, useState } from 'react'
 import type { ChildStats } from '@/types/database'
 import type { WeeklyRoutineDay } from '@/lib/childWeeklyRoutine'
+import ParentAgentHomeCards from '@/components/parent/ParentAgentHomeCards'
 
 /** 차트·피드백에 필요한 `child_stats` 일부만 받습니다(부모 홈 요약 객체와 맞춤). */
 export type EconomicEqStatsSlice = Pick<
   ChildStats,
   'eq_routine_rate' | 'eq_delay_score' | 'eq_save_ratio' | 'streak_days' | 'credits'
 >
-
-/**
- * 상단 「AI 인사이트 리포트」본문 — RAG·LLM 연동 전 템플릿입니다.
- * - 성장 단계·루틴·만족 지연·저축 비중은 `child_stats` 숫자를 그대로 넣습니다.
- * - 루틴·만족 지연은 수치 구간에 따라 문장만 살짝 바뀝니다(낮을 때는 안내 톤).
- * - 문단 사이에는 줄바꿈 한 번만 넣고, 빈 줄은 넣지 않습니다(화면이 과하게 벌어지지 않게).
- */
-function formatAiInsightReport(growthStageName: string, stats: EconomicEqStatsSlice): string {
-  const routine = stats.eq_routine_rate
-  const delay = stats.eq_delay_score
-  const save = Math.min(100, Math.max(0, stats.eq_save_ratio))
-
-  const routineSentence =
-    routine >= 55
-      ? `루틴 완주율은 ${routine}%로 안정적인 루틴달성율을 보입니다.`
-      : routine >= 30
-        ? `루틴 완주율은 ${routine}%예요. 조금씩 꾸준히 완료해 나가면 좋아요.`
-        : `루틴 완주율은 ${routine}%예요. 배정 미션을 함께 맞춰 가면 숫자가 함께 올라갑니다.`
-
-  const delaySentence =
-    delay < 45
-      ? `만족지연지수는 ${delay}%로 다소 낮은 편입니다. 미션을 통해 얻은 보상을 나누어 저금하기 시작하면 지수는 높아집니다.`
-      : delay < 65
-        ? `만족지연지수는 ${delay}%예요. 보상을 저금통으로 나누어 두는 연습을 더하면 좋아요.`
-        : `만족지연지수는 ${delay}%로 양호한 편입니다.`
-
-  const saveSentence = `저축비중이 ${save}%이네요. 아이가 원하는 보상을 달성하기 위해서 어떤 목표를 가지고 있는지 일상속 대화를 통해 동력을 심어주세요!`
-
-  // 각 줄은 `\n`으로만 이어 빈 줄 없이 붙입니다(`whitespace-pre-wrap` 표시용).
-  return [
-    '[AI 연동 전 임시 요약]',
-    `자녀는 현재 ${growthStageName} 단계에요.`,
-    routineSentence,
-    delaySentence,
-    saveSentence,
-  ].join('\n')
-}
 
 /** 만족 지연 지수 값으로 짧은 코멘트를 만듭니다(모달 「현재 상태」용). 문장 사이는 줄바꿈 한 번만 넣고 빈 줄은 넣지 않습니다. */
 function delayScoreReview(score: number, childName: string): string {
@@ -224,31 +187,28 @@ type Props = {
   stats: EconomicEqStatsSlice
   /** 서버에서 미리 계산한 이번 주(월~일) 루틴 완주율 */
   weeklyRoutine: WeeklyRoutineDay[]
-  /** 성장 단계 한글 이름(씨앗, 새싹 …) */
-  growthStageName: string
   childName: string
+  /** 선택된 자녀 id — 있으면 Railway 에이전트 카드(`/agent-a/latest`)를 띄웁니다. */
+  agentChildId?: string | null
 }
 
 /**
  * 부모 홈 「우리아이 경제 EQ 지수」 카드
  *
- * - **순서**: 먼저 AI 인사이트 리포트(코칭 가이드와 같은 카드·글꼴 스타일), 그다음 차트 묶음, 마지막 코칭 가이드
+ * - **순서**: 에이전트 카드(리포트·코칭) → 「우리아이 경제 EQ 지수」차트 묶음
  * - 만족 지연(반원) + 소비/저축(도넛)은 **한 줄 두 칸**, 그 아래 요일별 막대
  * - **데이터**: `eq_delay_score`·`eq_save_ratio` 는 DB 의 `recalculate_eq()` 가
  *   `child_stats`(지갑·저금통·총액)와 `mission_logs` 로 채웁니다. 섬(가용)=총액−지갑−저금통 은 도넛 분모에 넣지 않습니다.
- * - AI 인사이트는 요약 문단만 두고, **행동 유도 링크는 코칭 가이드 아래 2개**(스페셜 미션·마켓 보상)만 둡니다.
  */
 export default function EconomicEqPanel({
   stats,
   weeklyRoutine,
-  growthStageName,
   childName,
+  agentChildId,
 }: Props) {
   const gradId = useId().replace(/:/g, '')
   /** 어떤 그래프 설명 모달을 열었는지 — null 이면 닫힘 */
   const [eqChartModal, setEqChartModal] = useState<EqChartModalKind | null>(null)
-
-  const aiInsightReport = formatAiInsightReport(growthStageName, stats)
 
   // eq_save_ratio: 지갑+저금통 중 저금통 비중(0~100). 소비(파랑)=지갑, 저축(노랑)=저금통.
   const savePct = Math.min(100, Math.max(0, stats.eq_save_ratio))
@@ -256,11 +216,7 @@ export default function EconomicEqPanel({
 
   return (
     <section className="bg-white rounded-2xl p-4 shadow-sm space-y-4">
-      {/* AI 리포트: 코칭 가이드와 동일한 카드·타이포(제목 text-sm 볼드, 본문 text-xs) */}
-      <div className="rounded-2xl border border-amber-200/60 bg-amber-50/50 px-3.5 py-3">
-        <p className="text-sm font-bold text-gray-700 mb-2">AI 인사이트 리포트</p>
-        <p className="text-xs text-gray-700 leading-relaxed whitespace-pre-wrap">{aiInsightReport}</p>
-      </div>
+      {agentChildId ? <ParentAgentHomeCards childId={agentChildId} /> : null}
 
       <p className="text-sm font-bold text-gray-700">우리아이 경제 EQ 지수</p>
 
@@ -305,39 +261,6 @@ export default function EconomicEqPanel({
         <div className="rounded-xl bg-gray-50/80 px-2 py-3">
           <p className="text-[11px] font-bold text-gray-600 mb-2 text-center">일일 루틴 완주율 (이번 주)</p>
           <WeekdayRoutineBars days={weeklyRoutine} />
-        </div>
-      </div>
-
-      <div className="rounded-2xl border border-amber-200/60 bg-amber-50/50 px-3.5 py-3">
-        {/* 제목 스타일은 홈 「최근 활동」과 동일: text-sm + font-bold + gray-700 */}
-        <p className="text-sm font-bold text-gray-700 mb-2">경제 습관 코칭가이드</p>
-        <p className="text-xs text-gray-700 leading-relaxed whitespace-pre-wrap">
-          [이 단락은 RAG·LLM 연동 전 템플릿이며, 나중에 자녀 연령·기관 유형·미션 태그에 맞는 문서를 검색해 바꿔 끼우면
-          됩니다.]
-          {'\n\n'}
-          최근 7일간 누적 700크레딧을 저축했어요.{'\n'}
-          &apos;오늘은 사고싶은걸 바로 사지않고 저금통에 넣어둔거 정말 대단해!&apos;{'\n'}
-          같은 문장으로 아이에게 자기조절을 구체적으로 칭찬해주세요!
-        </p>
-
-        {/* 코칭 다음 행동: 한 줄짜리 문구만 두어 줄바꿈이 어색해지지 않게 함(탭 이동은 링크 목적지로 처리) */}
-        <div
-          className="mt-3 grid grid-cols-2 gap-2.5 border-t border-amber-200/50 pt-3"
-          role="group"
-          aria-label="코칭에 이어 실천하기"
-        >
-          <Link
-            href="/parent/routine#parent-routine-special-missions"
-            className="flex min-h-[3.5rem] items-center justify-center rounded-xl border border-amber-200 bg-white px-2 py-2.5 text-center text-[11px] font-bold leading-tight text-amber-950 shadow-sm ring-1 ring-amber-100/80 transition-colors active:scale-[0.99] hover:border-amber-300 hover:bg-amber-50/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4A90E2] focus-visible:ring-offset-2"
-          >
-            스페셜 미션 제안하기
-          </Link>
-          <Link
-            href="/parent/approval#parent-approval-market-rewards"
-            className="flex min-h-[3.5rem] items-center justify-center rounded-xl border border-amber-200 bg-white px-2 py-2.5 text-center text-[11px] font-bold leading-tight text-amber-950 shadow-sm ring-1 ring-amber-100/80 transition-colors active:scale-[0.99] hover:border-amber-300 hover:bg-amber-50/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4A90E2] focus-visible:ring-offset-2"
-          >
-            특별 보상 제안하기
-          </Link>
         </div>
       </div>
 

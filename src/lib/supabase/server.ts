@@ -1,16 +1,18 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import { requireSupabaseUrlAndAnonKey } from '@/lib/supabase/requireEnv'
 
 /**
  * 서버 환경(Server Components, Actions, Route Handlers)에서
  * 사용자 세션(쿠키)을 유지하며 Supabase와 통신하는 클라이언트
  */
 export const createClient = async () => {
+  const { url, anonKey } = requireSupabaseUrlAndAnonKey()
   const cookieStore = await cookies()
 
   return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    url,
+    anonKey,
     {
       cookies: {
         getAll() {

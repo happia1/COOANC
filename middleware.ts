@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { shouldClearAuthCookiesAfterError } from '@/lib/supabase/authSessionErrors'
+import { requireSupabaseUrlAndAnonKey } from '@/lib/supabase/requireEnv'
 
 /**
  * Supabase 세션 쿠키 갱신 미들웨어
@@ -13,11 +14,12 @@ import { shouldClearAuthCookiesAfterError } from '@/lib/supabase/authSessionErro
  * signOut 으로 응답 쿠키를 정리합니다. (콘솔의 AuthApiError 반복 완화)
  */
 export async function middleware(request: NextRequest) {
+  const { url, anonKey } = requireSupabaseUrlAndAnonKey()
   let supabaseResponse = NextResponse.next({ request })
 
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    url,
+    anonKey,
     {
       cookies: {
         getAll() {

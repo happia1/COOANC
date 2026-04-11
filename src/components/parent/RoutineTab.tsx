@@ -26,6 +26,7 @@ import CalendarSection from '@/components/parent/CalendarSection'
 import RoutineKeywordBuilderSheet from '@/components/parent/RoutineKeywordBuilderSheet'
 import SpecialMissionAddSheet from '@/components/parent/SpecialMissionAddSheet'
 import SpecialMissionBonusSheet from '@/components/parent/SpecialMissionBonusSheet'
+import RoutineAgentSchedulePanel from '@/components/parent/RoutineAgentSchedulePanel'
 import type { Mission } from '@/types/database'
 import { uuidStringsEqual } from '@/lib/normalizeUuid'
 import { ROUTINE_HAS_SCHOOL_KEY } from '@/lib/routineAlarmLocalPrefs'
@@ -422,6 +423,8 @@ type Props = {
   missions: Mission[]
   children: RoutineChildProfile[]
   todayDailyMissions?: TodayDailyMissionRow[]
+  /** 자녀 id → family_links.id (에이전트 B 일정 등록에 사용) */
+  familyLinkByChild?: Record<string, string>
 }
 
 /** 루틴 탭 목록: 이 자녀 전용 행만 (시스템 공용 행은 추가 시트에서만 선택) */
@@ -430,7 +433,12 @@ function missionsLinkedToChild(list: Mission[], childId: string | null): Mission
   return list.filter((m) => uuidStringsEqual(m.linked_child_id, childId))
 }
 
-export default function RoutineTab({ missions: initial, children, todayDailyMissions = [] }: Props) {
+export default function RoutineTab({
+  missions: initial,
+  children,
+  todayDailyMissions = [],
+  familyLinkByChild = {},
+}: Props) {
   const pathname = usePathname()
   const { selectedChildId, setSelectedChildId } = useParentStore()
   /** multiline: 긴 안내(예: API hint) — 줄바꿈·너비·표시 시간 확대 */
@@ -479,6 +487,10 @@ export default function RoutineTab({ missions: initial, children, todayDailyMiss
   const currentId = selectedChildId ?? children[0]?.id ?? null
   const currentChild = children.find((c) => c.id === currentId) ?? children[0]
   const childLevel = currentChild?.level ?? 0
+  const familyLinkId = currentId ? familyLinkByChild[currentId] ?? null : null
+
+  /** AI 일정 패널(오른쪽 슬라이드) 열림 여부 */
+  const [schedulePanelOpen, setSchedulePanelOpen] = useState(false)
 
   /** assign-today 브로드캐스트를 SUBSCRIBED 직후 바로 쏠 수 있게 미리 붙여 둡니다(매번 subscribe 대기 제거). */
   const assignNotifyChannelRef = useRef<RealtimeChannel | null>(null)
@@ -720,8 +732,27 @@ export default function RoutineTab({ missions: initial, children, todayDailyMiss
             />
           </Link>
           <ChildProfileNav tabs={tabs} compact />
+          <div className="flex justify-end">
+            <button
+              type="button"
+              disabled={!currentId}
+              onClick={() => setSchedulePanelOpen(true)}
+              aria-label="일정 등록 AI 패널 열기"
+              className="flex h-10 w-10 items-center justify-center rounded-xl border border-sky-100 bg-white text-lg shadow-sm transition active:scale-[0.97] disabled:opacity-40"
+            >
+              📅
+            </button>
+          </div>
         </div>
       )}
+
+      <RoutineAgentSchedulePanel
+        open={schedulePanelOpen}
+        onClose={() => setSchedulePanelOpen(false)}
+        familyLinkId={familyLinkId}
+        childId={currentId}
+        onToast={showToast}
+      />
 
       {/* 활성 미션 — 헤더와 연필(키워드 시트) 동일 행 */}
       <section>
