@@ -335,6 +335,25 @@
 
 ---
 
+## [2026-04-11] - COOANC-agent Railway·Supabase 환경변수 디버깅 (세션 종료)
+- **Status:** 🔄 진행 중 (에이전트 레포 푸시 완료, Railway 빌드 루트 설정은 대시보드에서 추가 확인 필요)
+- **Git (별도 저장소 `happia1/COOANC-agent`):**
+  - `486d718` — `chore: Railway 로그용 print 및 main.py logging 기본 설정` (`main.py` 상단 `logging.basicConfig`, `db/supabase_client.py`의 `logger.info` → `print(..., flush=True)`)
+  - `1f61b89` — `chore: railway.json 제거 — 대시보드 설정과 충돌 방지` (레포 루트 `railway.json` 삭제)
+- **Files Modified (로컬 워크스페이스 `cooanc-agent/`, COOANC 모노레포에는 gitignore):**
+  - `cooanc-agent/db/supabase_client.py` — `SUPABASE_URL`/`SUPABASE_SERVICE_KEY` 외에 `NEXT_PUBLIC_SUPABASE_URL`·`SUPABASE_SERVICE_ROLE_KEY` 폴백; 배포 로그용 `print` 디버깅; 실패 시 안내 문구 정비
+  - `cooanc-agent/main.py` — `import os` / `import logging` / `logging.basicConfig(level=logging.INFO)` 를 파일 상단에 배치
+- **Files Deleted:** `cooanc-agent/railway.json`
+- **Summary:**
+  - Railway에서 `SUPABASE_*` 미설정으로 보이던 문제를 추적하기 위해 런타임에 env 키 목록·소스 변수명만 출력하도록 했고, Next 앱과 동일한 env 이름도 읽도록 폴백을 넣었습니다.
+  - `railway.json`은 대시보드 설정과 우선순위가 겹칠 수 있어 제거했습니다.
+  - 빌드 실패 시 `Root Directory 'cooanc-agent' does not exist`가 나오면 서비스/환경 단위 Root가 아직 `cooanc-agent`로 잡혀 있거나, 실패 빌드 때문에 **마지막 성공 배포(옛 코드)**만 떠 앱에 옛 에러 JSON이 보일 수 있음을 정리했습니다.
+- **Next Steps:**
+  - Railway: Source가 `happia1/COOANC-agent` 단독 레포일 때 **Root Directory 비움**이 빌드 로그에 반영되는지 확인; 동일 오류 시 서비스 재연결 또는 새 서비스 생성 검토
+  - 빌드 성공 후 Runtime 로그에서 `Supabase URL source` / `All env vars` 출력으로 Variables 주입 여부 재확인
+
+---
+
 ## 📑 Commit Message Protocol
 1. 모든 커밋 메시지는 이 로그의 최신 기록을 바탕으로 작성한다.
 2. **형식**: `type: [작업명] #이슈번호(선택)`
