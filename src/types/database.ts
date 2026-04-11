@@ -59,6 +59,12 @@ export type ChildStats = {
    * 이보다 먼저 받은 칭찬 스티커(grant)는 팝업 종이 위 「새로 붙일 스티커」에서 제외(새 사이클만 표시).
    */
   praise_board_cleared_at?: string | null
+  /** 항해 섹션 (0=연안, 1=근해, 2=외해, 3=심해) */
+  boat_section?: number
+  /** 현재 섹션 내 배 위치 (0~STEPS_PER_SECTION-1) */
+  boat_step?: number
+  /** 하루 1회 배 이동 게이트: 마지막으로 하트 5개를 채운 날짜 (YYYY-MM-DD) */
+  last_hearts_full_date?: string | null
   created_at: string
   updated_at: string
 }
@@ -243,4 +249,22 @@ export type PraiseStickerPlacement = {
   /** 1~20: 곰돌이 판 숫자 칸. null 이면 예전 자유 좌표(x_ratio,y_ratio) */
   board_slot: number | null
   created_at: string
+}
+
+// ── 게임 레이어 ────────────────────────────────────────────────
+
+/** 트리거 발동 이력 (중복 방지 gate) */
+export type ChildTriggerFired = {
+  child_id:    string
+  trigger_key: string
+  fired_at:    string
+}
+
+/** 캐릭터 아이템 잠금 해제 이력 */
+export type ChildItemUnlock = {
+  id:          string
+  child_id:    string
+  item_index:  number
+  trigger_key: string
+  unlocked_at: string
 }

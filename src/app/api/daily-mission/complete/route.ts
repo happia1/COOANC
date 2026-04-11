@@ -5,6 +5,7 @@ import { scaledMissionRewards } from '@/lib/missionRewardMultiplier'
 import { resolveApiActorChildId } from '@/lib/resolveApiActorChildId'
 import { readChildStatInt } from '@/lib/childCreditsSplit'
 import type { Mission } from '@/types/database'
+import { fireGameTrigger } from '@/lib/gameLayer/fireGameTrigger'
 
 /**
  * POST /api/daily-mission/complete
@@ -147,6 +148,36 @@ export async function POST(req: NextRequest) {
   const keepPiggy = readChildStatInt(stats.credits_piggy)
   const baseCredits = readChildStatInt(stats.credits)
 
+  // ── 배 이동: 오늘 완료율 90% 이상 + 오늘 첫 달성 시 boat_step 증가 ──
+  const { data: todayMissions } = await supabase
+    .from('daily_missions')
+    .select('id, is_completed')
+    .eq('child_id', childId)
+    .eq('assigned_date', completionDay)
+
+  const totalToday = todayMissions?.length ?? 0
+  const completedToday = (todayMissions?.filter((m) => m.is_completed).length ?? 0) + 1 // +1 낙관적
+  const heartsFullToday = totalToday > 0 && completedToday / totalToday >= 0.9
+  const lastHeartsFullDate = (stats as Record<string, unknown>).last_hearts_full_date as string | null | undefined
+  const boatShouldAdvance = heartsFullToday && lastHeartsFullDate !== completionDay
+
+  const NAV_STEPS_PER_SECTION = 5
+  const NAV_SECTION_COUNT = 4
+  const currentBoatSection = ((stats as Record<string, unknown>).boat_section as number | undefined) ?? 0
+  const currentBoatStep = ((stats as Record<string, unknown>).boat_step as number | undefined) ?? 0
+
+  let newBoatSection = currentBoatSection
+  let newBoatStep = currentBoatStep
+  if (boatShouldAdvance) {
+    newBoatStep = currentBoatStep + 1
+    if (newBoatStep >= NAV_STEPS_PER_SECTION && newBoatSection < NAV_SECTION_COUNT - 1) {
+      newBoatSection = currentBoatSection + 1
+      newBoatStep = 0
+    } else if (newBoatStep >= NAV_STEPS_PER_SECTION) {
+      newBoatStep = NAV_STEPS_PER_SECTION - 1 // 마지막 섹션 마지막 칸에서 고정
+    }
+  }
+
   await supabase
     .from('child_stats')
     .update({
@@ -163,9 +194,17 @@ export async function POST(req: NextRequest) {
       last_mission_date: completionDay,
       promotion_pending: false,
       promotion_eligible_at: null,
+      ...(boatShouldAdvance && {
+        boat_section: newBoatSection,
+        boat_step: newBoatStep,
+        last_hearts_full_date: completionDay,
+      }),
       updated_at: completedAt,
     })
     .eq('child_id', childId)
+
+  // ── 게임 트리거: 첫 미션 완료 ──
+  const triggerResult = await fireGameTrigger(supabase, childId, 'FIRST_MISSION')
 
   return NextResponse.json({
     creditReward: creditEarned,
@@ -175,5 +214,9 @@ export async function POST(req: NextRequest) {
     newLevel,
     newExp,
     newStreak,
+    boatAdvanced: boatShouldAdvance,
+    itemUnlocked: triggerResult.fired && triggerResult.unlockedItemIndex !== null
+      ? { index: triggerResult.unlockedItemIndex, triggerKey: 'FIRST_MISSION' }
+      : null,
   })
 }

@@ -21,7 +21,7 @@ export function MapActionPill({ onClick }: { onClick: () => void }) {
       type="button"
       onClick={onClick}
       className="flex shrink-0 items-center justify-center rounded-md bg-transparent p-1.5 shadow-none transition active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/35"
-      aria-label="성장 지도와 뱃지 열기"
+      aria-label="항해지도 열기"
     >
       {mapImgOk ? (
         <Image

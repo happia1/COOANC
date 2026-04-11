@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { resolveApiActorChildId } from '@/lib/resolveApiActorChildId'
 import { readChildStatInt } from '@/lib/childCreditsSplit'
 import { isCategoryExcludedFromMarket } from '@/lib/parentMarketMenuSections'
+import { fireGameTrigger } from '@/lib/gameLayer/fireGameTrigger'
 
 /**
  * POST /api/market/request
@@ -154,10 +155,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: '요청 생성에 실패했어요. 다시 시도해 주세요.' }, { status: 500 })
   }
 
+  // ── 게임 트리거: 첫 구매 요청 ──
+  const triggerResult = await fireGameTrigger(supabase, childId, 'FIRST_PURCHASE')
+
   return NextResponse.json({
     request,
     credits: nextCredits,
     credits_wallet: nextWallet,
     credits_piggy: piggy,
+    itemUnlocked: triggerResult.fired && triggerResult.unlockedItemIndex !== null
+      ? { index: triggerResult.unlockedItemIndex, triggerKey: 'FIRST_PURCHASE' }
+      : null,
   }, { status: 201 })
 }

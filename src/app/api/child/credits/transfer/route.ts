@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { resolveApiActorChildId } from '@/lib/resolveApiActorChildId'
 import { creditsFloating, readChildStatInt } from '@/lib/childCreditsSplit'
+import { fireGameTrigger } from '@/lib/gameLayer/fireGameTrigger'
 
 /**
  * POST /api/child/credits/transfer
@@ -123,11 +124,22 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: '저장에 실패했어요' }, { status: 500 })
   }
 
+  // ── 게임 트리거 ──
+  let triggerResult = { fired: false, unlockedItemIndex: null as number | null }
+  if (kind === 'float_to_piggy') {
+    triggerResult = await fireGameTrigger(supabase, childId, 'FIRST_SAVE')
+  } else if (kind === 'float_to_wallet') {
+    triggerResult = await fireGameTrigger(supabase, childId, 'FIRST_WALLET_USE')
+  }
+
   const totalC = row.credits
   return NextResponse.json({
     credits: totalC,
     credits_wallet: nw,
     credits_piggy: np,
     credits_floating: totalC - nw - np,
+    itemUnlocked: triggerResult.fired && triggerResult.unlockedItemIndex !== null
+      ? { index: triggerResult.unlockedItemIndex, triggerKey: kind === 'float_to_piggy' ? 'FIRST_SAVE' : 'FIRST_WALLET_USE' }
+      : null,
   })
 }

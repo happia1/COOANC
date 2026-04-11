@@ -135,3 +135,9 @@ export const MISSION_CARD_REWARD_PILL_BASE_CLASSNAME =
 
 /** 알약 안 동전·하트 아이콘 가로(px) */
 export const MISSION_CARD_REWARD_ICON_WIDTH_PX = 12
+
+// ── 게임 레이어 추가 상수 (하트 시스템) ──────────────────────────────────────
+
+/** 제목 옆 하트 5개 그룹 래퍼 */
+export const MISSION_TODAY_HEARTS_GROUP_CLASSNAME =
+  'flex shrink-0 items-center gap-0.5 pr-0.5' as const

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { resolveApiActorChildId } from '@/lib/resolveApiActorChildId'
 import { isCategoryExcludedFromMarket } from '@/lib/parentMarketMenuSections'
+import { fireGameTrigger } from '@/lib/gameLayer/fireGameTrigger'
 
 /**
  * POST /api/market/wishlist — body:
@@ -163,7 +164,16 @@ export async function POST(req: NextRequest) {
     })
 
     if (error) return NextResponse.json({ error: '담기에 실패했어요' }, { status: 500 })
-    return NextResponse.json({ ok: true, quantity: 1 })
+
+    // ── 게임 트리거: 첫 장바구니 담기 ──
+    const triggerResult = await fireGameTrigger(supabase, childId, 'ADD_TO_CART')
+    return NextResponse.json({
+      ok: true,
+      quantity: 1,
+      itemUnlocked: triggerResult.fired && triggerResult.unlockedItemIndex !== null
+        ? { index: triggerResult.unlockedItemIndex, triggerKey: 'ADD_TO_CART' }
+        : null,
+    })
   }
 
   const { error: delErr } = await supabase

@@ -3,8 +3,8 @@
 import Image from 'next/image'
 import { useCallback, useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import type { ChildStats, PraiseStickerGrant, PraiseStickerPlacement } from '@/types/database'
-import GrowthMapSheet, { type GrowthMapSheetData } from '@/components/child/GrowthMapSheet'
+import type { ChildItemUnlock, ChildStats, PraiseStickerGrant, PraiseStickerPlacement } from '@/types/database'
+import NavigationMapSheet from '@/components/child/NavigationMapSheet'
 import BearStickerSheet from '@/components/child/BearStickerSheet'
 import PraiseGiftArrivalModal from '@/components/child/PraiseGiftArrivalModal'
 import ChildHomeIslandStage from '@/components/child/ChildHomeIslandStage'
@@ -13,6 +13,8 @@ import { MapActionPill, StickerActionPill } from '@/components/child/ChildScener
 import { mergePraiseStickerGrantsFromServer } from '@/lib/mergePraiseStickerGrantsFromServer'
 import { mergeChildStatsPatch, normalizeChildStatsCreditsSplit } from '@/lib/childCreditsSplit'
 import { ASSETS } from '@/constants/assets'
+import ItemUnlockCelebrationPopup from '@/components/child/ItemUnlockCelebrationPopup'
+import type { TriggerKey } from '@/lib/gameLayer/triggerItemMap'
 
 type Props = {
   childId: string
@@ -20,10 +22,14 @@ type Props = {
   childName: string
   /** 프로필에 고른 캐릭터 — 홈 섬 정면 스프라이트와 맞춥니다(없으면 토끼) */
   childAvatarUrl?: string | null
-  /** 지도 시트 안의 뱃지 컬렉션용(전체 뱃지 + 획득 맵) */
-  growthMapData: GrowthMapSheetData
+  /** @deprecated Phase 3에서 NavigationMapSheet로 교체됨. home/page.tsx에서 제거 예정. */
+  growthMapData?: Record<string, unknown>
   initialPraiseGrants: PraiseStickerGrant[]
   initialPraisePlacements: PraiseStickerPlacement[]
+  /** 이미 잠금 해제된 아이템 인덱스 목록 (서버에서 쿼리) */
+  initialUnlockedItemIndexes?: number[]
+  /** URL 파라미터 openNavMap=1 로 지도 자동 열기 */
+  initialMapOpen?: boolean
 }
 
 /**
@@ -42,11 +48,15 @@ export default function HomeTab({
   growthMapData,
   initialPraiseGrants,
   initialPraisePlacements,
+  initialUnlockedItemIndexes = [],
+  initialMapOpen = false,
 }: Props) {
   const [stats, setStats] = useState<ChildStats | null>(() =>
     initialStats ? normalizeChildStatsCreditsSplit(initialStats) : null,
   )
-  const [mapOpen, setMapOpen] = useState(false)
+  const [mapOpen, setMapOpen] = useState(initialMapOpen)
+  const [unlockedItemIndexes, setUnlockedItemIndexes] = useState<number[]>(initialUnlockedItemIndexes)
+  const [itemUnlockPopup, setItemUnlockPopup] = useState<{ index: number; triggerKey: TriggerKey } | null>(null)
   const [bearOpen, setBearOpen] = useState(false)
   const [grants, setGrants] = useState(initialPraiseGrants)
   const [placements, setPlacements] = useState(initialPraisePlacements)
@@ -218,6 +228,33 @@ export default function HomeTab({
     }
   }, [childId])
 
+  // 아이템 잠금 해제 실시간 구독 (다른 탭에서 트리거됐을 때 홈에서도 팝업)
+  useEffect(() => {
+    const supabase = createClient()
+    const ch = supabase
+      .channel(`child_item_unlocks:${childId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'child_item_unlocks',
+          filter: `child_id=eq.${childId}`,
+        },
+        (payload) => {
+          const row = payload.new as ChildItemUnlock
+          setUnlockedItemIndexes((prev) =>
+            prev.includes(row.item_index) ? prev : [...prev, row.item_index],
+          )
+          setItemUnlockPopup({ index: row.item_index, triggerKey: row.trigger_key as TriggerKey })
+        },
+      )
+      .subscribe()
+    return () => {
+      void supabase.removeChannel(ch)
+    }
+  }, [childId])
+
   const dismissArrival = useCallback(async () => {
     const now = new Date().toISOString()
     setGrants((prev) =>
@@ -241,23 +278,13 @@ export default function HomeTab({
     void dismissArrival()
   }, [dismissArrival])
 
-  const growthPayload: GrowthMapSheetData = stats
-    ? {
-        ...growthMapData,
-        level: stats.current_level,
-        streak: stats.streak_days,
-        longestStreak: stats.longest_streak,
-      }
-    : growthMapData
-
   const sheets = (
     <>
-      <GrowthMapSheet
+      <NavigationMapSheet
         open={mapOpen}
         onClose={() => setMapOpen(false)}
         childName={childName}
         stats={stats}
-        data={growthPayload}
       />
       <BearStickerSheet
         open={bearOpen}
@@ -341,11 +368,18 @@ export default function HomeTab({
             </div>
           </ChildHomeSceneryBand>
           <section className={homeBottomPanelClass} aria-label="내 캐릭터 꾸미기">
-            <CharacterDecorInventoryPlaceholder />
+            <CharacterDecorInventory unlockedIndexes={unlockedItemIndexes} />
           </section>
         </div>
         {sheets}
         {arrivalModal}
+        {itemUnlockPopup && (
+          <ItemUnlockCelebrationPopup
+            itemIndex={itemUnlockPopup.index}
+            triggerKey={itemUnlockPopup.triggerKey}
+            onClose={() => setItemUnlockPopup(null)}
+          />
+        )}
       </>
     )
   }
@@ -375,11 +409,18 @@ export default function HomeTab({
       </ChildHomeSceneryBand>
 
       <section className={homeBottomPanelClass} aria-label="내 캐릭터 꾸미기">
-        <CharacterDecorInventoryPlaceholder />
+        <CharacterDecorInventory unlockedIndexes={unlockedItemIndexes} />
       </section>
 
       {sheets}
       {arrivalModal}
+      {itemUnlockPopup && (
+        <ItemUnlockCelebrationPopup
+          itemIndex={itemUnlockPopup.index}
+          triggerKey={itemUnlockPopup.triggerKey}
+          onClose={() => setItemUnlockPopup(null)}
+        />
+      )}
     </div>
   )
 }
@@ -392,25 +433,16 @@ const DECOR_GRID_COLS = DECOR_ITEM_COUNT / 2
 
 /**
  * 꾸미기 인벤토리 — 아이템을 **위·아래 2줄**로 두고, **한 번의 가로 스크롤**로 두 줄이 같이 밀립니다.
- * (열 단위 `snap-center`: 한 칸에 위·아래 카드가 묶여서 스냅됩니다.)
- * 지금은 전부 비활성(준비중)만 보여 줍니다.
+ * 잠금 해제된 아이템은 컬러로, 그 외는 흑백 + 준비중 레이블로 표시합니다.
  */
-function CharacterDecorInventoryPlaceholder() {
+function CharacterDecorInventory({ unlockedIndexes }: { unlockedIndexes: number[] }) {
   return (
-    /** 하단 패널 안에서 제목은 고정 높이, 슬롯 영역만 남는 세로 공간을 씀(세로 스크롤 없음). */
     <div className="flex min-h-0 w-full flex-1 flex-col pt-1" aria-labelledby="child-decor-heading">
-      {/** 제목만 표시 — 부제 문구는 화면을 단순하게 하기 위해 제거했습니다. */}
       <div className="mb-2 flex shrink-0 flex-wrap items-center gap-x-2 gap-y-1">
         <h2 id="child-decor-heading" className="text-base font-black leading-tight text-brand-text">
           내 캐릭터 꾸미기
         </h2>
       </div>
-      {/**
-       * 바깥만 가로 스크롤 — 안쪽은 `flex` 로 “열”마다 `grid-rows-2` 를 쌓아 두 줄이 항상 같이 움직입니다.
-       * `pointer-events-none`: 준비중이라 눌러도 반응하지 않게 막아 두었어요.
-       * 각 열 너비(`18vw`·최대 76px): 한 열 높이(위+아래 정사각형)가 줄어들어 짧은 화면에서도 위줄이 잘리지 않기 쉽습니다.
-       * `items-start` + `pt-1`: 세로 가운데 정렬이면 남는 높이보다 그리드가 클 때 위·아래가 잘리는데, 위부터 채우면 상단 모서리가 보입니다.
-       */}
       <div
         className="-mx-1 min-h-0 flex-1 overflow-x-auto overflow-y-hidden px-2 pb-0.5 pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden snap-x snap-mandatory"
         style={{ WebkitOverflowScrolling: 'touch' }}
@@ -427,32 +459,33 @@ function CharacterDecorInventoryPlaceholder() {
             >
               {[0, 1].map((rowInCol) => {
                 const index = col * 2 + rowInCol
+                const unlocked = unlockedIndexes.includes(index)
                 return (
                   <div
                     key={`decor-item-${index}`}
-                    aria-disabled="true"
-                    aria-label={`꾸미기 아이템 ${index + 1}번, 준비 중`}
+                    aria-disabled={!unlocked}
+                    aria-label={`꾸미기 아이템 ${index + 1}번${unlocked ? ', 잠금 해제됨' : ', 준비 중'}`}
                     className="pointer-events-none aspect-square w-full"
                   >
-                    {/**
-                     * 정사각형 썸네일 — `public/.../items/` 폴더의 PNG 를 번호 순으로 한 장씩 넣습니다.
-                     * `object-contain`: 비율을 유지한 채 블록 안에 맞춥니다.
-                     */}
                     <div className="relative size-full overflow-hidden rounded-xl border border-amber-100/90 bg-[#f7f4eb] shadow-sm">
                       <Image
                         src={ASSETS.characters.decorItemImages[index]}
                         alt=""
                         fill
                         sizes="(max-width: 448px) 18vw, 76px"
-                        className="object-contain p-0.5 grayscale opacity-[0.55]"
+                        className={`object-contain p-0.5 transition-all duration-500 ${unlocked ? '' : 'grayscale opacity-[0.55]'}`}
                         draggable={false}
                       />
-                      <div className="pointer-events-none absolute inset-0 bg-white/35" aria-hidden />
-                      <div className="pointer-events-none absolute inset-x-0 bottom-0.5 flex justify-center px-0.5">
-                        <span className="rounded-md bg-slate-700/85 px-1 py-px text-[8px] font-black tracking-tight text-white shadow-sm">
-                          준비중
-                        </span>
-                      </div>
+                      {!unlocked && (
+                        <>
+                          <div className="pointer-events-none absolute inset-0 bg-white/35" aria-hidden />
+                          <div className="pointer-events-none absolute inset-x-0 bottom-0.5 flex justify-center px-0.5">
+                            <span className="rounded-md bg-slate-700/85 px-1 py-px text-[8px] font-black tracking-tight text-white shadow-sm">
+                              준비중
+                            </span>
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
                 )

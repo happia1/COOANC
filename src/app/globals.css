@@ -472,3 +472,54 @@
 .mission-credit-twinkle-f {
   animation: mission-credit-twinkle-orbit-f 1.4s ease-in-out 0.04s forwards;
 }
+
+/* ── 게임 레이어: 하트 시스템 ─────────────────────────────────── */
+
+@keyframes heart-fill-pop {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.45); }
+  65%  { transform: scale(0.9); }
+  100% { transform: scale(1); }
+}
+
+@keyframes hearts-celebrate {
+  0%   { transform: translateX(0); }
+  20%  { transform: translateX(-3px) rotate(-4deg); }
+  40%  { transform: translateX(3px) rotate(4deg); }
+  60%  { transform: translateX(-2px) rotate(-2deg); }
+  80%  { transform: translateX(2px) rotate(2deg); }
+  100% { transform: translateX(0); }
+}
+
+.heart-fill-pop {
+  animation: heart-fill-pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.hearts-celebrate {
+  animation: hearts-celebrate 0.5s ease-in-out both;
+}
+
+/* ── 게임 레이어: 아이템 잠금 해제 ───────────────────────────── */
+
+@keyframes item-unlock-pop {
+  0%   { transform: scale(0.5) rotate(-8deg); opacity: 0; }
+  60%  { transform: scale(1.15) rotate(3deg); opacity: 1; }
+  80%  { transform: scale(0.95) rotate(-1deg); }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+
+.item-unlock-pop {
+  animation: item-unlock-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+/* ── 게임 레이어: 항해지도 배 이동 ───────────────────────────── */
+
+@keyframes boat-advance {
+  0%   { transform: translateX(-8px); opacity: 0.6; }
+  60%  { transform: translateX(3px); opacity: 1; }
+  100% { transform: translateX(0); opacity: 1; }
+}
+
+.boat-advance {
+  animation: boat-advance 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}

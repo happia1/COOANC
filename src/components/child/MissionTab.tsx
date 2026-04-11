@@ -43,15 +43,12 @@ import {
   MISSION_CARD_TEXT_BLOCK_CLASSNAME,
   MISSION_CARD_TITLE_CLASSNAME,
   MISSION_TODAY_BOTTOM_SECTION_CLASSNAME,
-  MISSION_TODAY_EXP_FILL_CLASSNAME,
-  MISSION_TODAY_EXP_GROUP_CLASSNAME,
-  MISSION_TODAY_EXP_TEXT_IN_BAR_CLASSNAME,
-  MISSION_TODAY_EXP_TO_NEXT_CLASSNAME,
-  MISSION_TODAY_EXP_TRACK_CLASSNAME,
   MISSION_TODAY_TITLE_HEADING_CLASSNAME,
   MISSION_TODAY_TITLE_ROW_INNER_CLASSNAME,
   MISSION_TODAY_TITLE_ROW_OUTER_CLASSNAME,
 } from '@/lib/missionTodayLayoutSpec'
+import MissionHeartRow from '@/components/child/MissionHeartRow'
+import { completionRateToHearts } from '@/lib/missionHeartCount'
 
 type Props = {
   childId: string
@@ -187,6 +184,9 @@ export default function MissionTab({
     /** 2·3배 보너스일 때 배너 스프라이트와 함께 표시 */
     rewardMultiplier: RewardMultiplier
   } | null>(null)
+
+  /** 하트 5개 채움 축하 팝업 (하루 1회) */
+  const [heartsFullPopup, setHeartsFullPopup] = useState(false)
 
   const router = useRouter()
   /** 부모가 오늘 일정을 넣은 뒤 날짜 비교에 쓰는 최신 today 문자열 */
@@ -551,15 +551,21 @@ export default function MissionTab({
   const walletCredits = stNorm?.credits_wallet ?? 0
   const piggyCredits = stNorm?.credits_piggy ?? 0
   const floatingCredits = stNorm ? creditsFloating(stNorm) : 0
-  const exp = stats?.exp ?? 0
-  const expToNext = Math.max(1, stats?.exp_to_next_level ?? 1)
-  const expPct = Math.min(100, (exp / expToNext) * 100)
 
   const completedCount = useMemo(
     () => visibleMissionList.filter((dm) => done.has(dm.id)).length,
     [visibleMissionList, done],
   )
   const total = visibleMissionList.length
+  const filledHearts = completionRateToHearts(completedCount, total)
+
+  function handleHeartsFull() {
+    if (typeof window === 'undefined') return
+    const key = `cooanc_hearts_full_${childId}_${today}`
+    if (sessionStorage.getItem(key)) return
+    sessionStorage.setItem(key, '1')
+    setHeartsFullPopup(true)
+  }
 
   /** 크레딧 옮기기 팝업 제목만(본문 힌트는 레이아웃·겹침 이슈로 팝업에서 제거함) */
   const transferCopy: Record<CreditTransferKind, { title: string }> = {
@@ -588,39 +594,16 @@ export default function MissionTab({
   }
 
   /**
-   * 카드 바로 위 **한 행**: 왼쪽 제목 · 오른쪽 EXP.
+   * 카드 바로 위 **한 행**: 왼쪽 제목 · 오른쪽 하트 5개.
    * 레이아웃·간격은 `missionTodayLayoutSpec.ts` 고정값을 씁니다.
    */
   const missionTitleAboveCards = (
-    /**
-     * 음수 margin-top 은 금지: `bottomPanel` 이 세로 스크롤/클립을 쓰므로
-     * 「오늘의 미션」·EXP 막대 윗부분이 잘려 보일 수 있습니다.
-     * 위로 붙이고 싶을 때는 스펙 파일의 하단 섹션 클래스만 기획 합의 후 조정하세요.
-     */
     <div className={MISSION_TODAY_TITLE_ROW_OUTER_CLASSNAME}>
       <div className={MISSION_TODAY_TITLE_ROW_INNER_CLASSNAME}>
         <div className="flex min-w-0 flex-[0_1_auto] items-center gap-2 overflow-hidden">
           <h2 className={MISSION_TODAY_TITLE_HEADING_CLASSNAME}>오늘의 미션</h2>
         </div>
-        <div
-          className={MISSION_TODAY_EXP_GROUP_CLASSNAME}
-          role="group"
-          aria-label={`경험치 ${exp}, 목표 ${expToNext}`}
-        >
-          <div className={MISSION_TODAY_EXP_TRACK_CLASSNAME}>
-            <div
-              className={MISSION_TODAY_EXP_FILL_CLASSNAME}
-              style={{ width: `${expPct}%` }}
-            />
-            <span className={MISSION_TODAY_EXP_TEXT_IN_BAR_CLASSNAME}>
-              {exp}
-            </span>
-          </div>
-          <span className={MISSION_TODAY_EXP_TO_NEXT_CLASSNAME}>
-            <span aria-hidden>♥</span>
-            <span>{expToNext}</span>
-          </span>
-        </div>
+        <MissionHeartRow filledCount={filledHearts} onFull={handleHeartsFull} />
       </div>
     </div>
   )
@@ -1076,6 +1059,46 @@ export default function MissionTab({
         walletBalance={walletCredits}
         onSuccess={applyCreditTransferSuccess}
       />
+
+      {/* 하트 5개 채움 축하 팝업 */}
+      {heartsFullPopup &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[300] flex items-center justify-center bg-black/40 px-5"
+            role="dialog"
+            aria-modal="true"
+            aria-label="미션 완주 축하"
+          >
+            <div className="hearts-celebrate flex max-w-[min(22rem,calc(100vw-2.5rem))] flex-col items-center gap-4 rounded-3xl bg-white px-6 py-7 shadow-2xl ring-2 ring-pink-200">
+              <div className="text-4xl">🎉</div>
+              <p className="text-center text-base font-black leading-snug text-brand-text">
+                축하해요!<br />배가 항해를 시작했어요!
+              </p>
+              <p className="text-center text-xs text-gray-400">
+                오늘 미션을 90% 이상 완료했어요.
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setHeartsFullPopup(false)}
+                  className="rounded-xl bg-gray-100 px-4 py-2 text-sm font-bold text-gray-600 active:scale-95"
+                >
+                  닫기
+                </button>
+                <button
+                  onClick={() => {
+                    setHeartsFullPopup(false)
+                    router.push('/home?openNavMap=1')
+                  }}
+                  className="rounded-xl bg-gradient-to-r from-pink-400 to-rose-500 px-4 py-2 text-sm font-bold text-white shadow active:scale-95"
+                >
+                  지도 보기
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body,
+        )}
     </div>
   )
 }
