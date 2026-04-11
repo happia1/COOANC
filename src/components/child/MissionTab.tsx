@@ -6,8 +6,7 @@ import { useRouter } from 'next/navigation'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/client'
 import type { ChildStats, DailyMission, DailyMissionWithTemplate } from '@/types/database'
-import ChildHomeIslandStage from '@/components/child/ChildHomeIslandStage'
-import ChildHomeSceneryBand from '@/components/child/ChildHomeSceneryBand'
+import MissionCreditCards from '@/components/child/MissionCreditCards'
 import { parseSpecialMissionPopup } from '@/lib/specialMissionDescription'
 import { isRetiredSpecialMissionTitle, isSpecialSectionMission } from '@/lib/specialMissionChips'
 import { parseAlarmFromMissionDescription } from '@/lib/missionAlarmDescription'
@@ -608,47 +607,15 @@ export default function MissionTab({
     </div>
   )
 
-  /**
-   * 상단 영역: `flexFill={false}` 로 `60dvh`·최소 높이를 쓰고, 미션 탭 전체는 아래 래퍼에서 세로 스크롤됩니다.
-   * (예전처럼 상·하 flex 비율로 뷰포트만 꽉 채우면 내용이 잘리고 한꺼번에 밀리는 느낌이 납니다.)
-   */
   const heroBand = (
-    <ChildHomeSceneryBand
-      flexFill={false}
-      /** 상단 배경 이미지를 완전히 비활성화합니다. */
-      showBackground={false}
-      /** 요청하신 잔디 배경 이미지 경로를 상단 영역에 적용합니다. */
-      /** 배경은 중앙 정렬로 맞춰 오브젝트가 치우치지 않게 합니다. */
-      /** 미션 탭은 배경을 위로 당기지 않아(리프트 제거) 작은 화면에서도 잘림을 줄입니다. */
-      /** 밴드 자체 바탕색은 투명으로 두어 이미지 외 배경 덮임을 막습니다. */
-      className="bg-transparent"
-      ariaLabel="미션 상단"
-    >
-      {/** 연속일 등 상단 StatPill 은 사용하지 않음 — 크레딧은 섬 가운데·지갑·저금통에서 확인 */}
-      {/** `flex-1 min-h-0`: 홈과 같이 섬 무대가 풍경 밴드 안 남는 공간에 맞춰 줄어듦 */}
-      {/** `overflow-visible`: 섬·저금통 스프라이트가 세로로 삐져나와도 잘리지 않게 */}
-      <div className="flex min-h-0 flex-1 flex-col justify-end overflow-visible">
-        {/** 짧은 화면에서 위로 너무 당기면 부모 밖으로 삐져 나와 페이지 스크롤이 생길 수 있어 `-mt` 를 한 단계 줄였습니다. */}
-        <div className="relative mx-auto flex min-h-0 w-full max-w-sm flex-1 flex-col items-center justify-end overflow-visible -mt-8 sm:-mt-10">
-          <ChildHomeIslandStage
-            scene="gippybank"
-            density="flex"
-            showIslandArt={false}
-            missionPiggy={{ completed: completedCount, total }}
-            missionCredits={{
-              floating: floatingCredits,
-              wallet: walletCredits,
-              piggy: piggyCredits,
-              onCenterTap: () => {
-                if (floatingCredits > 0) setCreditSheetBucket('center')
-              },
-              onWalletTap: () => setCreditSheetBucket('wallet'),
-              onPiggyTap: () => setCreditSheetBucket('piggy'),
-            }}
-          />
-        </div>
-      </div>
-    </ChildHomeSceneryBand>
+    <MissionCreditCards
+      piggy={piggyCredits}
+      floating={floatingCredits}
+      wallet={walletCredits}
+      onPiggyTap={() => setCreditSheetBucket('piggy')}
+      onCenterTap={() => { if (floatingCredits > 0) setCreditSheetBucket('center') }}
+      onWalletTap={() => setCreditSheetBucket('wallet')}
+    />
   )
 
   /**
