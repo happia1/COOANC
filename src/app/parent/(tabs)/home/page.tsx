@@ -1,6 +1,7 @@
 /**
  * 부모 홈 탭 — 서버 컴포넌트
  * 전체 자녀 데이터를 한번에 조회 후 HomeTab(Client)에 전달합니다.
+ * (구매 승인 대기 건수는 공통 레이아웃에서만 조회해 상단 알람 시트로 넘깁니다.)
  *
  * 「오늘 미션 달성률」은 자녀 앱「오늘의 미션」과 같이,
  * **그날짜(date)로 배정된 daily_missions 행 전부**를 분모로 씁니다.
@@ -44,12 +45,7 @@ export default async function ParentHomePage() {
   const childIds = (links ?? []).map((l) => l.child_id)
 
   if (childIds.length === 0) {
-    return (
-      <HomeTab
-        childrenData={[]}
-        pendingCount={0}
-      />
-    )
+    return <HomeTab childrenData={[]} />
   }
 
   const today = getSeoulDateString()
@@ -62,7 +58,7 @@ export default async function ParentHomePage() {
   }
   const profiles = profileRows ?? []
 
-  const [statsRes, todayDailyRes, weekDailyRes, recentLogsRes, pendingRes] = await Promise.all([
+  const [statsRes, todayDailyRes, weekDailyRes, recentLogsRes] = await Promise.all([
     supabase
       .from('child_stats')
       .select('child_id, credits, hearts, current_level, exp, exp_to_next_level, streak_days, eq_delay_score, eq_routine_rate, eq_save_ratio')
@@ -90,12 +86,6 @@ export default async function ParentHomePage() {
       .eq('is_completed', true)
       .order('completed_at', { ascending: false })
       .limit(30),
-
-    supabase
-      .from('purchase_requests')
-      .select('id', { count: 'exact', head: true })
-      .in('child_id', childIds)
-      .in('status', ['pending', 'parent_buying']),
   ])
   const statsMap = Object.fromEntries(
     ((statsRes.data ?? []) as { child_id: string; [key: string]: unknown }[]).map((s) => [s.child_id, s])
@@ -132,8 +122,6 @@ export default async function ParentHomePage() {
     if (recentMap[log.child_id].length < 5) recentMap[log.child_id].push(log)
   }
 
-  const pendingCount = (pendingRes as unknown as { count: number | null }).count ?? 0
-
   // ChildSummary 조합
   const childrenData: ChildSummary[] = profiles.map((p) => {
     const stats = statsMap[p.id] as unknown as ChildSummary['stats'] | undefined
@@ -162,10 +150,5 @@ export default async function ParentHomePage() {
     }
   })
 
-  return (
-    <HomeTab
-      childrenData={childrenData}
-      pendingCount={pendingCount}
-    />
-  )
+  return <HomeTab childrenData={childrenData} />
 }

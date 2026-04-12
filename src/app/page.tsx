@@ -6,6 +6,7 @@
  */
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import BunnyRunLoader from '@/components/ui/BunnyRunLoader'
 import { createClient } from '@/lib/supabase/client'
 
 export default function RootPage() {
@@ -42,10 +43,7 @@ export default function RootPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-sky-100 via-white to-green-50">
-      <div className="flex flex-col items-center gap-4">
-        <div className="animate-bounce text-5xl">🌱</div>
-        <p className="text-sm font-bold text-gray-400">COOANC 불러오는 중...</p>
-      </div>
+      <BunnyRunLoader />
     </div>
   )
 }

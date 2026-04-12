@@ -50,7 +50,7 @@ function SlotNumber({ value, toneClass, sizeClass }: { value: number; toneClass:
   const chars = useMemo(() => String(displayed).split(''), [displayed])
 
   return (
-    <span className={`inline-flex items-center gap-[0.04em] font-black tabular-nums ${toneClass} ${sizeClass}`}>
+    <span className={`inline-flex items-center gap-[0.04em] font-semibold tabular-nums ${toneClass} ${sizeClass}`}>
       {chars.map((ch, idx) => (
         <span
           key={`d-${idx}-${ch}`}
@@ -75,8 +75,8 @@ function piggyStepFromCredits(piggy: number): number {
 
 /* ─────────────── 공통 이미지 박스 크기 ─────────────── */
 
-/** 세 이미지 모두 이 정사각형 안에 들어갑니다 */
-const IMG_BOX = 80 as const
+/** 세 이미지 모두 이 정사각형 안에 들어갑니다(이전보다 살짝 작게 — 돼지 저금통 체감 크기 조정) */
+const IMG_BOX = 72 as const
 
 /* ─────────────── Props ─────────────── */
 
@@ -99,40 +99,37 @@ export default function MissionCreditCards({
 }: MissionCreditCardsProps) {
   const piggyStep = piggyStepFromCredits(piggy)
 
+  /** 카드 바깥 테두리·배경: 흰색 + 살짝 투명(블록을 한 톤으로 묶음) */
+  const creditCardShell =
+    'rounded-2xl bg-white/78 px-1.5 py-3 shadow-sm ring-1 ring-white/75 backdrop-blur-[2px] transition-transform active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/90'
+
   return (
     <div className="grid grid-cols-3 gap-2" aria-label="크레딧 현황">
 
       {/* ── 저금통 ── */}
-      <button
-        type="button"
-        onClick={onPiggyTap}
-        className="flex flex-col items-center gap-1 rounded-2xl bg-rose-50 px-1.5 py-3 shadow-sm ring-1 ring-rose-200/60 transition-transform active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300"
-      >
+      <button type="button" onClick={onPiggyTap} className={`flex flex-col items-center gap-1 ${creditCardShell}`}>
         <div
           className="flex items-center justify-center overflow-hidden"
           style={{ width: IMG_BOX, height: IMG_BOX }}
         >
           <PiggyBankStageVisual
             stepIndex={piggyStep}
-            displayWidth={IMG_BOX - 8}
+            displayWidth={IMG_BOX - 10}
             className="select-none"
           />
         </div>
         <SlotNumber value={piggy} toneClass="text-rose-700" sizeClass="text-base" />
-        <p className="text-[11px] font-black text-rose-800">저금통</p>
-        <p className="text-[9.5px] leading-tight text-rose-500">크레딧 모이는 중</p>
-        <span className="mt-0.5 rounded-full bg-rose-200/70 px-2 py-0.5 text-[9px] font-bold text-rose-700">
-          이자 붙는 중 ✅
-        </span>
+        <p className="text-[11px] font-bold text-rose-800">저금통</p>
+        <p className="mt-0.5 text-center text-[10px] font-medium leading-snug text-rose-800">저축을 해요</p>
       </button>
 
-      {/* ── 가용 크레딧 ── */}
+      {/* ── 돈바구니(가용 크레딧) ── */}
       <button
         type="button"
         disabled={floating <= 0}
         onClick={onCenterTap}
         className={[
-          'flex flex-col items-center gap-1 rounded-2xl bg-amber-50 px-1.5 py-3 shadow-sm ring-1 ring-amber-200/60 transition-transform active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300',
+          `flex flex-col items-center gap-1 ${creditCardShell}`,
           floating <= 0 ? 'opacity-50' : '',
         ].join(' ')}
       >
@@ -149,19 +146,12 @@ export default function MissionCreditCards({
           />
         </div>
         <SlotNumber value={floating} toneClass="text-amber-700" sizeClass="text-base" />
-        <p className="text-[11px] font-black text-amber-800">가용 크레딧</p>
-        <p className="text-[9.5px] leading-tight text-amber-500">미션 완료로 쌓여요</p>
-        <span className="mt-0.5 rounded-full bg-amber-200/70 px-2 py-0.5 text-[9px] font-bold text-amber-700">
-          {floating > 0 ? '눌러서 나누기 →' : '아직 없어요'}
-        </span>
+        <p className="text-[11px] font-bold text-amber-800">돈바구니</p>
+        <p className="mt-0.5 text-center text-[10px] font-medium leading-snug text-amber-900">보상을 받아요</p>
       </button>
 
       {/* ── 내 지갑 ── */}
-      <button
-        type="button"
-        onClick={onWalletTap}
-        className="flex flex-col items-center gap-1 rounded-2xl bg-teal-50 px-1.5 py-3 shadow-sm ring-1 ring-teal-200/60 transition-transform active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-300"
-      >
+      <button type="button" onClick={onWalletTap} className={`flex flex-col items-center gap-1 ${creditCardShell}`}>
         <div
           className="flex items-center justify-center overflow-hidden"
           style={{ width: IMG_BOX, height: IMG_BOX }}
@@ -176,11 +166,8 @@ export default function MissionCreditCards({
           />
         </div>
         <SlotNumber value={wallet} toneClass="text-teal-700" sizeClass="text-base" />
-        <p className="text-[11px] font-black text-teal-800">내 지갑</p>
-        <p className="text-[9.5px] leading-tight text-teal-500">쓸 수 있는 크레딧</p>
-        <span className="mt-0.5 rounded-full bg-teal-200/70 px-2 py-0.5 text-[9px] font-bold text-teal-700">
-          지금 사용 가능 ✦
-        </span>
+        <p className="text-[11px] font-bold text-teal-800">내 지갑</p>
+        <p className="mt-0.5 text-center text-[10px] font-medium leading-snug text-teal-900">쓸 수 있어요</p>
       </button>
 
     </div>

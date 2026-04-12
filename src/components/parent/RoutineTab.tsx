@@ -8,6 +8,7 @@
  * - 일상 미션 카드는 이모지·제목·시각만 표시합니다. 활성/비활성은 상단 연필(키워드 시트)에서 한 번에 설정합니다.
  * - 알람은 온보딩·상단 「루틴 알람」에서만 설정해 충돌을 막습니다.
  * - 스페셜 「오늘 하루만」미션은 「일정 추가」→ 보너스 배율 시트에서 저장한 뒤 오늘 일정에 넣습니다.
+ * - 캘린더는 스페셜 미션처럼 제목·+가 흰 카드 밖에 두고, 우하단 파비콘 플로팅으로 AI 루틴 도우미 패널을 엽니다.
  * - 매일 스페셜은 「보상 배율」로만 배율을 바꿉니다(카드에 「보상 N배」 문구는 넣지 않음).
  * - 상단 자녀 프로필 카드를 누르면 홈 탭과 같이 「부모가 이 자녀 앱 화면 보기」로 들어갑니다(API 쿠키 후 /home).
  */
@@ -198,9 +199,19 @@ function RoutineMissionSlideCard({ mission: m, onOpenRewardEditor }: { mission: 
   )
 }
 
+/** 일상·스페셜 미션 설명·빈 목록·오전/오후 캡션·접기 행 보조 문구 — 크기·색 통일(기존 11px 보다 작게) */
+const ROUTINE_DESC_TEXT_CLASS = 'text-[10px] font-normal leading-snug text-gray-400'
+/** 제목 옆 한 줄 안내(줄임)용 — 위 본문 톤 + truncate */
+const ROUTINE_DESC_TRUNCATE_CLASS = `min-w-0 truncate ${ROUTINE_DESC_TEXT_CLASS}`
+
+const ROUTINE_WEEKDAY_AM_CAPTION = '주중 오전 일정을 세팅'
+const ROUTINE_WEEKDAY_PM_CAPTION = '주중 오후 일정을 세팅'
+const ROUTINE_WEEKEND_AM_CAPTION = '주말／공휴일 오전 일정을 세팅'
+const ROUTINE_WEEKEND_PM_CAPTION = '주말／공휴일 오후 일정을 세팅'
+
 function renderRoutineMissionStrip(list: Mission[], emptyHint: string, onOpenRewardEditor: (m: Mission) => void) {
   if (list.length === 0) {
-    return <p className="px-3 py-3 text-center text-[11px] text-gray-400">{emptyHint}</p>
+    return <p className={`px-3 py-3 text-center ${ROUTINE_DESC_TEXT_CLASS}`}>{emptyHint}</p>
   }
   return (
     <div className="-mx-1 overflow-x-auto pb-0.5 [scrollbar-width:thin]">
@@ -218,6 +229,7 @@ function renderRoutineMissionStrip(list: Mission[], emptyHint: string, onOpenRew
 
 /**
  * 오전·오후를 하나의 흰 카드에 넣고, 스페셜 미션과 같이 접기/펼치기 + 가로 슬라이드 목록으로 둡니다.
+ * - `amCaption` / `pmCaption`: 라벨 옆 한 줄 안내(`ROUTINE_DESC_TEXT_CLASS` 와 동일)
  */
 function AmPmRoutineBlock({
   am,
@@ -229,6 +241,8 @@ function AmPmRoutineBlock({
   emptyAmHint,
   emptyPmHint,
   onOpenRewardEditor,
+  amCaption,
+  pmCaption,
 }: {
   am: Mission[]
   pm: Mission[]
@@ -239,6 +253,10 @@ function AmPmRoutineBlock({
   emptyAmHint: string
   emptyPmHint: string
   onOpenRewardEditor: (m: Mission) => void
+  /** 오전 토글 줄 오른쪽(오전 라벨 옆) 안내 문구 — 없으면 라벨만 */
+  amCaption?: string
+  /** 오후 토글 줄 오른쪽 안내 문구 */
+  pmCaption?: string
 }) {
   return (
     <div className="overflow-x-hidden rounded-xl border border-gray-100 bg-white shadow-sm">
@@ -248,8 +266,11 @@ function AmPmRoutineBlock({
         aria-expanded={openAm}
         className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left transition-colors hover:bg-gray-50"
       >
-        <span className="text-xs font-bold text-gray-700">오전</span>
-        <ChevronToggleIcon open={openAm} className="text-gray-400" />
+        <span className="flex min-w-0 flex-1 items-center gap-2">
+          <span className="shrink-0 text-xs font-bold text-gray-700">오전</span>
+          {amCaption ? <span className={`min-w-0 ${ROUTINE_DESC_TEXT_CLASS}`}>{amCaption}</span> : null}
+        </span>
+        <ChevronToggleIcon open={openAm} className="shrink-0 text-gray-400" />
       </button>
       {openAm ? (
         <div className={am.length === 0 ? 'border-t border-gray-100' : SLIDE_SECTION_WITH_CARDS}>
@@ -262,8 +283,11 @@ function AmPmRoutineBlock({
         aria-expanded={openPm}
         className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left transition-colors hover:bg-gray-50"
       >
-        <span className="text-xs font-bold text-gray-700">오후</span>
-        <ChevronToggleIcon open={openPm} className="text-gray-400" />
+        <span className="flex min-w-0 flex-1 items-center gap-2">
+          <span className="shrink-0 text-xs font-bold text-gray-700">오후</span>
+          {pmCaption ? <span className={`min-w-0 ${ROUTINE_DESC_TEXT_CLASS}`}>{pmCaption}</span> : null}
+        </span>
+        <ChevronToggleIcon open={openPm} className="shrink-0 text-gray-400" />
       </button>
       {openPm ? (
         <div className={pm.length === 0 ? 'border-t border-gray-100' : SLIDE_SECTION_WITH_CARDS}>
@@ -338,14 +362,14 @@ function SpecialDailyEventBlock({
         {/* 제목 옆 보조 안내 문구를 작은 회색 글씨로 함께 표시 */}
         <div className="flex min-w-0 items-center gap-1.5">
           <span className="text-xs font-bold text-gray-700">매일 일정</span>
-          <span className="truncate text-[10px] font-medium text-gray-400">매일 스페셜 일정으로 추가 완료</span>
+          <span className={ROUTINE_DESC_TRUNCATE_CLASS}>매일 스페셜 일정으로 추가 완료</span>
         </div>
         <ChevronToggleIcon open={openDaily} className="text-gray-400" />
       </button>
       {openDaily ? (
         <div className={dailyMissions.length === 0 ? 'border-t border-gray-100' : SLIDE_SECTION_SPECIAL}>
           {dailyMissions.length === 0 ? (
-            <p className="px-3 py-3 text-center text-[11px] text-gray-400">매일 스페셜 미션이 없어요</p>
+            <p className={`px-3 py-3 text-center ${ROUTINE_DESC_TEXT_CLASS}`}>매일 스페셜 미션이 없어요</p>
           ) : (
             renderHorizontalCards(dailyMissions, false)
           )}
@@ -360,14 +384,14 @@ function SpecialDailyEventBlock({
         {/* 오늘 하루만 블록은 일정 추가 행동을 유도하는 안내 문구를 함께 표시 */}
         <div className="flex min-w-0 items-center gap-1.5">
           <span className="text-xs font-bold text-gray-700">오늘 하루만</span>
-          <span className="truncate text-[10px] font-medium text-gray-400">일정 추가를 눌러 오늘의 미션으로 추가</span>
+          <span className={ROUTINE_DESC_TRUNCATE_CLASS}>일정 추가를 눌러 오늘의 미션으로 추가</span>
         </div>
         <ChevronToggleIcon open={openEvent} className="text-gray-400" />
       </button>
       {openEvent ? (
         <div className={eventMissions.length === 0 ? 'border-t border-gray-100' : SLIDE_SECTION_SPECIAL}>
           {eventMissions.length === 0 ? (
-            <p className="px-3 py-3 text-center text-[11px] text-gray-400">
+            <p className={`px-3 py-3 text-center ${ROUTINE_DESC_TEXT_CLASS}`}>
               이벤트 스페셜이 없어요. 연필에서 추가한 뒤 카드의 「일정 추가」로 오늘만 자녀 화면에 넣을 수
               있어요.
             </p>
@@ -732,19 +756,28 @@ export default function RoutineTab({
             />
           </Link>
           <ChildProfileNav tabs={tabs} compact />
-          <div className="flex justify-end">
-            <button
-              type="button"
-              disabled={!currentId}
-              onClick={() => setSchedulePanelOpen(true)}
-              aria-label="일정 등록 AI 패널 열기"
-              className="flex h-10 w-10 items-center justify-center rounded-xl border border-sky-100 bg-white text-lg shadow-sm transition active:scale-[0.97] disabled:opacity-40"
-            >
-              📅
-            </button>
-          </div>
         </div>
       )}
+
+      {/**
+       * 루틴 도우미(챗봇) — 하단 탭 독(pb-24) 위, max-w-md 열 안 오른쪽에 고정
+       * - 본문 스크롤과 무관하게 항상 같은 자리(모바일 엄지 구역)에 둡니다.
+       */}
+      <div className="pointer-events-none fixed inset-x-0 bottom-24 z-[55] flex justify-center">
+        <div className="routine-fab-cloud pointer-events-auto flex w-full max-w-md justify-end px-4">
+          <button
+            type="button"
+            disabled={!currentId}
+            onClick={() => setSchedulePanelOpen(true)}
+            aria-label="루틴 도우미 챗봇 열기"
+            className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full border border-sky-100/90 bg-white shadow-[0_10px_28px_-6px_rgba(59,130,246,0.35),0_4px_14px_-4px_rgba(15,23,42,0.12)] transition active:scale-[0.94] disabled:pointer-events-none disabled:opacity-40"
+          >
+            {/* next/image localPatterns 제외 경로이므로 img 사용 — 루트 layout 과 동일한 파비콘 */}
+            {/* eslint-disable-next-line @next/next/no-img-element -- 정적 파비콘, public 루트 */}
+            <img src="/favicon-96x96.png" alt="" className="h-9 w-9 object-contain" />
+          </button>
+        </div>
+      </div>
 
       <RoutineAgentSchedulePanel
         open={schedulePanelOpen}
@@ -780,7 +813,7 @@ export default function RoutineTab({
             >
               미션 추가하기
             </button>
-            <p className="mt-2 text-[11px] text-gray-400">주중·주말 루틴을 칩으로 고르면 매일 그에 맞는 카드가 만들어져요.</p>
+            <p className={`mt-2 ${ROUTINE_DESC_TEXT_CLASS}`}>주중·주말 루틴을 칩으로 고르면 매일 그에 맞는 카드가 만들어져요.</p>
           </div>
         ) : (
           <div className="flex flex-col gap-3">
@@ -788,7 +821,7 @@ export default function RoutineTab({
             <div className="space-y-1.5">
               <p className="px-0.5 text-[11px] font-black text-gray-500">주간</p>
               {weekdayActive.length === 0 ? (
-                <p className="rounded-xl border border-gray-100 bg-white py-3 text-center text-[11px] text-gray-400 shadow-sm">
+                <p className={`rounded-xl border border-gray-100 bg-white py-3 text-center shadow-sm ${ROUTINE_DESC_TEXT_CLASS}`}>
                   주간 미션이 없어요
                 </p>
               ) : (
@@ -802,6 +835,8 @@ export default function RoutineTab({
                   emptyAmHint="오전 미션이 없어요"
                   emptyPmHint="오후 미션이 없어요"
                   onOpenRewardEditor={setRewardEditMission}
+                  amCaption={ROUTINE_WEEKDAY_AM_CAPTION}
+                  pmCaption={ROUTINE_WEEKDAY_PM_CAPTION}
                 />
               )}
             </div>
@@ -809,7 +844,7 @@ export default function RoutineTab({
             <div className="space-y-1.5">
               <p className="px-0.5 text-[11px] font-black text-gray-500">주말, 휴일</p>
               {weekendActive.length === 0 ? (
-                <p className="rounded-xl border border-gray-100 bg-white py-3 text-center text-[11px] text-gray-400 shadow-sm">
+                <p className={`rounded-xl border border-gray-100 bg-white py-3 text-center shadow-sm ${ROUTINE_DESC_TEXT_CLASS}`}>
                   주말, 휴일 미션이 없어요
                 </p>
               ) : (
@@ -823,6 +858,8 @@ export default function RoutineTab({
                   emptyAmHint="오전 미션이 없어요"
                   emptyPmHint="오후 미션이 없어요"
                   onOpenRewardEditor={setRewardEditMission}
+                  amCaption={ROUTINE_WEEKEND_AM_CAPTION}
+                  pmCaption={ROUTINE_WEEKEND_PM_CAPTION}
                 />
               )}
             </div>
@@ -846,6 +883,8 @@ export default function RoutineTab({
                 emptyAmHint="없음"
                 emptyPmHint="없음"
                 onOpenRewardEditor={setRewardEditMission}
+                amCaption={ROUTINE_WEEKDAY_AM_CAPTION}
+                pmCaption={ROUTINE_WEEKDAY_PM_CAPTION}
               />
             </div>
             <div className="space-y-1.5">
@@ -860,6 +899,8 @@ export default function RoutineTab({
                 emptyAmHint="없음"
                 emptyPmHint="없음"
                 onOpenRewardEditor={setRewardEditMission}
+                amCaption={ROUTINE_WEEKEND_AM_CAPTION}
+                pmCaption={ROUTINE_WEEKEND_PM_CAPTION}
               />
             </div>
           </div>
@@ -867,7 +908,8 @@ export default function RoutineTab({
       )}
 
       {/* 스페셜: 매일 반복하지 않는 미션 — 자녀 앱에서 팝업·카드로 전달 (헤더·빈 상태는 일상 미션과 동일 패턴) */}
-      <section id="parent-routine-special-missions">
+      {/* 일상 미션(·비활성) 블록과의 사이를 조금 더 벌림 — 부모 flex gap-3 에 더해짐 */}
+      <section id="parent-routine-special-missions" className="mt-2">
         <div className="mb-1.5 flex items-center justify-between gap-2">
           <h2 className="text-sm font-bold text-gray-800">스페셜 미션</h2>
           {/* 일상 미션과 동일: 연필 아이콘으로 추가·편집 시트 열기 */}
@@ -892,7 +934,7 @@ export default function RoutineTab({
             >
               스페셜 미션 추가하기
             </button>
-            <p className="mt-2 text-[11px] text-gray-400">
+            <p className={`mt-2 ${ROUTINE_DESC_TEXT_CLASS}`}>
               운동하기, 야채먹기, 외투 걸어두기 등 특별한 날의 이벤트 미션
             </p>
           </div>
@@ -925,6 +967,13 @@ export default function RoutineTab({
           />
         )}
       </section>
+
+      {/* 미션 세팅(일상·비활성·스페셜)과 캘린더 영역 시각적 구분 — 본문 px-4 와 맞춰 좌우로 끝까지 선 */}
+      <div
+        className="-mx-4 border-t border-gray-200"
+        role="separator"
+        aria-orientation="horizontal"
+      />
 
       <CalendarSection childId={currentId ?? null} />
 

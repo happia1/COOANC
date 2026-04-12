@@ -17,7 +17,7 @@ import {
 type Props = {
   /** 0 .. (단계 수 - 1) */
   stepIndex: number
-  /** 표시 가로 너비(px). 세로는 비율에 맞춤 — 단계가 올라갈수록 내부에서 추가로 키웁니다. */
+  /** 표시 가로 너비(px). 세로는 비율에 맞춤 — 단계별 배율은 `piggyStageVisualMultiplier` 에서만 조정합니다. */
   displayWidth: number
   className?: string
 }
@@ -28,17 +28,20 @@ function refPinkPigAtlasW(frames: ReadonlyArray<PiggyAtlasFrame>): number {
   return f ? piggyAtlasVisualSize(f).vw : 195
 }
 
+/** 예전 「첫 돼지」와 같은 화면 비율 — 중간 단계는 전부 이 크기로 통일합니다 */
+const PIGGY_BASE_VISUAL_SCALE = 0.98 as const
+/** 마지막 단계(왕관 돼지)만 살짝 키우는 추가 배율 */
+const PIGGY_CROWN_STAGE_EXTRA = 1.14 as const
+
 /**
- * 저금통 단계가 높아질수록 그림도 함께 커 보이게 하는 배율.
- * - 첫 단계(핑크 돼지)는 예전 0.66 배율 때문에 미션 섬 **지갑 아이콘(56px)** 보다 훨씬 작아 보였음 → 시작을 ~0.98 로 두어 지갑과 비슷한 체감 크기로 맞춤.
- * - 마지막 단계는 조금 더 키워 성장감 유지.
+ * 단계별 그림 크기 배율.
+ * - 예전에는 진행도에 따라 점점 커졌지만, 요청에 따라 **첫 돼지 크기를 끝까지 유지**합니다.
+ * - **마지막 단계(가득 찬/왕관)** 만 `PIGGY_CROWN_STAGE_EXTRA` 만큼 더 크게 보입니다.
  */
-function piggyStageProgressScale(stepIndex: number, stageCount: number): number {
-  if (stageCount <= 1) return 1
-  const p = stepIndex / (stageCount - 1)
-  const min = 0.98
-  const max = 1.3
-  return min + p * (max - min)
+function piggyStageVisualMultiplier(stepIndex: number, stageCount: number): number {
+  if (stageCount <= 1) return PIGGY_BASE_VISUAL_SCALE * PIGGY_CROWN_STAGE_EXTRA
+  const isLast = stepIndex === stageCount - 1
+  return isLast ? PIGGY_BASE_VISUAL_SCALE * PIGGY_CROWN_STAGE_EXTRA : PIGGY_BASE_VISUAL_SCALE
 }
 
 /**
@@ -54,7 +57,7 @@ export default function PiggyBankStageVisual({ stepIndex, displayWidth, classNam
   const rects = PIGGY_BANK_STAGE_RECTS
   const frameOrder = PIGGY_BANK_STAGE_FRAME_ORDER
   const refPinkW = refPinkPigAtlasW(GOLD_PIGGY_BANK_FRAMES)
-  const stageMul = piggyStageProgressScale(idx, n)
+  const stageMul = piggyStageVisualMultiplier(idx, n)
 
   if (urls != null && urls.length > 0) {
     const w = Math.round(displayWidth * stageMul)
@@ -94,8 +97,9 @@ export default function PiggyBankStageVisual({ stepIndex, displayWidth, classNam
       '레이어 339': 1.02,
     }
     const manual = OPTICAL_SCALE_BY_FRAME[frameName] ?? 1
-    const lateStageBoost = idx >= 4 && vw > refPinkW ? vw / refPinkW : 1
-    const normalizedWidth = Math.round(displayWidth * manual * lateStageBoost * stageMul)
+    /** 넓은 프레임 보정은 **마지막 단계**에서만 적용(중간 단계는 크기 고정 유지) */
+    const wideFrameBoost = idx === n - 1 && vw > refPinkW ? vw / refPinkW : 1
+    const normalizedWidth = Math.round(displayWidth * manual * wideFrameBoost * stageMul)
 
     const spriteFrames = Object.fromEntries(
       GOLD_PIGGY_BANK_FRAMES.map((f) => [

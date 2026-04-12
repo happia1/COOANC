@@ -23,6 +23,8 @@ import BearBoardCompleteModal from '@/components/child/BearBoardCompleteModal'
 
 const TITLE_ID = 'bear-sticker-sheet-title'
 const SLOT_TOTAL = 20
+/** 스티커 팝업(작았다→커짐) 전체 길이(ms) — 길수록 더 천천히 커져 보입니다 */
+const STICKER_POP_MS = 820
 /** 드래그 중 빈 칸에 더 넓게 끌어당김(자석), 놓을 때는 좁은 값으로 확정 */
 const DROP_RADIUS_SCALE = 1
 const MAGNET_RADIUS_SCALE = 1.45
@@ -167,6 +169,8 @@ export default function BearStickerSheet({
   const [placements, setPlacements] = useState(initialPlacements)
   const [floatPos, setFloatPos] = useState<Record<string, { x: number; y: number }>>({})
   const [placing, setPlacing] = useState(false)
+  /** 저장 실패 시 콘솔만 스쳐 지나가지 않도록, 시트 안에 남겨 두는 안내 문구입니다 */
+  const [placeSnapError, setPlaceSnapError] = useState<string | null>(null)
   /** 드래그 중 자석으로 당겨지는 빈 슬롯(시각 강조) */
   const [magneticPreviewSlot, setMagneticPreviewSlot] = useState<number | null>(null)
   const [boardCompleteModalOpen, setBoardCompleteModalOpen] = useState(false)
@@ -205,6 +209,11 @@ export default function BearStickerSheet({
 
   /** 스티커 좌표(%)는 이 박스(종횡비 보드) 기준이어야 함 — 바깥 래퍼와 크기가 다르면 드롭·위치가 틀어짐 */
   const boardRef = useRef<HTMLDivElement>(null)
+  /**
+   * `setPlacing(true)` 보다 먼저 막는 동시 진입 방지용 — 같은 턴에 `placeOnSlot` 이 두 번 불리면
+   * 첫 요청은 실패·둘째는 성공처럼 보이는 착시나 중복 POST 를 줄입니다.
+   */
+  const placingInFlightRef = useRef(false)
 
   useEffect(() => {
     if (praiseGrantsRevision > grantsRevisionAppliedRef.current) {
@@ -285,11 +294,18 @@ export default function BearStickerSheet({
   useEffect(() => {
     if (open) {
       setOverlayMounted(true)
-      const id = requestAnimationFrame(() => setOverlayVisible(true))
-      return () => cancelAnimationFrame(id)
+      /** 한 프레임 건너뛰면 `scale`·`opacity` 시작값이 먼저 페인트되어, 커지는 전환이 눈에 잘 들어옵니다 */
+      let innerRaf = 0
+      const outerRaf = requestAnimationFrame(() => {
+        innerRaf = requestAnimationFrame(() => setOverlayVisible(true))
+      })
+      return () => {
+        cancelAnimationFrame(outerRaf)
+        cancelAnimationFrame(innerRaf)
+      }
     }
     setOverlayVisible(false)
-    const t = window.setTimeout(() => setOverlayMounted(false), 220)
+    const t = window.setTimeout(() => setOverlayMounted(false), STICKER_POP_MS + 100)
     return () => window.clearTimeout(t)
   }, [open])
 
@@ -307,6 +323,11 @@ export default function BearStickerSheet({
       setMagneticPreviewSlot(null)
       setBoardCompleteConfetti(false)
     }
+  }, [open])
+
+  /** 시트를 다시 열면 이전 저장 오류 메시지는 비웁니다 */
+  useEffect(() => {
+    if (open) setPlaceSnapError(null)
   }, [open])
 
   /**
@@ -484,10 +505,12 @@ export default function BearStickerSheet({
    */
   const placeOnSlot = useCallback(
     async (grantId: string, slot: number) => {
-      if (occupiedSlots.has(slot) || placing) return
+      if (occupiedSlots.has(slot) || placingInFlightRef.current) return
       const c = slotCenterPercent(slot)
       if (!c) return
+      placingInFlightRef.current = true
       setPlacing(true)
+      setPlaceSnapError(null)
       let data: PraiseStickerPlacement | null = null
       try {
         const res = await fetch('/api/praise-sticker/place', {
@@ -504,16 +527,22 @@ export default function BearStickerSheet({
         })
         const json = (await res.json()) as { placement?: PraiseStickerPlacement; error?: string }
         if (!res.ok) {
-          console.error('[bear sticker slot]', json.error ?? res.statusText)
-          setPlacing(false)
+          const msg = typeof json.error === 'string' && json.error.trim() ? json.error.trim() : res.statusText
+          setPlaceSnapError(msg)
+          if (res.status === 403) console.warn('[bear sticker slot]', msg)
+          else console.error('[bear sticker slot]', msg)
           return
         }
         if (json.placement) data = json.placement
       } catch (e) {
+        setPlaceSnapError('네트워크 오류로 저장하지 못했어요.')
         console.error('[bear sticker slot]', e instanceof Error ? e.message : String(e))
+      } finally {
+        placingInFlightRef.current = false
+        setPlacing(false)
       }
-      setPlacing(false)
       if (data) {
+        setPlaceSnapError(null)
         const wasOneAwayFromFull = occupiedSlots.size === SLOT_TOTAL - 1
         setPlacements((prev) => [...prev, data as PraiseStickerPlacement])
         setFloatPos((prev) => {
@@ -556,7 +585,7 @@ export default function BearStickerSheet({
         }
       }
     },
-    [childId, occupiedSlots, placing, onBoardCleared, onInventoryChange, bumpBoardCycle],
+    [childId, occupiedSlots, onBoardCleared, onInventoryChange, bumpBoardCycle],
   )
 
   // dragRef 는 state 가 아니라서 변경돼도 effect 가 다시 안 돕니다. 리스너는 항상 달고, 핸들러 안에서만 dragRef 를 검사합니다.
@@ -686,17 +715,22 @@ export default function BearStickerSheet({
         {/* 반투명 딤: 스티커판만 돋보이게, 카드형 하늘 배경은 쓰지 않음 */}
         <button
           type="button"
-          className={`absolute inset-0 bg-black/45 transition-opacity duration-200 ease-out ${
+          className={`absolute inset-0 bg-black/45 transition-opacity ease-out ${
             overlayVisible ? 'opacity-100' : 'opacity-0'
           }`}
+          style={{ transitionDuration: `${Math.round(STICKER_POP_MS * 0.88)}ms` }}
           onClick={onClose}
           aria-label="닫기"
         />
 
+        {/**
+         * 판의 가로·세로(레이아웃)는 예전과 동일 — 크기(scale)는 건드리지 않고, 서서히 보이게만(opacity) 전환합니다.
+         */}
         <div
-          className={`relative z-10 w-full max-w-md transition-opacity duration-200 ease-out ${
+          className={`relative z-10 w-full max-w-md transition-opacity ease-out ${
             overlayVisible ? 'opacity-100' : 'opacity-0'
           }`}
+          style={{ transitionDuration: `${STICKER_POP_MS}ms` }}
         >
           <h2 id={TITLE_ID} className="sr-only">
             곰돌이 스티커 판
@@ -790,6 +824,21 @@ export default function BearStickerSheet({
               )
             })}
           </div>
+          {placeSnapError ? (
+            <div
+              className="mt-3 rounded-xl border border-amber-200/80 bg-amber-50 px-3 py-2.5 text-left shadow-sm"
+              role="alert"
+            >
+              <p className="text-xs font-semibold leading-snug text-amber-950">{placeSnapError}</p>
+              <button
+                type="button"
+                className="mt-2 text-xs font-bold text-amber-800 underline underline-offset-2 hover:text-amber-950"
+                onClick={() => setPlaceSnapError(null)}
+              >
+                닫기
+              </button>
+            </div>
+          ) : null}
         </div>
       </div>
       ) : null}

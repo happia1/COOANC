@@ -122,7 +122,7 @@ function piggyBankFrameIndexFromPiggy(piggy: number): number {
   return Math.round(ratio * (n - 1))
 }
 
-/** 미션 섬: 저금통(왼쪽)·지갑(오른쪽)·가운데 크레딧(동전 더미 아이콘) — 탭하면 옮기기 시트가 뜹니다 */
+/** 미션 무대(지도 위): 저금통(왼쪽)·지갑(오른쪽)·가운데 돈바구니(가용 동전) — 탭하면 옮기기 시트가 뜹니다 */
 export type MissionCreditIslandProps = {
   floating: number
   wallet: number
@@ -225,7 +225,7 @@ type Props = {
    * `missionCredits` 가 없을 때만 섬 위 단일 저금통(완료 비율)을 씁니다.
    */
   missionPiggy?: { completed: number; total: number }
-  /** 지갑·저금통·섬(가용) 분리 UI — 있으면 `missionPiggy` 단일 저금통은 숨깁니다 */
+  /** 지갑·저금통·돈바구니(가용) 분리 UI — 있으면 `missionPiggy` 단일 저금통은 숨깁니다 */
   missionCredits?: MissionCreditIslandProps
   /**
    * false: 섬·바다·잔디가 그려진 큰 PNG(`kids_background_island*.png`)를 그리지 않습니다.
@@ -287,7 +287,7 @@ export default function ChildHomeIslandStage({
   const src = ISLAND_IMAGE_SRC[scene]
   const box =
     density === 'viewportFit' ? BOX_VIEWPORT_FIT : density === 'flex' ? BOX_FLEX : BOX_DEFAULT
-  /** 미션은 부모(`max-w-sm`) 너비를 쓰면 저금통·섬이 좌우로 덜 잘림 */
+  /** 미션은 부모(`max-w-sm`) 너비를 쓰면 저금통·돈바구니(가운데)가 좌우로 덜 잘림 */
   const stageMaxClass = scene === 'gippybank' ? 'max-w-sm' : 'max-w-[20rem]'
 
   /** 미션(`gippybank`)은 알약·무대 박스는 그대로 두고 **섬 PNG 만** 살짝 위로 올립니다. */
@@ -694,7 +694,7 @@ export default function ChildHomeIslandStage({
                   onClick={missionCredits.onCenterTap}
                   aria-label={
                     showIslandArt
-                      ? `섬에 쌓인 크레딧 ${missionCredits.floating}. 눌러서 지갑이나 저금통으로 옮기기`
+                      ? `돈바구니에 쌓인 크레딧 ${missionCredits.floating}. 눌러서 지갑이나 저금통으로 옮기기`
                       : `아직 나누지 않은 크레딧 ${missionCredits.floating}. 눌러서 지갑이나 저금통으로 옮기기`
                   }
                   className={`relative z-[1] flex flex-col items-center rounded-2xl px-2 pb-1 pt-0.5 transition-transform active:scale-[0.97] ${MISSION_CREDIT_SPRITE_NUDGE_DOWN_CLASS} ${

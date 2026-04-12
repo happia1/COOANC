@@ -82,15 +82,21 @@ export function routineMissionFlowRank(m: RoutineFlowSortable): number {
   return 1000 + b * 500 + minutesFromHHMMSafe(m.scheduled_time)
 }
 
+/**
+ * 부모 루틴 탭 `sortMissionsByRoutineFlow` 와 자녀 미션 탭 슬라이더에서 **같은 순서 규칙**을 쓰기 위한 비교 함수입니다.
+ * (기상→취침 칩 순위 → 같은 랭크면 scheduled_time → 제목)
+ */
+export function compareRoutineFlowSortable(a: RoutineFlowSortable, b: RoutineFlowSortable): number {
+  const d = routineMissionFlowRank(a) - routineMissionFlowRank(b)
+  if (d !== 0) return d
+  const td = minutesFromHHMMSafe(a.scheduled_time) - minutesFromHHMMSafe(b.scheduled_time)
+  if (td !== 0) return td
+  return a.title.localeCompare(b.title, 'ko')
+}
+
 /** 기상 → 취침 흐름으로 미션 배열 정렬 */
 export function sortMissionsByRoutineFlow<T extends RoutineFlowSortable>(missions: T[]): T[] {
-  return [...missions].sort((a, b) => {
-    const d = routineMissionFlowRank(a) - routineMissionFlowRank(b)
-    if (d !== 0) return d
-    const td = minutesFromHHMMSafe(a.scheduled_time) - minutesFromHHMMSafe(b.scheduled_time)
-    if (td !== 0) return td
-    return a.title.localeCompare(b.title, 'ko')
-  })
+  return [...missions].sort(compareRoutineFlowSortable)
 }
 
 /** 키워드 칩 제목 집합 — 삭제·동기화 시 이 제목의 daily/weekly 템플릿만 정리 */

@@ -85,7 +85,7 @@ export async function POST(req: NextRequest) {
 
   if (wallet < effectivePrice) {
     return NextResponse.json(
-      { error: '지갑 크레딧이 부족해요. 미션 탭에서 섬의 크레딧을 지갑으로 옮겨 주세요.' },
+      { error: '지갑 크레딧이 부족해요. 미션 탭에서 돈바구니의 크레딧을 지갑으로 옮겨 주세요.' },
       { status: 400 },
     )
   }
@@ -111,7 +111,7 @@ export async function POST(req: NextRequest) {
   const nextWallet = wallet - effectivePrice
   const nextCredits = stats.credits - effectivePrice
 
-  // 총액·지갑에서 동시 차감(섬·저금통에 둔 분량은 그대로)
+  // 총액·지갑에서 동시 차감(돈바구니·저금통에 둔 분량은 그대로)
   const { error: deductErr } = await supabase
     .from('child_stats')
     .update({

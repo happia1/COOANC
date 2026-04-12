@@ -32,7 +32,7 @@ type Props = {
   /** 서버에서 읽은 숨김 상품 id — 부모가 토글하면 Realtime 으로 이 목록이 갱신됩니다 */
   initialHiddenStoreItemIds: string[]
   requests: PurchaseRequest[]
-  /** 마켓 결제에 쓰는 지갑 크레딧(섬·저금통에 둔 것 제외) */
+  /** 마켓 결제에 쓰는 지갑 크레딧(돈바구니·저금통에 둔 것 제외) */
   creditsWallet: number
   /** 장바구니(서버 `market_wishlist_items`) 초기 목록(상품별 수량 포함) */
   initialWishlistEntries: { storeItemId: string; quantity: number }[]

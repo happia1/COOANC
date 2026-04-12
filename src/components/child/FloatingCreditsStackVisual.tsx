@@ -7,7 +7,7 @@ import { MISSION_CREDITS_STAGE_CAP } from '@/constants/piggyBankStages'
 import { EFFECT_LIGHTS } from '@/constants/sprites'
 
 type Props = {
-  /** 섬에 아직 나누지 않은 크레딧(가용) — 많을수록 동전 단계·크기가 올라갑니다 */
+  /** 돈바구니에 아직 나누지 않은 크레딧(가용) — 많을수록 동전 단계·크기가 올라갑니다 */
   floating: number
   /** 0일 때 흐리게(버튼 비활성과 맞춤) */
   dimWhenEmpty?: boolean
@@ -16,7 +16,7 @@ type Props = {
   className?: string
   /**
    * true: 이미지를 프레임(박스)의 세로·가로 중앙에 둡니다(옮기기 시트 카드 등).
-   * false(기본): 섬 가운데용으로 아래쪽 기준 + 살짝 내림(`CREDIT_NUDGE_DOWN_PX`).
+   * false(기본): 미션 가운데(돈바구니)용으로 아래쪽 기준 + 살짝 내림(`CREDIT_NUDGE_DOWN_PX`).
    */
   centerInFrame?: boolean
 }
@@ -53,7 +53,7 @@ const BLEED_X = 20
 const BLEED_Y_TOP = 18
 const BLEED_Y_BOTTOM = 38
 
-/** 섬 가운데: 동전을 살짝 아래로 내려 맵과 맞출 때 쓰는 px(높이 박스에 포함) */
+/** 미션 가운데(돈바구니): 동전을 살짝 아래로 내려 맵과 맞출 때 쓰는 px(높이 박스에 포함) */
 const CREDIT_NUDGE_DOWN_PX = 20
 
 type LightFx = {

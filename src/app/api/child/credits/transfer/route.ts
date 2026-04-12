@@ -7,7 +7,7 @@ import { fireGameTrigger } from '@/lib/gameLayer/fireGameTrigger'
 /**
  * POST /api/child/credits/transfer
  * body: { kind, amount, childId? }
- * - kind: 지갑·저금통·가용(섬) 사이 이동. 총 credits 는 변하지 않습니다.
+ * - kind: 지갑·저금통·가용(돈바구니) 사이 이동. 총 credits 는 변하지 않습니다.
  */
 const KINDS = [
   'float_to_wallet',
@@ -78,11 +78,11 @@ export async function POST(req: NextRequest) {
   let np = p
   switch (kind as Kind) {
     case 'float_to_wallet':
-      if (amount > float) return NextResponse.json({ error: '섬에 있는 크레딧이 부족해요' }, { status: 400 })
+      if (amount > float) return NextResponse.json({ error: '돈바구니에 있는 크레딧이 부족해요' }, { status: 400 })
       nw = w + amount
       break
     case 'float_to_piggy':
-      if (amount > float) return NextResponse.json({ error: '섬에 있는 크레딧이 부족해요' }, { status: 400 })
+      if (amount > float) return NextResponse.json({ error: '돈바구니에 있는 크레딧이 부족해요' }, { status: 400 })
       np = p + amount
       break
     case 'wallet_to_float':

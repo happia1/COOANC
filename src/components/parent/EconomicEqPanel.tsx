@@ -18,7 +18,7 @@ function delayScoreReview(score: number, childName: string): string {
     return `${childName}의 지표를 보면, 보유 크레딧 중 많은 부분이 저금통에 있어요.\n당장 쓰지 않고 모으는 습관이 잘 보입니다.`
   }
   if (score >= 35) {
-    return `저금통 비율이 중간쯤이에요.\n가용(섬)이나 지갑에만 두지 않고 저금통으로 옮기면 같은 총액에서도 이 수치가 함께 올라갑니다.`
+    return `저금통 비율이 중간쯤이에요.\n가용(돈바구니)이나 지갑에만 두지 않고 저금통으로 옮기면 같은 총액에서도 이 수치가 함께 올라갑니다.`
   }
   return `아직 가용·지갑 쪽 비중이 크면 수치가 낮게 보일 수 있어요.\n작은 목표부터 저금통으로 옮기는 연습을 보면 좋아요.`
 }
@@ -79,7 +79,7 @@ function EqChartExplainModal({
         <div>
           <p className="font-bold text-gray-900 mb-1">이 그래프는?</p>
           <p>
-            전체 보유 크레딧(가용 섬 + 지갑 + 저금통) 중 <strong>저금통에 묶인 비율</strong>을 0~100%로 보여 줍니다.
+            전체 보유 크레딧(가용 돈바구니 + 지갑 + 저금통) 중 <strong>저금통에 묶인 비율</strong>을 0~100%로 보여 줍니다.
             당장 쓰지 않고 나중을 위해 모아 두는 비중을 한눈에 볼 수 있어요.
           </p>
         </div>
@@ -99,7 +99,7 @@ function EqChartExplainModal({
           <p className="font-bold text-gray-900 mb-1">높으면 좋을까요?</p>
           <p>
             일반적으로 <strong>높을수록</strong> &quot;나중에 쓰기&quot;·만족 지연 습관이 잘 잡혀 있다고 볼 수 있어요.
-            다만 미션 보상이 가용(섬)에만 쌓이고 저금통으로 옮기지 않으면 총액은 많은데 수치는 낮게 나올 수 있습니다.
+            다만 미션 보상이 가용(돈바구니)에만 쌓이고 저금통으로 옮기지 않으면 총액은 많은데 수치는 낮게 나올 수 있습니다.
           </p>
         </div>
         <div>
@@ -116,7 +116,7 @@ function EqChartExplainModal({
           <p className="font-bold text-gray-900 mb-1">이 그래프는?</p>
           <p>
             <strong>지갑(바로 쓸 돈)</strong>과 <strong>저금통(모아 둔 돈)</strong>만 놓고, 저축이 차지하는 비율을
-            도넛으로 보여 줍니다. 아직 어디에 둘지 정하지 않은 가용(섬) 크레딧은 &quot;결정 전&quot;이라 이 비교의
+            도넛으로 보여 줍니다. 아직 어디에 둘지 정하지 않은 가용(돈바구니) 크레딧은 &quot;결정 전&quot;이라 이 비교의
             분모에 넣지 않아요.
           </p>
         </div>
@@ -198,7 +198,7 @@ type Props = {
  * - **순서**: 에이전트 카드(리포트·코칭) → 「우리아이 경제 EQ 지수」차트 묶음
  * - 만족 지연(반원) + 소비/저축(도넛)은 **한 줄 두 칸**, 그 아래 요일별 막대
  * - **데이터**: `eq_delay_score`·`eq_save_ratio` 는 DB 의 `recalculate_eq()` 가
- *   `child_stats`(지갑·저금통·총액)와 `mission_logs` 로 채웁니다. 섬(가용)=총액−지갑−저금통 은 도넛 분모에 넣지 않습니다.
+ *   `child_stats`(지갑·저금통·총액)와 `mission_logs` 로 채웁니다. 돈바구니(가용)=총액−지갑−저금통 은 도넛 분모에 넣지 않습니다.
  */
 export default function EconomicEqPanel({
   stats,

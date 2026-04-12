@@ -523,3 +523,37 @@
 .boat-advance {
   animation: boat-advance 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
+
+/* ── 부모 루틴 탭: 루틴 도우미 플로팅 버튼 — 구름처럼 가볍게 떠다님 ── */
+
+@keyframes routine-fab-cloud-float {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) rotate(0deg);
+  }
+  25% {
+    transform: translate3d(3px, -8px, 0) rotate(1.2deg);
+  }
+  50% {
+    transform: translate3d(-4px, -12px, 0) rotate(-0.8deg);
+  }
+  75% {
+    transform: translate3d(-2px, -5px, 0) rotate(0.6deg);
+  }
+}
+
+/** 플로팅 래퍼에만 적용 — 버튼 클릭 영역은 그대로 두고 살짝 흔들림 */
+.routine-fab-cloud {
+  animation: routine-fab-cloud-float 4.2s ease-in-out infinite;
+  will-change: transform;
+}
+
+.routine-fab-cloud:has(button:disabled) {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .routine-fab-cloud {
+    animation: none;
+  }
+}

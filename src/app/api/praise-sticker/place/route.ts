@@ -75,6 +75,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: '받은 스티커가 아니에요' }, { status: 404 })
   }
 
+  /** 부모가 「자녀 화면 들어가기」로 볼 때는 auth.uid() 가 자녀가 아니라 RLS insert 가 막힐 수 있음 → 안내 문구를 나눕니다 */
+  const { data: actorProfile } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle()
+  const actorIsParent = actorProfile?.role === 'parent'
+
   const service = createServiceRoleClient()
   const db = service ?? supabase
   const { data, error } = await db
@@ -99,13 +103,12 @@ export async function POST(req: NextRequest) {
     }
     const msgLc = `${error.message ?? ''}`.toLowerCase()
     if (error.code === '42501' || msgLc.includes('row-level security')) {
-      return NextResponse.json(
-        {
-          error:
-            '저장 권한이 없어요. Supabase에 마이그레이션 036(praise_sticker_placements 부모 insert)을 적용하거나, 서버에 SUPABASE_SERVICE_ROLE_KEY를 설정해 주세요.',
-        },
-        { status: 403 },
-      )
+      const base =
+        'Supabase에 마이그레이션 036(praise_sticker_placements 부모 insert)을 적용하거나, Next 서버 환경에 SUPABASE_SERVICE_ROLE_KEY를 넣어 주세요.'
+      const errorText = actorIsParent
+        ? `부모 보기(자녀 화면 미리보기)에서는 이렇게 설정해야 스티커를 저장할 수 있어요. ${base}`
+        : `저장 권한이 없어요. ${base}`
+      return NextResponse.json({ error: errorText }, { status: 403 })
     }
     return NextResponse.json({ error: '판에 붙이지 못했어요' }, { status: 500 })
   }

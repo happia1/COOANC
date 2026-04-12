@@ -12,7 +12,7 @@ import { readChildStatInt } from '@/lib/childCreditsSplit'
 import { walletImageSrcByStage, walletStageIndexByCredits } from '@/lib/walletStages'
 
 /**
- * 미션 섬·옮기기 UI 와 동일 규칙: 저금통 잔액(0~`MISSION_CREDITS_STAGE_CAP`)으로 단계 인덱스를 고릅니다.
+ * 미션 탭(저금통·돈바구니·지갑) 옮기기 UI 와 동일 규칙: 저금통 잔액(0~`MISSION_CREDITS_STAGE_CAP`)으로 단계 인덱스를 고릅니다.
  */
 function piggyBankStepIndexForBalance(currentPiggy: number): number {
   const n = piggyBankStageCount()
@@ -22,7 +22,7 @@ function piggyBankStepIndexForBalance(currentPiggy: number): number {
   return Math.round((clamped / cap) * (n - 1))
 }
 
-/** 지갑 그림은 `@/lib/walletStages` 와 미션 섬·마켓과 동일(9단계)입니다. */
+/** 지갑 그림은 `@/lib/walletStages` 와 미션 탭·마켓과 동일(9단계)입니다. */
 
 export type CreditTransferKind =
   | 'float_to_wallet'
@@ -59,14 +59,14 @@ type Props = {
   title: string
   /** 서버가 돌려준 지갑·저금통·총액으로 부모 `stats` 를 즉시 갱신합니다(Realtime 지연과 무관). */
   onSuccess: (result: CreditTransferApiSuccess) => void
-  /** 저금통 미리보기(`float_to_piggy` 등)에 쓸 현재 저금통 잔액 — 섬과 같은 단계 그림 */
+  /** 저금통 미리보기(`float_to_piggy` 등)에 쓸 현재 저금통 잔액 — `PiggyBankStageVisual` 단계와 동일 */
   piggyBalance: number
-  /** 지갑 미리보기(`float_to_wallet` 등)에 쓸 현재 지갑 잔액 — 섬과 같은 단계 그림 */
+  /** 지갑 미리보기(`float_to_wallet` 등)에 쓸 현재 지갑 잔액 — 마켓과 같은 단계 그림 */
   walletBalance: number
 }
 
 /**
- * 크레딧을 지갑·저금통·섬(가용) 사이로 옮길 때 뜨는 수량 입력 팝업입니다.
+ * 크레딧을 지갑·저금통·돈바구니(가용) 사이로 옮길 때 뜨는 수량 입력 팝업입니다.
  * - 확인 시 `/api/child/credits/transfer` 를 호출합니다.
  */
 export default function MissionCreditMoveDialog({
@@ -206,7 +206,7 @@ export default function MissionCreditMoveDialog({
           </p>
 
           {/**
-           * 섬에서 옮길 때: 크레딧 → 선택한 통(지갑/저금통) 그림을 화살표로 이어 방향을 확인합니다.
+           * 돈바구니(가용)에서 옮길 때: 크레딧 → 선택한 통(지갑/저금통) 그림을 화살표로 이어 방향을 확인합니다.
            * (긴 설명 문구는 빼서 작은 화면에서 키패드·빠른 버튼과 겹치지 않게 합니다.)
            */}
           {kind === 'float_to_wallet' || kind === 'float_to_piggy' ? (
@@ -376,18 +376,18 @@ export function MissionCreditActionSheet({ open, onClose, bucket, floating, wall
   } else if (bucket === 'wallet') {
     rows = []
     if (wallet > 0) {
-      rows.push({ kind: 'wallet_to_float', label: '섬으로 꺼내기 (다시 모아 두기)' })
+      rows.push({ kind: 'wallet_to_float', label: '돈바구니로 꺼내기 (다시 모아 두기)' })
       rows.push({ kind: 'wallet_to_piggy', label: '저금통으로 옮기기' })
     }
   } else {
     if (piggy > 0) {
-      rows.push({ kind: 'piggy_to_float', label: '섬으로 꺼내기' })
+      rows.push({ kind: 'piggy_to_float', label: '돈바구니로 꺼내기' })
       rows.push({ kind: 'piggy_to_wallet', label: '지갑으로 옮기기 (쓸 준비)' })
     }
   }
 
   /**
-   * 모든 버킷(섬/지갑/저금통)에서 이미지 카드로 선택하도록 통일합니다.
+   * 모든 버킷(돈바구니/지갑/저금통)에서 이미지 카드로 선택하도록 통일합니다.
    * - 사용자가 텍스트를 읽지 않아도 아이콘만 보고 방향을 고를 수 있게 합니다.
    */
   function optionVisual(kind: CreditTransferKind): {
@@ -411,7 +411,7 @@ export function MissionCreditActionSheet({ open, onClose, bucket, floating, wall
     }
   }
 
-  const titleText = bucket === 'wallet' ? '지갑' : bucket === 'piggy' ? '저금통' : '크레딧'
+  const titleText = bucket === 'wallet' ? '지갑' : bucket === 'piggy' ? '저금통' : '돈바구니'
   const amountForBucket = bucket === 'center' ? floating : bucket === 'wallet' ? wallet : piggy
   const amountText = amountForBucket.toLocaleString('ko-KR')
   const showAmount = bucket === 'center' ? floating > 0 : true

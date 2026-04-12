@@ -3,10 +3,10 @@
 /**
  * 부모 루틴 탭 — 캘린더
  * - localStorage(cooanc_calendar_events_v1) 저장
- * - 제목 줄 오른쪽 끝 + 하나로 일정 추가 시트 열기(공휴일/방학/기념일/기타 + 선택적「간단한 설명」)
- * - 공휴일·방학·기념일·기타 칩은 한 줄 범례만 표시(칩마다 + 없음)
- * - 날짜 탭: 해당 날 일정이 있으면 상세 슬라이드, 없으면 빈 상태 시트 +「일정등록하기」(+와 동일 EventSheet, 클릭한 날짜로 시작·종료일 채움)
- * - 일정 상세 시트 헤더 오른쪽 + : 헤더 +와 같은 EventSheet(일정 추가)를 연 뒤 상세는 닫음
+ * - 「캘린더」제목·+ 버튼은 스페셜 미션처럼 흰 카드 밖 상단 한 줄(+는 오른쪽 끝) — + 로 일정 추가 바텀시트(EventSheet) 열기
+ * - 공휴일·방학·기념일·기타 범례 칩은 한 줄 가로 스크롤(스크롤바는 숨기고 손가락으로만 밀기)
+ * - 날짜 탭: 해당 날 일정이 있으면 상세 슬라이드, 없으면 빈 상태 시트 +「일정등록하기」(헤더 +와 동일 EventSheet, 클릭한 날짜로 시작·종료일 채움)
+ * - 일정 상세 시트 헤더 오른쪽 + : 헤더와 같은 EventSheet(일정 추가)를 연 뒤 상세는 닫음
  * - 「이번 달 일정」은 같은 줄 오른쪽 화살표로 접기/펼치기(처음엔 접힘)
  * - 시트 z-index는 하단 독바(z-50)보다 위로 두어 저장 버튼이 가리지 않게 함
  */
@@ -174,10 +174,10 @@ export default function CalendarSection({ childId }: Props) {
   }
 
   return (
-    <section className="bg-white rounded-2xl p-4 shadow-sm">
-      {/* 일상 미션과 동일: 왼쪽 + / 오른쪽 제목 느낌으로 + 먼저 배치 */}
-      <div className="mb-3 flex items-center justify-between gap-2">
-        <h2 className="min-w-0 truncate text-sm font-black text-brand-text">캘린더</h2>
+    <section>
+      {/* 스페셜 미션과 동일: 섹션 제목은 카드 밖, 액션(+ )는 같은 줄 오른쪽 끝 */}
+      <div className="mb-1.5 flex items-center justify-between gap-2">
+        <h2 className="text-sm font-bold text-gray-800">캘린더</h2>
         <button
           type="button"
           onClick={openAddSheet}
@@ -188,12 +188,18 @@ export default function CalendarSection({ childId }: Props) {
         </button>
       </div>
 
-      {/* 범례: 네 종류를 한 줄에 나란히(좁으면 자동 줄바꿈) */}
-      <div className="mb-3 flex flex-wrap items-center gap-2">
+      <div className="rounded-2xl bg-white p-4 shadow-sm">
+      {/* 범례: 한 줄 가로 스크롤 — 스크롤바 UI는 숨김(웹킷·파이어폭스·구형 Edge) */}
+      <div
+        className="mb-3 flex snap-x snap-proximity touch-pan-x gap-2 overflow-x-auto overscroll-x-contain pb-0.5 [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+        role="list"
+        aria-label="일정 유형 범례"
+      >
         {EVENT_TYPES_ORDER.map((type) => (
           <span
             key={type}
-            className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold ${EVENT_COLORS[type].bg} ${EVENT_COLORS[type].text}`}
+            role="listitem"
+            className={`inline-flex shrink-0 snap-start items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-bold ${EVENT_COLORS[type].bg} ${EVENT_COLORS[type].text}`}
           >
             <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${EVENT_COLORS[type].dot}`} aria-hidden />
             {EVENT_TYPE_LABELS[type]}
@@ -319,6 +325,7 @@ export default function CalendarSection({ childId }: Props) {
           )}
         </div>
       )}
+      </div>
 
       {sheet && (
         <EventSheet

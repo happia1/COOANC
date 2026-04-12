@@ -4,7 +4,8 @@
  * - 에이전트 `main.py` 에서 CORS 가 열려 있어야 합니다.
  */
 
-const DEFAULT_AGENT_URL = 'https://cooanc-agent-production.up.railway.app'
+/** 배포 기본값 — 로컬에서는 `.env.local` 의 NEXT_PUBLIC_AGENT_URL 로 덮어씁니다. */
+const DEFAULT_AGENT_URL = 'https://cooanc-agent.onrender.com'
 
 /** 환경변수가 비어 있으면 프로덕션 기본 URL 로 폴백합니다(로컬에서 .env 없이도 동작 확인용). */
 export function getAgentBaseUrl(): string {

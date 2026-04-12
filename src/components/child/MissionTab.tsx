@@ -9,6 +9,7 @@ import type { ChildStats, DailyMission, DailyMissionWithTemplate } from '@/types
 import MissionCreditCards from '@/components/child/MissionCreditCards'
 import { parseSpecialMissionPopup } from '@/lib/specialMissionDescription'
 import { isRetiredSpecialMissionTitle, isSpecialSectionMission } from '@/lib/specialMissionChips'
+import { compareRoutineFlowSortable, type RoutineFlowSortable } from '@/lib/routineChips'
 import { parseAlarmFromMissionDescription } from '@/lib/missionAlarmDescription'
 import { scaledMissionRewards, type RewardMultiplier } from '@/lib/missionRewardMultiplier'
 import MissionSleepMorningLayer from '@/components/child/MissionSleepMorningLayer'
@@ -64,16 +65,44 @@ function cardSubtitle(description: string | null | undefined): string | null {
   return description
 }
 
+/** 일상 미션 한 줄을 부모 루틴 탭과 같은 기준(칩 흐름 + daily_missions.scheduled_time)으로 정렬 키로 바꿉니다 */
+function dailyMissionToRoutineFlowSortable(dm: DailyMissionWithTemplate): RoutineFlowSortable | null {
+  if (!dm.missions) return null
+  return {
+    title: dm.missions.title,
+    block: dm.missions.block ?? null,
+    /** 오늘 행에 붙은 시각이 있으면 우선(템플릿과 다를 수 있음) */
+    scheduled_time: dm.scheduled_time ?? null,
+  }
+}
+
+/**
+ * 가로 슬라이더 순서: 일상은 부모 `sortMissionsByRoutineFlow` 와 동일, 스페셜은 시각 오름차순 뒤에 붙임
+ * (예전처럼 block 칸막이만 하면 같은 블록 안에서 시간 순이 깨짐)
+ */
 function orderedMissionsForSlider(list: DailyMissionWithTemplate[]): DailyMissionWithTemplate[] {
   const routineRows = list.filter((dm) => dm.missions && !isSpecialSectionMission(dm.missions))
   const specialRows = list.filter((dm) => dm.missions && isSpecialSectionMission(dm.missions))
-  const blockOrder: (string | null)[] = ['morning', 'afternoon', 'evening', 'bedtime', null]
-  const out: DailyMissionWithTemplate[] = []
-  for (const bk of blockOrder) {
-    out.push(...routineRows.filter((dm) => (dm.missions.block ?? null) === bk))
-  }
-  out.push(...specialRows)
-  return out
+
+  const sortedRoutine = [...routineRows].sort((a, b) => {
+    const sa = dailyMissionToRoutineFlowSortable(a)
+    const sb = dailyMissionToRoutineFlowSortable(b)
+    if (!sa || !sb) return 0
+    return compareRoutineFlowSortable(sa, sb)
+  })
+
+  const sortedSpecial = [...specialRows].sort((a, b) => {
+    const ta = a.scheduled_time
+    const tb = b.scheduled_time
+    if (!ta && !tb) return (a.missions?.title ?? '').localeCompare(b.missions?.title ?? '', 'ko')
+    if (!ta) return 1
+    if (!tb) return -1
+    const c = ta.localeCompare(tb)
+    if (c !== 0) return c
+    return (a.missions?.title ?? '').localeCompare(b.missions?.title ?? '', 'ko')
+  })
+
+  return [...sortedRoutine, ...sortedSpecial]
 }
 
 /**
@@ -150,7 +179,7 @@ function isMissionRolledBackPayload(v: unknown): v is { dailyMissionId: string; 
  * 미션 탭
  * - 배경: 미션 상단 잔디 PNG 는 쓰지 않고, 자녀 레이아웃 배경만 보입니다.
  * - **오늘의 미션** 바깥·제목·카드 줄 **패딩**, 카드 **비율·간격** 모두 `missionTodayLayoutSpec.ts` 픽스. 임의 수정 금지.
- * - 미션 탭 본문은 세로 스크롤로 상단(섬)·하단(카드)을 이어서 볼 수 있습니다.
+ * - 미션 탭 본문은 세로 스크롤로 상단(저금통·돈바구니·지갑 무대)·하단(카드)을 이어서 볼 수 있습니다.
  * - 카드 썸네일: `resolveRoutineMissionPngUrl`(제목 우선) 또는 `routines_01` 아틀라스(`missionRoutineIconFrame`)
  * - 부모 Realtime 「다시 하기」: DB 는 서버에서 이미 되돌아가고, 여기서는 카드만 슬라이더에 다시 보이게 맞춥니다.
  * - 칭찬 스티커(곰돌이) 단추는 **홈** 화면 플로팅 버튼으로만 엽니다.
@@ -163,7 +192,7 @@ export default function MissionTab({
   isFullRestDay,
 }: Props) {
   const [stats, setStats] = useState<ChildStats | null>(initialStats)
-  /** 지갑·저금통·섬 옮기기: 먼저 어떤 통을 눌렀는지(시트) → 종류 선택 후 수량 팝업 */
+  /** 지갑·저금통·돈바구니(가용) 옮기기: 먼저 어떤 통을 눌렀는지(시트) → 종류 선택 후 수량 팝업 */
   const [creditSheetBucket, setCreditSheetBucket] = useState<'center' | 'wallet' | 'piggy' | null>(null)
   const [creditMoveKind, setCreditMoveKind] = useState<CreditTransferKind | null>(null)
 
@@ -579,8 +608,8 @@ export default function MissionTab({
   const transferCopy: Record<CreditTransferKind, { title: string }> = {
     float_to_wallet: { title: '지갑으로 옮기기' },
     float_to_piggy: { title: '저금통으로 옮기기' },
-    wallet_to_float: { title: '섬으로 꺼내기' },
-    piggy_to_float: { title: '섬으로 꺼내기' },
+    wallet_to_float: { title: '돈바구니로 꺼내기' },
+    piggy_to_float: { title: '돈바구니로 꺼내기' },
     wallet_to_piggy: { title: '저금통으로 옮기기' },
     piggy_to_wallet: { title: '지갑으로 옮기기' },
   }

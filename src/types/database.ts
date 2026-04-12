@@ -47,7 +47,7 @@ export type ChildStats = {
   eq_delay_score: number
   /** 루틴 완주율 0~100 — 최근 14일 mission_logs 기준 */
   eq_routine_rate: number
-  /** 저축 비중 0~100 — 지갑+저금통 중 저금통 비율(섬·가용은 분모 제외) */
+  /** 저축 비중 0~100 — 지갑+저금통 중 저금통 비율(돈바구니·가용은 분모 제외) */
   eq_save_ratio: number
   streak_days: number
   last_mission_date: string | null

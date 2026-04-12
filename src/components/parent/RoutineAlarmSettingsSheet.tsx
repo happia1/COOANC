@@ -1,9 +1,9 @@
 'use client'
 
 /**
- * 부모 상단 알람 아이콘용 시트
- * - 온보딩과 동일한 기상·하원·귀가·취침 + 추가 일정(미션과 무관, custom 배열)
- * - 우측 + 로 추가 일정 넣기, 행마다 삭제 가능
+ * 부모 「루틴 알람 설정」전용 시트 — 알람시계(alarm.png) 느낌의 생활 알람만 다룹니다.
+ * - 알림·공지는 상단 `notice.png` 버튼의 ParentBellBoardSheet 를 씁니다(루틴 설정은 알람시계 버튼만).
+ * - 온보딩과 동일한 기상·하원·귀가·취침 + 추가 일정, 우측 + 로 추가, 행마다 삭제 가능
  */
 
 import { useCallback, useEffect, useLayoutEffect, useState } from 'react'

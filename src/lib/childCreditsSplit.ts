@@ -17,7 +17,7 @@ export function readChildStatInt(value: unknown): number {
 }
 
 /**
- * 총 크레딧 중 지갑·저금통에 아직 나누지 않은 양 = 미션 섬 「잔디 위 동전」으로 보여 줍니다.
+ * 총 크레딧 중 지갑·저금통에 아직 나누지 않은 양 = 미션 탭 가운데 「돈바구니 동전」으로 보여 줍니다.
  * 미션 보상은 총액만 오르고 지갑/저금통은 그대로라서, 새 크레딧은 여기(가용)에 먼저 쌓입니다.
  */
 export function creditsFloating(

@@ -24,10 +24,20 @@ module.exports = {
           '0%, 100%': { transform: 'translateY(0)' },
           '50%': { transform: 'translateY(-8px)' },
         },
+        /** 부모 상단 종 아이콘: 처리할 알림(예: 구매 승인 대기)이 있을 때 좌우로 흔들리는 느낌(알람시계 아이콘에는 쓰지 않음) */
+        parentAlarmBellWiggle: {
+          '0%, 100%': { transform: 'rotate(0deg)' },
+          '15%': { transform: 'rotate(-14deg)' },
+          '30%': { transform: 'rotate(12deg)' },
+          '45%': { transform: 'rotate(-10deg)' },
+          '60%': { transform: 'rotate(8deg)' },
+          '75%': { transform: 'rotate(-4deg)' },
+        },
       },
       animation: {
         'market-parachute': 'marketParachuteDrop 2.4s cubic-bezier(0.22, 1, 0.36, 1) forwards',
         'market-moto': 'marketMotoBob 1.8s ease-in-out infinite',
+        'parent-alarm-bell': 'parentAlarmBellWiggle 1.1s ease-in-out infinite',
       },
       colors: {
         brand: {

@@ -8,6 +8,7 @@
  * - 미션 완료 시 막대는 daily_missions Realtime 과 동일 패턴입니다.
  * - 프로필 카드를 누르면 그 아이의 「자녀용 앱 화면」(미션·홈 등)으로 들어갑니다(쿠키 설정 후 /home).
  * - 맨 아래 「최근 활동」은 처음엔 접혀 있고, 헤더를 누르면 목록이 펼쳐집니다(루틴 탭 접기와 같은 화살표 동작).
+ * - 구매 승인 대기 안내는 홈이 아니라 상단 종(알림·루틴 알람) 시트에서 보여 줍니다.
  */
 
 import { useEffect, useMemo, useState } from 'react'
@@ -78,10 +79,9 @@ export type ChildSummary = {
 
 type Props = {
   childrenData: ChildSummary[]
-  pendingCount: number
 }
 
-export default function HomeTab({ childrenData, pendingCount }: Props) {
+export default function HomeTab({ childrenData }: Props) {
   const { selectedChildId, setSelectedChildId } = useParentStore()
 
   const currentId = selectedChildId ?? childrenData[0]?.id
@@ -230,22 +230,6 @@ export default function HomeTab({ childrenData, pendingCount }: Props) {
 
       {/* 자녀 전환: ◀ ▶ 및 스와이프 (Zustand 로 루틴 탭과 동일한 자녀 선택) */}
       <ChildProfileNav tabs={tabs} />
-
-      {/* 승인 대기 배너 */}
-      {pendingCount > 0 && (
-        <Link
-          href="/parent/approval"
-          className="flex items-center justify-between bg-amber-50 border-2 border-amber-300 rounded-2xl px-4 py-3"
-        >
-          <div className="flex items-center gap-2">
-            <div>
-              <p className="text-sm font-bold text-amber-700">구매 요청 {pendingCount}건 대기 중</p>
-              <p className="text-[11px] text-amber-500">승인 탭에서 확인하세요</p>
-            </div>
-          </div>
-          <span className="text-amber-400 font-bold text-lg">›</span>
-        </Link>
-      )}
 
       {!child ? (
         <div className="flex flex-col items-center justify-center py-20 gap-4">
