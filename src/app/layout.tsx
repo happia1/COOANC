@@ -6,6 +6,7 @@
 import './globals.css'
 import type { Metadata } from 'next'
 import type { ReactNode } from 'react'
+import { PublicHolidaysBootstrap } from '@/components/system/PublicHolidaysBootstrap'
 
 export const metadata: Metadata = {
   title: 'COOANC - 아이의 올바른 경제 습관',
@@ -34,7 +35,11 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="ko">
-      <body>{children}</body>
+      <body>
+        {/* 앱 로드 시 올해 공휴일을 백그라운드로 DB 동기화(연도당 1회) */}
+        <PublicHolidaysBootstrap />
+        {children}
+      </body>
     </html>
   )
 }

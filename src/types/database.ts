@@ -268,3 +268,14 @@ export type ChildItemUnlock = {
   trigger_key: string
   unlocked_at: string
 }
+
+/** 공공데이터포털 특일 API 캐시(`public_holidays`) — 달력·루틴 도우미에서 사용 */
+export type PublicHoliday = {
+  id: string
+  year: number
+  holiday_date: string
+  name: string
+  is_holiday: 'Y' | 'N'
+  created_at: string
+  updated_at: string
+}

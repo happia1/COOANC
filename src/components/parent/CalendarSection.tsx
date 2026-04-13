@@ -17,6 +17,7 @@ import type { LocalCalendarEvent } from '@/types/database'
 import { getSeoulDateString } from '@/lib/koreaDate'
 import { COOANC_CALENDAR_EVENTS_STORAGE_KEY } from '@/lib/localStorageChildScope'
 import { COOANC_CALENDAR_STORAGE_UPDATE_EVENT } from '@/lib/syncAgentEventToLocalCalendar'
+import { createClient } from '@/lib/supabase/client'
 
 const STORAGE_KEY = COOANC_CALENDAR_EVENTS_STORAGE_KEY
 
@@ -105,6 +106,8 @@ export default function CalendarSection({ childId }: Props) {
   const [monthScheduleOpen, setMonthScheduleOpen] = useState(false)
   /** 상단 범례(유형 칩) 선택 시: null 이면 전체, 값이면 그 eventType 만 달력·목록에 표시 */
   const [legendFilter, setLegendFilter] = useState<LocalCalendarEvent['eventType'] | null>(null)
+  /** `public_holidays` 에서 읽은 법정 공휴일 이름 — 날짜 키(YYYY-MM-DD) → 표시명 */
+  const [holidayNamesByDate, setHolidayNamesByDate] = useState<Record<string, string>>({})
 
   useEffect(() => {
     try {
@@ -132,6 +135,42 @@ export default function CalendarSection({ childId }: Props) {
       window.removeEventListener('storage', reloadFromStorage)
     }
   }, [])
+
+  /** Supabase `public_holidays` — 이번 달 법정 공휴일만 읽어 달력에 빨간 이름으로 표시 */
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      try {
+        const supabase = createClient()
+        const pad = (n: number) => String(n).padStart(2, '0')
+        const ym = `${year}-${pad(month + 1)}`
+        const start = `${ym}-01`
+        const lastD = new Date(year, month + 1, 0).getDate()
+        const end = `${ym}-${pad(lastD)}`
+        const { data, error } = await supabase
+          .from('public_holidays')
+          .select('holiday_date,name')
+          .gte('holiday_date', start)
+          .lte('holiday_date', end)
+          .eq('is_holiday', 'Y')
+        if (cancelled) return
+        if (error || !data) {
+          setHolidayNamesByDate({})
+          return
+        }
+        const map: Record<string, string> = {}
+        for (const row of data as { holiday_date: string; name: string }[]) {
+          map[String(row.holiday_date).slice(0, 10)] = row.name
+        }
+        setHolidayNamesByDate(map)
+      } catch {
+        if (!cancelled) setHolidayNamesByDate({})
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [year, month])
 
   const saveEvents = useCallback(
     (updated: LocalCalendarEvent[] | ((prev: LocalCalendarEvent[]) => LocalCalendarEvent[])) => {
@@ -306,6 +345,7 @@ export default function CalendarSection({ childId }: Props) {
           const isToday = dk === todayStr
           const isSun = idx % 7 === 0
           const isSat = idx % 7 === 6
+          const publicHolidayName = holidayNamesByDate[dk]
           /** 같은 날 중복 id 제거 후 최대 3개만 점으로 표시 */
           const dotEvents = [...new Map(evHere.map((e) => [e.id, e])).values()].slice(0, 3)
           return (
@@ -322,6 +362,14 @@ export default function CalendarSection({ childId }: Props) {
               ].join(' ')}
             >
               {day}
+              {publicHolidayName ? (
+                <span
+                  className="mt-0.5 max-w-[3.25rem] truncate px-0.5 text-center text-[8px] font-extrabold leading-tight text-red-600"
+                  title={publicHolidayName}
+                >
+                  {publicHolidayName}
+                </span>
+              ) : null}
               {/*
                 일정이 없는 날도 같은 높이의 ‘도트 자리’를 항상 두어,
                 점이 생겼을 때만 행 높이가 커지는 현상(줄 간격 들쭉날쭉)을 막습니다.

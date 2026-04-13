@@ -49,6 +49,7 @@ import {
   shouldSkipSyncAgentEvent,
   syncAgentEventToLocalCalendar,
 } from '@/lib/syncAgentEventToLocalCalendar'
+import { enrichAgentParseResponseWithHolidayRoutineOff } from '@/lib/publicHolidaysRoutineOff'
 
 type Props = {
   open: boolean
@@ -869,7 +870,9 @@ export default function RoutineAgentSchedulePanel({
     setLoading(true)
     try {
       const resRaw = await postAgentParse(body)
-      const res = normalizeParseResponse(resRaw)
+      const resNorm = normalizeParseResponse(resRaw)
+      /** 법정 공휴일과 겹치면 `routine_off` 를 자동으로 켭니다(Supabase `public_holidays`). */
+      const res = await enrichAgentParseResponseWithHolidayRoutineOff(resNorm)
       const isMulti = res.mode === 'multi' && (res.schedules?.length ?? 0) > 0
       const multiSlots: MultiSlotUi[] | undefined = isMulti
         ? (res.schedules ?? []).map((row) => ({
@@ -958,7 +961,8 @@ export default function RoutineAgentSchedulePanel({
       if (!shouldCallAPI(trimmed, false)) {
         const localPlan = buildScheduleFromText(trimmed)
         if (localPlan) {
-          const res = buildAgentParseResponseFromLocal(localPlan)
+          const resLocal = buildAgentParseResponseFromLocal(localPlan)
+          const res = await enrichAgentParseResponseWithHolidayRoutineOff(resLocal)
           const sug: SuggestionUi[] = (res.suggestions ?? []).map((s) => ({ ...s, status: 'pending' as const }))
           setMessages((prev) => [
             ...prev,
