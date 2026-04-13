@@ -93,6 +93,21 @@ export type AgentCommitScheduleResponse = {
   saved_event_id: string | null
 }
 
+/**
+ * `postAgentParse` 가 HTTP 비정상 응답일 때 던집니다.
+ * 프론트에서 429·503 등으로 안내 문구를 나눌 때 `status` 를 씁니다.
+ */
+export class AgentParseRequestError extends Error {
+  readonly status: number
+
+  constructor(status: number, message: string) {
+    super(message)
+    this.name = 'AgentParseRequestError'
+    this.status = status
+    Object.setPrototypeOf(this, new.target.prototype)
+  }
+}
+
 /** 최근 AI 리포트 1건 — 없으면 null(404 등). */
 export async function fetchAgentLatestReport(childId: string): Promise<AgentLatestReportRow | null> {
   const base = getAgentBaseUrl()
@@ -123,7 +138,7 @@ export async function postAgentParse(body: {
   const json = (await res.json().catch(() => ({}))) as Record<string, unknown>
   if (!res.ok) {
     const detail = typeof json.detail === 'string' ? json.detail : JSON.stringify(json)
-    throw new Error(detail || `파싱 실패 (${res.status})`)
+    throw new AgentParseRequestError(res.status, detail || `파싱 실패 (${res.status})`)
   }
   return json as unknown as AgentParseResponse
 }

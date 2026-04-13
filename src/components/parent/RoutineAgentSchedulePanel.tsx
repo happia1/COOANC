@@ -19,6 +19,7 @@ import {
   postAgentApprove,
   postAgentCommitSchedule,
   postAgentParse,
+  AgentParseRequestError,
   type AgentParseApiRow,
   type AgentParseEvent,
   type AgentParseResponse,
@@ -50,6 +51,7 @@ import {
   syncAgentEventToLocalCalendar,
 } from '@/lib/syncAgentEventToLocalCalendar'
 import { enrichAgentParseResponseWithHolidayRoutineOff } from '@/lib/publicHolidaysRoutineOff'
+import { routineAgentImageParseAssistantMessage } from '@/lib/routineAgentImageParseErrors'
 
 type Props = {
   open: boolean
@@ -907,14 +909,26 @@ export default function RoutineAgentSchedulePanel({
        * (그대로 두면 오늘 날짜에 사용자 문장 전체가 제목인 일정이 생김)
        */
       if (!isMulti && shouldSkipSyncAgentEvent(res.event)) {
-        onToast('AI 서버가 잠시 바빠 일정을 읽지 못했어요. 잠시 후 다시 시도해 주세요.', false, true)
+        /** HTTP 200 이지만 본문에 Gemini 오류가 섞인 경우 — 이미지일 때만 429/503/기타 말풍선 분기 */
+        const errBlob = `${res.event.title ?? ''}\n${res.event.description ?? ''}`
+        onToast(
+          body.input_type === 'image'
+            ? '이미지 분석을 완료하지 못했어요. 위 안내를 확인해 주세요.'
+            : 'AI 서버가 잠시 바빠 일정을 읽지 못했어요. 잠시 후 다시 시도해 주세요.',
+          false,
+          true,
+        )
+        const assistantText =
+          body.input_type === 'image'
+            ? routineAgentImageParseAssistantMessage(null, errBlob)
+            : '지금은 요청이 많아 응답이 지연되고 있어요. 잠시 후 같은 내용으로 다시 보내 주세요.'
         setMessages((prev) => [
           ...prev,
           {
             id: newId(),
             kind: 'text',
             role: 'assistant',
-            text: '지금은 요청이 많아 응답이 지연되고 있어요. 잠시 후 같은 내용으로 다시 보내 주세요.',
+            text: assistantText,
           },
         ])
         bumpUnreadIfClosed(1)
@@ -943,7 +957,24 @@ export default function RoutineAgentSchedulePanel({
       bumpUnreadIfClosed(1)
       onToast(isMulti ? `일정 ${multiSlots?.length ?? 0}건을 찾았어요. 한 건씩 확인해 주세요` : 'AI 분석이 완료됐어요')
     } catch (err) {
-      onToast(err instanceof Error ? err.message : '분석에 실패했어요', false, true)
+      const raw = err instanceof Error ? err.message : '분석에 실패했어요'
+      const httpStatus = err instanceof AgentParseRequestError ? err.status : null
+      /** 이미지 파싱만 HTTP/본문으로 429·503·기타 안내를 말풍선으로 구분 */
+      if (body.input_type === 'image') {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: newId(),
+            kind: 'text',
+            role: 'assistant',
+            text: routineAgentImageParseAssistantMessage(httpStatus, raw),
+          },
+        ])
+        bumpUnreadIfClosed(1)
+        onToast('이미지 분석을 완료하지 못했어요. 위 안내를 확인해 주세요.', false, true)
+      } else {
+        onToast(raw, false, true)
+      }
     } finally {
       setLoading(false)
     }
