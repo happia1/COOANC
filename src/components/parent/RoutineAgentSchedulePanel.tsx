@@ -17,8 +17,10 @@ import {
   postAgentApprove,
   postAgentCommitSchedule,
   postAgentParse,
+  type AgentParseApiRow,
   type AgentParseEvent,
   type AgentParseResponse,
+  type AgentParsedScheduleRow,
   type AgentParseSuggestion,
 } from '@/lib/agentApi'
 import { getSeoulDateString } from '@/lib/koreaDate'
@@ -203,6 +205,11 @@ type MultiSlotUi = {
   slotSuggestions: SuggestionUi[]
 }
 
+/** 다건 슬롯이 모두 등록·건너뛰기 처리됐는지 */
+function isMultiAllReviewedSlots(slots: MultiSlotUi[]) {
+  return slots.length > 0 && slots.every((s) => s.status === 'committed' || s.status === 'skipped')
+}
+
 type ChatParseMessage = {
   id: string
   kind: 'parse'
@@ -214,6 +221,8 @@ type ChatParseMessage = {
   multiSlots?: MultiSlotUi[]
   /** multiSlots 가 있을 때만 씀 — 현재 몇 번째 일정을 보고 있는지 */
   multiIndex?: number
+  /** 다건에서 등록/건너뛰기로 모두 처리했을 때 한 번만 true */
+  multiReviewComplete?: boolean
 }
 
 type ChatMessage = ChatTextMessage | ChatParseMessage
@@ -225,15 +234,70 @@ function stripDataUrlBase64(dataUrl: string): string {
   return dataUrl.slice(i + 'base64,'.length).trim()
 }
 
-/** 구버전 에이전트(모드 필드 없음)도 깨지지 않게 응답을 맞춥니다 */
-function normalizeParseResponse(raw: AgentParseResponse): AgentParseResponse {
+/** `schedules_api` 만 오는 최신 서버 응답 → `schedules` + `mode` 로 통일 */
+function scheduleRowFromApi(pe: AgentParseApiRow): AgentParsedScheduleRow {
+  const t = String(pe.event_type ?? pe.type ?? 'etc')
+  const desc = String(pe.description ?? pe.note ?? '').trim()
   return {
-    mode: raw.mode ?? 'single',
-    schedules: raw.schedules ?? null,
+    event: {
+      type: t,
+      title: String(pe.title ?? '').trim() || '일정',
+      start_date: String(pe.start_date ?? '').trim(),
+      end_date: pe.end_date ?? null,
+      ...(desc ? { description: desc } : {}),
+    },
+    suggestions: [],
+  }
+}
+
+/** 구버전 에이전트(`mode` 없음, `schedules_api` 만 multi)도 깨지지 않게 맞춥니다 */
+function normalizeParseResponse(raw: AgentParseResponse): AgentParseResponse {
+  const mode: AgentParseResponse['mode'] =
+    raw.mode ?? (raw.type === 'multi' ? 'multi' : raw.type === 'single' ? 'single' : 'single')
+
+  let schedules = raw.schedules ?? null
+  if (
+    mode === 'multi' &&
+    Array.isArray(raw.schedules_api) &&
+    raw.schedules_api.length > 0 &&
+    (!schedules || schedules.length === 0)
+  ) {
+    schedules = raw.schedules_api.map(scheduleRowFromApi)
+  }
+
+  return {
+    ...raw,
+    mode,
+    schedules,
     event: raw.event,
     suggestions: raw.suggestions ?? [],
     saved_event_id: raw.saved_event_id ?? null,
   }
+}
+
+/** 일정 유형 코드 → 한글 라벨 (학사일정표 JSON 의 school 등) */
+function agentEventTypeLabel(code: string): string {
+  const c = (code || '').toLowerCase()
+  if (c === 'school') return '학교행사'
+  if (c === 'holiday') return '휴일·휴업'
+  if (c === 'vacation') return '방학·돌봄'
+  if (c === 'travel') return '여행'
+  if (c === 'birthday') return '기념일'
+  if (c === 'special') return '기념일'
+  if (c === 'other') return '기타'
+  return '기타'
+}
+
+/** YYYY-MM-DD 가 속한 요일을 짧은 한글로 (예: 토) */
+function weekdayKoFromYmd(isoDate: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(isoDate.trim())
+  if (!m) return ''
+  const y = Number(m[1])
+  const mo = Number(m[2]) - 1
+  const d = Number(m[3])
+  const dt = new Date(y, mo, d)
+  if (Number.isNaN(dt.getTime())) return ''
+  return new Intl.DateTimeFormat('ko-KR', { weekday: 'short' }).format(dt)
 }
 
 /**
@@ -299,6 +363,19 @@ export default function RoutineAgentSchedulePanel({
    * null 이면 접힘(카테고리만 보임). 탭 클릭 시 해당 id 로 펼침, 같은 탭 재클릭 시 다시 접음.
    */
   const [expandedIntentCategoryId, setExpandedIntentCategoryId] = useState<string | null>(null)
+  /**
+   * 다건 일정 카드에서 [수정하기] 로 연 필드 임시값.
+   * parse 말풍선 id + 슬롯 인덱스가 일치할 때만 해당 슬롯 위에 편집 폼을 띄웁니다.
+   */
+  const [multiEdit, setMultiEdit] = useState<{
+    parseMsgId: string
+    slotIndex: number
+    title: string
+    start_date: string
+    end_date: string
+    type: string
+    description: string
+  } | null>(null)
   /** 직접 입력 폼 — 캘린더 일정 추가와 같은 항목 */
   const todayStr = getSeoulDateString()
   const [dTitle, setDTitle] = useState('')
@@ -360,6 +437,7 @@ export default function RoutineAgentSchedulePanel({
     setDDesc('')
     if (fileRef.current) fileRef.current.value = ''
     setExpandedIntentCategoryId(null)
+    setMultiEdit(null)
   }, [])
 
   /**
@@ -563,13 +641,22 @@ export default function RoutineAgentSchedulePanel({
           status: 'pending',
         }),
       )
+      setMultiEdit((cur) => (cur?.parseMsgId === parseMsgId && cur.slotIndex === slotIndex ? null : cur))
       setMessages((prev) =>
         prev.map((m) => {
           if (m.kind !== 'parse' || m.id !== parseMsgId || !m.multiSlots) return m
           const nextSlots = m.multiSlots.map((s, j) =>
             j === slotIndex ? { ...s, status: 'committed' as const, slotSuggestions } : s,
           )
-          return { ...m, multiSlots: nextSlots }
+          const n = nextSlots.length
+          const nextIdx = Math.min(slotIndex + 1, Math.max(0, n - 1))
+          const done = isMultiAllReviewedSlots(nextSlots)
+          return {
+            ...m,
+            multiSlots: nextSlots,
+            multiIndex: nextIdx,
+            multiReviewComplete: Boolean(m.multiReviewComplete || done),
+          }
         }),
       )
       onToast('이 일정을 등록했어요. 아래 제안을 적용할지 골라 주세요')
@@ -581,13 +668,22 @@ export default function RoutineAgentSchedulePanel({
   }
 
   const handleMultiSkipSlot = (parseMsgId: string, slotIndex: number) => {
+    setMultiEdit((cur) => (cur?.parseMsgId === parseMsgId && cur.slotIndex === slotIndex ? null : cur))
     setMessages((prev) =>
       prev.map((m) => {
         if (m.kind !== 'parse' || m.id !== parseMsgId || !m.multiSlots) return m
         const nextSlots = m.multiSlots.map((s, j) =>
           j === slotIndex ? { ...s, status: 'skipped' as const, slotSuggestions: [] } : s,
         )
-        return { ...m, multiSlots: nextSlots }
+        const n = nextSlots.length
+        const nextIdx = Math.min(slotIndex + 1, Math.max(0, n - 1))
+        const done = isMultiAllReviewedSlots(nextSlots)
+        return {
+          ...m,
+          multiSlots: nextSlots,
+          multiIndex: nextIdx,
+          multiReviewComplete: Boolean(m.multiReviewComplete || done),
+        }
       }),
     )
     onToast('이 일정은 건너뛸게요')
@@ -602,6 +698,46 @@ export default function RoutineAgentSchedulePanel({
         return { ...m, multiIndex: clamped }
       }),
     )
+  }
+
+  /** 다건 카드에서 [수정하기] — 현재 슬롯 일정을 임시 폼으로 불러옵니다 */
+  const openMultiEdit = (parseMsgId: string, slotIndex: number, ev: AgentParseEvent) => {
+    setMultiEdit({
+      parseMsgId,
+      slotIndex,
+      title: ev.title ?? '',
+      start_date: ev.start_date ?? '',
+      end_date: (ev.end_date ?? ev.start_date ?? '') as string,
+      type: ev.type ?? 'etc',
+      description: ev.description ?? '',
+    })
+  }
+
+  /** 임시 폼 내용을 해당 슬롯의 `event` 에 반영합니다 */
+  const applyMultiEdit = () => {
+    if (!multiEdit) return
+    setMessages((prev) =>
+      prev.map((m) => {
+        if (m.kind !== 'parse' || m.id !== multiEdit.parseMsgId || !m.multiSlots) return m
+        const nextSlots = m.multiSlots.map((s, j) => {
+          if (j !== multiEdit.slotIndex) return s
+          return {
+            ...s,
+            event: {
+              ...s.event,
+              title: multiEdit.title.trim() || '일정',
+              start_date: multiEdit.start_date,
+              end_date: multiEdit.end_date.trim() || multiEdit.start_date,
+              type: multiEdit.type,
+              description: multiEdit.description.trim() || undefined,
+            },
+          }
+        })
+        return { ...m, multiSlots: nextSlots }
+      }),
+    )
+    setMultiEdit(null)
+    onToast('이 일정 내용을 수정했어요')
   }
 
   /** 제안 카드의 적용/거절 — suggestion_id 가 있을 때만 서버로 갑니다 */
@@ -798,66 +934,146 @@ export default function RoutineAgentSchedulePanel({
                     )
                   }
 
-                  /** 여러 일정이 한 번에 나온 경우: < 1/N > 로 한 건씩 보고 등록/건너뛰기 */
+                  /* 여러 일정: 1/N 과 등록·건너뛰기·수정 (실제 저장은 commit-schedule API) */
                   if (m.multiSlots && m.multiSlots.length > 0 && m.agentCall) {
                     const idx = m.multiIndex ?? 0
                     const slot = m.multiSlots[idx]
                     const n = m.multiSlots.length
+                    const total = m.parseResult.count ?? n
                     const ev = slot.event
+                    const wk = weekdayKoFromYmd(ev.start_date)
+                    const dateLine = `${ev.start_date}${wk ? ` (${wk})` : ''}`
+                    const isEditingThis =
+                      multiEdit?.parseMsgId === m.id && multiEdit?.slotIndex === idx
+                    const multiTypeOptions = ['school', 'holiday', 'vacation', 'etc', 'travel', 'birthday'] as const
                     return (
                       <li key={m.id} className="flex w-full justify-start">
-                        <div className="max-w-[95%] space-y-2">
-                          <div className="flex items-center justify-between gap-2 rounded-2xl rounded-bl-md bg-indigo-50/95 px-3 py-2 text-[10px] font-black text-indigo-950 shadow-sm ring-1 ring-indigo-100">
-                            <span>일정 확인</span>
-                            <span className="tabular-nums">
-                              &lt; {idx + 1} / {n} &gt;
-                            </span>
-                          </div>
-                          <div className="flex justify-center gap-2">
+                        <div className="max-w-[95%] space-y-2 rounded-2xl border border-indigo-100 bg-white p-3 shadow-md ring-1 ring-indigo-50">
+                          <p className="text-center text-xs font-black text-indigo-950">
+                            📋 {total}개 일정을 찾았어요!
+                          </p>
+                          <div className="flex items-center justify-center gap-2 text-[11px] font-black tabular-nums text-gray-800">
                             <button
                               type="button"
                               disabled={idx <= 0}
                               onClick={() => setMultiIndex(m.id, idx - 1)}
-                              className="rounded-lg border border-gray-200 bg-white px-3 py-1 text-[10px] font-bold text-gray-700 disabled:opacity-40"
+                              className="rounded-lg border border-gray-200 bg-gray-50 px-2 py-1 text-[10px] disabled:opacity-40"
                             >
-                              이전
+                              ◀
                             </button>
+                            <span>
+                              &lt; {idx + 1} / {n} &gt;
+                            </span>
                             <button
                               type="button"
                               disabled={idx >= n - 1}
                               onClick={() => setMultiIndex(m.id, idx + 1)}
-                              className="rounded-lg border border-gray-200 bg-white px-3 py-1 text-[10px] font-bold text-gray-700 disabled:opacity-40"
+                              className="rounded-lg border border-gray-200 bg-gray-50 px-2 py-1 text-[10px] disabled:opacity-40"
                             >
-                              다음
+                              ▶
                             </button>
                           </div>
-                          <div className="whitespace-pre-wrap rounded-2xl rounded-bl-md bg-sky-100/90 px-3 py-2 text-xs leading-relaxed text-gray-900 shadow-sm">
-                            <p className="font-black text-sky-950">이번에 볼 일정</p>
-                            <p className="mt-1 font-bold">{ev.title || '일정'}</p>
-                            <p className="mt-0.5 text-[10px] text-gray-600">
-                              유형: {ev.type} · {ev.start_date}
-                              {ev.end_date ? ` ~ ${ev.end_date}` : ''}
-                            </p>
-                          </div>
-                          {slot.status === 'pending' ? (
-                            <div className="flex gap-2">
+                          {isEditingThis && multiEdit ? (
+                            <div className="space-y-2 rounded-xl border border-amber-200 bg-amber-50/80 p-2">
+                              <p className="text-[10px] font-black text-amber-900">일정 수정</p>
+                              <input
+                                value={multiEdit.title}
+                                onChange={(e) => setMultiEdit({ ...multiEdit, title: e.target.value })}
+                                className="w-full rounded-lg border border-gray-200 px-2 py-1 text-[11px]"
+                                placeholder="제목"
+                              />
+                              <div className="grid grid-cols-2 gap-1">
+                                <input
+                                  type="date"
+                                  value={multiEdit.start_date}
+                                  onChange={(e) => setMultiEdit({ ...multiEdit, start_date: e.target.value })}
+                                  className="rounded-lg border border-gray-200 px-1 py-1 text-[10px]"
+                                />
+                                <input
+                                  type="date"
+                                  value={multiEdit.end_date}
+                                  min={multiEdit.start_date}
+                                  onChange={(e) => setMultiEdit({ ...multiEdit, end_date: e.target.value })}
+                                  className="rounded-lg border border-gray-200 px-1 py-1 text-[10px]"
+                                />
+                              </div>
+                              <select
+                                value={multiEdit.type}
+                                onChange={(e) => setMultiEdit({ ...multiEdit, type: e.target.value })}
+                                className="w-full rounded-lg border border-gray-200 px-1 py-1 text-[10px]"
+                              >
+                                {multiTypeOptions.map((t) => (
+                                  <option key={t} value={t}>
+                                    {agentEventTypeLabel(t)}
+                                  </option>
+                                ))}
+                              </select>
+                              <textarea
+                                value={multiEdit.description}
+                                onChange={(e) => setMultiEdit({ ...multiEdit, description: e.target.value })}
+                                rows={2}
+                                className="routine-agent-hide-scrollbar w-full resize-none rounded-lg border border-gray-200 px-2 py-1 text-[10px]"
+                                placeholder="비고·설명"
+                              />
+                              <div className="flex gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => applyMultiEdit()}
+                                  className="flex-1 rounded-lg bg-amber-600 py-1.5 text-[10px] font-black text-white"
+                                >
+                                  저장
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setMultiEdit(null)}
+                                  className="flex-1 rounded-lg border border-gray-300 bg-white py-1.5 text-[10px] font-bold text-gray-600"
+                                >
+                                  취소
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="space-y-1 rounded-xl bg-sky-50/90 px-3 py-2 text-xs text-gray-900 ring-1 ring-sky-100">
+                              <p className="font-black text-sky-950">{ev.title || '일정'}</p>
+                              <p className="text-[11px] text-gray-700">
+                                📅 {dateLine}
+                                {ev.end_date && ev.end_date !== ev.start_date ? ` ~ ${ev.end_date}` : ''}
+                              </p>
+                              <p className="text-[10px] text-gray-600">
+                                🏷 {agentEventTypeLabel(ev.type)}
+                              </p>
+                              {ev.description ? (
+                                <p className="text-[10px] text-gray-600">📝 {ev.description}</p>
+                              ) : null}
+                            </div>
+                          )}
+                          {slot.status === 'pending' && !isEditingThis ? (
+                            <div className="flex flex-wrap gap-1.5">
                               <button
                                 type="button"
                                 disabled={loading}
                                 onClick={() =>
                                   void handleMultiCommitSlot(m.id, idx, slot, m.agentCall!)
                                 }
-                                className="flex-1 rounded-xl bg-emerald-500 py-2.5 text-[10px] font-black text-white shadow active:scale-[0.99] disabled:opacity-50"
+                                className="min-w-0 flex-1 rounded-xl bg-emerald-500 py-2 text-[10px] font-black text-white shadow active:scale-[0.99] disabled:opacity-50"
                               >
-                                등록
+                                등록하기
                               </button>
                               <button
                                 type="button"
                                 disabled={loading}
                                 onClick={() => handleMultiSkipSlot(m.id, idx)}
-                                className="flex-1 rounded-xl bg-gray-100 py-2.5 text-[10px] font-black text-gray-700 active:scale-[0.99] disabled:opacity-50"
+                                className="min-w-0 flex-1 rounded-xl bg-gray-100 py-2 text-[10px] font-black text-gray-800 active:scale-[0.99] disabled:opacity-50"
                               >
                                 건너뛰기
+                              </button>
+                              <button
+                                type="button"
+                                disabled={loading}
+                                onClick={() => openMultiEdit(m.id, idx, ev)}
+                                className="min-w-0 flex-1 rounded-xl border border-sky-300 bg-sky-50 py-2 text-[10px] font-black text-sky-900 active:scale-[0.99] disabled:opacity-50"
+                              >
+                                수정하기
                               </button>
                             </div>
                           ) : null}
@@ -905,6 +1121,11 @@ export default function RoutineAgentSchedulePanel({
                           ) : null}
                           {slot.status === 'committed' && slot.slotSuggestions.length === 0 ? (
                             <p className="text-[10px] text-gray-500">이 일정에 대한 추가 제안이 없어요.</p>
+                          ) : null}
+                          {m.multiReviewComplete ? (
+                            <p className="rounded-xl bg-emerald-50 px-2 py-2.5 text-center text-[11px] font-black text-emerald-900 ring-1 ring-emerald-100">
+                              모든 일정 확인 완료!
+                            </p>
                           ) : null}
                         </div>
                       </li>

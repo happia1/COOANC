@@ -40,6 +40,17 @@ export type AgentParseEvent = {
   description?: string
 }
 
+/** 에이전트가 `type`/`schedules_api` 로 주는 경우를 프론트 `mode`/`schedules` 로 맞출 때 씁니다. */
+export type AgentParseApiRow = {
+  title?: string
+  start_date?: string
+  end_date?: string | null
+  event_type?: string
+  type?: string
+  description?: string
+  note?: string
+}
+
 export type AgentParseSuggestion = {
   type: string
   detail: string
@@ -55,6 +66,11 @@ export type AgentParsedScheduleRow = {
 }
 
 export type AgentParseResponse = {
+  /** 서버 최신 응답과의 호환 (`mode` 와 동일 역할) */
+  type?: 'single' | 'multi'
+  count?: number
+  /** 원본 추출 행(학사일정표 등) — `schedules` 가 없을 때 UI 가 맞출 수 있음 */
+  schedules_api?: AgentParseApiRow[] | null
   mode: AgentParseMode
   /** 다건일 때만 채워짐 — 각 줄은 처음엔 suggestions 가 비어 있고, ‘등록’ 후 채워짐 */
   schedules: AgentParsedScheduleRow[] | null
