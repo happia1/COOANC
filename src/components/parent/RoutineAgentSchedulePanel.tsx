@@ -3,7 +3,7 @@
 /**
  * 루틴 탭 — 우측 하단에서 열리는 「챗봇」슬라이딩 패널입니다.
  * - Framer Motion 으로 오른쪽에서 패널이 들어옵니다. 패널·대화 스크롤 영역 배경은 흰색으로 통일합니다.
- * - 상단 인텐트 UI: 대분류·세부 칩 모두 가로 스크롤(막대 숨김) + 우측 페이드(`globals.css` 의 `.routine-agent-intent-scroll-fade`). 세부 칩은 카테고리 탭을 눌렀을 때만 보입니다(같은 탭 재클릭 시 접힘).
+ * - 웰컴: 짧은 인사 + 「일정 등록」「루틴 관리」카드. 일정 등록 → 안내 말풍선 후 채팅·이미지 흐름. 루틴 관리 → 탭으로 `RoutineKeywordBuilderSheet`·`SpecialMissionAddSheet` 를 패널 안에 embedded 재사용.
  * - 가로·세로 스크롤 **막대(슬라이드 바)** 는 `globals.css` 의 `.routine-agent-hide-scrollbar` 로 숨기되, 스크롤 동작은 그대로 둡니다.
  * - 부모 탭 `<main>` 이 스크롤 컨테이너라 막대가 오버레이 위에 겹칠 수 있어, 열릴 때 `overflow` 를 잠그고 z-index 를 시트들보다 높입니다.
  * - 텍스트·이미지는 `/agent-b/parse` 로 보냅니다. 한 건만 나오면 곧바로 DB 초안 + 제안이 붙고, 여러 건이면 `< 1/N >` 로 한 줄씩 확인한 뒤 [등록] 시 `/agent-b/commit-schedule` 로 저장합니다.
@@ -52,12 +52,19 @@ import {
 } from '@/lib/syncAgentEventToLocalCalendar'
 import { enrichAgentParseResponseWithHolidayRoutineOff } from '@/lib/publicHolidaysRoutineOff'
 import { routineAgentImageParseAssistantMessage } from '@/lib/routineAgentImageParseErrors'
+import type { Mission } from '@/types/database'
+import RoutineKeywordBuilderSheet from '@/components/parent/RoutineKeywordBuilderSheet'
+import SpecialMissionAddSheet from '@/components/parent/SpecialMissionAddSheet'
 
 type Props = {
   open: boolean
   onClose: () => void
   familyLinkId: string | null
   childId: string | null
+  /** 루틴 관리 탭 — 키워드 시트와 동일 스냅샷(없으면 빈 배열) */
+  routineMissions?: Mission[]
+  specialMissions?: Mission[]
+  hasSchool?: boolean
   onToast: (msg: string, ok?: boolean, multiline?: boolean) => void
   /**
    * 패널이 닫혀 있는 동안 AI 분석(parse)·다건 일정 커밋 등 **새 답장**이 도착했을 때만 호출됩니다.
@@ -68,155 +75,14 @@ type Props = {
   onPanelOpened?: () => void
 }
 
-/** AI 가 처음 인사할 때 쓰는 고정 문구(줄바꿈 포함) */
-const WELCOME_TEXT = `안녕하세요. '루틴 도우미'에요!
-원하는 키워드를 클릭하거나 메시지를 입력해보세요.
-예) '4월 25일 체육대회 등록해줘'`
+/** 일정 등록 카드 클릭 후 채팅에 넣는 안내(줄바꿈 유지) */
+const SCHEDULE_REGISTER_INTRO = `날짜와 일정 내용을 입력하시거나
+학사일정표 사진을 올려주세요.
 
-/** 세부 인텐트 한 칩 — 라벨(표시) + 채팅에 넣을 질문세트(여러 줄) */
-type RoutineIntentChip = { id: string; label: string; prompt: string }
+예) '4월 25일 체육대회'
+    '다음주 토요일 가족여행'`
 
-/** 카테고리(탭) 하나 — 아래에 세부 인텐트 칩이 2개 붙습니다 */
-type RoutineIntentCategory = {
-  id: string
-  label: string
-  /** 탭(선택/비선택)에 쓰는 테일윈드 클래스 */
-  tabActiveClass: string
-  tabInactiveClass: string
-  intents: [RoutineIntentChip, RoutineIntentChip]
-}
-
-/**
- * 4대 카테고리 × 세부 인텐트 2개 = 8칩.
- * 각 prompt 는 부모가 답하기 쉬운 질문세트(번호 목록)로 구성했습니다.
- */
-const INTENT_CATEGORIES: RoutineIntentCategory[] = [
-  {
-    id: 'cat_schedule',
-    label: '일정추가',
-    tabActiveClass: 'border-teal-300 bg-teal-50 text-teal-950 shadow-sm',
-    tabInactiveClass: 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50',
-    intents: [
-      {
-        id: 'intent_school_event',
-        label: '학교행사',
-        prompt: `【학교 행사 일정】 아래에 순서대로 적어 주시면 일정 반영에 도움이 됩니다.
-
-1) 행사 이름과 날짜(또는 기간)를 알려 주세요.
-2) 하루 종일인가요? 몇 시부터 몇 시까지인가요?
-3) 그날은 미션·루틴을 어떻게 할까요? (휴일 루틴 / 완화 / 없음 등)
-4) 학교 안내문·시간표 이미지가 있으면 첨부해 주셔도 됩니다.`,
-      },
-      {
-        id: 'intent_public_holiday',
-        label: '공휴일',
-        prompt: `【공휴일 반영】 아래를 채워 주세요.
-
-1) 넣고 싶은 공휴일 날짜(또는 이름: 예 설날)를 알려 주세요.
-2) 그날 루틴은 어떻게 할까요? (휴일 루틴 적용 / 미션 없음 등)
-3) 연휴라면 시작일과 종료일을 함께 적어 주세요.`,
-      },
-    ],
-  },
-  {
-    id: 'cat_family_trip',
-    label: '가족여행',
-    tabActiveClass: 'border-amber-300 bg-amber-50 text-amber-950 shadow-sm',
-    tabInactiveClass: 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50',
-    intents: [
-      {
-        id: 'intent_family_trip',
-        label: '가족여행',
-        prompt: `【가족 여행】 일정을 맞춰 볼게요. 아래에 답해 주세요.
-
-1) 여행지(또는 목적)와 출발·복귀 날짜를 알려 주세요.
-2) 여행 중 미션·저충은 어떻게 할까요? (유지 / 완화 / 중단 등)
-3) 이동이 긴 날(비행기·기차 등)이 있나요? 있다면 날짜를 적어 주세요.`,
-      },
-      {
-        id: 'intent_pause_short',
-        label: '잠깐멈춤',
-        prompt: `【잠깐 멈춤(일시 중단)】 아래를 알려 주세요.
-
-1) 멈추고 싶은 기간의 시작일·종료일을 적어 주세요.
-2) 그동안 루틴은 어떻게 할까요? (완전 휴식 / 최소만 유지 등)
-3) 멈추는 이유가 있다면 간단히 적어 주세요. (선택)`,
-      },
-    ],
-  },
-  {
-    id: 'cat_vacation',
-    label: '방학설정',
-    tabActiveClass: 'border-violet-300 bg-violet-50 text-violet-950 shadow-sm',
-    tabInactiveClass: 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50',
-    intents: [
-      {
-        id: 'intent_vacation_plan',
-        label: '방학계획',
-        prompt: `【방학 계획】 아래 질문에 답해 주세요.
-
-1) 방학 시작일과 종료일을 알려 주세요.
-2) 방학 중에 아이와 함께 두고 싶은 목표(미션·생활 패턴)가 있나요?
-3) 중간에 학교에 가는 날이나 짧은 등교가 있나요?`,
-      },
-      {
-        id: 'intent_special_mission',
-        label: '특별미션',
-        prompt: `【특별 미션】 맞춤 아이디어를 드릴게요.
-
-1) 다루고 싶은 주제가 있나요? (예: 독서, 운동, 생활습관)
-2) 원하는 기간과 난이도(쉬움 / 보통 / 도전)를 알려 주세요.
-3) 평소 루틴과 겹치지 않게 구성할까요? (예/아니오 + 원하는 방식)`,
-      },
-    ],
-  },
-  {
-    id: 'cat_mission_suggest',
-    label: '미션제안',
-    tabActiveClass: 'border-rose-300 bg-rose-50 text-rose-950 shadow-sm',
-    tabInactiveClass: 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50',
-    intents: [
-      {
-        id: 'intent_savings_mission',
-        label: '저축미션',
-        prompt: `【저축 미션】 아래를 알려 주세요.
-
-1) 아이 나이대와 현재 용돈·저축 방식이 있나요?
-2) 목표 금액이나 저축 이유가 있나요?
-3) 하루 단위와 주 단위 중 어떤 주기가 편하세요?`,
-      },
-      {
-        id: 'intent_challenge_mission',
-        label: '도전미션',
-        prompt: `【도전 미션】 제안에 쓸 정보예요.
-
-1) 아이가 좋아하거나 잘하는 활동이 있나요?
-2) 조금 어렵지만 해 보고 싶은 영역이 있나요?
-3) 원하는 기간(일주일 / 한 달 등)과 보상 방식이 있나요?`,
-      },
-    ],
-  },
-]
-
-/** 세부 칩 2개에 쓰는 파스텔 스타일(카테고리별 톤에 맞춤) */
-const SUBCHIP_STYLES_BY_CATEGORY: Record<string, [string, string]> = {
-  cat_schedule: [
-    'border-teal-100 bg-teal-50/90 text-teal-900',
-    'border-teal-100 bg-teal-50/90 text-teal-900',
-  ],
-  cat_family_trip: [
-    'border-amber-100 bg-amber-50/90 text-amber-900',
-    'border-amber-100 bg-amber-50/90 text-amber-900',
-  ],
-  cat_vacation: [
-    'border-violet-100 bg-violet-50/90 text-violet-900',
-    'border-violet-100 bg-violet-50/90 text-violet-900',
-  ],
-  cat_mission_suggest: [
-    'border-rose-100 bg-rose-50/90 text-rose-900',
-    'border-rose-100 bg-rose-50/90 text-rose-900',
-  ],
-}
+type AgentPanelShell = 'welcome' | 'schedule_chat' | 'routine_manage'
 
 type SuggestionUi = AgentParseSuggestion & { status: 'pending' | 'approved' | 'rejected' }
 
@@ -721,6 +587,9 @@ export default function RoutineAgentSchedulePanel({
   onClose,
   familyLinkId,
   childId,
+  routineMissions = [],
+  specialMissions = [],
+  hasSchool = false,
   onToast,
   onAssistantRepliesWhileClosed,
   onPanelOpened,
@@ -736,11 +605,10 @@ export default function RoutineAgentSchedulePanel({
   const [loading, setLoading] = useState(false)
   /** 통합 제안 카드에서 POST /agent-b/approve 연속 호출 중 — `parseMsgId` 또는 `parseMsgId:slotIndex` */
   const [suggestionSubmitKey, setSuggestionSubmitKey] = useState<string | null>(null)
-  /**
-   * 인텐트 UI: 세부 칩을 펼친 카테고리 id.
-   * null 이면 접힘(카테고리만 보임). 탭 클릭 시 해당 id 로 펼침, 같은 탭 재클릭 시 다시 접음.
-   */
-  const [expandedIntentCategoryId, setExpandedIntentCategoryId] = useState<string | null>(null)
+  /** 웰컴(카드 2개) / 일정 채팅 / 루틴·스페셜 탭 */
+  const [shell, setShell] = useState<AgentPanelShell>('welcome')
+  /** 루틴 관리 — 일반 루틴 vs 스페셜 미션 */
+  const [routineSubTab, setRoutineSubTab] = useState<'routine' | 'special'>('routine')
   /**
    * 다건 일정 카드에서 [수정하기] 로 연 필드 임시값.
    * parse 말풍선 id + 슬롯 인덱스가 일치할 때만 해당 슬롯 위에 편집 폼을 띄웁니다.
@@ -819,14 +687,15 @@ export default function RoutineAgentSchedulePanel({
     setImageBase64(null)
     setLoading(false)
     if (fileRef.current) fileRef.current.value = ''
-    setExpandedIntentCategoryId(null)
+    setShell('welcome')
+    setRoutineSubTab('routine')
     setMultiEdit(null)
   }, [])
 
   /**
-   * `childId` / `familyLinkId` 가 바뀌면 이전 아이와의 대화를 지우고 환영 말풍선만 둡니다.
+   * `childId` / `familyLinkId` 가 바뀌면 이전 아이와의 대화를 지우고 웰컴(카드) 화면으로 돌립니다.
    * (같은 아이로 루틴 탭을 벗어났다가 돌아오면 컴포넌트가 다시 마운트되면서 ref 가 초기화될 수 있어,
-   *  그때도 한 번 환영이 붙을 수 있습니다 — 의도된 “새 세션” 동작에 가깝습니다.)
+   *  그때도 한 번 초기화가 붙을 수 있습니다 — 의도된 “새 세션” 동작에 가깝습니다.)
    */
   useEffect(() => {
     if (!childId || !familyLinkId) return
@@ -834,7 +703,6 @@ export default function RoutineAgentSchedulePanel({
     if (agentSessionScopeRef.current === scope) return
     agentSessionScopeRef.current = scope
     resetAll()
-    setMessages([{ id: newId(), kind: 'text', role: 'assistant', text: WELCOME_TEXT }])
   }, [childId, familyLinkId, resetAll])
 
   /** 패널이 닫혀 있는 동안 새 AI 답장이 생기면 부모에게 숫자만 넘깁니다 */
@@ -850,7 +718,7 @@ export default function RoutineAgentSchedulePanel({
   useEffect(() => {
     if (!open) return
     listEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, loading, open])
+  }, [messages, loading, open, shell])
 
   const onPickImage = (e: React.ChangeEvent<HTMLInputElement>) => {
     void (async () => {
@@ -1041,21 +909,11 @@ export default function RoutineAgentSchedulePanel({
     }
   }
 
-  /** 인텐트 칩 — 질문세트를 어시스턴트 말풍선으로 채팅에 추가 */
-  const pushIntentQuestionSet = (prompt: string) => {
-    setMessages((prev) => [...prev, { id: newId(), kind: 'text', role: 'assistant', text: prompt }])
-  }
-
-  /** 펼쳐진 카테고리에 대응하는 데이터(접혀 있으면 null) */
-  const activeIntentCategory =
-    expandedIntentCategoryId == null
-      ? null
-      : (INTENT_CATEGORIES.find((c) => c.id === expandedIntentCategoryId) ?? null)
-
-  /** 카테고리 탭 클릭: 다른 탭이면 펼침, 이미 펼친 같은 탭이면 접기 */
-  const onIntentCategoryTabClick = (catId: string) => {
-    setExpandedIntentCategoryId((prev) => (prev === catId ? null : catId))
-  }
+  /** 루틴 관리 탭에서 취소·저장 후 웰컴으로 */
+  const closeRoutineEmbedded = useCallback(() => {
+    setShell('welcome')
+    setRoutineSubTab('routine')
+  }, [])
 
   /** 다건 스캔 중 한 줄을 DB 에 올리고, 그 줄에 대한 루틴 제안을 받아옵니다(말풍선에서 넘긴 slot/call 을 그대로 씀) */
   const handleMultiCommitSlot = async (
@@ -1456,71 +1314,45 @@ export default function RoutineAgentSchedulePanel({
               </button>
             </div>
 
-            {/*
-              인텐트 상단: 대분류·세부 칩 모두 가로 스크롤(막대 숨김) + 우측 페이드로 더 스크롤됨을 힌트.
-              버튼은 shrink-0 로 폭이 줄지 않게 해 키워드가 늘어나도 슬라이드로 탐색합니다.
-            */}
-            <div className="shrink-0 border-b border-gray-100 bg-white px-3 py-2">
-              <p className="mb-1.5 text-[10px] font-bold text-gray-400">무엇을 도와드릴까요?</p>
-              <div className="routine-agent-intent-scroll-fade relative">
-                <div
-                  className="routine-agent-hide-scrollbar flex touch-pan-x gap-2 overflow-x-auto pb-1.5 pt-0.5"
-                  role="tablist"
-                  aria-label="루틴 도우미 인텐트 카테고리"
-                >
-                  {INTENT_CATEGORIES.map((cat) => {
-                    const selected = cat.id === expandedIntentCategoryId
-                    return (
-                      <button
-                        key={cat.id}
-                        type="button"
-                        role="tab"
-                        aria-selected={selected}
-                        aria-expanded={selected}
-                        onClick={() => onIntentCategoryTabClick(cat.id)}
-                        className={`shrink-0 rounded-lg border px-3 py-2 text-center text-[10px] font-black leading-tight transition active:scale-[0.98] ${
-                          selected ? cat.tabActiveClass : cat.tabInactiveClass
-                        }`}
-                      >
-                        {cat.label}
-                      </button>
-                    )
-                  })}
+            {/* 웰컴: 짧은 인사 + 일정 등록 / 루틴 관리 카드(모바일 1열, 넓은 화면 2열) */}
+            {shell === 'welcome' ? (
+              <div className="shrink-0 space-y-4 border-b border-gray-100 bg-white px-3 pb-4 pt-4">
+                <p className="text-center text-[15px] font-bold leading-snug text-gray-800">
+                  안녕하세요! 무엇을 도와드릴까요?
+                </p>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShell('schedule_chat')
+                      setMessages((prev) => [
+                        ...prev,
+                        { id: newId(), kind: 'text', role: 'assistant', text: SCHEDULE_REGISTER_INTRO },
+                      ])
+                      bumpUnreadIfClosed(1)
+                    }}
+                    className="rounded-2xl border border-sky-200 bg-sky-50/95 px-4 py-4 text-center text-sm font-black text-sky-950 shadow-sm transition active:scale-[0.99]"
+                  >
+                    일정 등록
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!childId}
+                    onClick={() => {
+                      if (!childId) return
+                      setShell('routine_manage')
+                      setRoutineSubTab('routine')
+                    }}
+                    className="rounded-2xl border border-violet-200 bg-violet-50/95 px-4 py-4 text-center text-sm font-black text-violet-950 shadow-sm transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    루틴 관리
+                  </button>
                 </div>
               </div>
-              {activeIntentCategory ? (
-                <div className="routine-agent-intent-scroll-fade relative mt-2">
-                  <div
-                    className="routine-agent-hide-scrollbar flex touch-pan-x gap-2 overflow-x-auto pb-1 pt-0.5"
-                    role="group"
-                    aria-label={`${activeIntentCategory.label} 세부 인텐트`}
-                  >
-                    {activeIntentCategory.intents.map((chip, idx) => {
-                      const pair = SUBCHIP_STYLES_BY_CATEGORY[activeIntentCategory.id] ?? [
-                        'border-gray-200 bg-gray-50 text-gray-900',
-                        'border-gray-200 bg-gray-50 text-gray-900',
-                      ]
-                      const chipClass = pair[idx % 2] ?? pair[0]
-                      return (
-                        <button
-                          key={chip.id}
-                          type="button"
-                          onClick={() => pushIntentQuestionSet(chip.prompt)}
-                          className={`shrink-0 whitespace-nowrap rounded-xl border px-3 py-2.5 text-center text-[11px] font-black leading-snug shadow-sm transition active:scale-[0.98] ${chipClass}`}
-                        >
-                          {chip.label}
-                        </button>
-                      )
-                    })}
-                  </div>
-                </div>
-              ) : (
-                <p className="mt-2 rounded-lg border border-dashed border-gray-200 bg-gray-50/80 px-2 py-2 text-center text-[10px] font-bold text-gray-400">
-                  카테고리를 누르면 세부 선택이 펼쳐져요
-                </p>
-              )}
-            </div>
+            ) : null}
 
+            {shell === 'schedule_chat' ? (
+              <>
             {/* 대화창 전체 영역 — 스크롤 배경도 흰색으로 통일(스크롤바는 숨기고 위·아래 스크롤은 그대로) */}
             <div className="routine-agent-hide-scrollbar min-h-0 flex-1 overflow-y-auto bg-white px-3 py-2">
               <ul className="flex flex-col gap-2">
@@ -1809,6 +1641,66 @@ export default function RoutineAgentSchedulePanel({
                 보내기
               </button>
             </div>
+              </>
+            ) : null}
+
+            {shell === 'routine_manage' && childId ? (
+              <div className="flex min-h-0 flex-1 flex-col gap-2 border-t border-gray-100 bg-white px-2 pb-2 pt-2">
+                <div className="flex shrink-0 gap-2" role="tablist" aria-label="루틴 관리 하위 탭">
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={routineSubTab === 'routine'}
+                    onClick={() => setRoutineSubTab('routine')}
+                    className={`min-h-11 min-w-0 flex-1 rounded-xl border px-2 py-2 text-center text-xs font-black transition ${
+                      routineSubTab === 'routine'
+                        ? 'border-sky-300 bg-sky-50 text-sky-950 shadow-sm'
+                        : 'border-gray-200 bg-white text-gray-600'
+                    }`}
+                  >
+                    일반 루틴
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={routineSubTab === 'special'}
+                    onClick={() => setRoutineSubTab('special')}
+                    className={`min-h-11 min-w-0 flex-1 rounded-xl border px-2 py-2 text-center text-xs font-black transition ${
+                      routineSubTab === 'special'
+                        ? 'border-violet-300 bg-violet-50 text-violet-950 shadow-sm'
+                        : 'border-gray-200 bg-white text-gray-600'
+                    }`}
+                  >
+                    스페셜 미션
+                  </button>
+                </div>
+                <div className="routine-agent-hide-scrollbar flex min-h-0 flex-1 flex-col overflow-hidden">
+                  {routineSubTab === 'routine' ? (
+                    <RoutineKeywordBuilderSheet
+                      key={`agent-routine-kw-${childId}`}
+                      embedded
+                      open
+                      onClose={closeRoutineEmbedded}
+                      linkedChildId={childId}
+                      hasSchool={hasSchool}
+                      routineMissions={routineMissions}
+                      onSuccess={() => onToast('루틴이 업데이트됐어요!')}
+                    />
+                  ) : (
+                    <SpecialMissionAddSheet
+                      key={`agent-routine-sp-${childId}`}
+                      embedded
+                      open
+                      onClose={closeRoutineEmbedded}
+                      childId={childId}
+                      specialMissions={specialMissions}
+                      onToast={onToast}
+                      successToastOverride="미션이 업데이트됐어요!"
+                    />
+                  )}
+                </div>
+              </div>
+            ) : null}
           </motion.aside>
         </motion.div>
       ) : null}

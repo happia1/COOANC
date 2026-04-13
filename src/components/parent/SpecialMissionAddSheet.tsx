@@ -23,6 +23,10 @@ type Props = {
   childId: string | null
   specialMissions: Mission[]
   onToast: (msg: string, ok?: boolean) => void
+  /** true면 루틴 도우미 패널 안에만 렌더(딤 없음) */
+  embedded?: boolean
+  /** 저장 성공 시(변경이 있을 때) 기본 토스트 대신 이 문구를 씁니다 */
+  successToastOverride?: string
 }
 
 export default function SpecialMissionAddSheet({
@@ -31,6 +35,8 @@ export default function SpecialMissionAddSheet({
   childId,
   specialMissions,
   onToast,
+  embedded = false,
+  successToastOverride,
 }: Props) {
   const router = useRouter()
   const [selectedIds, setSelectedIds] = useState<string[]>([])
@@ -174,7 +180,7 @@ export default function SpecialMissionAddSheet({
       if (updated > 0) parts.push(`설정 변경 ${updated}개`)
       if (deleted > 0) parts.push(`삭제 ${deleted}개`)
       if (parts.length > 0) {
-        onToast(`스페셜 미션: ${parts.join(', ')} 반영했어요.`)
+        onToast(successToastOverride ?? `스페셜 미션: ${parts.join(', ')} 반영했어요.`)
       } else {
         onToast('변경할 내용이 없어요')
       }
@@ -184,7 +190,7 @@ export default function SpecialMissionAddSheet({
     } finally {
       setLoading(false)
     }
-  }, [childId, selectedIds, dailyAutoIds, router, onToast, onClose])
+  }, [childId, selectedIds, dailyAutoIds, router, onToast, onClose, successToastOverride])
 
   if (!open) return null
 
@@ -195,10 +201,12 @@ export default function SpecialMissionAddSheet({
   const dailyChips = selectedChips.filter((c) => dailyAutoIds.includes(c.id))
   const eventChips = selectedChips.filter((c) => !dailyAutoIds.includes(c.id))
 
-  return (
-    <div className="fixed inset-0 z-[72] flex flex-col justify-end" role="dialog" aria-modal="true" aria-labelledby="sp-sheet-title">
-      <button type="button" className="absolute inset-0 bg-black/45" aria-label="닫기" onClick={onClose} />
-      <div className="relative flex max-h-[88vh] flex-col rounded-t-2xl bg-white shadow-2xl">
+  const card = (
+    <div
+      className={`relative flex min-h-0 flex-col overflow-hidden bg-white shadow-2xl ${
+        embedded ? 'h-full max-h-full rounded-xl border border-gray-100' : 'max-h-[88vh] rounded-t-2xl'
+      }`}
+    >
         <div className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-gray-200" aria-hidden />
         <div className="border-b border-gray-100 px-4 pb-2 pt-3">
           <p id="sp-sheet-title" className="text-center text-sm font-black text-gray-900">
@@ -319,6 +327,20 @@ export default function SpecialMissionAddSheet({
           </button>
         </div>
       </div>
+  )
+
+  if (embedded) {
+    return (
+      <div className="flex min-h-0 flex-1 flex-col" role="region" aria-labelledby="sp-sheet-title">
+        {card}
+      </div>
+    )
+  }
+
+  return (
+    <div className="fixed inset-0 z-[72] flex flex-col justify-end" role="dialog" aria-modal="true" aria-labelledby="sp-sheet-title">
+      <button type="button" className="absolute inset-0 bg-black/45" aria-label="닫기" onClick={onClose} />
+      {card}
     </div>
   )
 }

@@ -29,6 +29,11 @@ type Props = {
   /** 루틴 탭에서 넘기는 이 자녀 일상 미션(스페셜 제외) — 열 때 칩 동기화 */
   routineMissions: Mission[]
   onSuccess?: () => void
+  /**
+   * true: 전체 화면 딤 없이 패널 안에만 카드 본문을 둡니다(루틴 도우미 탭 재사용).
+   * false(기본): 기존 하단 시트와 동일합니다.
+   */
+  embedded?: boolean
 }
 
 export default function RoutineKeywordBuilderSheet({
@@ -38,6 +43,7 @@ export default function RoutineKeywordBuilderSheet({
   hasSchool,
   routineMissions,
   onSuccess,
+  embedded = false,
 }: Props) {
   const router = useRouter()
   const [weekdayAm, setWeekdayAm] = useState<string[]>([])
@@ -127,10 +133,12 @@ export default function RoutineKeywordBuilderSheet({
 
   if (!open) return null
 
-  return (
-    <div className="fixed inset-0 z-[70] flex flex-col justify-end" role="dialog" aria-modal="true" aria-labelledby="kw-sheet-title">
-      <button type="button" className="absolute inset-0 bg-black/45" aria-label="닫기" onClick={onClose} />
-      <div className="relative flex max-h-[88vh] flex-col rounded-t-2xl bg-white shadow-2xl">
+  const card = (
+    <div
+      className={`relative flex min-h-0 flex-col overflow-hidden bg-white shadow-2xl ${
+        embedded ? 'h-full max-h-full rounded-xl border border-gray-100' : 'max-h-[88vh] rounded-t-2xl'
+      }`}
+    >
         <div className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-gray-200" aria-hidden />
         <div className="border-b border-gray-100 px-4 pb-2 pt-3">
           <p id="kw-sheet-title" className="text-center text-sm font-black text-gray-900">
@@ -222,6 +230,20 @@ export default function RoutineKeywordBuilderSheet({
           </button>
         </div>
       </div>
+  )
+
+  if (embedded) {
+    return (
+      <div className="flex min-h-0 flex-1 flex-col" role="region" aria-labelledby="kw-sheet-title">
+        {card}
+      </div>
+    )
+  }
+
+  return (
+    <div className="fixed inset-0 z-[70] flex flex-col justify-end" role="dialog" aria-modal="true" aria-labelledby="kw-sheet-title">
+      <button type="button" className="absolute inset-0 bg-black/45" aria-label="닫기" onClick={onClose} />
+      {card}
     </div>
   )
 }

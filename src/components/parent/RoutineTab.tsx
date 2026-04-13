@@ -806,6 +806,9 @@ export default function RoutineTab({
         onClose={() => setSchedulePanelOpen(false)}
         familyLinkId={familyLinkId}
         childId={currentId}
+        routineMissions={routineOnly}
+        specialMissions={specialOnly}
+        hasSchool={hasSchool}
         onToast={showToast}
         onAssistantRepliesWhileClosed={(delta) =>
           setRoutineAgentUnread((n) => {
