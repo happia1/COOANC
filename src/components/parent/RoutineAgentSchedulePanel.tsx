@@ -233,6 +233,8 @@ type MultiSlotUi = {
   routineCardComplete?: boolean
   /** 다건 슬롯에서 [취소]로 닫은 카드인지 */
   routineCardCancelled?: boolean
+  /** 법정 공휴일과 겹쳐 자동 휴일 처리된 슬롯인지 */
+  holidayAutoFromPublic?: boolean
 }
 
 /** 다건 슬롯이 모두 등록·건너뛰기 처리됐는지 */
@@ -418,10 +420,22 @@ function UnifiedScheduleConfirmCard(props: {
   registrationComplete?: boolean
   /** 부모가 [취소] 처리로 카드를 닫았을 때 보여 줄 문구 */
   cancelledComplete?: boolean
+  /** 법정 공휴일(`public_holidays`)과 겹쳐 휴일·루틴 끔을 자동 적용한 경우 안내 문구 */
+  showPublicHolidayAutoBanner?: boolean
   onRegister: (payload: ScheduleConfirmRegisterPayload) => void | Promise<void>
   onCancel: () => void | Promise<void>
 }) {
-  const { layout, event: ev, suggestions, busy, registrationComplete, cancelledComplete, onRegister, onCancel } = props
+  const {
+    layout,
+    event: ev,
+    suggestions,
+    busy,
+    registrationComplete,
+    cancelledComplete,
+    showPublicHolidayAutoBanner,
+    onRegister,
+    onCancel,
+  } = props
   const descFieldId = useId()
   const pending = pendingSuggestions(suggestions)
 
@@ -492,6 +506,11 @@ function UnifiedScheduleConfirmCard(props: {
   return (
     <div className="rounded-2xl border border-violet-100/90 bg-gradient-to-b from-violet-50/90 via-white to-sky-50/80 p-3 shadow-md ring-1 ring-sky-100/60">
       <p className="text-center text-xs font-black text-violet-950">{heading}</p>
+      {showPublicHolidayAutoBanner ? (
+        <p className="mt-2 rounded-lg bg-red-50 px-2 py-1.5 text-center text-[10px] font-black leading-snug text-red-800 ring-1 ring-red-100">
+          공휴일로 자동 설정됐어요
+        </p>
+      ) : null}
       <div className="my-2 border-t border-violet-100/80" />
 
       {layout === 'compact' ? (
@@ -879,6 +898,7 @@ export default function RoutineAgentSchedulePanel({
             event: row.event,
             status: 'pending' as const,
             slotSuggestions: [],
+            holidayAutoFromPublic: Boolean(row.holiday_auto_from_public),
           }))
         : undefined
       const sug: SuggestionUi[] = (res.suggestions ?? []).map((s) => ({ ...s, status: 'pending' as const }))
@@ -1646,6 +1666,7 @@ export default function RoutineAgentSchedulePanel({
                               layout="compact"
                               event={slot.event}
                               suggestions={slot.slotSuggestions}
+                              showPublicHolidayAutoBanner={Boolean(slot.holidayAutoFromPublic)}
                               registrationComplete={Boolean(slot.routineCardComplete)}
                               cancelledComplete={Boolean(slot.routineCardCancelled)}
                               busy={suggestionSubmitKey === `${m.id}:${idx}` || loading}
@@ -1691,6 +1712,7 @@ export default function RoutineAgentSchedulePanel({
                           layout="full"
                           event={ev}
                           suggestions={m.suggestions}
+                          showPublicHolidayAutoBanner={Boolean(m.parseResult.holiday_auto_applied)}
                           registrationComplete={Boolean(m.confirmComplete)}
                           cancelledComplete={Boolean(m.confirmCancelled)}
                           busy={suggestionSubmitKey === m.id || loading}

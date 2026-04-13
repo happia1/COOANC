@@ -26,6 +26,10 @@ const EVENT_COLORS: Record<LocalCalendarEvent['eventType'], { bg: string; text: 
   vacation: { bg: 'bg-blue-50', text: 'text-blue-700', dot: 'bg-blue-400' },
   special: { bg: 'bg-yellow-50', text: 'text-yellow-700', dot: 'bg-yellow-400' },
   other: { bg: 'bg-gray-100', text: 'text-gray-700', dot: 'bg-gray-400' },
+  /** 행사 — 초록 톤(학교·기관 행사 등) */
+  event: { bg: 'bg-emerald-50', text: 'text-emerald-800', dot: 'bg-emerald-500' },
+  /** 여행 — 하늘색 톤 */
+  travel: { bg: 'bg-sky-50', text: 'text-sky-800', dot: 'bg-sky-500' },
 }
 
 /** 범례 칩만: 필터 선택 시 배경·글자·점을 한 단계 진하게(다시 누르면 EVENT_COLORS 와 동일 톤으로 복귀) */
@@ -34,6 +38,8 @@ const EVENT_LEGEND_CHIP_SELECTED: Record<LocalCalendarEvent['eventType'], { bg: 
   vacation: { bg: 'bg-blue-200', text: 'text-blue-900', dot: 'bg-blue-600' },
   special: { bg: 'bg-yellow-200', text: 'text-yellow-900', dot: 'bg-yellow-600' },
   other: { bg: 'bg-gray-300', text: 'text-gray-900', dot: 'bg-gray-600' },
+  event: { bg: 'bg-emerald-200', text: 'text-emerald-950', dot: 'bg-emerald-600' },
+  travel: { bg: 'bg-sky-200', text: 'text-sky-950', dot: 'bg-sky-600' },
 }
 
 /** 표시 전용 이름 (special = 기념일, other = 그 외 일정) */
@@ -42,10 +48,19 @@ const EVENT_TYPE_LABELS: Record<LocalCalendarEvent['eventType'], string> = {
   vacation: '방학',
   special: '기념일',
   other: '기타',
+  event: '행사',
+  travel: '여행',
 }
 
 /** 범례·일정 시트에서 쓰는 종류 순서 */
-const EVENT_TYPES_ORDER: LocalCalendarEvent['eventType'][] = ['holiday', 'vacation', 'special', 'other']
+const EVENT_TYPES_ORDER: LocalCalendarEvent['eventType'][] = [
+  'holiday',
+  'vacation',
+  'special',
+  'event',
+  'travel',
+  'other',
+]
 
 type OverrideType = LocalCalendarEvent['routineOverride']
 
@@ -205,6 +220,35 @@ export default function CalendarSection({ childId }: Props) {
       dateEventMap[d].push(ev)
     }
   }
+  /**
+   * 법정 공휴일(`public_holidays`)은 별도 localStorage 행 없이도 **공휴일(빨간) 점**이 찍히게 합니다.
+   * id 는 `__public_holiday__:` 로 시작해 일반 일정과 구분합니다(상세 시트에서는 숨김).
+   * 다른 유형만 필터한 상태에서는 범례와 맞추기 위해 공휴일 점은 넣지 않습니다.
+   */
+  const showPublicHolidayDots = legendFilter == null || legendFilter === 'holiday'
+  if (showPublicHolidayDots) {
+    for (const dk of Object.keys(holidayNamesByDate)) {
+      const parts = dk.split('-').map(Number)
+      const yv = parts[0]
+      const mv = parts[1]
+      if (yv !== year || mv - 1 !== month) continue
+      const nm = holidayNamesByDate[dk]
+      if (!nm) continue
+      const syn: LocalCalendarEvent = {
+        id: `__public_holiday__:${dk}`,
+        childId: null,
+        title: nm,
+        startDate: dk,
+        endDate: dk,
+        eventType: 'holiday',
+        routineOverride: 'none',
+      }
+      const cur = dateEventMap[dk] ?? []
+      if (!cur.some((e) => e.id.startsWith('__public_holiday__:'))) {
+        dateEventMap[dk] = [syn, ...cur]
+      }
+    }
+  }
 
   const firstDay = new Date(year, month, 1).getDay()
   const daysCount = new Date(year, month + 1, 0).getDate()
@@ -213,7 +257,8 @@ export default function CalendarSection({ childId }: Props) {
 
   function handleDayClick(dk: string) {
     const raw = dateEventMap[dk] ?? []
-    const byId = new Map(raw.map((e) => [e.id, e]))
+    const userOnly = raw.filter((e) => !e.id.startsWith('__public_holiday__:'))
+    const byId = new Map(userOnly.map((e) => [e.id, e]))
     const uniq = [...byId.values()]
     if (uniq.length > 0) {
       setEmptyDayKey(null)

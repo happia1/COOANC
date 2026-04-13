@@ -14,11 +14,13 @@ import { COOANC_CALENDAR_EVENTS_STORAGE_KEY } from '@/lib/localStorageChildScope
 /** `CalendarSection` 이 `localStorage` 를 다시 읽을 때 구독하는 이벤트 이름 */
 export const COOANC_CALENDAR_STORAGE_UPDATE_EVENT = 'cooanc-calendar-storage-updated'
 
-/** 에이전트 `event.type` 문자열을 부모 캘린더(localStorage)의 `eventType` 네 가지로 맞춥니다. */
+/** 에이전트 `event.type` 문자열을 부모 캘린더(localStorage)의 `eventType` 으로 맞춥니다. */
 export function agentParseTypeToLocalEventType(t: string): LocalCalendarEvent['eventType'] {
   const c = (t || '').trim().toLowerCase()
   if (c === 'holiday') return 'holiday'
   if (c === 'vacation') return 'vacation'
+  if (c === 'travel') return 'travel'
+  if (c === 'school') return 'event'
   if (c === 'special' || c === 'birthday') return 'special'
   return 'other'
 }

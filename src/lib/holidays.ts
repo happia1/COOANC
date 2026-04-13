@@ -109,13 +109,41 @@ export async function fetchKasiHolidaysForYear(
     const body = (json as { response?: { body?: { totalCount?: number | string } } })?.response?.body
     totalCount = Number(body?.totalCount ?? 0)
 
+    const pageItems: KasiHolidayApiItem[] = []
     for (const row of extractItemArray(json)) {
       const n = normalizeItem(row)
-      if (n) all.push(n)
+      if (n) {
+        all.push(n)
+        pageItems.push(n)
+      }
+    }
+
+    // 개발 시 터미널·브라우저 콘솔에서 API 응답이 도착했는지 확인하기 위한 로그입니다.
+    if (process.env.NODE_ENV === 'development') {
+      const sample = pageItems.slice(0, 5).map((it) => ({
+        locdate: it.locdate,
+        dateName: it.dateName,
+        isHoliday: it.isHoliday,
+      }))
+      console.log('[fetchKasiHolidaysForYear]', {
+        solYear,
+        pageNo,
+        httpOk: res.ok,
+        headerCode,
+        headerMsg,
+        totalCount,
+        pageItemCount: pageItems.length,
+        cumulative: all.length,
+        sample,
+      })
     }
 
     if (totalCount <= 0 || pageNo * numOfRows >= totalCount) break
     pageNo += 1
+  }
+
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[fetchKasiHolidaysForYear] done', { solYear, totalItems: all.length })
   }
 
   return { items: all, headerCode: headerCode || '00', headerMsg }

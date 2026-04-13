@@ -129,7 +129,7 @@ export type CalendarEvent = {
   title: string
   start_date: string    // YYYY-MM-DD
   end_date: string      // YYYY-MM-DD
-  event_type: 'holiday' | 'vacation' | 'special' | 'other'
+  event_type: 'holiday' | 'vacation' | 'special' | 'other' | 'event' | 'travel'
   routine_override: 'weekend' | 'none'
   created_at: string
 }
@@ -143,7 +143,7 @@ export type LocalCalendarEvent = {
   description?: string
   startDate: string       // YYYY-MM-DD
   endDate: string         // YYYY-MM-DD
-  eventType: 'holiday' | 'vacation' | 'special' | 'other'
+  eventType: 'holiday' | 'vacation' | 'special' | 'other' | 'event' | 'travel'
   routineOverride: 'weekend' | 'none'
 }
 

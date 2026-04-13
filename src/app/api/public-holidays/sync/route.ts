@@ -48,6 +48,19 @@ export async function GET(req: NextRequest) {
   const { items, headerCode, headerMsg } = await fetchKasiHolidaysForYear(serviceKey, year, {
     numOfRows: 50,
   })
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[public-holidays/sync] API 응답', {
+      year,
+      headerCode,
+      headerMsg,
+      itemCount: items.length,
+      sample: items.slice(0, 5).map((it) => ({
+        locdate: it.locdate,
+        dateName: it.dateName,
+        isHoliday: it.isHoliday,
+      })),
+    })
+  }
   if (headerCode !== '00') {
     return NextResponse.json(
       { ok: false, year, headerCode, headerMsg },

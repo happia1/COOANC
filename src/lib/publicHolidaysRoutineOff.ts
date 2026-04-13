@@ -1,9 +1,11 @@
 /**
- * 루틴 도우미: 일정이 **법정 공휴일(is_holiday=Y)** 과 겹치면 `routine_off: true` 를 붙입니다.
- * 비개발자: "쉬는 날이면 미션도 쉬게 할까요?" 토글이 자동으로 켜지게 하는 규칙입니다.
+ * 루틴 도우미: 일정이 **법정 공휴일(is_holiday=Y)** 과 겹치면
+ * - `type: 'holiday'`, `routine_off: true` 로 맞추고
+ * - 응답에 `holiday_auto_applied` / 슬롯별 `holiday_auto_from_public` 플래그를 붙입니다.
+ * 비개발자: "그날은 법정 쉬는 날이니까 휴일로 처리할게요" 라고 앱이 스스로 정해 주는 단계입니다.
  */
 
-import type { AgentParseEvent, AgentParseResponse } from '@/lib/agentApi'
+import type { AgentParseEvent, AgentParseResponse, AgentParsedScheduleRow } from '@/lib/agentApi'
 import { createClient } from '@/lib/supabase/client'
 
 /** YYYY-MM-DD 문자열 두 개 사이(포함)의 모든 날짜 */
@@ -38,15 +40,21 @@ function collectDatesFromResponse(res: AgentParseResponse): string[] {
   return [...set]
 }
 
-function applyHolidayToEvent(ev: AgentParseEvent, holidaySet: Set<string>): AgentParseEvent {
+function applyPublicHolidayToEvent(
+  ev: AgentParseEvent,
+  holidaySet: Set<string>,
+): { event: AgentParseEvent; changed: boolean } {
   const hit = expandYmdInclusive(ev.start_date, ev.end_date).some((d) => holidaySet.has(d))
-  if (!hit) return ev
-  return { ...ev, routine_off: true }
+  if (!hit) return { event: ev, changed: false }
+  return {
+    event: { ...ev, type: 'holiday', routine_off: true },
+    changed: true,
+  }
 }
 
 /**
- * `public_holidays` 테이블을 조회해, 일정 기간과 겹치는 공휴일(Y)이 있으면 `routine_off` 를 true 로 설정합니다.
- * Supabase 미설정·테이블 없음 등은 조용히 원본을 돌려줍니다.
+ * `public_holidays` 테이블을 조회해, 일정 기간과 겹치는 공휴일(Y)이 있으면
+ * `type: holiday`, `routine_off: true` 및 UI용 플래그를 설정합니다.
  */
 export async function enrichAgentParseResponseWithHolidayRoutineOff(
   res: AgentParseResponse,
@@ -65,17 +73,29 @@ export async function enrichAgentParseResponseWithHolidayRoutineOff(
 
     const holidaySet = new Set(data.map((r) => String((r as { holiday_date: string }).holiday_date).slice(0, 10)))
 
-    const nextEvent = applyHolidayToEvent(res.event, holidaySet)
-    const nextSchedules =
-      res.schedules?.map((row) => ({
-        ...row,
-        event: applyHolidayToEvent(row.event, holidaySet),
-      })) ?? null
+    let holiday_auto_applied = false
+
+    const r0 = applyPublicHolidayToEvent(res.event, holidaySet)
+    if (r0.changed) holiday_auto_applied = true
+
+    let nextSchedules: AgentParsedScheduleRow[] | null = res.schedules
+    if (res.schedules?.length) {
+      nextSchedules = res.schedules.map((row) => {
+        const r = applyPublicHolidayToEvent(row.event, holidaySet)
+        if (r.changed) holiday_auto_applied = true
+        return {
+          ...row,
+          event: r.event,
+          holiday_auto_from_public: r.changed ? true : row.holiday_auto_from_public,
+        }
+      })
+    }
 
     return {
       ...res,
-      event: nextEvent,
+      event: r0.event,
       schedules: nextSchedules,
+      holiday_auto_applied: holiday_auto_applied || undefined,
     }
   } catch {
     return res

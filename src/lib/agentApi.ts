@@ -66,6 +66,8 @@ export type AgentParseMode = 'single' | 'multi'
 export type AgentParsedScheduleRow = {
   event: AgentParseEvent
   suggestions: AgentParseSuggestion[]
+  /** `public_holidays` 와 겹쳐 유형·루틴이 자동 조정됐는지(다건 슬롯 카드 안내용) */
+  holiday_auto_from_public?: boolean
 }
 
 export type AgentParseResponse = {
@@ -80,6 +82,8 @@ export type AgentParseResponse = {
   event: AgentParseEvent
   suggestions: AgentParseSuggestion[]
   saved_event_id: string | null
+  /** 법정 공휴일(`public_holidays`)과 겹쳐 휴일·루틴 끔을 자동 적용했는지 */
+  holiday_auto_applied?: boolean
 }
 
 /** POST /agent-b/commit-schedule 한 건 저장 응답(모드 필드 없음) */

@@ -579,9 +579,13 @@ export function localBuiltScheduleFromParentForm(input: {
       ? 'holiday'
       : input.calendarEventType === 'vacation'
         ? 'vacation'
-        : input.calendarEventType === 'special'
-          ? 'birthday'
-          : 'etc'
+        : input.calendarEventType === 'travel'
+          ? 'travel'
+          : input.calendarEventType === 'event'
+            ? 'school'
+            : input.calendarEventType === 'special'
+              ? 'birthday'
+              : 'etc'
   return {
     title: title || '일정',
     start_date: s,
