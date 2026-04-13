@@ -14,6 +14,9 @@ import {
 import { agentParseTypeToLocalEventType } from '@/lib/syncAgentEventToLocalCalendar'
 import type { LocalCalendarEvent } from '@/types/database'
 
+/** 직접 입력 폼 감사 문자열에만 붙이는 토큰 — `shouldCallAPI` 가 키워드 조건을 통과하도록 함 */
+const DIRECT_FORM_AUDIT_TAG = '직접입력'
+
 /** 에이전트/DB 와 맞춘 이벤트 유형 코드 */
 export type EventType = 'school' | 'holiday' | 'vacation' | 'travel' | 'birthday' | 'hospital' | 'etc'
 
@@ -188,6 +191,11 @@ const KEYWORD_GROUPS: { type: EventType; words: string[] }[] = [
       '치과',
       '병원',
     ],
+  },
+  /** 폼에서 온 짧은 문장도 `hasMappedKeyword` 를 만족시키기 위한 최소 토큰(일반 채팅에 잘 안 씀) */
+  {
+    type: 'etc',
+    words: [DIRECT_FORM_AUDIT_TAG],
   },
 ]
 
@@ -542,6 +550,61 @@ export function buildAgentParseResponseFromLocal(schedule: LocalBuiltSchedule): 
  * 날짜·키워드가 분명한 한 줄에서 일정 JSON 을 만듭니다.
  * - 실패 시 null → 호출 측에서 Gemini 로 폴백하면 됩니다.
  */
+/** 직접 입력 폼에서 넘긴 `YYYY-MM-DD` 만 허용합니다 */
+const YMD_ISO = /^\d{4}-\d{2}-\d{2}$/
+
+/**
+ * 부모 탭 「직접 입력」폼 값으로 로컬 일정 객체를 만듭니다.
+ * - `shouldCallAPI` 가 false 일 때만 쓰면 됩니다.
+ * - 날짜가 잘못되면 null 을 돌려 호출 측에서 API 로 폴백할 수 있습니다.
+ */
+export function localBuiltScheduleFromParentForm(input: {
+  title: string
+  start_date: string
+  end_date: string
+  calendarEventType: LocalCalendarEvent['eventType']
+  /** 폼의 「미션 없음」이면 true */
+  routine_off: boolean
+  /** 확인 카드·메모에 그대로 실을 문자열(폼 전체 블록 등) */
+  note: string
+}): LocalBuiltSchedule | null {
+  const title = input.title.trim()
+  const s = input.start_date.trim()
+  const e0 = input.end_date.trim()
+  if (!title || !YMD_ISO.test(s) || !YMD_ISO.test(e0)) return null
+  let end = e0
+  if (end < s) end = s
+  const event_type: EventType =
+    input.calendarEventType === 'holiday'
+      ? 'holiday'
+      : input.calendarEventType === 'vacation'
+        ? 'vacation'
+        : input.calendarEventType === 'special'
+          ? 'birthday'
+          : 'etc'
+  return {
+    title: title || '일정',
+    start_date: s,
+    end_date: end,
+    event_type,
+    routine_off: input.routine_off,
+    note: input.note.trim(),
+  }
+}
+
+/** `handleDirectSave` 가 `shouldCallAPI` 에 넘길 한 줄짜리 문자열을 만듭니다 */
+export function buildDirectFormAuditLine(parts: {
+  title: string
+  start: string
+  end: string
+  eventLabel: string
+  description: string
+}): string {
+  return [parts.title.trim(), parts.start.trim(), parts.end.trim(), parts.eventLabel.trim(), parts.description.trim(), DIRECT_FORM_AUDIT_TAG]
+    .filter(Boolean)
+    .join(' ')
+}
+
 export function buildScheduleFromText(input: string): LocalBuiltSchedule | null {
   const range = extractDateRange(input)
   if (!range) return null
