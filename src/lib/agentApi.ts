@@ -36,6 +36,8 @@ export type AgentParseEvent = {
   title: string
   start_date: string
   end_date: string | null
+  /** 서버가 넣는 설명(다건 커밋 후에도 올 수 있음) */
+  description?: string
 }
 
 export type AgentParseSuggestion = {
@@ -44,7 +46,25 @@ export type AgentParseSuggestion = {
   suggestion_id: string | null
 }
 
+/** `single`: 바로 DB에 초안이 저장됨. `multi`: 스캔만 하고 한 건씩 commit API 로 저장 */
+export type AgentParseMode = 'single' | 'multi'
+
+export type AgentParsedScheduleRow = {
+  event: AgentParseEvent
+  suggestions: AgentParseSuggestion[]
+}
+
 export type AgentParseResponse = {
+  mode: AgentParseMode
+  /** 다건일 때만 채워짐 — 각 줄은 처음엔 suggestions 가 비어 있고, ‘등록’ 후 채워짐 */
+  schedules: AgentParsedScheduleRow[] | null
+  event: AgentParseEvent
+  suggestions: AgentParseSuggestion[]
+  saved_event_id: string | null
+}
+
+/** POST /agent-b/commit-schedule 한 건 저장 응답(모드 필드 없음) */
+export type AgentCommitScheduleResponse = {
   event: AgentParseEvent
   suggestions: AgentParseSuggestion[]
   saved_event_id: string | null
@@ -83,6 +103,28 @@ export async function postAgentParse(body: {
     throw new Error(detail || `파싱 실패 (${res.status})`)
   }
   return json as unknown as AgentParseResponse
+}
+
+/** 다건 스캔 후, 한 건의 일정만 서버(DB)에 확정 저장하고 루틴 제안을 생성합니다. */
+export async function postAgentCommitSchedule(body: {
+  family_link_id: string
+  child_id: string
+  input_type: 'text' | 'image'
+  text_input?: string
+  event: AgentParseEvent
+}): Promise<AgentCommitScheduleResponse> {
+  const base = getAgentBaseUrl()
+  const res = await fetch(`${base}/agent-b/commit-schedule`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  const json = (await res.json().catch(() => ({}))) as Record<string, unknown>
+  if (!res.ok) {
+    const detail = typeof json.detail === 'string' ? json.detail : JSON.stringify(json)
+    throw new Error(detail || `저장 실패 (${res.status})`)
+  }
+  return json as unknown as AgentCommitScheduleResponse
 }
 
 /** 제안 승인 또는 거절 */

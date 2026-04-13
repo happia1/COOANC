@@ -3,6 +3,7 @@
  * - 상단바에 넘기는 「구매 승인 대기」개수는 여기서 조회해, 홈 화면과 중복 쿼리를 피합니다.
  */
 import type { ReactNode } from 'react'
+import { PARENT_TABS_MAIN_SCROLL_EL_ID } from '@/lib/parentTabsMainScrollId'
 import { createClient } from '@/lib/supabase/server'
 import ParentNavBar from '@/components/parent/ParentNavBar'
 import ParentTopBar from '@/components/parent/ParentTopBar'
@@ -35,7 +36,10 @@ export default async function ParentTabsLayout({ children }: { children: ReactNo
   return (
     <div className="min-h-screen bg-gradient-to-b from-sky-50 via-white to-blue-50 flex flex-col">
       <ParentTopBar pendingApprovalCount={pendingApprovalCount} />
-      <main className="flex-1 overflow-y-auto w-full max-w-md mx-auto px-4 pt-4 pb-24">
+      <main
+        id={PARENT_TABS_MAIN_SCROLL_EL_ID}
+        className="mx-auto w-full max-w-md flex-1 overflow-y-auto px-4 pb-24 pt-4"
+      >
         {children}
       </main>
       <ParentNewPurchaseRequestModal />

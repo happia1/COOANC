@@ -2,7 +2,7 @@
 
 import Image from 'next/image'
 import Link from 'next/link'
-import { AUTH_LOGO_SRC, TOPBAR_LOGO_CLASSNAME, TOPBAR_LOGO_HEIGHT, TOPBAR_LOGO_WIDTH } from '@/constants/branding'
+import { TOPBAR_LOGO_CLASSNAME, TOPBAR_LOGO_HEIGHT, TOPBAR_LOGO_SRC, TOPBAR_LOGO_WIDTH } from '@/constants/branding'
 import ParentRoutineAlarmButton from '@/components/parent/ParentRoutineAlarmButton'
 
 type TopBarProps = {
@@ -12,15 +12,18 @@ type TopBarProps = {
 
 /**
  * 부모 앱 공통 상단바
- * - 좌: COOANC 로고
+ * - 좌: 앱 파비콘과 동일한 마크(브라우저 탭 아이콘과 같은 이미지)
  * - 우: 종(알림·공지) + 알람시계(루틴 알람 바로가기) + 설정
  */
 export default function ParentTopBar({ pendingApprovalCount }: TopBarProps) {
   return (
     <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-sm border-b border-gray-100 shadow-sm">
       <div className="flex items-center justify-between max-w-md mx-auto px-4 py-3">
+        {/**
+         * 탭 파비콘과 같은 그림입니다. 파일은 `/assets/**` 아래에 두어 `next.config` 의 `localPatterns` 와 맞습니다.
+         */}
         <Image
-          src={AUTH_LOGO_SRC}
+          src={TOPBAR_LOGO_SRC}
           alt="COOANC"
           width={TOPBAR_LOGO_WIDTH}
           height={TOPBAR_LOGO_HEIGHT}

@@ -557,3 +557,14 @@
     animation: none;
   }
 }
+
+/* ── 루틴 도우미 챗봇: 막대는 안 보이게, 스크롤 동작은 유지 ── */
+.routine-agent-hide-scrollbar {
+  -ms-overflow-style: none; /* 옛 Edge/IE 계열 */
+  scrollbar-width: none; /* Firefox: 스크롤 막대 숨김 */
+}
+.routine-agent-hide-scrollbar::-webkit-scrollbar {
+  width: 0; /* 세로 막대가 차지하던 폭 제거 */
+  height: 0; /* 가로 막대가 차지하던 높이 제거 */
+  display: none; /* Chromium/Safari 등 WebKit 계열 */
+}

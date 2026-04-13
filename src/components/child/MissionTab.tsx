@@ -633,15 +633,14 @@ export default function MissionTab({
   }
 
   /**
-   * 카드 바로 위 **한 행**: 왼쪽 제목 · 오른쪽 하트 5개.
+   * 카드 바로 위 **한 행**: 「오늘의 미션」 글자 바로 옆에 하트 5개를 붙이고, 줄 전체를 왼쪽 정렬합니다.
+   * (비개발자용) 화면 가로가 넓어도 하트가 오른쪽 끝으로 밀리지 않고 제목 옆에 모여 있습니다.
    * 레이아웃·간격은 `missionTodayLayoutSpec.ts` 고정값을 씁니다.
    */
   const missionTitleAboveCards = (
     <div className={MISSION_TODAY_TITLE_ROW_OUTER_CLASSNAME}>
       <div className={MISSION_TODAY_TITLE_ROW_INNER_CLASSNAME}>
-        <div className="flex min-w-0 flex-[0_1_auto] items-center gap-2 overflow-hidden">
-          <h2 className={MISSION_TODAY_TITLE_HEADING_CLASSNAME}>오늘의 미션</h2>
-        </div>
+        <h2 className={MISSION_TODAY_TITLE_HEADING_CLASSNAME}>오늘의 미션</h2>
         <MissionHeartRow filledCount={filledHearts} onFull={handleHeartsFull} />
       </div>
     </div>

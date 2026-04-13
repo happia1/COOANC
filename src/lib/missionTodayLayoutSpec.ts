@@ -56,9 +56,9 @@ export const MISSION_TODAY_BOTTOM_SECTION_CLASSNAME =
 export const MISSION_TODAY_TITLE_ROW_OUTER_CLASSNAME =
   'w-full min-w-0 shrink-0 pl-2 pr-2 pb-0.5 pt-0.5' as const
 
-/** 제목·EXP 를 한 행에 넣는 flex 컨테이너 */
+/** 제목·하트(또는 EXP 묶음)를 한 행에 넣는 flex 컨테이너 — `justify-start` 로 가로 전체를 쓰더라도 왼쪽에 붙입니다 */
 export const MISSION_TODAY_TITLE_ROW_INNER_CLASSNAME =
-  'flex w-full min-w-0 flex-nowrap items-center gap-2' as const
+  'flex w-full min-w-0 flex-nowrap items-center justify-start gap-2' as const
 
 /** 「오늘의 미션」 제목 텍스트 */
 export const MISSION_TODAY_TITLE_HEADING_CLASSNAME =

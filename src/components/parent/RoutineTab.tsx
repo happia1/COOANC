@@ -40,6 +40,7 @@ import {
 import { sortMissionsByRoutineFlow } from '@/lib/routineChips'
 import SpriteImage from '@/components/common/SpriteImage'
 import { ICONS } from '@/constants/sprites'
+import { TOPBAR_LOGO_SRC } from '@/constants/branding'
 import { MISSION_ROUTINES_ATLAS } from '@/constants/missionRoutineAtlas'
 import { missionRoutineIconFrame } from '@/lib/missionRoutineIconFrame'
 import { resolveRoutineMissionPngUrl } from '@/lib/routineMissionThumbnail'
@@ -383,7 +384,7 @@ function SpecialDailyEventBlock({
       >
         {/* 오늘 하루만 블록은 일정 추가 행동을 유도하는 안내 문구를 함께 표시 */}
         <div className="flex min-w-0 items-center gap-1.5">
-          <span className="text-xs font-bold text-gray-700">오늘 하루만</span>
+          <span className="text-xs font-bold text-gray-700">오늘 하루</span>
           <span className={ROUTINE_DESC_TRUNCATE_CLASS}>일정 추가를 눌러 오늘의 미션으로 추가</span>
         </div>
         <ChevronToggleIcon open={openEvent} className="text-gray-400" />
@@ -772,9 +773,9 @@ export default function RoutineTab({
             aria-label="루틴 도우미 챗봇 열기"
             className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full border border-sky-100/90 bg-white shadow-[0_10px_28px_-6px_rgba(59,130,246,0.35),0_4px_14px_-4px_rgba(15,23,42,0.12)] transition active:scale-[0.94] disabled:pointer-events-none disabled:opacity-40"
           >
-            {/* next/image localPatterns 제외 경로이므로 img 사용 — 루트 layout 과 동일한 파비콘 */}
-            {/* eslint-disable-next-line @next/next/no-img-element -- 정적 파비콘, public 루트 */}
-            <img src="/favicon-96x96.png" alt="" className="h-9 w-9 object-contain" />
+            {/* `/assets/**` 경로라 `next/image` 도 가능하지만, 플로팅 버튼은 가볍게 img 유지 */}
+            {/* eslint-disable-next-line @next/next/no-img-element -- 작은 브랜드 마크 */}
+            <img src={TOPBAR_LOGO_SRC} alt="" className="h-9 w-9 object-contain" />
           </button>
         </div>
       </div>

@@ -239,7 +239,7 @@ export default function SpecialMissionAddSheet({
                 <div className="rounded-xl border border-violet-100 bg-violet-50/40 p-3">
                   <p className="text-xs font-black text-violet-900">매일 일정에 표시</p>
                   <p className="mt-0.5 text-[10px] leading-snug text-violet-800/80">
-                    아래 스페셜은 저장 후 자녀 앱 오늘 일정에 매일 자동으로 포함돼요. 항목마다 다시 쓰지 않아도 됩니다.
+                    매일 스페셜 미션으로 자동으로 추가됩니다.
                   </p>
                   <ul className="mt-2 space-y-2">
                     {dailyChips.map((chip) => (
@@ -268,10 +268,10 @@ export default function SpecialMissionAddSheet({
 
               {eventChips.length > 0 ? (
                 <div className="rounded-xl border border-amber-100 bg-amber-50/30 p-3">
-                  <p className="text-xs font-black text-amber-900">오늘 하루만 넣기</p>
+                  <p className="text-xs font-black text-amber-900">오늘 하루만 일정에 추가</p>
                   <p className="mt-0.5 text-[10px] leading-snug text-amber-900/70">
-                    매일이 아닌 스페셜은 저장 후 루틴 탭 카드에서 「오늘 일정에 넣기」로 그날만 자녀 화면에 보이게 할 수
-                    있어요.
+                    오늘 하루만 스페셜 미션에 추가할 수 있어요.
+                    
                   </p>
                   <ul className="mt-2 space-y-2">
                     {eventChips.map((chip) => (
