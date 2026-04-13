@@ -40,9 +40,7 @@ import {
   agentTypeToLocalCalendarType,
   agentTypeToPickerLabel,
   buildAgentParseResponseFromLocal,
-  buildDirectFormAuditLine,
   buildScheduleFromText,
-  localBuiltScheduleFromParentForm,
   normalizeAgentTypeForPicker,
   shouldCallAPI,
 } from '@/lib/routineAgentLocalParse'
@@ -1019,78 +1017,52 @@ export default function RoutineAgentSchedulePanel({
 
   /**
    * 직접 입력 폼 [저장]
-   * - 제목·시작일·종료일이 모두 있고 `shouldCallAPI` 가 false 이면 로컬에서 JSON 을 만들고,
-   * - 애매하거나(긴 설명·접속사 등) 조건이 맞지 않으면 기존처럼 `/agent-b/parse` 로 보냅니다.
+   * - 이 경로는 확인 카드 없이 **즉시 캘린더에 반영**합니다.
+   * - 저장 성공 시 폼을 자동으로 닫고, 다음 입력을 위해 기본값으로 되돌립니다.
    */
   const handleDirectSave = async () => {
-    if (!dTitle.trim()) {
+    const title = dTitle.trim()
+    if (!title) {
       onToast('일정 이름을 입력해 주세요', false)
+      return
+    }
+    if (!dStart.trim() || !dEnd.trim()) {
+      onToast('시작일과 종료일을 입력해 주세요', false)
       return
     }
     if (!familyLinkId || !childId) {
       onToast('가족 연결 정보를 찾을 수 없어요. 잠시 후 다시 시도해 주세요.', false)
       return
     }
-    const block = [
-      '[직접 입력 일정]',
-      `일정 이름: ${dTitle.trim()}`,
-      `시작일: ${dStart}`,
-      `종료일: ${dEnd}`,
-      `이벤트 종류: ${EVENT_TYPE_LABELS[dType]}`,
-      `루틴 적용: ${dOverride === 'weekend' ? '휴일 루틴 적용' : '미션 없음'}`,
-      dDesc.trim() ? `설명: ${dDesc.trim()}` : '',
-    ]
-      .filter(Boolean)
-      .join('\n')
 
-    setMessages((prev) => [...prev, { id: newId(), kind: 'text', role: 'user', text: block }])
-
-    const datesFilled = Boolean(dStart.trim() && dEnd.trim())
-    const auditLine = buildDirectFormAuditLine({
-      title: dTitle.trim(),
-      start: dStart,
-      end: dEnd,
-      eventLabel: EVENT_TYPE_LABELS[dType],
-      description: dDesc.trim(),
-    })
-
-    if (datesFilled && !shouldCallAPI(auditLine, false)) {
-      const noteBody = dDesc.trim() ? `${dDesc.trim()}\n\n${block}` : block
-      const localPlan = localBuiltScheduleFromParentForm({
-        title: dTitle.trim(),
-        start_date: dStart,
-        end_date: dEnd,
-        calendarEventType: dType,
-        routine_off: dOverride === 'none',
-        note: noteBody,
-      })
-      if (localPlan) {
-        const res = buildAgentParseResponseFromLocal(localPlan)
-        const sug: SuggestionUi[] = (res.suggestions ?? []).map((s) => ({ ...s, status: 'pending' as const }))
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: newId(),
-            kind: 'parse',
-            role: 'assistant',
-            parseResult: res,
-            suggestions: sug,
-            deferCalendarSync: true,
-            calendarRowId: null,
-          },
-        ])
-        bumpUnreadIfClosed(1)
-        onToast('입력 내용을 바로 반영했어요. 아래에서 확인 후 등록해 주세요')
-        return
-      }
+    /** 직접 입력 폼의 로컬 타입(holiday/vacation/special/other)을 에이전트 타입 문자열로 맞춥니다. */
+    const typeCode =
+      dType === 'holiday' ? 'holiday' : dType === 'vacation' ? 'vacation' : dType === 'special' ? 'birthday' : 'etc'
+    const event: AgentParseEvent = {
+      type: typeCode,
+      title,
+      start_date: dStart,
+      end_date: dEnd === dStart ? null : dEnd,
+      ...(dDesc.trim() ? { description: dDesc.trim() } : {}),
+      routine_off: dOverride === 'none',
     }
 
-    await runParse({
-      family_link_id: familyLinkId,
-      child_id: childId,
-      input_type: 'text',
-      text_input: block,
+    const rowId = syncAgentEventToLocalCalendar(childId, event, null, {
+      routineOverride: dOverride,
     })
+    if (!rowId) {
+      onToast('직접 입력 일정을 저장하지 못했어요. 잠시 후 다시 시도해 주세요.', false)
+      return
+    }
+
+    setDirectOpen(false)
+    setDTitle('')
+    setDStart(getSeoulDateString())
+    setDEnd(getSeoulDateString())
+    setDType('holiday')
+    setDOverride('weekend')
+    setDDesc('')
+    onToast('일정을 바로 등록했어요')
   }
 
   /** 다건 스캔 중 한 줄을 DB 에 올리고, 그 줄에 대한 루틴 제안을 받아옵니다(말풍선에서 넘긴 slot/call 을 그대로 씀) */
