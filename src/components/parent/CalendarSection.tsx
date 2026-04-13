@@ -886,7 +886,7 @@ function EventDetailBottomSheet({
                 )}
                 {isReadonlyPublicHoliday ? (
                   <p className="mt-3 text-[11px] font-bold leading-snug text-gray-500">
-                    법정 공휴일은 서비스에서 자동으로 표시되며, 편집하거나 삭제할 수 없어요.
+                    법정 공휴일은 편집하거나 삭제할 수 없어요.
                   </p>
                 ) : (
                 <div className="mt-3 flex gap-2">
