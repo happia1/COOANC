@@ -9,6 +9,14 @@ import { isRetriableMissingColumnError } from '@/lib/supabase/childProfileSelect
 import HomeTab from '@/components/child/HomeTab'
 import type { ChildStats, ChildItemUnlock, PraiseStickerGrant, PraiseStickerPlacement } from '@/types/database'
 
+/** 홈 탭에 쓰는 프로필 한 줄 — 구형 DB 는 `avatar_url` 컬럼 없이 name·role 만 올 수 있음 */
+type ChildProfileForHome = {
+  name: string | null
+  role: string | null
+  /** 스키마에 컬럼이 없으면 이 필드가 비어 있을 수 있음 */
+  avatar_url?: string | null
+}
+
 /** 매 요청 최신 RSC 로 오래된 SSR HTML 과 클라 번들이 어긋나 hydration 이 깨지는 경우를 줄입니다. */
 export const dynamic = 'force-dynamic'
 
@@ -49,11 +57,11 @@ export default async function ChildHomePage({
   const praisePlacements = (placementsRes.data ?? []) as PraiseStickerPlacement[]
   const unlockedItemIndexes = ((itemUnlocksRes.data ?? []) as Pick<ChildItemUnlock, 'item_index'>[]).map((r) => r.item_index)
 
-  /** `avatar_url` 컬럼이 없는 구형 DB 는 name 만 다시 읽습니다 */
-  let profileRow = profileRes.data
+  /** `avatar_url` 컬럼이 없는 구형 DB 는 name·role 만 다시 읽습니다 */
+  let profileRow: ChildProfileForHome | null = profileRes.data as ChildProfileForHome | null
   if (profileRes.error && isRetriableMissingColumnError(profileRes.error)) {
     const fallback = await supabase.from('profiles').select('name, role').eq('id', childId).maybeSingle()
-    profileRow = fallback.data
+    profileRow = fallback.data as ChildProfileForHome | null
   }
 
   const meta = user?.user_metadata as { name?: string } | undefined
@@ -63,9 +71,7 @@ export default async function ChildHomePage({
     '쿠앵이'
 
   const childAvatarUrl =
-    profileRow && typeof (profileRow as { avatar_url?: string | null }).avatar_url === 'string'
-      ? (profileRow as { avatar_url: string }).avatar_url.trim() || null
-      : null
+    profileRow && typeof profileRow.avatar_url === 'string' ? profileRow.avatar_url.trim() || null : null
 
   return (
     <HomeTab

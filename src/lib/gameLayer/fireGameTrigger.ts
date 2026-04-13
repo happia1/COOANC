@@ -17,11 +17,11 @@ export async function fireGameTrigger(
   childId: string,
   key: TriggerKey,
 ): Promise<FireGameTriggerResult> {
-  // 트리거 발동 이력 삽입 (중복 시 무시)
-  const { error: insertErr, count } = await supabase
+  // 트리거 발동 이력 삽입 (중복 시 무시) — `select` 는 컬럼 문자열만 받도록 타입이 좁혀져 count 옵션은 쓰지 않습니다
+  const { error: insertErr, data: insertedRows } = await supabase
     .from('child_trigger_fired')
     .insert({ child_id: childId, trigger_key: key })
-    .select('*', { count: 'exact', head: true })
+    .select('child_id')
 
   if (insertErr) {
     // ON CONFLICT(23505) = 이미 발동됨 → 조용히 무시
@@ -33,8 +33,8 @@ export async function fireGameTrigger(
     return { fired: false, unlockedItemIndex: null }
   }
 
-  // count === 0 이면 ON CONFLICT 발생 → 이미 발동됨
-  if (!count || count === 0) {
+  /** `ON CONFLICT DO NOTHING` 이면 삽입된 행이 없어 배열이 비어 있을 수 있음 */
+  if (!insertedRows?.length) {
     return { fired: false, unlockedItemIndex: null }
   }
 
