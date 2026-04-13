@@ -95,6 +95,15 @@ function datesInRange(start: string, end: string): string[] {
   return result
 }
 
+/** 달력 칸 폭 한정: 공휴일 이름은 5글자 이하이면 그대로, 초과 시 앞 4글자 + '..' (예: 부처님오신날 → 부처님오.., 노동절 → 노동절) */
+const PUBLIC_HOLIDAY_CELL_LABEL_MAX_CHARS = 5
+
+function shortPublicHolidayCellLabel(full: string): string {
+  const chars = Array.from(full.trim())
+  if (chars.length <= PUBLIC_HOLIDAY_CELL_LABEL_MAX_CHARS) return chars.join('')
+  return `${chars.slice(0, 4).join('')}..`
+}
+
 type SheetState = {
   startDate: string
   endDate: string
@@ -408,10 +417,10 @@ export default function CalendarSection({ childId }: Props) {
               {day}
               {publicHolidayName ? (
                 <span
-                  className="mt-0.5 max-w-[3.25rem] truncate px-0.5 text-center text-[8px] font-extrabold leading-tight text-red-600"
+                  className="mt-0.5 block w-full min-w-0 max-w-[3.25rem] overflow-hidden whitespace-nowrap text-ellipsis px-0.5 text-center text-[10px] font-bold leading-none text-red-600"
                   title={publicHolidayName}
                 >
-                  {publicHolidayName}
+                  {shortPublicHolidayCellLabel(publicHolidayName)}
                 </span>
               ) : null}
               {/*
