@@ -149,25 +149,24 @@ export async function fetchKasiHolidaysForYear(
   return { items: all, headerCode: headerCode || '00', headerMsg }
 }
 
-/** API 행 → Supabase upsert 용 레코드(연도·날짜·이름·Y/N) */
+/** API 행 → Supabase upsert 용 레코드(`public_holidays`: year, date, name) — 실제 쉬는 날만 넣습니다 */
 export function kasiItemsToPublicHolidayRows(
   solYear: number,
   items: KasiHolidayApiItem[],
-): { year: number; holiday_date: string; name: string; is_holiday: 'Y' | 'N' }[] {
-  const out: { year: number; holiday_date: string; name: string; is_holiday: 'Y' | 'N' }[] = []
+): { year: number; date: string; name: string }[] {
+  const out: { year: number; date: string; name: string }[] = []
   const seen = new Set<string>()
   for (const it of items) {
+    if (it.isHoliday !== 'Y') continue
     const ymd = locdateToIsoDate(it.locdate)
     if (!ymd) continue
     const dedupKey = `${solYear}:${ymd}`
     if (seen.has(dedupKey)) continue
     seen.add(dedupKey)
-    const flag: 'Y' | 'N' = it.isHoliday === 'Y' ? 'Y' : 'N'
     out.push({
       year: solYear,
-      holiday_date: ymd,
+      date: ymd,
       name: it.dateName,
-      is_holiday: flag,
     })
   }
   return out

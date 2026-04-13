@@ -1,5 +1,5 @@
 /**
- * 루틴 도우미: 일정이 **법정 공휴일(is_holiday=Y)** 과 겹치면
+ * 루틴 도우미: 일정이 **법정 공휴일(`public_holidays.date`)** 과 겹치면
  * - `type: 'holiday'`, `routine_off: true` 로 맞추고
  * - 응답에 `holiday_auto_applied` / 슬롯별 `holiday_auto_from_public` 플래그를 붙입니다.
  * 비개발자: "그날은 법정 쉬는 날이니까 휴일로 처리할게요" 라고 앱이 스스로 정해 주는 단계입니다.
@@ -53,7 +53,7 @@ function applyPublicHolidayToEvent(
 }
 
 /**
- * `public_holidays` 테이블을 조회해, 일정 기간과 겹치는 공휴일(Y)이 있으면
+ * `public_holidays` 테이블을 조회해, 일정 기간과 겹치는 행이 있으면
  * `type: holiday`, `routine_off: true` 및 UI용 플래그를 설정합니다.
  */
 export async function enrichAgentParseResponseWithHolidayRoutineOff(
@@ -64,14 +64,10 @@ export async function enrichAgentParseResponseWithHolidayRoutineOff(
 
   try {
     const supabase = createClient()
-    const { data, error } = await supabase
-      .from('public_holidays')
-      .select('holiday_date')
-      .in('holiday_date', dates)
-      .eq('is_holiday', 'Y')
+    const { data, error } = await supabase.from('public_holidays').select('date').in('date', dates)
     if (error || !data?.length) return res
 
-    const holidaySet = new Set(data.map((r) => String((r as { holiday_date: string }).holiday_date).slice(0, 10)))
+    const holidaySet = new Set(data.map((r) => String((r as { date: string }).date).slice(0, 10)))
 
     let holiday_auto_applied = false
 

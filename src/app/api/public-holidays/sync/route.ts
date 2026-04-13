@@ -72,12 +72,8 @@ export async function GET(req: NextRequest) {
   const nowIso = new Date().toISOString()
 
   if (rows.length > 0) {
-    const payload = rows.map((r) => ({
-      ...r,
-      updated_at: nowIso,
-    }))
-    const { error: upErr } = await admin.from('public_holidays').upsert(payload, {
-      onConflict: 'year,holiday_date',
+    const { error: upErr } = await admin.from('public_holidays').upsert(rows, {
+      onConflict: 'year,date',
     })
     if (upErr) {
       return NextResponse.json({ ok: false, error: upErr.message }, { status: 500 })

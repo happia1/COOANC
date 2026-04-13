@@ -273,9 +273,8 @@ export type ChildItemUnlock = {
 export type PublicHoliday = {
   id: string
   year: number
-  holiday_date: string
+  /** DB 컬럼명 `date` (YYYY-MM-DD) */
+  date: string
   name: string
-  is_holiday: 'Y' | 'N'
   created_at: string
-  updated_at: string
 }

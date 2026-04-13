@@ -164,18 +164,17 @@ export default function CalendarSection({ childId }: Props) {
         const end = `${ym}-${pad(lastD)}`
         const { data, error } = await supabase
           .from('public_holidays')
-          .select('holiday_date,name')
-          .gte('holiday_date', start)
-          .lte('holiday_date', end)
-          .eq('is_holiday', 'Y')
+          .select('date,name')
+          .gte('date', start)
+          .lte('date', end)
         if (cancelled) return
         if (error || !data) {
           setHolidayNamesByDate({})
           return
         }
         const map: Record<string, string> = {}
-        for (const row of data as { holiday_date: string; name: string }[]) {
-          map[String(row.holiday_date).slice(0, 10)] = row.name
+        for (const row of data as { date: string; name: string }[]) {
+          map[String(row.date).slice(0, 10)] = row.name
         }
         setHolidayNamesByDate(map)
       } catch {
