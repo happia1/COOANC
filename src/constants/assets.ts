@@ -36,18 +36,42 @@ export const ASSETS = {
     modes: `${ASSETS_IMG_BASE}/characters/modes`,
     onboarding: `${ASSETS_IMG_BASE}/characters/onboarding`,
     /**
-     * 홈 「내 캐릭터 꾸미기」용 아이템 PNG — `public/assets/img/characters/items/` 안 파일을 1번부터 순서대로 씁니다.
-     * (파일명에 공백이 있어도 웹 경로로는 그대로 사용 가능합니다.)
+     * 홈 「내 캐릭터 꾸미기」용 아이템 PNG 목록입니다.
+     * - 실제 파일은 `public/assets/img/characters/items/` 에 있으며, 괄호 안 숫자가 작은 것부터 큰 순으로 정렬해 두었습니다.
+     * - (2)~(8) 번 파일은 현재 폴더에 없으므로 목록에서 빠져 있습니다.
+     * - 파일명에 공백이 있어도 Next/Image 가 그대로 요청할 수 있습니다.
      */
     decorItemImages: [
       assetImg('characters', 'items', 'items (1).png'),
-      assetImg('characters', 'items', 'items (2).png'),
-      assetImg('characters', 'items', 'items (3).png'),
-      assetImg('characters', 'items', 'items (4).png'),
-      assetImg('characters', 'items', 'items (5).png'),
-      assetImg('characters', 'items', 'items (6).png'),
-      assetImg('characters', 'items', 'items (7).png'),
-      assetImg('characters', 'items', 'items (8).png'),
+      assetImg('characters', 'items', 'items (9).png'),
+      assetImg('characters', 'items', 'items (10).png'),
+      assetImg('characters', 'items', 'items (11).png'),
+      assetImg('characters', 'items', 'items (12).png'),
+      assetImg('characters', 'items', 'items (13).png'),
+      assetImg('characters', 'items', 'items (14).png'),
+      assetImg('characters', 'items', 'items (15).png'),
+      assetImg('characters', 'items', 'items (16).png'),
+      assetImg('characters', 'items', 'items (17).png'),
+      assetImg('characters', 'items', 'items (18).png'),
+      assetImg('characters', 'items', 'items (19).png'),
+      assetImg('characters', 'items', 'items (20).png'),
+      assetImg('characters', 'items', 'items (21).png'),
+      assetImg('characters', 'items', 'items (22).png'),
+      assetImg('characters', 'items', 'items (23).png'),
+      assetImg('characters', 'items', 'items (24).png'),
+      assetImg('characters', 'items', 'items (25).png'),
+      assetImg('characters', 'items', 'items (26).png'),
+      assetImg('characters', 'items', 'items (27).png'),
+      assetImg('characters', 'items', 'items (28).png'),
+      assetImg('characters', 'items', 'items (29).png'),
+      assetImg('characters', 'items', 'items (30).png'),
+      assetImg('characters', 'items', 'items (31).png'),
+      assetImg('characters', 'items', 'items (32).png'),
+      assetImg('characters', 'items', 'items (33).png'),
+      assetImg('characters', 'items', 'items (34).png'),
+      assetImg('characters', 'items', 'items (35).png'),
+      assetImg('characters', 'items', 'items (36).png'),
+      assetImg('characters', 'items', 'items (37).png'),
     ] as const,
   },
 
@@ -88,3 +112,10 @@ export const ASSETS = {
 } as const
 
 export type AssetsCategory = keyof typeof ASSETS
+
+/**
+ * 꾸미기 아이템을 화면에서 전부 잠금처럼 보이게 할 때 true 로 둡니다.
+ * - true: DB 에 잠금 해제가 있어도 칸은 잠금 UI만 보이고, 실시간으로 새로 풀려도 축하 팝업은 띄우지 않습니다.
+ * - 조건(미션·저장 등)을 `triggerItemMap` 과 연동한 뒤 false 로 바꾸면 정상적으로 해제 상태가 반영됩니다.
+ */
+export const CHARACTER_DECOR_UI_FORCE_ALL_LOCKED = true

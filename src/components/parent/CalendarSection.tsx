@@ -4,10 +4,11 @@
  * 부모 루틴 탭 — 캘린더
  * - localStorage(cooanc_calendar_events_v1) 저장
  * - 「캘린더」제목·+ 버튼은 스페셜 미션처럼 흰 카드 밖 상단 한 줄(+는 오른쪽 끝) — + 로 일정 추가 바텀시트(EventSheet) 열기
- * - 공휴일·방학·기념일·기타 범례 칩은 한 줄 가로 스크롤(스크롤바는 숨기고 손가락으로만 밀기)
+ * - 공휴일·방학·기념일·기타 범례 칩은 한 줄 가로 스크롤; **탭하면 해당 유형만** 필터(같은 칩 다시 탭하면 해제). 선택 칩은 **색만 진하게**(테두리 링 없음).
  * - 날짜 탭: 해당 날 일정이 있으면 상세 슬라이드, 없으면 빈 상태 시트 +「일정등록하기」(헤더 +와 동일 EventSheet, 클릭한 날짜로 시작·종료일 채움)
  * - 일정 상세 시트 헤더 오른쪽 + : 헤더와 같은 EventSheet(일정 추가)를 연 뒤 상세는 닫음
- * - 「이번 달 일정」은 같은 줄 오른쪽 화살표로 접기/펼치기(처음엔 접힘)
+ * - 「이번 달 일정」은 **항상** 같은 줄에 표시(일정 0건이어도 숨기지 않음). 펼치면 목록 또는 빈 안내.
+ * - 흰 카드는 `pb-4`(작은 하단 여백)만 둠. 저작 표시 `ⓒRHYMIA.Ltd.co` 는 **카드 밖**(섹션 하단) 중앙.
  * - 시트 z-index는 하단 독바(z-50)보다 위로 두어 저장 버튼이 가리지 않게 함
  */
 
@@ -15,6 +16,7 @@ import { useState, useEffect, useCallback } from 'react'
 import type { LocalCalendarEvent } from '@/types/database'
 import { getSeoulDateString } from '@/lib/koreaDate'
 import { COOANC_CALENDAR_EVENTS_STORAGE_KEY } from '@/lib/localStorageChildScope'
+import { COOANC_CALENDAR_STORAGE_UPDATE_EVENT } from '@/lib/syncAgentEventToLocalCalendar'
 
 const STORAGE_KEY = COOANC_CALENDAR_EVENTS_STORAGE_KEY
 
@@ -23,6 +25,14 @@ const EVENT_COLORS: Record<LocalCalendarEvent['eventType'], { bg: string; text: 
   vacation: { bg: 'bg-blue-50', text: 'text-blue-700', dot: 'bg-blue-400' },
   special: { bg: 'bg-yellow-50', text: 'text-yellow-700', dot: 'bg-yellow-400' },
   other: { bg: 'bg-gray-100', text: 'text-gray-700', dot: 'bg-gray-400' },
+}
+
+/** 범례 칩만: 필터 선택 시 배경·글자·점을 한 단계 진하게(다시 누르면 EVENT_COLORS 와 동일 톤으로 복귀) */
+const EVENT_LEGEND_CHIP_SELECTED: Record<LocalCalendarEvent['eventType'], { bg: string; text: string; dot: string }> = {
+  holiday: { bg: 'bg-red-200', text: 'text-red-900', dot: 'bg-red-600' },
+  vacation: { bg: 'bg-blue-200', text: 'text-blue-900', dot: 'bg-blue-600' },
+  special: { bg: 'bg-yellow-200', text: 'text-yellow-900', dot: 'bg-yellow-600' },
+  other: { bg: 'bg-gray-300', text: 'text-gray-900', dot: 'bg-gray-600' },
 }
 
 /** 표시 전용 이름 (special = 기념일, other = 그 외 일정) */
@@ -93,6 +103,8 @@ export default function CalendarSection({ childId }: Props) {
   const [emptyDayKey, setEmptyDayKey] = useState<string | null>(null)
   /** 이번 달 일정 목록: 처음엔 접어 두고, 같은 줄 오른쪽 화살표로 펼침 */
   const [monthScheduleOpen, setMonthScheduleOpen] = useState(false)
+  /** 상단 범례(유형 칩) 선택 시: null 이면 전체, 값이면 그 eventType 만 달력·목록에 표시 */
+  const [legendFilter, setLegendFilter] = useState<LocalCalendarEvent['eventType'] | null>(null)
 
   useEffect(() => {
     try {
@@ -100,6 +112,24 @@ export default function CalendarSection({ childId }: Props) {
       if (raw) setEvents(JSON.parse(raw))
     } catch {
       /* ignore */
+    }
+  }, [])
+
+  /** 루틴 도우미 등이 `localStorage` 를 갱신하면 같은 탭에서도 목록을 다시 읽습니다 */
+  useEffect(() => {
+    const reloadFromStorage = () => {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY)
+        if (raw) setEvents(JSON.parse(raw))
+      } catch {
+        /* ignore */
+      }
+    }
+    window.addEventListener(COOANC_CALENDAR_STORAGE_UPDATE_EVENT, reloadFromStorage)
+    window.addEventListener('storage', reloadFromStorage)
+    return () => {
+      window.removeEventListener(COOANC_CALENDAR_STORAGE_UPDATE_EVENT, reloadFromStorage)
+      window.removeEventListener('storage', reloadFromStorage)
     }
   }, [])
 
@@ -116,13 +146,18 @@ export default function CalendarSection({ childId }: Props) {
 
   const todayStr = getSeoulDateString()
 
-  const monthEvents = events.filter((ev) => {
+  /** 이번 달·현재 아이에 해당하는 일정(필터 적용 전) */
+  const monthEventsAll = events.filter((ev) => {
     if (ev.childId && ev.childId !== childId) return false
     return datesInRange(ev.startDate, ev.endDate).some((d) => {
       const [y, m] = d.split('-').map(Number)
       return y === year && m - 1 === month
     })
   })
+  /** 범례에서 한 유형만 골랐을 때: 달력 점·날짜 탭 상세·「이번 달 일정」목록 모두 이 목록 기준 */
+  const monthEvents = legendFilter
+    ? monthEventsAll.filter((ev) => ev.eventType === legendFilter)
+    : monthEventsAll
 
   const dateEventMap: Record<string, LocalCalendarEvent[]> = {}
   for (const ev of monthEvents) {
@@ -173,6 +208,11 @@ export default function CalendarSection({ childId }: Props) {
     } else setMonth((m) => m + 1)
   }
 
+  /** 범례 칩: 같은 유형을 다시 누르면 필터 해제(전체 보기) */
+  function toggleLegendFilter(type: LocalCalendarEvent['eventType']) {
+    setLegendFilter((cur) => (cur === type ? null : type))
+  }
+
   return (
     <section>
       {/* 스페셜 미션과 동일: 섹션 제목은 카드 밖, 액션(+ )는 같은 줄 오른쪽 끝 */}
@@ -188,23 +228,40 @@ export default function CalendarSection({ childId }: Props) {
         </button>
       </div>
 
-      <div className="rounded-2xl bg-white p-4 shadow-sm">
+      {/* pb-4: 이번 달 일정 아래·카드 하단 여백을 최소로(요청에 따라 pb-10 → 더 축소). FAB과 겹치면 pb-6 등으로만 살짝 늘리면 됨 */}
+      <div className="rounded-2xl bg-white px-4 pt-4 pb-4 shadow-sm">
       {/* 범례: 한 줄 가로 스크롤 — 스크롤바 UI는 숨김(웹킷·파이어폭스·구형 Edge) */}
       <div
         className="mb-3 flex snap-x snap-proximity touch-pan-x gap-2 overflow-x-auto overscroll-x-contain pb-0.5 [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
         role="list"
-        aria-label="일정 유형 범례"
+        aria-label="일정 유형 범례 — 칩을 누르면 해당 유형만 표시"
       >
-        {EVENT_TYPES_ORDER.map((type) => (
-          <span
-            key={type}
-            role="listitem"
-            className={`inline-flex shrink-0 snap-start items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-bold ${EVENT_COLORS[type].bg} ${EVENT_COLORS[type].text}`}
-          >
-            <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${EVENT_COLORS[type].dot}`} aria-hidden />
-            {EVENT_TYPE_LABELS[type]}
-          </span>
-        ))}
+        {EVENT_TYPES_ORDER.map((type) => {
+          const selected = legendFilter === type
+          const chip = selected ? EVENT_LEGEND_CHIP_SELECTED[type] : EVENT_COLORS[type]
+          return (
+            <button
+              key={type}
+              type="button"
+              role="listitem"
+              aria-pressed={selected}
+              aria-label={
+                selected
+                  ? `${EVENT_TYPE_LABELS[type]} 필터 해제하고 전체 보기`
+                  : `${EVENT_TYPE_LABELS[type]}만 달력에 표시`
+              }
+              onClick={() => toggleLegendFilter(type)}
+              className={[
+                'inline-flex shrink-0 snap-start items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-bold transition-colors duration-150 active:opacity-90',
+                chip.bg,
+                chip.text,
+              ].join(' ')}
+            >
+              <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${chip.dot}`} aria-hidden />
+              {EVENT_TYPE_LABELS[type]}
+            </button>
+          )
+        })}
       </div>
 
       <div className="mb-3 flex items-center justify-between">
@@ -240,7 +297,8 @@ export default function CalendarSection({ childId }: Props) {
         ))}
       </div>
 
-      <div className="grid grid-cols-7 gap-y-1">
+      {/* gap-y-2: 행 사이 여백을 조금 넓혀 도트가 있어도 답답하지 않게 함 */}
+      <div className="grid grid-cols-7 gap-y-2">
         {cells.map((day, idx) => {
           if (!day) return <div key={idx} />
           const dk = dateKey(year, month, day)
@@ -248,62 +306,82 @@ export default function CalendarSection({ childId }: Props) {
           const isToday = dk === todayStr
           const isSun = idx % 7 === 0
           const isSat = idx % 7 === 6
+          /** 같은 날 중복 id 제거 후 최대 3개만 점으로 표시 */
+          const dotEvents = [...new Map(evHere.map((e) => [e.id, e])).values()].slice(0, 3)
           return (
             <button
               key={idx}
               type="button"
               onClick={() => handleDayClick(dk)}
               className={[
-                'relative flex flex-col items-center rounded-lg py-1 text-[11px] font-bold transition-all',
+                /* py-1.5: 숫자 줄·도트 슬롯을 포함해 모든 날짜 칸 높이를 통일하기 위한 여백 */
+                'relative flex flex-col items-center rounded-lg py-1.5 text-[11px] font-bold transition-all',
                 isToday ? 'ring-2 ring-brand-blue' : '',
                 'hover:bg-gray-50',
                 isSun ? 'text-red-500' : isSat ? 'text-blue-500' : 'text-gray-700',
               ].join(' ')}
             >
               {day}
-              {evHere.length > 0 && (
-                <div className="mt-0.5 flex flex-wrap justify-center gap-0.5">
-                  {[...new Map(evHere.map((e) => [e.id, e])).values()]
-                    .slice(0, 3)
-                    .map((ev) => (
-                      <span key={ev.id} className={`h-1.5 w-1.5 rounded-full ${EVENT_COLORS[ev.eventType].dot}`} />
-                    ))}
-                </div>
-              )}
+              {/*
+                일정이 없는 날도 같은 높이의 ‘도트 자리’를 항상 두어,
+                점이 생겼을 때만 행 높이가 커지는 현상(줄 간격 들쭉날쭉)을 막습니다.
+                h-3 안에 h-1 도트: 작은 점이라 한 줄에 3개가 들어가기 쉽고, 줄 높이 변화도 최소화됩니다.
+              */}
+              <div
+                className="mt-0.5 flex h-3 w-full flex-nowrap items-center justify-center gap-px overflow-hidden"
+                aria-hidden={dotEvents.length === 0}
+              >
+                {dotEvents.map((ev) => (
+                  <span
+                    key={ev.id}
+                    className={`h-1 w-1 shrink-0 rounded-full ${EVENT_COLORS[ev.eventType].dot}`}
+                  />
+                ))}
+              </div>
             </button>
           )
         })}
       </div>
 
-      {monthEvents.length > 0 && (
-        <div className="mt-3">
-          {/* 제목과 같은 줄 오른쪽: 아래 방향 토글(펼치면 180° 회전) */}
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-[11px] font-bold text-gray-400">이번 달 일정</p>
-            <button
-              type="button"
-              onClick={() => setMonthScheduleOpen((o) => !o)}
-              className="flex min-h-9 min-w-9 shrink-0 items-center justify-center rounded-lg text-gray-400 transition-colors active:bg-gray-100"
-              aria-expanded={monthScheduleOpen}
-              aria-label={monthScheduleOpen ? '이번 달 일정 접기' : '이번 달 일정 펼치기'}
+      {/*
+        이번 달 일정: 일정이 0건이어도 헤더·토글은 항상 보이게(이전에는 monthEvents.length > 0 일 때만 렌더되어 사라짐).
+      */}
+      <div className="mt-3">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-[11px] font-bold text-gray-400">이번 달 일정</p>
+          <button
+            type="button"
+            onClick={() => setMonthScheduleOpen((o) => !o)}
+            className="flex min-h-9 min-w-9 shrink-0 items-center justify-center rounded-lg text-gray-400 transition-colors active:bg-gray-100"
+            aria-expanded={monthScheduleOpen}
+            aria-label={monthScheduleOpen ? '이번 달 일정 접기' : '이번 달 일정 펼치기'}
+          >
+            <svg
+              className={`h-5 w-5 transition-transform duration-200 ${monthScheduleOpen ? 'rotate-180' : ''}`}
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden
             >
-              <svg
-                className={`h-5 w-5 transition-transform duration-200 ${monthScheduleOpen ? 'rotate-180' : ''}`}
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden
-              >
-                <path d="M6 9l6 6 6-6" />
-              </svg>
-            </button>
-          </div>
-          {monthScheduleOpen && (
-            <div className="mt-2 flex flex-col gap-2">
-              {monthEvents.map((ev) => (
+              <path d="M6 9l6 6 6-6" />
+            </svg>
+          </button>
+        </div>
+        {monthScheduleOpen ? (
+          <div className="mt-2 flex flex-col gap-2">
+            {monthEvents.length === 0 ? (
+              <p className="rounded-xl border border-dashed border-gray-200 bg-gray-50/80 px-3 py-3 text-center text-[10px] font-bold text-gray-400">
+                {monthEventsAll.length === 0
+                  ? '이번 달 등록된 일정이 없어요'
+                  : legendFilter
+                    ? `${EVENT_TYPE_LABELS[legendFilter]} 일정은 이번 달에 없어요. 위 칩을 다시 누르면 전체를 볼 수 있어요`
+                    : '이번 달 등록된 일정이 없어요'}
+              </p>
+            ) : (
+              monthEvents.map((ev) => (
                 <button
                   key={ev.id}
                   type="button"
@@ -320,11 +398,20 @@ export default function CalendarSection({ childId }: Props) {
                   </div>
                   <span className="shrink-0 text-[10px] font-bold text-gray-400">상세</span>
                 </button>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+              ))
+            )}
+          </div>
+        ) : null}
+      </div>
+      </div>
+
+      {/*
+        저작 표시: 흰 카드 밖(섹션 하단) 중앙 — 카드와 시각적으로 분리
+      */}
+      <div className="mt-2 text-center">
+        <p className="text-[9px] font-medium tracking-tight text-gray-400" aria-label="저작권 표시">
+          ⓒRHYMIA.Ltd.co
+        </p>
       </div>
 
       {sheet && (

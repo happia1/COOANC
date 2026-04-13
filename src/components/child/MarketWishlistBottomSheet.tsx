@@ -85,17 +85,18 @@ export default function MarketWishlistBottomSheet({
         </div>
         {/* 스크롤 영역 하단 패딩: 독바 + safe-area + 여유를 크게 두어 마지막 버튼이 가려지지 않게 함 */}
         <div className="max-h-[min(70vh,500px)] overflow-y-auto px-4 pb-[calc(60px+env(safe-area-inset-bottom,0px)+22px)] pt-3">
-          {/* 영수증 형태: 작은 이미지 + 물건명 + 금액, 마지막 합계(크레딧 텍스트 제거) */}
+          {/* 영수증 형태: 상품 썸네일(크게) + 물건명 + 금액, 마지막 합계(크레딧 텍스트 제거) */}
           <section className="rounded-2xl border border-dashed border-amber-300 bg-amber-50/85 p-3">
             <p className="text-center text-[11px] font-black text-amber-950">영수증</p>
-            <div className="mt-2 space-y-1">
+            <div className="mt-2 space-y-1.5">
               {wishlistEntries.map(({ item, quantity }) => (
                 <div
                   key={`receipt-${item.id}`}
-                  className="flex items-center justify-between gap-2 rounded-lg bg-white/70 px-2 py-1.5 text-[10px]"
+                  className="flex items-center justify-between gap-2 rounded-lg bg-white/70 px-2 py-2 text-[10px]"
                 >
-                  <div className="flex min-w-0 items-center gap-2">
-                    <div className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-md bg-amber-100/80">
+                  <div className="flex min-w-0 items-center gap-2.5">
+                    {/* 이전 28px(h-7) → 52px: 영수증에서 상품이 한눈에 보이도록 확대 */}
+                    <div className="flex h-[3.25rem] w-[3.25rem] shrink-0 items-center justify-center overflow-hidden rounded-lg bg-amber-100/80">
                       {item.image_url ? (
                         // eslint-disable-next-line @next/next/no-img-element -- 외부/스토리지 이미지 URL
                         <img
@@ -105,7 +106,7 @@ export default function MarketWishlistBottomSheet({
                           draggable={false}
                         />
                       ) : (
-                        <MarketItemImage frame={marketFrameKeyForItemId(item.id, item.name)} width={20} />
+                        <MarketItemImage frame={marketFrameKeyForItemId(item.id, item.name)} height={48} />
                       )}
                     </div>
                     <span className="truncate text-gray-700">{item.name}</span>

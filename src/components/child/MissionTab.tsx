@@ -6,8 +6,15 @@ import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/client'
-import type { ChildStats, DailyMission, DailyMissionWithTemplate } from '@/types/database'
+import type {
+  ChildStats,
+  DailyMission,
+  DailyMissionWithTemplate,
+  PraiseStickerGrant,
+  PraiseStickerPlacement,
+} from '@/types/database'
 import MissionCreditCards from '@/components/child/MissionCreditCards'
+import ChildMapStickerFloatingStack from '@/components/child/ChildMapStickerFloatingStack'
 import { parseSpecialMissionPopup } from '@/lib/specialMissionDescription'
 import { isRetiredSpecialMissionTitle, isSpecialSectionMission } from '@/lib/specialMissionChips'
 import { compareRoutineFlowSortable, type RoutineFlowSortable } from '@/lib/routineChips'
@@ -54,7 +61,12 @@ import { completionRateToHearts } from '@/lib/missionHeartCount'
 
 type Props = {
   childId: string
+  /** 항해지도 시트 제목 등 — `mission/page.tsx` 에서 프로필과 동일 규칙으로 전달 */
+  childName: string
   initialStats: ChildStats | null
+  /** 곰 스티커 시트 초기 데이터(홈과 동일 쿼리) */
+  initialPraiseGrants: PraiseStickerGrant[]
+  initialPraisePlacements: PraiseStickerPlacement[]
   dailyMissions: DailyMissionWithTemplate[]
   today: string
   isFullRestDay: boolean
@@ -184,11 +196,14 @@ function isMissionRolledBackPayload(v: unknown): v is { dailyMissionId: string; 
  * - 미션 탭 본문은 세로 스크롤로 상단(저금통·돈바구니·지갑 무대)·하단(카드)을 이어서 볼 수 있습니다.
  * - 카드 썸네일: `resolveRoutineMissionPngUrl`(제목 우선) 또는 `routines_01` 아틀라스(`missionRoutineIconFrame`)
  * - 부모 Realtime 「다시 하기」: DB 는 서버에서 이미 되돌아가고, 여기서는 카드만 슬라이더에 다시 보이게 맞춥니다.
- * - 칭찬 스티커(곰돌이) 단추는 **홈** 화면 플로팅 버튼으로만 엽니다.
+ * - 항해지도·스티커 단추: 홈 `HomeTab` 과 **같은 `max-w-sm` 좌표**로 `ChildMapStickerFloatingStack` 에서 노출합니다.
  */
 export default function MissionTab({
   childId,
+  childName,
   initialStats,
+  initialPraiseGrants,
+  initialPraisePlacements,
   dailyMissions,
   today,
   isFullRestDay,
@@ -633,8 +648,8 @@ export default function MissionTab({
   }
 
   /**
-   * 카드 바로 위 **한 행**: 「오늘의 미션」 글자 바로 옆에 하트 5개를 붙이고, 줄 전체를 왼쪽 정렬합니다.
-   * (비개발자용) 화면 가로가 넓어도 하트가 오른쪽 끝으로 밀리지 않고 제목 옆에 모여 있습니다.
+   * 카드 바로 위 **한 행**: 「오늘의 미션」은 왼쪽, 완료율 EXP 하트 5개는 같은 줄 **오른쪽**에 둡니다.
+   * (비개발자용) 가로가 넓으면 제목과 하트 사이에 빈 공간이 생기고, 제목이 길면 말줄임으로 하트와 겹치지 않습니다.
    * 레이아웃·간격은 `missionTodayLayoutSpec.ts` 고정값을 씁니다.
    */
   const missionTitleAboveCards = (
@@ -663,30 +678,48 @@ export default function MissionTab({
     </div>
   )
 
-  /** 상단 크레딧 카드만 — 배경은 루트 `missionTabBackdrop` 가 담당 */
+  /**
+   * 상단 크레딧 카드만 — 배경은 루트 `missionTabBackdrop` 가 담당.
+   * 세로로 `flex-[3]` 빈칸 + 카드 + `flex-1` 빈칸 → 남는 높이를 **3:1**로 나눔.
+   * (비개발자용) 중앙(`1:1`)과 맨 아래 붙임(`전부 위`)의 **가운데**쯤, 즉 “절반만” 아래로 내린 위치와 같습니다.
+   * `pb-1 sm:pb-1.5`: 하단 경계와 살짝 간격. 하단 `bottomPanel` 스펙은 그대로입니다.
+   */
   const heroBand = (
-    <div className="relative flex min-h-0 w-full flex-[5.5] basis-0 items-center justify-center self-stretch">
+    <div className="relative flex min-h-0 w-full flex-[5.5] basis-0 flex-col self-stretch pb-1 sm:pb-1.5">
+      {/** 장식용 여백 — 스크린 리더에 읽히지 않게 숨김 */}
+      <div className="min-h-0 shrink-0 flex-[3]" aria-hidden />
       {/** `max-w-sm` 보다 좁게 — 세 칸 카드 가로를 줄이고 양옆에 배경이 조금 더 보이게 */}
-      <div className="relative z-10 w-full max-w-[18rem] px-3 sm:max-w-[18.5rem] sm:px-4">
-        <MissionCreditCards
-          piggy={piggyCredits}
-          floating={floatingCredits}
-          wallet={walletCredits}
-          onPiggyTap={() => setCreditSheetBucket('piggy')}
-          onCenterTap={() => { if (floatingCredits > 0) setCreditSheetBucket('center') }}
-          onWalletTap={() => setCreditSheetBucket('wallet')}
-        />
+      {/** `z-0`: 제목·하트(`z-[30]`)가 위로 겹칠 때 저금통 줄보다 뒤에 두어 글이 가려지지 않게 함 */}
+      <div className="relative z-0 flex w-full shrink-0 justify-center px-3 sm:px-4">
+        <div className="w-full max-w-[18rem] sm:max-w-[18.5rem]">
+          <MissionCreditCards
+            piggy={piggyCredits}
+            floating={floatingCredits}
+            wallet={walletCredits}
+            onPiggyTap={() => setCreditSheetBucket('piggy')}
+            onCenterTap={() => { if (floatingCredits > 0) setCreditSheetBucket('center') }}
+            onWalletTap={() => setCreditSheetBucket('wallet')}
+          />
+        </div>
       </div>
+      <div className="min-h-0 shrink-0 flex-1" aria-hidden />
     </div>
   )
 
   /**
    * 하단 「오늘의 미션」 블록 — 패딩·카드 비율·간격은 `missionTodayLayoutSpec.ts` 픽스(상단 스펙 목록).
-   * 높이는 내용만큼(`shrink-0`)이고, 탭 전체 세로 스크롤은 상위 래퍼가 담당합니다.
+   * 제목·하트는 **스크롤 밖**에 두고, 그 아래만 `overflow-y-auto` 해 `-mt` 로 위로 올린 제목이 잘리지 않게 합니다.
    */
   const bottomPanel = (
     <section className={MISSION_TODAY_BOTTOM_SECTION_CLASSNAME} aria-label="오늘의 미션 카드">
       {missionTitleAboveCards}
+      {/**
+       * 세로 스크롤은 이 안만 — 제목은 밖에 두고, `pt-2` 로 카드 행만 아래로 살짝 내림.
+       */}
+      <div
+        className="flex min-h-0 min-w-0 flex-1 flex-col gap-0.5 overflow-x-hidden overflow-y-auto overscroll-contain pt-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        style={{ WebkitOverflowScrolling: 'touch' }}
+      >
       {ordered.length === 0 ? (
         <div className="flex flex-col items-center justify-center gap-2 px-6 py-8 text-center">
           <p className="font-bold text-brand-text">아직 미션이 없어요</p>
@@ -711,8 +744,8 @@ export default function MissionTab({
            * 가로만 스크롤 — 세로는 카드 본문 높이를 맞춰 잘리지 않게 합니다.
            */}
           {/**
-           * `flex-1` 이면 패널 세로가 부족할 때 이 행 높이만 줄어들고, 카드보다 짧아져 하단이 `overflow-hidden` 으로 잘립니다.
-           * `flex-none` 으로 카드 실제 높이만큼만 쓰고, 부족하면 위 `section` 의 `overflow-y-auto` 로만 스크롤합니다.
+           * `flex-1` 이면 패널 세로가 부족할 때 이 행 높이만 줄어들고, 카드보다 짧아져 하단이 잘릴 수 있음.
+           * `flex-none` 으로 카드 실제 높이만큼만 쓰고, 부족하면 위쪽 **제목 아래** `overflow-y-auto` 래퍼에서만 세로 스크롤합니다.
            */}
           <div
             className={MISSION_CARD_SCROLLER_CLASSNAME}
@@ -827,6 +860,7 @@ export default function MissionTab({
           </div>
         </>
       )}
+      </div>
     </section>
   )
 
@@ -989,9 +1023,18 @@ export default function MissionTab({
             completedCount={completedCount}
             totalMissions={total}
           />
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+          <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-hidden">
+            <ChildMapStickerFloatingStack
+              childId={childId}
+              childName={childName}
+              stats={stats}
+              setStats={setStats}
+              initialPraiseGrants={initialPraiseGrants}
+              initialPraisePlacements={initialPraisePlacements}
+            />
             {heroBand}
-            <div className="flex min-h-0 flex-[4.5] basis-0 flex-col items-center justify-center gap-2 overflow-y-auto overscroll-contain px-4 py-2 text-center sm:gap-3 sm:px-6 sm:py-4">
+            {/** `-mt-2`: 상단 크레딧 칸(5.5)은 그대로 두고, 이 하단 칸만 살짝 위로 당겨 간격을 줄임 */}
+            <div className="-mt-2 flex min-h-0 min-w-0 flex-[4.5] basis-0 flex-col items-center justify-center gap-2 overflow-x-hidden overflow-y-hidden overscroll-contain px-4 py-2 text-center sm:gap-3 sm:px-6 sm:py-4">
               <span className="text-sm font-black text-gray-400">휴식</span>
               <p className="text-lg font-black text-brand-text sm:text-xl">오늘은 쉬는 날이에요!</p>
               <p className="text-xs text-gray-400 sm:text-sm">푹 쉬고 내일 또 열심히 해봐요.</p>
@@ -1067,13 +1110,21 @@ export default function MissionTab({
           />
         ) : null}
         {/**
-         * 세로 `overflow-y-auto`: 상단·하단을 스크롤로 볼 수 있음.
-         * 가로는 `hidden` — `overflow-y-auto`+`visible` 조합이 브라우저에서 전체 가로 스크롤을 만들기 때문.
-         * 카드 가로 스와이프는 하단 `MISSION_CARD_SCROLLER` 안에서만 됩니다.
+         * `overflow-y-hidden`: flex `min-h-0` 축소가 깨지지 않게 해 한 화면에 맞춤(`overflow-y-visible` 이면 세로 스크롤바 유발).
+         * 카드만 필요 시 스크롤 — `bottomPanel` 안 래퍼에 `overflow-y-auto` + 스크롤바 숨김.
          */}
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-hidden">
+          <ChildMapStickerFloatingStack
+            childId={childId}
+            childName={childName}
+            stats={stats}
+            setStats={setStats}
+            initialPraiseGrants={initialPraiseGrants}
+            initialPraisePlacements={initialPraisePlacements}
+          />
           {heroBand}
-          <div className="flex min-h-0 flex-[4.5] basis-0 flex-col overflow-y-auto overscroll-contain">
+          {/** `z-20` + 세로 visible: 제목이 위로 나와도 잘리지 않고, 상단 크레딧(z-0)보다 앞에 그려짐 */}
+          <div className="relative z-20 -mt-2 flex min-h-0 min-w-0 flex-[4.5] basis-0 flex-col overflow-x-hidden overflow-y-hidden overscroll-contain">
             {bottomPanel}
           </div>
         </div>

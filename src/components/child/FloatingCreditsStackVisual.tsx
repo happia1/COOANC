@@ -4,6 +4,7 @@ import Image from 'next/image'
 import { useEffect, useRef, useState } from 'react'
 import SpriteImage from '@/components/common/SpriteImage'
 import { MISSION_CREDITS_STAGE_CAP, PIGGY_BANK_VISUAL_MAX_SCALE } from '@/constants/piggyBankStages'
+import { missionCreditsProgressiveScaleMul } from '@/lib/missionCreditVisualProgressiveScale'
 import { EFFECT_LIGHTS } from '@/constants/sprites'
 
 type Props = {
@@ -42,6 +43,12 @@ const COIN_STAGE_IMAGE_URLS: ReadonlyArray<string> = Array.from({ length: 10 }, 
 })
 
 const COIN_STAGE_COUNT = COIN_STAGE_IMAGE_URLS.length
+
+/**
+ * `home_credit10`(마지막 동전 PNG)만 추가로 줄임 — 저금통 왕관 단계를 줄인 것과 비슷하게 맞춤.
+ * (비개발자용) 크레딧이 가득 찼을 때 동전 그림이 너무 크게만 보이지 않게 합니다.
+ */
+const FLOATING_LAST_COIN_STAGE_VISUAL_MUL = 0.78 as const
 
 /** PNG 비율이 제각각이라 레이아웃만 맞출 때 쓰는 대략적인 세로/가로 비율(높이 쪽이 조금 더 김) */
 const CREDIT_IMAGE_LAYOUT_HEIGHT_RATIO = 1.12
@@ -90,7 +97,8 @@ function coinStageIndex(amount: number): number {
 
 /**
  * 가운데 가용 크레딧: 동전 PNG 10단계.
- * - 그림 **가로 크기**는 `PIGGY_BANK_VISUAL_MAX_SCALE`(저금통 왕관 단계와 동일)으로만 계산합니다.
+ * - 그림 **기준 가로**는 `PIGGY_BANK_VISUAL_MAX_SCALE` 로 잡고, 마지막 PNG(`home_credit10`)만 `FLOATING_LAST_COIN_STAGE_VISUAL_MUL` 로 한 번 더 줄입니다.
+ *   850 이상 잔액에서는 저금통과 같은 규칙(`missionCreditsProgressiveScaleMul`)으로 **추가 scale** 해 점점 커 보이게 합니다.
  * - 잔액이 바뀌면 **목표 단계**까지 `displayStage` 를 한 칸씩 올리거나 내려 미션 카드 저금통·지갑과 같은 리듬으로 맞춥니다.
  */
 export default function FloatingCreditsStackVisual({
@@ -103,6 +111,8 @@ export default function FloatingCreditsStackVisual({
   maxOuterHeightPx,
 }: Props) {
   const targetCredit = Math.max(0, Math.min(Math.floor(floating), MAX_FLOATING_FOR_STAGE))
+  /** 850~캡: 저금통과 동일 곡선으로 시각 크기만 키움(동전 단계와 별개) */
+  const creditsVisualMul = missionCreditsProgressiveScaleMul(targetCredit)
   /** 잔액에 맞는 동전 그림 단계(0~9) — 실제 목표 */
   const targetStage = coinStageIndex(targetCredit)
   /** 화면에 그리는 단계 — `targetStage` 로 한 칸씩 따라감 */
@@ -194,7 +204,7 @@ export default function FloatingCreditsStackVisual({
 
   const outerShellClass = [
     tightSlot
-      ? 'relative inline-flex max-w-none shrink-0 flex-col items-center overflow-hidden px-0.5 pb-0 pt-0'
+      ? 'relative inline-flex max-w-none shrink-0 flex-col items-center overflow-visible px-0.5 pb-0 pt-0'
       : 'relative inline-flex max-w-none shrink-0 flex-col items-center overflow-visible px-1.5 pb-2 pt-1.5',
     className.trim() || 'drop-shadow-[0_3px_12px_rgba(0,0,0,0.16)]',
     opacityClass,
@@ -203,7 +213,11 @@ export default function FloatingCreditsStackVisual({
     .join(' ')
 
   const useSlotCap = Boolean(tightSlot && typeof maxOuterHeightPx === 'number' && maxOuterHeightPx > 0)
+  /** 슬롯 안에 맞추는 축소만 담당 — 잔액 성장은 `creditsVisualMul` 을 곱해 별도로 적용합니다 */
   const slotScale = useSlotCap ? Math.min(1, maxOuterHeightPx! / displayHeight) : 1
+  /** 인덱스 9 = `home_credit10` — 마지막 단계만 시각적으로 축소 */
+  const lastCoinStageMul = displayStage === COIN_STAGE_COUNT - 1 ? FLOATING_LAST_COIN_STAGE_VISUAL_MUL : 1
+  const finalVisualScale = slotScale * creditsVisualMul * lastCoinStageMul
 
   /**
    * `translateY(0)` 로 하단 클립을 막은 뒤에도, PNG·서브픽셀 여유를 위해 `overflow-visible` 을 둡니다.
@@ -267,13 +281,13 @@ export default function FloatingCreditsStackVisual({
       aria-hidden
     >
       {useSlotCap ? (
-        <div className="flex h-full min-h-0 w-full items-end justify-center overflow-hidden">
+        <div className="flex h-full min-h-0 w-full items-end justify-center overflow-visible">
           <div
             className="shrink-0"
             style={{
               width: layoutWidth,
               height: displayHeight,
-              transform: `scale(${slotScale})`,
+              transform: `scale(${finalVisualScale})`,
               transformOrigin: 'bottom center',
             }}
           >
@@ -281,7 +295,15 @@ export default function FloatingCreditsStackVisual({
           </div>
         </div>
       ) : (
-        stageBox
+        <div
+          className="inline-flex max-w-none shrink-0"
+          style={{
+            transform: `scale(${creditsVisualMul * lastCoinStageMul})`,
+            transformOrigin: 'bottom center',
+          }}
+        >
+          {stageBox}
+        </div>
       )}
     </div>
   )

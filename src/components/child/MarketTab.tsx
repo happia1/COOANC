@@ -305,6 +305,8 @@ export default function MarketTab({
   const [requestsSheetOpen, setRequestsSheetOpen] = useState(false)
   /** 장바구니 요약·미션 이동은 플로팅 버튼 → 슬라이딩 시트로만 노출 */
   const [wishlistSheetOpen, setWishlistSheetOpen] = useState(false)
+  /** 선반에서 「장바구니」로 담은 직후 — 바구니 그림 + 「보러가기」 안내 팝업 */
+  const [wishlistAddedNoticeOpen, setWishlistAddedNoticeOpen] = useState(false)
   const [purchaseCelebrationOpen, setPurchaseCelebrationOpen] = useState(false)
 
   const dismissPurchaseCelebration = useCallback(() => setPurchaseCelebrationOpen(false), [])
@@ -662,8 +664,9 @@ export default function MarketTab({
     const id = shelfActionFor.item.id
     const ok = await addWishlistOne(id)
     if (ok) {
-      showToast('장바구니에 담았어요')
       dismissShelfAction()
+      // 토스트 대신 전용 팝업(바구니 그림 + 장바구니 시트로 이동 버튼)을 띄웁니다
+      setWishlistAddedNoticeOpen(true)
     }
   }, [shelfActionFor, addWishlistOne, dismissShelfAction])
 
@@ -1002,23 +1005,19 @@ export default function MarketTab({
             <p id="market-shelf-action-title" className="text-center text-base font-black text-brand-text">
               {shelfActionFor.item.name}
             </p>
-            <div className="mt-2.5 flex justify-center">
-              <div
-                className="flex h-[4.25rem] w-[4.25rem] items-end justify-center overflow-hidden rounded-2xl bg-amber-50/90 ring-1 ring-amber-100"
-                aria-hidden
-              >
-                {shelfActionFor.item.image_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={shelfActionFor.item.image_url}
-                    alt=""
-                    className="max-h-[3.75rem] max-w-full object-contain object-bottom"
-                    draggable={false}
-                  />
-                ) : (
-                  <MarketItemImage frame={shelfActionFor.frame} height={60} />
-                )}
-              </div>
+            {/* 상품 썸네일: 뒤쪽 색·테두리 없이 그림만 보이게(팝업 흰 배경 위에 이미지) */}
+            <div className="mt-2.5 flex justify-center" aria-hidden>
+              {shelfActionFor.item.image_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={shelfActionFor.item.image_url}
+                  alt=""
+                  className="max-h-[4.25rem] max-w-[min(100%,5rem)] object-contain"
+                  draggable={false}
+                />
+              ) : (
+                <MarketItemImage frame={shelfActionFor.frame} height={60} />
+              )}
             </div>
             {/* 요청사항: 레벨 표시는 제거하고, 크레딧 가독성을 높이기 위해 숫자 크기를 키웁니다. */}
             <div className="mt-2 text-center text-sm font-bold text-gray-500">
@@ -1033,31 +1032,46 @@ export default function MarketTab({
               {shelfActionBuyMeta && (
                 <>
                   <div className="grid grid-cols-2 gap-2">
+                    {/*
+                      구매 / 장바구니: 그림(아이콘)을 크게, 글자는 작게 두어
+                      한눈에 「지갑으로 바로 산다 / 바구니에 담는다」가 구분되게 합니다.
+                    */}
                     <button
                       type="button"
                       disabled={!shelfActionBuyMeta.canBuy}
                       onClick={openPurchaseFromShelfAction}
-                      className="rounded-2xl bg-brand-blue px-2 py-3 text-sm font-black text-white shadow-md ring-1 ring-brand-blue/20 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-500 disabled:ring-0 active:scale-[0.99] disabled:active:scale-100"
+                      className="rounded-2xl bg-sky-100 px-2 py-3 text-sky-950 shadow-md ring-1 ring-sky-200/90 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-500 disabled:ring-0 active:scale-[0.99] disabled:active:scale-100"
                     >
-                      {/* 요청사항: 버튼 내부를 아이콘(윗줄) + 텍스트(아랫줄) 2단으로 표시합니다. */}
-                      <span className="inline-flex flex-col items-center justify-center gap-1 leading-none">
-                        {/* 요청사항: 구매 버튼 아이콘을 지갑으로 통일 */}
-                        <SpriteImage sheet={ICONS} frame="wallet" width={16} clipRotated={false} />
-                        <span>구매하기</span>
+                      {/* 연한 파란 배경 + 진한 글자로 「구매」가 부드럽게 보이게 */}
+                      <span className="inline-flex flex-col items-center justify-center gap-1.5 leading-none">
+                        {/* 미션·마켓 하단과 같은 9단계 지갑 PNG(스프라이트 지갑 대신 최신 일러스트) */}
+                        <Image
+                          src={walletImageSrcByStage(animatedWalletIdx)}
+                          alt=""
+                          width={36}
+                          height={36}
+                          className="h-9 w-9 shrink-0 select-none object-contain drop-shadow-sm"
+                          draggable={false}
+                        />
+                        <span className="text-[10px] font-black tracking-tight text-sky-950">구매하기</span>
                       </span>
                     </button>
                     <button
                       type="button"
                       disabled={wishBusy === shelfActionBuyMeta.it.id}
                       onClick={() => void cartFromShelfAction()}
-                      className="rounded-2xl border-2 border-sky-400/80 bg-sky-50 px-2 py-3 text-sm font-black text-sky-950 shadow-sm active:scale-[0.99] disabled:opacity-50"
+                      className="rounded-2xl bg-amber-100 px-2 py-3 text-amber-950 shadow-md ring-1 ring-amber-200/90 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100"
                     >
-                      {/* 요청사항: 장바구니 버튼도 아이콘(윗줄) + 텍스트(아랫줄) 구성으로 통일합니다. */}
-                      <span className="inline-flex flex-col items-center justify-center gap-1 leading-none">
-                        {/* 요청사항: 카트 이모지 대신 basket_filled 이미지 사용 */}
+                      {/* 구매하기와 같은 블록 스타일(ring·그림자·패딩)·색만 노란 계열 */}
+                      <span className="inline-flex flex-col items-center justify-center gap-1.5 leading-none">
                         {/* eslint-disable-next-line @next/next/no-img-element -- public 정적 자산 경로 */}
-                        <img src={BASKET_FILLED_SRC} alt="" className="h-4 w-4 object-contain" draggable={false} />
-                        <span>장바구니</span>
+                        <img
+                          src={BASKET_FILLED_SRC}
+                          alt=""
+                          className="h-9 w-9 shrink-0 object-contain drop-shadow-sm"
+                          draggable={false}
+                        />
+                        <span className="text-[10px] font-black tracking-tight text-amber-950">장바구니</span>
                       </span>
                     </button>
                   </div>
@@ -1078,6 +1092,56 @@ export default function MarketTab({
               type="button"
               onClick={dismissShelfAction}
               className="mt-2.5 w-full py-2 text-sm font-bold text-gray-500"
+            >
+              닫기
+            </button>
+          </div>
+        </div>
+      )}
+
+      {wishlistAddedNoticeOpen && (
+        <div
+          className="fixed inset-0 z-[91] flex items-center justify-center bg-black/45 px-4 py-8"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="market-wishlist-added-title"
+        >
+          {/* 바깥 탭: 팝업만 닫고 장바구니 시트는 열지 않음 */}
+          <button
+            type="button"
+            className="absolute inset-0 cursor-default"
+            aria-label="닫기"
+            onClick={() => setWishlistAddedNoticeOpen(false)}
+          />
+          <div className="relative z-[1] mx-auto w-full max-w-[18rem] rounded-3xl bg-white p-5 text-center shadow-2xl ring-1 ring-black/[0.06]">
+            {/* 마켓 전역과 동일한 장바구니 일러스트 — 담긴 것을 직관적으로 보여 줌 */}
+            <div className="mx-auto flex justify-center">
+              {/* eslint-disable-next-line @next/next/no-img-element -- public 정적 자산 */}
+              <img
+                src={BASKET_FILLED_SRC}
+                alt=""
+                className="h-16 w-16 object-contain drop-shadow-sm"
+                draggable={false}
+              />
+            </div>
+            <p id="market-wishlist-added-title" className="mt-3 text-base font-black text-brand-text">
+              장바구니에 담았어요!
+            </p>
+            <p className="mt-1 text-xs font-bold text-gray-500">담긴 물건을 확인해 볼까요?</p>
+            <button
+              type="button"
+              onClick={() => {
+                setWishlistAddedNoticeOpen(false)
+                setWishlistSheetOpen(true)
+              }}
+              className="mt-5 w-full rounded-2xl bg-amber-100 py-3.5 text-sm font-black text-amber-950 shadow-md ring-1 ring-amber-200/90 active:scale-[0.99]"
+            >
+              장바구니 보러가기
+            </button>
+            <button
+              type="button"
+              onClick={() => setWishlistAddedNoticeOpen(false)}
+              className="mt-2 w-full py-2 text-sm font-bold text-gray-500"
             >
               닫기
             </button>

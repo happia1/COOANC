@@ -2,7 +2,7 @@
 
 /**
  * 자녀 프로필용 캐릭터 얼굴(`*_profile.png`) 선택 UI
- * - `settings`: 캐릭터 5종 그리드(「기본」 없음 — DB 가 null 이면 카드에 레벨 이름 등 기존 규칙)
+ * - `settings`: 캐릭터 6종 그리드(「기본」 없음 — DB 가 null 이면 카드에 레벨 이름 등 기존 규칙)
  * - `onboarding`: 맨 아래 한 줄 — 카드 안 사각 영역에 캐릭터(홈 섬과 같은 종류) 표시
  */
 
@@ -15,7 +15,7 @@ export type ChildProfileAvatarPickerProps = {
   value: string | null
   onChange: (url: string | null) => void
   id?: string
-  /** `onboarding` 은 5종만 가로 나열, 「기본」 없음 */
+  /** `onboarding` 은 캐릭터 목록만 가로 나열, 「기본」 없음 */
   mode?: 'settings' | 'onboarding'
 }
 
@@ -72,12 +72,12 @@ export function ChildProfileAvatarPicker({
     <div className="flex flex-col gap-2" id={id}>
       <p className="text-xs font-bold text-gray-500">프로필 이미지</p>
       <p className="text-[11px] leading-snug text-gray-400">
-        캐릭터를 고르면 부모 홈·루틴 카드에 원형 사진으로 보여요. 아직 사진이 없으면 레벨 이름이 표시돼요.
+        캐릭터를 고르면 부모 홈·루틴 카드에 사각 썸네일로 보여요. 아직 사진이 없으면 레벨 이름이 표시돼요.
       </p>
       {/**
-       * 설정「자녀 프로필 수정」: 흰 원·테두리 없음, 선택은 옅은 회색 배경. 썸네일은 이전보다 작게(h-8).
+       * 설정「자녀 프로필 수정」: 동그라미 프레임 없이 둥근 사각만. 선택은 옅은 회색 배경. 썸네일은 작게(h-8).
        */}
-      <div className="grid grid-cols-5 gap-2 sm:gap-2.5">
+      <div className="grid grid-cols-3 gap-2 sm:grid-cols-6 sm:gap-2.5">
         {CHILD_PROFILE_AVATAR_OPTIONS.map(({ url, label }) => {
           const selected = value === url
           return (
@@ -90,10 +90,10 @@ export function ChildProfileAvatarPicker({
                 selected ? 'bg-gray-100' : 'bg-transparent hover:bg-gray-50'
               }`}
             >
-              {/** 원형 안은 흰 바탕만 — 링·그림자·테두리 없음 */}
-              <span className="block h-8 w-8 overflow-hidden rounded-full bg-white sm:h-9 sm:w-9">
+              {/** 흰 사각 배경만 — 원형 링·테두리 없음 */}
+              <span className="block h-8 w-8 overflow-hidden rounded-lg bg-white sm:h-9 sm:w-9">
                 {/* eslint-disable-next-line @next/next/no-img-element -- 로컬 public 정적 자산 */}
-                <img src={url} alt="" className="h-full w-full object-cover object-center" />
+                <img src={url} alt="" className="h-full w-full object-contain object-center p-0.5" />
               </span>
               <span className="max-w-full truncate text-[9px] font-bold text-gray-600">{label}</span>
             </button>

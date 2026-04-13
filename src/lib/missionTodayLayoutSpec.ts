@@ -10,10 +10,12 @@ import type { CSSProperties } from 'react'
  *
  * ── 바깥·패딩(겹침·클리핑과 연동) ──
  * • 하단 섹션 `MISSION_TODAY_BOTTOM_SECTION_CLASSNAME`
- *   - 가로 px-3, 세로 pt-0.5 pb-2.5, 블록 간 gap-0.5, overflow-x-hidden (5.5:4.5 flex 분할 이후 -mt-12 제거)
- * • 제목·EXP 줄 `MISSION_TODAY_TITLE_ROW_OUTER/INNER` + EXP 트랙·글자 클래스
- *   - 제목 래퍼 가로 pl-2 pr-2 (섹션 px-3 과 합쳐 기준선 고정)
- *   - 한 행 gap-2, 막대 높이 11px·max-w-[14rem], ♥ 쪽 글자 10px(sm 11px) 등
+ *   - 가로 px-3, 세로 pt-0.5 pb-2.5, 블록 간 gap-0.5, overflow-x-hidden·**overflow-y-hidden**(미션 탭 전체 세로 스크롤 방지), `min-h-0 flex-1`
+ * • 제목·하트 줄 `MISSION_TODAY_TITLE_ROW_OUTER/INNER` + (카드용) EXP 트랙·글자 클래스
+ *   - 제목 래퍼 가로 pl-2 pr-2, 세로 `-mt-1 pt-0`(위로는 살짝만 — 상단바 z-40 아래 `main` 안에서는 과한 `-mt` 가 글을 가림)
+ *   - `relative z-[30]`: 저금통 줄(z-0)보다 앞
+ *   - 한 행: 「오늘의 미션」은 왼쪽, EXP 하트 5개는 `justify-between` 으로 오른쪽 정렬, gap-2
+ *   - 카드 막대: 높이 11px·max-w-[14rem], ♥ 쪽 글자 10px(sm 11px) 등
  * • 카드 가로 스크롤 `MISSION_CARD_SCROLLER_CLASSNAME`
  *   - 카드 간 gap-0.5(조밀), 스크롤 안쪽 pl-2 pr-2 (= 제목 래퍼와 동일, 그림자 잘림 방지)
  *
@@ -48,21 +50,24 @@ export function missionTabLowerPanelFlexStyle(): CSSProperties {
   }
 }
 
-/** 「오늘의 미션」 하단 섹션 — 픽스 패딩. 세로 스크롤은 하단 flex 래퍼가 담당. (상단 스펙 목록 준수) */
+/** 「오늘의 미션」 하단 섹션 — 픽스 패딩. 세로 스크롤은 `MissionTab` 안 제목 **아래** 래퍼만 담당. */
 export const MISSION_TODAY_BOTTOM_SECTION_CLASSNAME =
-  'relative z-10 flex min-w-0 shrink-0 flex-col gap-0.5 overflow-x-hidden overflow-y-visible px-3 pb-2.5 pt-0.5' as const
+  'relative z-10 flex min-h-0 min-w-0 flex-1 flex-col gap-0.5 overflow-x-hidden overflow-y-hidden px-3 pb-2.5 pt-0.5' as const
 
-/** 제목·EXP 줄 바깥 — 픽스 pl-2 pr-2 (카드 스크롤러와 기준선 동일). */
+/**
+ * 제목·하트 한 줄 바깥 — 가로는 카드 스크롤러와 맞춤(pl-2 pr-2).
+ * `-mt-1` + `pt-0`: 저금통과 살짝만 겹침. `relative z-[30]`: 크레딧 줄(z-0)보다 앞(상단바는 main 밖 z-40 이라 과한 음수 마진은 피함).
+ */
 export const MISSION_TODAY_TITLE_ROW_OUTER_CLASSNAME =
-  'w-full min-w-0 shrink-0 pl-2 pr-2 pb-0.5 pt-0.5' as const
+  'relative z-[30] w-full min-w-0 shrink-0 pl-2 pr-2 pb-0.5 pt-0 -mt-1' as const
 
-/** 제목·하트(또는 EXP 묶음)를 한 행에 넣는 flex 컨테이너 — `justify-start` 로 가로 전체를 쓰더라도 왼쪽에 붙입니다 */
+/** 제목·하트 5개를 한 행에 넣는 flex 컨테이너 — `justify-between` 으로 제목은 왼쪽, 하트 묶음은 오른쪽 끝에 둡니다 */
 export const MISSION_TODAY_TITLE_ROW_INNER_CLASSNAME =
-  'flex w-full min-w-0 flex-nowrap items-center justify-start gap-2' as const
+  'flex w-full min-w-0 flex-nowrap items-center justify-between gap-2' as const
 
-/** 「오늘의 미션」 제목 텍스트 */
+/** 「오늘의 미션」 제목 텍스트 — `flex-1 min-w-0` 로 남는 가로를 쓰며 길면 말줄임(하트와 겹침 방지) */
 export const MISSION_TODAY_TITLE_HEADING_CLASSNAME =
-  'min-w-0 truncate text-sm font-black leading-tight text-brand-text' as const
+  'min-w-0 flex-1 truncate text-sm font-black leading-tight text-brand-text' as const
 
 /** EXP 막대·♥·숫자 묶음 */
 export const MISSION_TODAY_EXP_GROUP_CLASSNAME =

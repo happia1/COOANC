@@ -1,7 +1,7 @@
 /**
  * 부모 앱용 컴팩트 자녀 프로필 카드 (홈·설정·자녀 상세 공통)
- * - 왼쪽: 아바타
- * - 가운데(세로): **이름 + Lv**(Lv 는 얇은 글씨·회색) → **미취학·유치원·나이** — 아바타 원과 **세로 가운데** 맞춤
+ * - 왼쪽: 아바타(둥근 사각 — 동그라미 프레임 없음)
+ * - 가운데(세로): **이름 + Lv**(Lv 는 얇은 글씨·회색) → **미취학·유치원·나이** — 아바타 썸네일과 **세로 가운데** 맞춤
  * - 오른쪽: 기본은 크레딧·하트·연속일 **2열 그리드** — `hideStats` 이면 통계 대신 `actions`(설정의 수정/삭제 등)
  * - 홈에서만: 하단 전체 너비로 오늘 미션 달성률(`mission`)
  *
@@ -71,15 +71,15 @@ export function CompactChildProfileCard({
   /** 카드 바깥: 얇은 링·그림자(테두리처럼 보이던 것) 없이 흰 배경만 — 홈·루틴·설정 동일 */
   return (
     <div className={`rounded-xl bg-white px-2.5 py-2 ${className}`.trim()}>
-      {/** 한 행 전체를 세로 가운데 정렬 — 자녀 정보 텍스트 블록이 프로필 사진(원)의 중앙과 맞도록 합니다 */}
+      {/** 한 행 전체를 세로 가운데 정렬 — 자녀 정보 텍스트 블록이 프로필 사진의 중앙과 맞도록 합니다 */}
       <div className="flex items-center gap-2.5">
         <div className="flex min-w-0 min-h-0 flex-1 items-center gap-3">
-          {/** 원형 뒤는 흰색만 — 예전 하늘색 그라데이션·흰 링은 제거했습니다. */}
-          <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-full bg-white">
+          {/** 사각 썸네일 뒤는 흰색만 — 동그라미 링 없음 */}
+          <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-white">
             {avatarUrl ? (
               /**
-               * 프로필 PNG 는 귀·턱이 길어 `object-cover` 만 쓰면 원 밖으로 잘려 보입니다.
-               * 안쪽 여백(`p-2`) + `object-contain` 으로 그림 전체가 원 안에 들어가고, 상대적으로 작게 보입니다.
+               * 프로필 PNG 는 귀·턱이 길어 `object-cover` 만 쓰면 잘려 보입니다.
+               * 안쪽 여백(`p-2`) + `object-contain` 으로 그림 전체가 사각 안에 들어가게 합니다.
                */
               <div className="flex h-full w-full items-center justify-center p-2">
                 {/* eslint-disable-next-line @next/next/no-img-element */}

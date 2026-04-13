@@ -14,6 +14,7 @@ import {
   type ChicksFrameName,
   type FoxFrameName,
   type HamsterFrameName,
+  type OtterFrameName,
 } from '@/constants/sprites'
 import { publicUrlForChildProfileAvatar, isAllowedChildProfileAvatarUrl } from '@/lib/childProfileAvatar'
 
@@ -24,6 +25,7 @@ export type HomeIslandStageSprite =
   | { character: 'chicks'; frame: ChicksFrameName; width: number; height: number }
   | { character: 'fox'; frame: FoxFrameName; width: number; height: number }
   | { character: 'hamster'; frame: HamsterFrameName; width: number; height: number }
+  | { character: 'otter'; frame: OtterFrameName; width: number; height: number }
 
 const DEFAULT_STAGE: HomeIslandStageSprite = {
   character: 'bunny',
@@ -65,6 +67,13 @@ const HAMSTER_HOME_STAGE_HEIGHT = 170
  */
 const CHICK_HOME_STAGE_WIDTH = 98
 const CHICK_HOME_STAGE_HEIGHT = 152
+
+/**
+ * 수달 홈 무대 가로·세로:
+ * - 기본 체급은 여우/토끼와 비슷하게 두되, 수달 시트 비율을 고려해 세로를 조금 줄여 답답하지 않게 보이게 합니다.
+ */
+const OTTER_HOME_STAGE_WIDTH = 116
+const OTTER_HOME_STAGE_HEIGHT = 210
 
 /** 프로필 URL → 홈 무대용 스프라이트(정면 프레임) */
 const STAGE_BY_AVATAR_URL: Record<string, HomeIslandStageSprite> = {
@@ -109,6 +118,16 @@ const STAGE_BY_AVATAR_URL: Record<string, HomeIslandStageSprite> = {
     frame: 'chics (1)',
     width: CHICK_HOME_STAGE_WIDTH,
     height: CHICK_HOME_STAGE_HEIGHT,
+  },
+  /**
+   * 수달: `otter.png` 시트는 왼쪽→오른쪽이 (1)뒤·(3)옆·(2)정면 순입니다.
+   * 예전에 (1)만 쓰면 등만 보이므로 정면은 `Otter (2)` 를 씁니다.
+   */
+  [publicUrlForChildProfileAvatar('otter_profile.png')]: {
+    character: 'otter',
+    frame: 'Otter (2)',
+    width: OTTER_HOME_STAGE_WIDTH,
+    height: OTTER_HOME_STAGE_HEIGHT,
   },
 }
 

@@ -16,12 +16,11 @@ import piggyBankAtlasJson from '@/constants/piggy_bank.atlas.json'
 export const MISSION_CREDITS_STAGE_CAP = 1000 as const
 
 /**
- * 돼지 저금통 그림이 **가장 클 때**(핑크 기본 0.98 × 왕관 단계 추가 1.14) 쓰는 가로 배율입니다.
- * `PiggyBankStageVisual` 과 숫자를 맞춰 두었고, 돈바구니(가용 크레딧) 동전은 항상 이 비율만 써서
- * 저금통이 커졌다 작아졌다 하는 느낌 없이 **큰 쪽 크기**로만 보이게 합니다.
+ * 돈바구니 동전 **기준 가로** 배율(0.98 × 1.06 — 예전 1.14 보다 전체적으로 한 단계 작게).
+ * 저금통 마지막 단계는 `PiggyBankStageVisual` 의 `PIGGY_CROWN_STAGE_EXTRA` 로 별도 조정.
  */
 /** 표현식에는 `as const` 를 붙일 수 없어, 곱셈 결과를 그대로 둡니다 */
-export const PIGGY_BANK_VISUAL_MAX_SCALE = 0.98 * 1.14
+export const PIGGY_BANK_VISUAL_MAX_SCALE = 0.98 * 1.06
 
 /** 한 장에 여러 단계를 붙여 둔 PNG 경로 (`public` 기준) */
 export const PIGGY_BANK_COMBINED_SRC = '/assets/img/items/piggy-bank/piggy_bank.png' as const

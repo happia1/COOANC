@@ -229,6 +229,7 @@ export default function MissionCreditMoveDialog({
                   <PiggyBankStageVisual
                     stepIndex={piggyBankStepIndexForBalance(piggyBalance)}
                     displayWidth={44}
+                    piggyCredits={piggyBalance}
                     className="drop-shadow-md"
                   />
                 </div>
@@ -477,6 +478,7 @@ export function MissionCreditActionSheet({ open, onClose, bucket, floating, wall
                         <PiggyBankStageVisual
                           stepIndex={piggyBankStepIndexForBalance(piggy)}
                           displayWidth={52}
+                          piggyCredits={piggy}
                           className="drop-shadow-[0_6px_14px_rgba(0,0,0,0.15)]"
                         />
                       </div>

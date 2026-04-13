@@ -6,7 +6,7 @@
  * - 상단 인텐트 UI: 대분류·세부 칩 모두 가로 스크롤(막대 숨김) + 우측 페이드(`globals.css` 의 `.routine-agent-intent-scroll-fade`). 세부 칩은 카테고리 탭을 눌렀을 때만 보입니다(같은 탭 재클릭 시 접힘).
  * - 가로·세로 스크롤 **막대(슬라이드 바)** 는 `globals.css` 의 `.routine-agent-hide-scrollbar` 로 숨기되, 스크롤 동작은 그대로 둡니다.
  * - 부모 탭 `<main>` 이 스크롤 컨테이너라 막대가 오버레이 위에 겹칠 수 있어, 열릴 때 `overflow` 를 잠그고 z-index 를 시트들보다 높입니다.
- * - 텍스트·이미지·직접 입력은 `/agent-b/parse` 로 보냅니다. 한 건만 나오면 곧바로 DB 초안 + 제안이 붙고, 여러 건이면 `< 1/N >` 로 한 줄씩 확인한 뒤 [등록] 시 `/agent-b/commit-schedule` 로 저장합니다.
+ * - 텍스트·이미지는 `/agent-b/parse` 로 보냅니다. 한 건만 나오면 곧바로 DB 초안 + 제안이 붙고, 여러 건이면 `< 1/N >` 로 한 줄씩 확인한 뒤 [등록] 시 `/agent-b/commit-schedule` 로 저장합니다.
  * - 패널을 **닫아도 대화 말풍선은 지우지 않습니다**(자녀·가족 연결만 바뀔 때 새로 시작). 닫힌 뒤 분석이 끝나면 부모 탭이 플로팅 배지 숫자를 올립니다.
  * - 제안(routine_off 등)은 **한 장의 파스텔 카드**로 묶고, `special_mission`·`extra_reward` 는 화면에 숨긴 뒤 [등록하기] 때 서버에만 승인 요청합니다.
  * - 이미지는 브라우저에서 JPEG 로 줄여 보내 MIME 불일치·용량 초과 오류를 줄입니다.
@@ -67,7 +67,7 @@ type Props = {
 
 /** AI 가 처음 인사할 때 쓰는 고정 문구(줄바꿈 포함) */
 const WELCOME_TEXT = `안녕하세요. '루틴 도우미'에요!
-원하는 키워드를 클릭하거나 직접 입력해보세요.
+원하는 키워드를 클릭하거나 메시지를 입력해보세요.
 예) '4월 25일 체육대회 등록해줘'`
 
 /** 세부 인텐트 한 칩 — 라벨(표시) + 채팅에 넣을 질문세트(여러 줄) */
@@ -215,15 +215,6 @@ const SUBCHIP_STYLES_BY_CATEGORY: Record<string, [string, string]> = {
   ],
 }
 
-/** 캘린더(EventSheet)와 같은 네 가지 일정 종류 라벨 */
-const EVENT_TYPES_ORDER: LocalCalendarEvent['eventType'][] = ['holiday', 'vacation', 'special', 'other']
-const EVENT_TYPE_LABELS: Record<LocalCalendarEvent['eventType'], string> = {
-  holiday: '공휴일',
-  vacation: '방학',
-  special: '기념일',
-  other: '기타',
-}
-
 type SuggestionUi = AgentParseSuggestion & { status: 'pending' | 'approved' | 'rejected' }
 
 type ChatTextMessage = { id: string; kind: 'text'; role: 'user' | 'assistant'; text: string }
@@ -239,6 +230,8 @@ type MultiSlotUi = {
   calendarRowId?: string | null
   /** 다건 슬롯에서 루틴 확인 카드 등록까지 끝난 뒤 성공 문구만 보일 때 true */
   routineCardComplete?: boolean
+  /** 다건 슬롯에서 [취소]로 닫은 카드인지 */
+  routineCardCancelled?: boolean
 }
 
 /** 다건 슬롯이 모두 등록·건너뛰기 처리됐는지 */
@@ -261,6 +254,8 @@ type ChatParseMessage = {
   multiReviewComplete?: boolean
   /** [등록하기] 까지 끝난 단건·다건 슬롯 — 확인 카드를 성공 문구로 바꿉니다 */
   confirmComplete?: boolean
+  /** 단건에서 [취소]로 카드 닫힘 처리했는지 */
+  confirmCancelled?: boolean
   /** `syncAgentEventToLocalCalendar` 가 돌려준 행 id — 서버 `saved_event_id` 가 비어도 패치 가능 */
   calendarRowId?: string | null
   /** 로컬 규칙 파싱만 한 경우 true — parse 직후엔 달력에 안 붙이고 등록 시 한 번에 저장 */
@@ -420,10 +415,12 @@ function UnifiedScheduleConfirmCard(props: {
   busy: boolean
   /** 부모가 [등록하기] 완료로 바꾼 뒤에는 짧은 성공 문구만 보여 줍니다 */
   registrationComplete?: boolean
+  /** 부모가 [취소] 처리로 카드를 닫았을 때 보여 줄 문구 */
+  cancelledComplete?: boolean
   onRegister: (payload: ScheduleConfirmRegisterPayload) => void | Promise<void>
   onCancel: () => void | Promise<void>
 }) {
-  const { layout, event: ev, suggestions, busy, registrationComplete, onRegister, onCancel } = props
+  const { layout, event: ev, suggestions, busy, registrationComplete, cancelledComplete, onRegister, onCancel } = props
   const descFieldId = useId()
   const pending = pendingSuggestions(suggestions)
 
@@ -468,6 +465,14 @@ function UnifiedScheduleConfirmCard(props: {
     return (
       <div className="rounded-2xl border border-violet-100/90 bg-gradient-to-b from-violet-50/90 to-sky-50/70 px-3 py-3 text-center shadow-sm ring-1 ring-violet-100/50">
         <p className="text-[11px] font-bold text-violet-900">일정을 등록했어요</p>
+      </div>
+    )
+  }
+
+  if (cancelledComplete) {
+    return (
+      <div className="rounded-2xl border border-gray-200 bg-gray-50/90 px-3 py-2.5 text-center shadow-sm ring-1 ring-gray-100">
+        <p className="text-[10px] font-bold text-gray-600">취소된 일정입니다</p>
       </div>
     )
   }
@@ -709,8 +714,6 @@ export default function RoutineAgentSchedulePanel({
   const [loading, setLoading] = useState(false)
   /** 통합 제안 카드에서 POST /agent-b/approve 연속 호출 중 — `parseMsgId` 또는 `parseMsgId:slotIndex` */
   const [suggestionSubmitKey, setSuggestionSubmitKey] = useState<string | null>(null)
-  /** [직접 입력하기] 펼침 여부 */
-  const [directOpen, setDirectOpen] = useState(false)
   /**
    * 인텐트 UI: 세부 칩을 펼친 카테고리 id.
    * null 이면 접힘(카테고리만 보임). 탭 클릭 시 해당 id 로 펼침, 같은 탭 재클릭 시 다시 접음.
@@ -729,15 +732,6 @@ export default function RoutineAgentSchedulePanel({
     type: string
     description: string
   } | null>(null)
-  /** 직접 입력 폼 — 캘린더 일정 추가와 같은 항목 */
-  const todayStr = getSeoulDateString()
-  const [dTitle, setDTitle] = useState('')
-  const [dStart, setDStart] = useState(todayStr)
-  const [dEnd, setDEnd] = useState(todayStr)
-  const [dType, setDType] = useState<LocalCalendarEvent['eventType']>('holiday')
-  const [dOverride, setDOverride] = useState<LocalCalendarEvent['routineOverride']>('weekend')
-  const [dDesc, setDDesc] = useState('')
-
   const fileRef = useRef<HTMLInputElement>(null)
   const listEndRef = useRef<HTMLDivElement>(null)
   /** 비동기(parse)가 끝날 때 패널이 열려 있는지 — 닫힌 뒤 완료되면 미읽음만 올립니다 */
@@ -802,13 +796,6 @@ export default function RoutineAgentSchedulePanel({
     setImagePreview(null)
     setImageBase64(null)
     setLoading(false)
-    setDirectOpen(false)
-    setDTitle('')
-    setDStart(getSeoulDateString())
-    setDEnd(getSeoulDateString())
-    setDType('holiday')
-    setDOverride('weekend')
-    setDDesc('')
     if (fileRef.current) fileRef.current.value = ''
     setExpandedIntentCategoryId(null)
     setMultiEdit(null)
@@ -1013,56 +1000,6 @@ export default function RoutineAgentSchedulePanel({
   /** 카테고리 탭 클릭: 다른 탭이면 펼침, 이미 펼친 같은 탭이면 접기 */
   const onIntentCategoryTabClick = (catId: string) => {
     setExpandedIntentCategoryId((prev) => (prev === catId ? null : catId))
-  }
-
-  /**
-   * 직접 입력 폼 [저장]
-   * - 이 경로는 확인 카드 없이 **즉시 캘린더에 반영**합니다.
-   * - 저장 성공 시 폼을 자동으로 닫고, 다음 입력을 위해 기본값으로 되돌립니다.
-   */
-  const handleDirectSave = async () => {
-    const title = dTitle.trim()
-    if (!title) {
-      onToast('일정 이름을 입력해 주세요', false)
-      return
-    }
-    if (!dStart.trim() || !dEnd.trim()) {
-      onToast('시작일과 종료일을 입력해 주세요', false)
-      return
-    }
-    if (!familyLinkId || !childId) {
-      onToast('가족 연결 정보를 찾을 수 없어요. 잠시 후 다시 시도해 주세요.', false)
-      return
-    }
-
-    /** 직접 입력 폼의 로컬 타입(holiday/vacation/special/other)을 에이전트 타입 문자열로 맞춥니다. */
-    const typeCode =
-      dType === 'holiday' ? 'holiday' : dType === 'vacation' ? 'vacation' : dType === 'special' ? 'birthday' : 'etc'
-    const event: AgentParseEvent = {
-      type: typeCode,
-      title,
-      start_date: dStart,
-      end_date: dEnd === dStart ? null : dEnd,
-      ...(dDesc.trim() ? { description: dDesc.trim() } : {}),
-      routine_off: dOverride === 'none',
-    }
-
-    const rowId = syncAgentEventToLocalCalendar(childId, event, null, {
-      routineOverride: dOverride,
-    })
-    if (!rowId) {
-      onToast('직접 입력 일정을 저장하지 못했어요. 잠시 후 다시 시도해 주세요.', false)
-      return
-    }
-
-    setDirectOpen(false)
-    setDTitle('')
-    setDStart(getSeoulDateString())
-    setDEnd(getSeoulDateString())
-    setDType('holiday')
-    setDOverride('weekend')
-    setDDesc('')
-    onToast('일정을 바로 등록했어요')
   }
 
   /** 다건 스캔 중 한 줄을 DB 에 올리고, 그 줄에 대한 루틴 제안을 받아옵니다(말풍선에서 넘긴 slot/call 을 그대로 씀) */
@@ -1305,7 +1242,7 @@ export default function RoutineAgentSchedulePanel({
       setMessages((prev) =>
         prev.map((m) =>
           m.kind === 'parse' && m.id === parseMsgId
-            ? { ...m, suggestions: mapSuggestionsAfterRejectAll(m.suggestions) }
+            ? { ...m, suggestions: mapSuggestionsAfterRejectAll(m.suggestions), confirmCancelled: true }
             : m,
         ),
       )
@@ -1403,7 +1340,12 @@ export default function RoutineAgentSchedulePanel({
           const nextSlots = m.multiSlots.map((slot, j) =>
             j !== slotIndex
               ? slot
-              : { ...slot, slotSuggestions: mapSuggestionsAfterRejectAll(slot.slotSuggestions) },
+              : {
+                  ...slot,
+                  slotSuggestions: mapSuggestionsAfterRejectAll(slot.slotSuggestions),
+                  routineCardComplete: true,
+                  routineCardCancelled: true,
+                },
           )
           return { ...m, multiSlots: nextSlots }
         }),
@@ -1701,6 +1643,7 @@ export default function RoutineAgentSchedulePanel({
                               event={slot.event}
                               suggestions={slot.slotSuggestions}
                               registrationComplete={Boolean(slot.routineCardComplete)}
+                              cancelledComplete={Boolean(slot.routineCardCancelled)}
                               busy={suggestionSubmitKey === `${m.id}:${idx}` || loading}
                               onRegister={(payload) =>
                                 void handleUnifiedRegisterMulti(
@@ -1745,6 +1688,7 @@ export default function RoutineAgentSchedulePanel({
                           event={ev}
                           suggestions={m.suggestions}
                           registrationComplete={Boolean(m.confirmComplete)}
+                          cancelledComplete={Boolean(m.confirmCancelled)}
                           busy={suggestionSubmitKey === m.id || loading}
                           onRegister={(payload) =>
                             void handleUnifiedRegisterSingle(
@@ -1774,107 +1718,9 @@ export default function RoutineAgentSchedulePanel({
               <div ref={listEndRef} />
             </div>
 
-            {/* 하단: 접이식 직접 입력 + 이미지 + 입력창 + 보내기 */}
+            {/* 하단: 이미지 + 입력창 + 보내기 */}
             <div className="shrink-0 border-t border-gray-100 bg-white px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2">
               <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onPickImage} />
-
-              <button
-                type="button"
-                onClick={() => setDirectOpen((v) => !v)}
-                className="mb-2 flex w-full items-center justify-center gap-1 rounded-xl border border-gray-200 bg-white py-2 text-[11px] font-bold text-gray-700 shadow-sm"
-                aria-expanded={directOpen}
-              >
-                직접 입력하기
-                <span className="text-gray-400" aria-hidden>
-                  {directOpen ? '⌃' : '∨'}
-                </span>
-              </button>
-
-              {directOpen ? (
-                <div className="mb-3 space-y-2 rounded-xl border border-gray-100 bg-white p-3 shadow-inner">
-                  <div>
-                    <label className="mb-0.5 block text-[10px] font-bold text-gray-500">일정 이름</label>
-                    <input
-                      value={dTitle}
-                      onChange={(e) => setDTitle(e.target.value)}
-                      className="w-full rounded-lg border border-gray-200 px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-brand-blue/30"
-                      placeholder="예: 여름방학"
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="mb-0.5 block text-[10px] font-bold text-gray-500">시작일</label>
-                      <input
-                        type="date"
-                        value={dStart}
-                        onChange={(e) => setDStart(e.target.value)}
-                        className="w-full rounded-lg border border-gray-200 px-1 py-1.5 text-[11px] focus:outline-none focus:ring-2 focus:ring-brand-blue/30"
-                      />
-                    </div>
-                    <div>
-                      <label className="mb-0.5 block text-[10px] font-bold text-gray-500">종료일</label>
-                      <input
-                        type="date"
-                        value={dEnd}
-                        min={dStart}
-                        onChange={(e) => setDEnd(e.target.value)}
-                        className="w-full rounded-lg border border-gray-200 px-1 py-1.5 text-[11px] focus:outline-none focus:ring-2 focus:ring-brand-blue/30"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <p className="mb-1 text-[10px] font-bold text-gray-500">이벤트 종류</p>
-                    <div className="grid grid-cols-2 gap-1">
-                      {EVENT_TYPES_ORDER.map((type) => (
-                        <button
-                          key={type}
-                          type="button"
-                          onClick={() => setDType(type)}
-                          className={`rounded-lg border py-1.5 text-[10px] font-bold ${
-                            dType === type ? 'border-brand-blue bg-brand-blue/10 text-brand-blue' : 'border-gray-200 text-gray-400'
-                          }`}
-                        >
-                          {EVENT_TYPE_LABELS[type]}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div>
-                    <p className="mb-1 text-[10px] font-bold text-gray-500">루틴 적용</p>
-                    <div className="flex gap-1">
-                      {(['weekend', 'none'] as const).map((v) => (
-                        <button
-                          key={v}
-                          type="button"
-                          onClick={() => setDOverride(v)}
-                          className={`flex-1 rounded-lg border py-1.5 text-[10px] font-bold ${
-                            dOverride === v ? 'border-brand-blue bg-brand-blue/10 text-brand-blue' : 'border-gray-200 text-gray-400'
-                          }`}
-                        >
-                          {v === 'weekend' ? '휴일 루틴 적용' : '미션 없음'}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div>
-                    <label className="mb-0.5 block text-[10px] font-bold text-gray-500">간단한 설명</label>
-                    <textarea
-                      value={dDesc}
-                      onChange={(e) => setDDesc(e.target.value)}
-                      rows={2}
-                      className="routine-agent-hide-scrollbar w-full resize-none rounded-lg border border-gray-200 px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-brand-blue/30"
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    disabled={loading || !dTitle.trim()}
-                    onClick={() => void handleDirectSave()}
-                    className="w-full rounded-xl bg-brand-blue py-2.5 text-xs font-black text-white shadow disabled:opacity-50"
-                  >
-                    저장
-                  </button>
-                </div>
-              ) : null}
 
               <div className="mb-2 flex gap-2">
                 <button

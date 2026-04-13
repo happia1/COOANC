@@ -16,7 +16,13 @@ import { getActorChildContext } from '@/lib/getActorChildContext'
 import MissionTab from '@/components/child/MissionTab'
 import { getSeoulDateString } from '@/lib/koreaDate'
 import { uuidStringsEqual } from '@/lib/normalizeUuid'
-import type { ChildStats, DailyMissionWithTemplate, Mission } from '@/types/database'
+import type {
+  ChildStats,
+  DailyMissionWithTemplate,
+  Mission,
+  PraiseStickerGrant,
+  PraiseStickerPlacement,
+} from '@/types/database'
 
 type RoutineType = 'weekday' | 'weekend' | 'holiday' | 'vacation'
 
@@ -64,13 +70,24 @@ export default async function MissionPage() {
 
   const today = getSeoulDateString()
 
-  const [statsRes, familyRes] = await Promise.all([
+  const [statsRes, familyRes, profileRes, grantsRes, placementsRes] = await Promise.all([
     supabase.from('child_stats').select('*').eq('child_id', childId).maybeSingle(),
     supabase.from('family_links').select('parent_id').eq('child_id', childId).limit(1).maybeSingle(),
+    supabase.from('profiles').select('name').eq('id', childId).maybeSingle(),
+    supabase
+      .from('praise_sticker_grants')
+      .select('*')
+      .eq('child_id', childId)
+      .order('created_at', { ascending: false }),
+    supabase.from('praise_sticker_placements').select('*').eq('child_id', childId),
   ])
 
   const initialStats = (statsRes.data ?? null) as ChildStats | null
   const level = initialStats?.current_level ?? 0
+
+  const childName = (profileRes.data?.name ?? '').trim() || '쿠앵이'
+  const initialPraiseGrants = (grantsRes.data ?? []) as PraiseStickerGrant[]
+  const initialPraisePlacements = (placementsRes.data ?? []) as PraiseStickerPlacement[]
 
   const parentId = familyRes.data?.parent_id ?? null
 
@@ -156,7 +173,10 @@ export default async function MissionPage() {
   return (
     <MissionTab
       childId={childId}
+      childName={childName}
       initialStats={initialStats}
+      initialPraiseGrants={initialPraiseGrants}
+      initialPraisePlacements={initialPraisePlacements}
       dailyMissions={dailyMissions}
       today={today}
       isFullRestDay={fullRest}

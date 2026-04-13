@@ -8,7 +8,8 @@
  * - 일상 미션 카드는 이모지·제목·시각만 표시합니다. 활성/비활성은 상단 연필(키워드 시트)에서 한 번에 설정합니다.
  * - 알람은 온보딩·상단 「루틴 알람」에서만 설정해 충돌을 막습니다.
  * - 스페셜 「오늘 하루만」미션은 「일정 추가」→ 보너스 배율 시트에서 저장한 뒤 오늘 일정에 넣습니다.
- * - 캘린더는 스페셜 미션처럼 제목·+가 흰 카드 밖에 두고, 우하단 파비콘 플로팅으로 AI 루틴 도우미 패널을 엽니다.
+ * - 캘린더는 스페셜 미션처럼 제목·+가 흰 카드 밖에 두고, 우하단 **하단 독바 바로 위**에 작은 원형 파비콘으로 AI 루틴 도우미 패널을 엽니다.
+ * - 도우미 창을 닫아도 **대화 내역은 유지**되며, 닫힌 상태에서 AI 분석이 끝나면 플로팅 버튼에 **미읽음 숫자**가 표시됩니다.
  * - 매일 스페셜은 「보상 배율」로만 배율을 바꿉니다(카드에 「보상 N배」 문구는 넣지 않음).
  * - 상단 자녀 프로필 카드를 누르면 홈 탭과 같이 「부모가 이 자녀 앱 화면 보기」로 들어갑니다(API 쿠키 후 /home).
  */
@@ -516,6 +517,13 @@ export default function RoutineTab({
 
   /** AI 일정 패널(오른쪽 슬라이드) 열림 여부 */
   const [schedulePanelOpen, setSchedulePanelOpen] = useState(false)
+  /** 패널이 닫혀 있는 동안 도우미(AI) 답장이 쌓인 개수 — 플로팅 버튼 배지 */
+  const [routineAgentUnread, setRoutineAgentUnread] = useState(0)
+
+  /** 다른 자녀로 바꾸면 이전 아이 기준 미읽음은 의미가 없어 0으로 돌립니다 */
+  useEffect(() => {
+    setRoutineAgentUnread(0)
+  }, [currentId])
 
   /** assign-today 브로드캐스트를 SUBSCRIBED 직후 바로 쏠 수 있게 미리 붙여 둡니다(매번 subscribe 대기 제거). */
   const assignNotifyChannelRef = useRef<RealtimeChannel | null>(null)
@@ -761,21 +769,34 @@ export default function RoutineTab({
       )}
 
       {/**
-       * 루틴 도우미(챗봇) — 하단 탭 독(pb-24) 위, max-w-md 열 안 오른쪽에 고정
-       * - 본문 스크롤과 무관하게 항상 같은 자리(모바일 엄지 구역)에 둡니다.
+       * 루틴 도우미(챗봇) — max-w-md 열 안 오른쪽에 고정
+       * - `ParentNavBar` 독 높이 60px + 홈 인디케이터 `safe-area` + 10px 간격 → **독바 바로 위**에 붙임.
+       * - 원형 버튼은 `h-12`(이전 h-14보다 한 단계 작게), 로고는 `h-8` 로 비율 맞춤.
        */}
-      <div className="pointer-events-none fixed inset-x-0 bottom-24 z-[55] flex justify-center">
+      <div className="pointer-events-none fixed inset-x-0 bottom-[calc(60px+env(safe-area-inset-bottom,0px)+10px)] z-[55] flex justify-center">
         <div className="routine-fab-cloud pointer-events-auto flex w-full max-w-md justify-end px-4">
           <button
             type="button"
             disabled={!currentId}
             onClick={() => setSchedulePanelOpen(true)}
-            aria-label="루틴 도우미 챗봇 열기"
-            className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full border border-sky-100/90 bg-white shadow-[0_10px_28px_-6px_rgba(59,130,246,0.35),0_4px_14px_-4px_rgba(15,23,42,0.12)] transition active:scale-[0.94] disabled:pointer-events-none disabled:opacity-40"
+            aria-label={
+              routineAgentUnread > 0
+                ? `루틴 도우미, 새 답장 ${routineAgentUnread}개. 열어서 확인하기`
+                : '루틴 도우미 챗봇 열기'
+            }
+            className="relative flex h-12 w-12 shrink-0 items-center justify-center overflow-visible rounded-full border border-sky-100/90 bg-white shadow-[0_10px_28px_-6px_rgba(59,130,246,0.35),0_4px_14px_-4px_rgba(15,23,42,0.12)] transition active:scale-[0.94] disabled:pointer-events-none disabled:opacity-40"
           >
             {/* `/assets/**` 경로라 `next/image` 도 가능하지만, 플로팅 버튼은 가볍게 img 유지 */}
             {/* eslint-disable-next-line @next/next/no-img-element -- 작은 브랜드 마크 */}
-            <img src={TOPBAR_LOGO_SRC} alt="" className="h-9 w-9 object-contain" />
+            <img src={TOPBAR_LOGO_SRC} alt="" className="h-8 w-8 object-contain" />
+            {routineAgentUnread > 0 ? (
+              <span
+                className="absolute -right-0.5 -top-0.5 flex h-[1.125rem] min-w-[1.125rem] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-black tabular-nums leading-none text-white shadow ring-2 ring-white"
+                aria-hidden
+              >
+                {routineAgentUnread > 99 ? '99+' : routineAgentUnread}
+              </span>
+            ) : null}
           </button>
         </div>
       </div>
@@ -786,6 +807,13 @@ export default function RoutineTab({
         familyLinkId={familyLinkId}
         childId={currentId}
         onToast={showToast}
+        onAssistantRepliesWhileClosed={(delta) =>
+          setRoutineAgentUnread((n) => {
+            const next = n + delta
+            return next > 999 ? 999 : next
+          })
+        }
+        onPanelOpened={() => setRoutineAgentUnread(0)}
       />
 
       {/* 활성 미션 — 헤더와 연필(키워드 시트) 동일 행 */}

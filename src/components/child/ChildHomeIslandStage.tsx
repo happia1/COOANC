@@ -267,6 +267,11 @@ function HomeIslandHeroSprite({
       return (
         <CharacterSprite character="hamster" frame={sprite.frame} width={sprite.width} height={sprite.height} className={cls} />
       )
+    /** 수달: `resolveHomeIslandStageSprite` 가 `character: 'otter'` 를 넘길 때 — 분기 없으면 화면에 아무것도 안 그려짐 */
+    case 'otter':
+      return (
+        <CharacterSprite character="otter" frame={sprite.frame} width={sprite.width} height={sprite.height} className={cls} />
+      )
   }
 }
 
@@ -511,6 +516,7 @@ export default function ChildHomeIslandStage({
                       <PiggyBankStageVisual
                         stepIndex={animatedPiggyIdx}
                         displayWidth={64}
+                        piggyCredits={missionCredits.piggy}
                         className={MISSION_CREDIT_SPRITE_POP_SHADOW_CLASS}
                       />
                     </div>

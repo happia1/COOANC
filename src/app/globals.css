@@ -568,3 +568,24 @@
   height: 0; /* 가로 막대가 차지하던 높이 제거 */
   display: none; /* Chromium/Safari 등 WebKit 계열 */
 }
+
+/* 루틴 도우미 상단 키워드 행: 우측 끝 페이드(스크롤 여유가 있음을 힌트, 파스텔 흰·연보라) */
+.routine-agent-intent-scroll-fade {
+  position: relative;
+}
+.routine-agent-intent-scroll-fade::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 2.25rem;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(
+    to left,
+    #ffffff 0%,
+    rgba(245, 243, 255, 0.55) 40%,
+    rgba(245, 243, 255, 0) 100%
+  );
+}

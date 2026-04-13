@@ -12,7 +12,7 @@ import ChildHomeSceneryBand from '@/components/child/ChildHomeSceneryBand'
 import { MapActionPill, StickerActionPill } from '@/components/child/ChildSceneryTopPills'
 import { mergePraiseStickerGrantsFromServer } from '@/lib/mergePraiseStickerGrantsFromServer'
 import { mergeChildStatsPatch, normalizeChildStatsCreditsSplit } from '@/lib/childCreditsSplit'
-import { ASSETS } from '@/constants/assets'
+import { ASSETS, CHARACTER_DECOR_UI_FORCE_ALL_LOCKED } from '@/constants/assets'
 import ItemUnlockCelebrationPopup from '@/components/child/ItemUnlockCelebrationPopup'
 import type { TriggerKey } from '@/lib/gameLayer/triggerItemMap'
 
@@ -36,7 +36,7 @@ type Props = {
  * 아이 앱 홈 탭
  * - **한 화면**: 상단 풍경·하단 꾸미기가 **6:4** 비율(`flex-[6]`/`flex-[4]`)로 나뉨
  * - 섬 무대는 `ChildHomeIslandStage` 의 `density="flex"` 로 남는 세로 공간에 맞춤
- * - 배경: `home_background_01.png` 는 **풀 블리드 래퍼 뒤 한 겹**만 깝니다(이동·확대·overflow 잘림 없음 → 가장자리가 잘리지 않게). `ChildHomeSceneryBand` 는 콘텐츠만 담고 `showBackground={false}` 입니다. 옛 잔디·섬 합성 PNG는 `showIslandArt={false}` 로 끕니다.
+ * - 배경: 미션 탭과 **같은** 큰 그림(`ASSETS.layouts.sharedAppBackground`, `background_01.png`)을 풀 블리드 셸 **뒤 한 겹**만 깝니다(`MissionTab` 의 `missionTabBackdrop` 와 동일). `ChildHomeSceneryBand` 는 캐릭터 무대만 담고 `showBackground={false}` 입니다. 옛 잔디·섬 합성 PNG는 `showIslandArt={false}` 로 끕니다.
  * - 칭찬 스티커(곰)는 무대 **오른쪽 상단**(기존 날씨 자리), 성장 지도는 무대 **왼쪽** 지도 단추로 엽니다.
  * - 부모가 칭찬 스티커를 내면 팝업 후 곰돌이 판에서 붙일 수 있음
  */
@@ -57,6 +57,11 @@ export default function HomeTab({
   const [mapOpen, setMapOpen] = useState(initialMapOpen)
   const [unlockedItemIndexes, setUnlockedItemIndexes] = useState<number[]>(initialUnlockedItemIndexes)
   const [itemUnlockPopup, setItemUnlockPopup] = useState<{ index: number; triggerKey: TriggerKey } | null>(null)
+  /**
+   * 꾸미기 칸에 실제로 넘길「잠금 해제된 인덱스」입니다.
+   * `CHARACTER_DECOR_UI_FORCE_ALL_LOCKED` 가 true 이면 DB 값과 관계없이 빈 배열이라 전부 잠금 UI가 됩니다.
+   */
+  const effectiveDecorUnlocked = CHARACTER_DECOR_UI_FORCE_ALL_LOCKED ? [] : unlockedItemIndexes
   const [bearOpen, setBearOpen] = useState(false)
   const [grants, setGrants] = useState(initialPraiseGrants)
   const [placements, setPlacements] = useState(initialPraisePlacements)
@@ -246,7 +251,10 @@ export default function HomeTab({
           setUnlockedItemIndexes((prev) =>
             prev.includes(row.item_index) ? prev : [...prev, row.item_index],
           )
-          setItemUnlockPopup({ index: row.item_index, triggerKey: row.trigger_key as TriggerKey })
+          /** 전부 잠금 강제 모드에서는 축하 팝업만 막고, 상태는 나중에 플래그 해제 시 반영되게 둡니다. */
+          if (!CHARACTER_DECOR_UI_FORCE_ALL_LOCKED) {
+            setItemUnlockPopup({ index: row.item_index, triggerKey: row.trigger_key as TriggerKey })
+          }
         },
       )
       .subscribe()
@@ -336,21 +344,20 @@ export default function HomeTab({
    * (미션 탭 `mission/layout.tsx` 와 같은 `calc(100%+2rem)` 원리 — 비개발자용: 화면 가장자리까지 그림이 이어집니다.)
    */
   const homeFullBleedShellClass =
-    'relative -mx-4 -mt-4 box-border flex min-h-0 min-w-0 w-[calc(100%+2rem)] max-w-none flex-1 shrink-0 flex-col self-stretch overflow-visible'
+    'relative isolate -mx-4 -mt-4 box-border flex min-h-0 min-w-0 w-[calc(100%+2rem)] max-w-none flex-1 shrink-0 flex-col self-stretch overflow-visible'
 
   /**
-   * 홈 탭 전체 높이를 덮는 배경 한 겹.
-   * - 예전: `overflow-hidden` + 잔디만 올리는 `translate`/`scale` 을 쓰면 **세로로 긴 영역**에서 가장자리가 잘려 보였습니다.
-   * - 지금: 잘리지 않게 `overflow` 를 건드리지 않고, `object-cover` 만으로 화면을 채웁니다(비개발자용: 그림이 프레임 밖으로 잘리지 않게 맞춤).
+   * 홈 전체 뒤쪽 배경 — 미션 탭 `missionTabBackdrop` 과 같은 PNG·같은 깔기 방식입니다.
+   * (비개발자용) 아이가 보는 큰 하늘·풍경 그림이고, 버튼·캐릭터는 이 위 `z-[1]` 레이어에 있습니다.
    */
   const homeTabFullBackground = (
     <div className="pointer-events-none absolute inset-0 z-0" aria-hidden>
       <Image
-        src={ASSETS.layouts.childHomeBackground01}
+        src={ASSETS.layouts.sharedAppBackground}
         alt=""
         fill
         className="object-cover object-center"
-        sizes="(max-width: 448px) 100vw, 448px"
+        sizes="100vw"
         priority
       />
     </div>
@@ -361,41 +368,43 @@ export default function HomeTab({
       <>
         <div className={homeFullBleedShellClass}>
           {homeTabFullBackground}
-          {/** 통계가 아직 없을 때도 동일한 홈 배경·캐릭터 무대. 배경은 `homeTabFullBackground` 한 겹뿐입니다. */}
-          <ChildHomeSceneryBand edgeBleed={false} flexFill showBackground={false} ariaLabel="홈 상단">
-            <div className="shrink-0 space-y-2 py-1 text-center">
-              <p className="text-sm text-gray-500">부모님이 미션을 만들어주실 거야.</p>
-            </div>
-            {/** `flex-1 min-h-0`: 풍경 밴드 안에서 섬이 남는 높이를 쓰고, 작은 화면에서도 잘리지 않게 줄어듦 */}
-            <div className="flex min-h-0 flex-1 flex-col justify-end">
-              {/**
-               * 성장 지도 단추만 무대 **왼쪽** 세로 가운데 — 곰 스티커는 화면 오른쪽 아래 플로팅으로 옮겼습니다.
-               * `pointer-events-none` 으로 빈 곳 탭은 통과하고 지도 단추만 눌리게 합니다.
-               */}
-              {/**
-               * 섬·잔디·캐릭터 묶음: `-mt` 를 더 줄여 한 칸 더 아래로 보이게(곰 단추와 맞춤).
-               */}
-              <div className="relative mx-auto flex min-h-0 w-full max-w-sm flex-1 flex-col items-center justify-end -mt-2 sm:-mt-4">
-                {/**
-                 * 성장 지도(지도 아이콘) 단추 위치
-                 * - 요청사항: "왼쪽 상단" 배치
-                 * - `pointer-events-none` 으로 빈 영역 탭은 통과시키고, 버튼만 `pointer-events-auto` 로 눌리게 합니다.
-                 * - `pt-5`/`sm:pt-6`: 곰 스티커 단추와 같은 높이감으로 맞춤
-                 */}
-                <div className="pointer-events-none absolute left-0 top-0 z-20 flex items-start pl-0.5 pt-5 sm:pl-1 sm:pt-6">
-                  <div className="pointer-events-auto shrink-0">
-                    <MapActionPill onClick={() => setMapOpen(true)} />
-                  </div>
-                </div>
-                {/** 기존 날씨 위치에 곰 스티커 단추를 배치합니다. */}
-                {stickerTopRightButton}
-                <ChildHomeIslandStage density="flex" homeAvatarUrl={childAvatarUrl} showIslandArt={false} />
+          {/** 통계가 없을 때도 배경은 미션과 동일 PNG, 콘텐츠만 이 래퍼 위에 올립니다. */}
+          <div className="relative z-[1] flex min-h-0 min-w-0 flex-1 flex-col">
+            <ChildHomeSceneryBand edgeBleed={false} flexFill showBackground={false} ariaLabel="홈 상단">
+              <div className="shrink-0 space-y-2 py-1 text-center">
+                <p className="text-sm text-gray-500">부모님이 미션을 만들어주실 거야.</p>
               </div>
-            </div>
-          </ChildHomeSceneryBand>
-          <section className={homeBottomPanelClass} aria-label="내 캐릭터 꾸미기">
-            <CharacterDecorInventory unlockedIndexes={unlockedItemIndexes} />
-          </section>
+              {/** `flex-1 min-h-0`: 풍경 밴드 안에서 섬이 남는 높이를 쓰고, 작은 화면에서도 잘리지 않게 줄어듦 */}
+              <div className="flex min-h-0 flex-1 flex-col justify-end">
+                {/**
+                 * 성장 지도 단추만 무대 **왼쪽** 세로 가운데 — 곰 스티커는 화면 오른쪽 아래 플로팅으로 옮겼습니다.
+                 * `pointer-events-none` 으로 빈 곳 탭은 통과하고 지도 단추만 눌리게 합니다.
+                 */}
+                {/**
+                 * 섬·잔디·캐릭터 묶음: `-mt` 를 더 줄여 한 칸 더 아래로 보이게(곰 단추와 맞춤).
+                 */}
+                <div className="relative mx-auto flex min-h-0 w-full max-w-sm flex-1 flex-col items-center justify-end -mt-2 sm:-mt-4">
+                  {/**
+                   * 성장 지도(지도 아이콘) 단추 위치
+                   * - 요청사항: "왼쪽 상단" 배치
+                   * - `pointer-events-none` 으로 빈 영역 탭은 통과시키고, 버튼만 `pointer-events-auto` 로 눌리게 합니다.
+                   * - `pt-5`/`sm:pt-6`: 곰 스티커 단추와 같은 높이감으로 맞춤
+                   */}
+                  <div className="pointer-events-none absolute left-0 top-0 z-20 flex items-start pl-0.5 pt-5 sm:pl-1 sm:pt-6">
+                    <div className="pointer-events-auto shrink-0">
+                      <MapActionPill onClick={() => setMapOpen(true)} />
+                    </div>
+                  </div>
+                  {/** 기존 날씨 위치에 곰 스티커 단추를 배치합니다. */}
+                  {stickerTopRightButton}
+                  <ChildHomeIslandStage density="flex" homeAvatarUrl={childAvatarUrl} showIslandArt={false} />
+                </div>
+              </div>
+            </ChildHomeSceneryBand>
+            <section className={homeBottomPanelClass} aria-label="내 캐릭터 꾸미기">
+              <CharacterDecorInventory unlockedIndexes={effectiveDecorUnlocked} />
+            </section>
+          </div>
         </div>
         {sheets}
         {arrivalModal}
@@ -413,31 +422,33 @@ export default function HomeTab({
   return (
     <div className={homeFullBleedShellClass}>
       {homeTabFullBackground}
-      <ChildHomeSceneryBand edgeBleed={false} flexFill flexFillWeight={5.5} showBackground={false} ariaLabel="홈 상단">
-        {/** 캐릭터 무대: `-mt` 로 하단 꾸미기와 살짝만 겹칩니다. 배경은 셸의 `homeTabFullBackground` 가 담당합니다. */}
-        <div className="flex min-h-0 flex-1 flex-col justify-end gap-1.5">
-          <div className="relative mx-auto flex min-h-0 w-full max-w-sm flex-1 flex-col items-center justify-end -mt-2 sm:-mt-4">
-            {/**
-             * 성장 지도(지도 아이콘) 단추 위치
-             * - 요청사항: "왼쪽 상단" 배치
-             * - 로딩/정상 화면에서 동일한 좌표를 사용해 UX 를 일관되게 합니다.
-             * - `pt-5`/`sm:pt-6`: 우측 곰 스티커 단추와 세로 위치를 맞춤
-             */}
-            <div className="pointer-events-none absolute left-0 top-0 z-20 flex items-start pl-0.5 pt-5 sm:pl-1 sm:pt-6">
-              <div className="pointer-events-auto shrink-0">
-                <MapActionPill onClick={() => setMapOpen(true)} />
+      <div className="relative z-[1] flex min-h-0 min-w-0 flex-1 flex-col">
+        <ChildHomeSceneryBand edgeBleed={false} flexFill flexFillWeight={5.5} showBackground={false} ariaLabel="홈 상단">
+          {/** 캐릭터 무대: `-mt` 로 하단 꾸미기와 살짝만 겹칩니다. 배경은 셸의 `homeTabFullBackground` 가 담당합니다. */}
+          <div className="flex min-h-0 flex-1 flex-col justify-end gap-1.5">
+            <div className="relative mx-auto flex min-h-0 w-full max-w-sm flex-1 flex-col items-center justify-end -mt-2 sm:-mt-4">
+              {/**
+               * 성장 지도(지도 아이콘) 단추 위치
+               * - 요청사항: "왼쪽 상단" 배치
+               * - 로딩/정상 화면에서 동일한 좌표를 사용해 UX 를 일관되게 합니다.
+               * - `pt-5`/`sm:pt-6`: 우측 곰 스티커 단추와 세로 위치를 맞춤
+               */}
+              <div className="pointer-events-none absolute left-0 top-0 z-20 flex items-start pl-0.5 pt-5 sm:pl-1 sm:pt-6">
+                <div className="pointer-events-auto shrink-0">
+                  <MapActionPill onClick={() => setMapOpen(true)} />
+                </div>
               </div>
+              {/** 기존 날씨 위치(우상단)에 곰 스티커 단추를 동일하게 배치합니다. */}
+              {stickerTopRightButton}
+              <ChildHomeIslandStage density="flex" homeAvatarUrl={childAvatarUrl} showIslandArt={false} />
             </div>
-            {/** 기존 날씨 위치(우상단)에 곰 스티커 단추를 동일하게 배치합니다. */}
-            {stickerTopRightButton}
-            <ChildHomeIslandStage density="flex" homeAvatarUrl={childAvatarUrl} showIslandArt={false} />
           </div>
-        </div>
-      </ChildHomeSceneryBand>
+        </ChildHomeSceneryBand>
 
-      <section className={homeBottomPanelClass} aria-label="내 캐릭터 꾸미기">
-        <CharacterDecorInventory unlockedIndexes={unlockedItemIndexes} />
-      </section>
+        <section className={homeBottomPanelClass} aria-label="내 캐릭터 꾸미기">
+          <CharacterDecorInventory unlockedIndexes={effectiveDecorUnlocked} />
+        </section>
+      </div>
 
       {sheets}
       {arrivalModal}
@@ -459,8 +470,35 @@ const DECOR_ITEM_COUNT = ASSETS.characters.decorItemImages.length
 const DECOR_GRID_COLS = DECOR_ITEM_COUNT / 2
 
 /**
+ * 잠금된 칸 가운데에만 겹쳐 보일 자물쇠 SVG 입니다(별도 아이콘 패키지 없이 가볍게 그립니다).
+ * 선 색은 `currentColor` 이므로 부모에서 `text-white` 등으로 **흰 자물쇠**를 줄 수 있습니다.
+ * `aria-hidden`: 스크린 리더는 바깥 `aria-label` 로만 설명하고 이 그림은 장식으로 취급합니다.
+ */
+function DecorLockIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden
+    >
+      <path
+        d="M7 11V8a5 5 0 0110 0v3"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <rect x="4" y="11" width="16" height="11" rx="2" stroke="currentColor" strokeWidth="2" />
+      <circle cx="12" cy="16" r="1.25" fill="currentColor" />
+    </svg>
+  )
+}
+
+/**
  * 꾸미기 인벤토리 — 아이템을 **위·아래 2줄**로 두고, **한 번의 가로 스크롤**로 두 줄이 같이 밀립니다.
- * 잠금 해제된 아이템은 컬러로, 그 외는 흑백 + 준비중 레이블로 표시합니다.
+ * 잠금 해제된 아이템은 컬러로, 그 외는 흑백 썸네일 위에 **흰색 자물쇠**만 가운데 겹칩니다(별도 막·「잠금」글자 없음).
  */
 function CharacterDecorInventory({ unlockedIndexes }: { unlockedIndexes: number[] }) {
   return (
@@ -491,7 +529,7 @@ function CharacterDecorInventory({ unlockedIndexes }: { unlockedIndexes: number[
                   <div
                     key={`decor-item-${index}`}
                     aria-disabled={!unlocked}
-                    aria-label={`꾸미기 아이템 ${index + 1}번${unlocked ? ', 잠금 해제됨' : ', 준비 중'}`}
+                    aria-label={`꾸미기 아이템 ${index + 1}번${unlocked ? ', 잠금 해제됨' : ', 잠금됨'}`}
                     className="pointer-events-none aspect-square w-full"
                   >
                     <div className="relative size-full overflow-hidden rounded-xl border border-amber-100/90 bg-[#f7f4eb] shadow-sm">
@@ -504,14 +542,10 @@ function CharacterDecorInventory({ unlockedIndexes }: { unlockedIndexes: number[
                         draggable={false}
                       />
                       {!unlocked && (
-                        <>
-                          <div className="pointer-events-none absolute inset-0 bg-white/35" aria-hidden />
-                          <div className="pointer-events-none absolute inset-x-0 bottom-0.5 flex justify-center px-0.5">
-                            <span className="rounded-md bg-slate-700/85 px-1 py-px text-[8px] font-black tracking-tight text-white shadow-sm">
-                              준비중
-                            </span>
-                          </div>
-                        </>
+                        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                          {/** 가운데 흰 자물쇠만 — 밝은 썸네일에서도 보이도록 살짝 어두운 외곽 그림자 */}
+                          <DecorLockIcon className="size-[28%] min-h-[22px] min-w-[22px] max-h-9 max-w-9 text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.45)]" />
+                        </div>
                       )}
                     </div>
                   </div>

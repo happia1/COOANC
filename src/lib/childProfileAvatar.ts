@@ -20,6 +20,7 @@ export const CHILD_PROFILE_AVATAR_FILENAMES = [
   'chick_profile.png',
   'fox_profile.png',
   'hamster_profile.png',
+  'otter_profile.png',
 ] as const
 
 export type ChildProfileAvatarFilename = (typeof CHILD_PROFILE_AVATAR_FILENAMES)[number]
@@ -50,16 +51,18 @@ export const CHILD_PROFILE_AVATAR_OPTIONS: ReadonlyArray<{ url: string; label: s
   { url: publicUrlForChildProfileAvatar('chick_profile.png'), label: '병아리' },
   { url: publicUrlForChildProfileAvatar('fox_profile.png'), label: '여우' },
   { url: publicUrlForChildProfileAvatar('hamster_profile.png'), label: '햄스터' },
+  { url: publicUrlForChildProfileAvatar('otter_profile.png'), label: '수달' },
 ]
 
 /**
- * 온보딩 폼 하단 한 줄 나열 순서 (요청: fox → bunny → bear → hamster → chick)
+ * 온보딩 폼 하단 한 줄 나열 순서
  * — 이 순서대로 프로필 PNG 를 고르면 홈 섬 정면 캐릭터가 같은 종으로 맞춰집니다.
  */
 export const CHILD_PROFILE_AVATAR_OPTIONS_ONBOARDING_ROW: ReadonlyArray<{ url: string; label: string }> = [
   { url: publicUrlForChildProfileAvatar('fox_profile.png'), label: '여우' },
   { url: publicUrlForChildProfileAvatar('bunny_profile.png'), label: '토끼' },
   { url: publicUrlForChildProfileAvatar('bear_profile.png'), label: '곰' },
+  { url: publicUrlForChildProfileAvatar('otter_profile.png'), label: '수달' },
   { url: publicUrlForChildProfileAvatar('hamster_profile.png'), label: '햄스터' },
   { url: publicUrlForChildProfileAvatar('chick_profile.png'), label: '병아리' },
 ]

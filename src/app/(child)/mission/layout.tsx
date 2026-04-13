@@ -7,7 +7,9 @@ import type { ReactNode } from 'react'
  *   비치는 것처럼 보입니다. `w-[calc(100%+2rem)]` + `-mx-4` + `-mt-4` 로 패딩 폭만큼 박스를 넓히고
  *   당겨서, `MissionTab` 배경이 셸 가장자리까지 닿게 합니다(홈 `ChildHomeSceneryBand` 와 같은 원리).
  * - `overflow-x-hidden`: 탭 **전체**가 좌우로 밀리며 생기는 가로 스크롤·스크롤바를 막습니다.
- * - `overflow-y-hidden`: 세로는 `MissionTab` 내부 스크롤 영역이 담당합니다.
+ * - `overflow-y-hidden`: 세로는 **한 화면 안**에 가두어 `main` 전체 스크롤바가 생기지 않게 함.
+ *   (`overflow-y-visible` 이면 flex 자식 `min-height:auto` 가 콘텐츠만큼 커져 뷰포트를 넘깁니다.)
+ *   제목·하트는 `MissionTab` 안에서 `-mt` 를 최소로 두고, 카드만 안쪽 `overflow-y-auto`(스크롤바 숨김)로 처리합니다.
  */
 export default function ChildMissionLayout({ children }: { children: ReactNode }) {
   return (
