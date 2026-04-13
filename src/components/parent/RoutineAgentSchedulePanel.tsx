@@ -3,14 +3,16 @@
 /**
  * 루틴 탭 — 우측 하단에서 열리는 「챗봇」슬라이딩 패널입니다.
  * - Framer Motion 으로 오른쪽에서 패널이 들어옵니다. 패널·대화 스크롤 영역 배경은 흰색으로 통일합니다.
- * - 상단 인텐트 UI: 카테고리 탭 4개는 항상 보이고, 세부 인텐트 칩 2개는 해당 카테고리를 눌렀을 때만 펼칩니다(같은 탭 재클릭 시 접힘).
+ * - 상단 인텐트 UI: 대분류·세부 칩 모두 가로 스크롤(막대 숨김) + 우측 페이드(`globals.css` 의 `.routine-agent-intent-scroll-fade`). 세부 칩은 카테고리 탭을 눌렀을 때만 보입니다(같은 탭 재클릭 시 접힘).
  * - 가로·세로 스크롤 **막대(슬라이드 바)** 는 `globals.css` 의 `.routine-agent-hide-scrollbar` 로 숨기되, 스크롤 동작은 그대로 둡니다.
  * - 부모 탭 `<main>` 이 스크롤 컨테이너라 막대가 오버레이 위에 겹칠 수 있어, 열릴 때 `overflow` 를 잠그고 z-index 를 시트들보다 높입니다.
  * - 텍스트·이미지·직접 입력은 `/agent-b/parse` 로 보냅니다. 한 건만 나오면 곧바로 DB 초안 + 제안이 붙고, 여러 건이면 `< 1/N >` 로 한 줄씩 확인한 뒤 [등록] 시 `/agent-b/commit-schedule` 로 저장합니다.
+ * - 패널을 **닫아도 대화 말풍선은 지우지 않습니다**(자녀·가족 연결만 바뀔 때 새로 시작). 닫힌 뒤 분석이 끝나면 부모 탭이 플로팅 배지 숫자를 올립니다.
+ * - 제안(routine_off 등)은 **한 장의 파스텔 카드**로 묶고, `special_mission`·`extra_reward` 는 화면에 숨긴 뒤 [등록하기] 때 서버에만 승인 요청합니다.
  * - 이미지는 브라우저에서 JPEG 로 줄여 보내 MIME 불일치·용량 초과 오류를 줄입니다.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
@@ -27,6 +29,13 @@ import { getSeoulDateString } from '@/lib/koreaDate'
 import { TOPBAR_LOGO_SRC } from '@/constants/branding'
 import { PARENT_TABS_MAIN_SCROLL_EL_ID } from '@/lib/parentTabsMainScrollId'
 import type { LocalCalendarEvent } from '@/types/database'
+import { COOANC_CALENDAR_EVENTS_STORAGE_KEY } from '@/lib/localStorageChildScope'
+import {
+  agentParseTypeToLocalEventType,
+  patchLocalCalendarEventInStorage,
+  shouldSkipSyncAgentEvent,
+  syncAgentEventToLocalCalendar,
+} from '@/lib/syncAgentEventToLocalCalendar'
 
 type Props = {
   open: boolean
@@ -34,11 +43,19 @@ type Props = {
   familyLinkId: string | null
   childId: string | null
   onToast: (msg: string, ok?: boolean, multiline?: boolean) => void
+  /**
+   * 패널이 닫혀 있는 동안 AI 분석(parse)·다건 일정 커밋 등 **새 답장**이 도착했을 때만 호출됩니다.
+   * 부모 탭에서 플로팅 버튼 배지 숫자를 올릴 때 씁니다.
+   */
+  onAssistantRepliesWhileClosed?: (count: number) => void
+  /** 패널이 열릴 때마다 호출 — 미읽음 배지를 0으로 돌릴 때 사용합니다 */
+  onPanelOpened?: () => void
 }
 
 /** AI 가 처음 인사할 때 쓰는 고정 문구(줄바꿈 포함) */
-const WELCOME_TEXT = `안녕하세요! 어떤 걸 도와드릴까요?
-위에서 카테고리를 한 번 누르면 세부 칩이 펼쳐져요. 칩을 누르면 질문 가이드가 나옵니다. 필요하면 직접 입력해도 됩니다 😊`
+const WELCOME_TEXT = `안녕하세요. '루틴 도우미'에요!
+원하는 키워드를 클릭하거나 직접 입력해보세요.
+예) '4월 25일 체육대회 등록해줘'`
 
 /** 세부 인텐트 한 칩 — 라벨(표시) + 채팅에 넣을 질문세트(여러 줄) */
 type RoutineIntentChip = { id: string; label: string; prompt: string }
@@ -203,6 +220,8 @@ type MultiSlotUi = {
   event: AgentParseEvent
   status: 'pending' | 'skipped' | 'committed'
   slotSuggestions: SuggestionUi[]
+  /** commit-schedule 응답의 `saved_event_id` — 로컬 캘린더 행 id 와 같아 확인 카드에서 수정 시 패치에 씁니다 */
+  savedEventId?: string | null
 }
 
 /** 다건 슬롯이 모두 등록·건너뛰기 처리됐는지 */
@@ -238,16 +257,15 @@ function stripDataUrlBase64(dataUrl: string): string {
 function scheduleRowFromApi(pe: AgentParseApiRow): AgentParsedScheduleRow {
   const t = String(pe.event_type ?? pe.type ?? 'etc')
   const desc = String(pe.description ?? pe.note ?? '').trim()
-  return {
-    event: {
-      type: t,
-      title: String(pe.title ?? '').trim() || '일정',
-      start_date: String(pe.start_date ?? '').trim(),
-      end_date: pe.end_date ?? null,
-      ...(desc ? { description: desc } : {}),
-    },
-    suggestions: [],
+  const event: AgentParseEvent = {
+    type: t,
+    title: String(pe.title ?? '').trim() || '일정',
+    start_date: String(pe.start_date ?? '').trim(),
+    end_date: pe.end_date ?? null,
+    ...(desc ? { description: desc } : {}),
+    ...(typeof pe.routine_off === 'boolean' ? { routine_off: pe.routine_off } : {}),
   }
+  return { event, suggestions: [] }
 }
 
 /** 구버전 에이전트(`mode` 없음, `schedules_api` 만 multi)도 깨지지 않게 맞춥니다 */
@@ -300,6 +318,251 @@ function weekdayKoFromYmd(isoDate: string): string {
   return new Intl.DateTimeFormat('ko-KR', { weekday: 'short' }).format(dt)
 }
 
+/** 제안 `type` 문자열을 소문자로 정규화(서버가 대소문자 섞어 줄 수 있음) */
+function suggestionTypeNorm(t: string | undefined): string {
+  return String(t ?? '')
+    .trim()
+    .toLowerCase()
+}
+
+/** `routine_off` 제안인지 — 이날 루틴 끄기 토글과 연결 */
+function isRoutineOffSuggestion(s: Pick<SuggestionUi, 'type'>): boolean {
+  return suggestionTypeNorm(s.type) === 'routine_off'
+}
+
+function pendingSuggestions(suggestions: SuggestionUi[]) {
+  return suggestions.filter((s) => s.status === 'pending')
+}
+
+/** [등록하기] 성공 후 로컬 상태를 서버와 같은 의미로 맞춤 */
+function mapSuggestionsAfterApprove(suggestions: SuggestionUi[], routineOffOn: boolean): SuggestionUi[] {
+  return suggestions.map((s) => {
+    if (s.status !== 'pending') return s
+    if (!s.suggestion_id) return { ...s, status: 'rejected' as const }
+    if (isRoutineOffSuggestion(s)) return { ...s, status: routineOffOn ? 'approved' : 'rejected' }
+    return { ...s, status: 'approved' as const }
+  })
+}
+
+function mapSuggestionsAfterRejectAll(suggestions: SuggestionUi[]): SuggestionUi[] {
+  return suggestions.map((s) => (s.status === 'pending' ? { ...s, status: 'rejected' as const } : s))
+}
+
+/** 확인 카드 [등록하기] 시 부모가 로컬 캘린더·제안 승인에 함께 넘길 값 */
+type ScheduleConfirmRegisterPayload = {
+  routineOffOn: boolean
+  eventType: LocalCalendarEvent['eventType']
+  description: string
+}
+
+/**
+ * 유형 키워드 칩 한 종류 — 화면에는 짧은 한글 라벨, 저장에는 `eventType` 만 씁니다.
+ * (같은 `eventType` 이라도 부모가 구분하기 쉽게 라벨을 나눴습니다.)
+ */
+type ScheduleKeywordChipId = 'school' | 'public' | 'vacation' | 'trip' | 'anniv' | 'other'
+
+const SCHEDULE_KEYWORD_CHIPS: {
+  id: ScheduleKeywordChipId
+  label: string
+  eventType: LocalCalendarEvent['eventType']
+}[] = [
+  { id: 'school', label: '학교·행사', eventType: 'other' },
+  { id: 'public', label: '공휴일', eventType: 'holiday' },
+  { id: 'vacation', label: '방학·돌봄', eventType: 'vacation' },
+  { id: 'trip', label: '가족여행', eventType: 'vacation' },
+  { id: 'anniv', label: '기념일', eventType: 'special' },
+  { id: 'other', label: '기타', eventType: 'other' },
+]
+
+/**
+ * 제목·설명·에이전트 유형을 읽어 **처음에 어떤 키워드 칩을 켤지** 추측합니다.
+ * - 예: 글에 ‘방학’이 있으면 방학·돌봄 칩, ‘체육대회’면 학교·행사 칩을 우선합니다.
+ */
+function inferScheduleKeywordChipId(ev: AgentParseEvent): ScheduleKeywordChipId {
+  const blob = `${ev.title ?? ''} ${ev.description ?? ''}`
+  const t = (ev.type || '').trim().toLowerCase()
+
+  if (t === 'school' || /학교|체육대회|현장학습|수련회|알림장|학부모|세례식/.test(blob)) return 'school'
+  if (t === 'holiday' || /공휴|대체공휴|설날|추석|신정|휴일|연휴/.test(blob)) return 'public'
+  if (t === 'vacation' || /방학|돌봄|여름방학|겨울방학/.test(blob)) return 'vacation'
+  if (t === 'travel' || /여행|캠핑|패키지|출국|해외/.test(blob)) return 'trip'
+  if (t === 'birthday' || /생일|돌잔치|기념일|졸업식|입학식/.test(blob)) return 'anniv'
+
+  const mapped = agentParseTypeToLocalEventType(ev.type)
+  const byType = SCHEDULE_KEYWORD_CHIPS.find((c) => c.eventType === mapped)
+  return byType?.id ?? 'other'
+}
+
+/**
+ * 통합 등록 카드 — 일정 요약 + 유형 키워드 칩 + 설명 입력 + 간단 루틴 on/off + 등록/취소.
+ * - `layout="full"`: 단건 파싱 직후, 제목·날짜까지 카드 안에 표시
+ * - `layout="compact"`: 다건에서 위쪽 박스에 일정이 있으므로 루틴·유형 위주로만 표시
+ */
+function UnifiedScheduleConfirmCard(props: {
+  layout: 'full' | 'compact'
+  event: AgentParseEvent
+  suggestions: SuggestionUi[]
+  busy: boolean
+  onRegister: (payload: ScheduleConfirmRegisterPayload) => void | Promise<void>
+  onCancel: () => void | Promise<void>
+}) {
+  const { layout, event: ev, suggestions, busy, onRegister, onCancel } = props
+  const descFieldId = useId()
+  const pending = pendingSuggestions(suggestions)
+  const showRoutineToggle = pending.some((s) => isRoutineOffSuggestion(s))
+  /** routine_off 제안이 있으면 처음부터 ON */
+  const [routineOffOn, setRoutineOffOn] = useState(() => pending.some((s) => isRoutineOffSuggestion(s)))
+  /** 부모가 고른 유형 키워드(칩 하나만 선택) */
+  const [keywordId, setKeywordId] = useState<ScheduleKeywordChipId>(() => inferScheduleKeywordChipId(ev))
+  /** 사용자가 고칠 수 있는 설명 — 처음엔 AI가 넣은 설명을 그대로 둡니다 */
+  const [descriptionDraft, setDescriptionDraft] = useState(() => ev.description ?? '')
+
+  /** 같은 말풍선 안에서 AI가 새 `event` 를 주면 키워드·설명만 초기화합니다 */
+  useEffect(() => {
+    setKeywordId(inferScheduleKeywordChipId(ev))
+    setDescriptionDraft(ev.description ?? '')
+  }, [ev.title, ev.type, ev.start_date, ev.end_date, ev.description])
+
+  /** 제안 목록이 바뀌면(새 파싱 등) 루틴 끄기 스위치 기본값을 다시 맞춥니다 */
+  useEffect(() => {
+    const pend = suggestions.filter((s) => s.status === 'pending')
+    setRoutineOffOn(pend.some((s) => isRoutineOffSuggestion(s)))
+  }, [suggestions])
+
+  const wk = weekdayKoFromYmd(ev.start_date)
+  const dateLine = `${ev.start_date}${wk ? ` (${wk})` : ''}`
+  const dateRange =
+    ev.end_date && ev.end_date !== ev.start_date ? `${dateLine} ~ ${ev.end_date}` : dateLine
+
+  const selectedEventType =
+    SCHEDULE_KEYWORD_CHIPS.find((c) => c.id === keywordId)?.eventType ?? ('other' as const)
+
+  if (pending.length === 0) {
+    if (suggestions.length === 0) return null
+    return (
+      <div className="rounded-2xl border border-violet-100/90 bg-gradient-to-b from-violet-50/90 to-sky-50/70 px-3 py-3 text-center shadow-sm ring-1 ring-violet-100/50">
+        <p className="text-[11px] font-bold text-violet-900">✓ 일정을 등록했어요</p>
+      </div>
+    )
+  }
+
+  const heading = layout === 'full' ? '일정을 등록할까요?' : '이 일정의 루틴을 적용할까요?'
+
+  return (
+    <div className="rounded-2xl border border-violet-100/90 bg-gradient-to-b from-violet-50/90 via-white to-sky-50/80 p-3 shadow-md ring-1 ring-sky-100/60">
+      <p className="text-center text-xs font-black text-violet-950">{heading}</p>
+      {layout === 'full' ? (
+        <div className="mt-2 space-y-1 text-xs text-gray-900">
+          <p className="font-black text-gray-900">{ev.title || '일정'}</p>
+          <p className="text-[11px] text-gray-700">{dateRange}</p>
+        </div>
+      ) : (
+        <p className="mt-1.5 text-center text-[10px] font-bold text-gray-500">
+          유형·설명을 손볼 수 있어요. 등록하면 루틴 제안도 함께 반영돼요.
+        </p>
+      )}
+
+      {/* 유형: 탭할 수 있는 키워드 칩 — 한 번에 하나만 선택 */}
+      <div className={layout === 'full' ? 'mt-3' : 'mt-2'}>
+        <p className="mb-1.5 text-[10px] font-bold text-gray-500">유형 키워드</p>
+        <div className="flex flex-wrap gap-1.5">
+          {SCHEDULE_KEYWORD_CHIPS.map((chip) => {
+            const on = chip.id === keywordId
+            return (
+              <button
+                key={chip.id}
+                type="button"
+                disabled={busy}
+                onClick={() => setKeywordId(chip.id)}
+                className={`rounded-full border px-2.5 py-1 text-[10px] font-black transition ${
+                  on
+                    ? 'border-violet-400 bg-violet-500 text-white shadow-sm'
+                    : 'border-gray-200 bg-white text-gray-600 active:scale-[0.98]'
+                } disabled:opacity-50`}
+              >
+                {chip.label}
+              </button>
+            )
+          })}
+        </div>
+        <p className="mt-1 text-[9px] text-gray-400">내용을 바탕으로 위 키워드를 자동 골라 두었어요. 필요하면 눌러 바꿀 수 있어요.</p>
+      </div>
+
+      {/* 설명: 부모가 직접 적는 칸 */}
+      <div className="mt-2.5">
+        <label className="mb-1 block text-[10px] font-bold text-gray-500" htmlFor={descFieldId}>
+          설명(선택)
+        </label>
+        <textarea
+          id={descFieldId}
+          disabled={busy}
+          value={descriptionDraft}
+          onChange={(e) => setDescriptionDraft(e.target.value)}
+          rows={layout === 'full' ? 3 : 2}
+          placeholder="예: 준비물, 장소, 시간 등 메모해 두세요"
+          className="routine-agent-hide-scrollbar w-full resize-none rounded-xl border border-gray-200 bg-white px-2.5 py-2 text-[11px] leading-relaxed text-gray-900 placeholder:text-gray-300 focus:outline-none focus:ring-2 focus:ring-brand-blue/25 disabled:opacity-50"
+        />
+      </div>
+
+      {/* 루틴: 캘린더 시트와 비슷한 한 줄 토글 — 큰 박스 없이 */}
+      {showRoutineToggle ? (
+        <div className="mt-3 flex items-center justify-between gap-2 border-t border-gray-100 pt-2.5">
+          <div className="min-w-0">
+            <p className="text-[11px] font-bold text-gray-800">이날 루틴 끄기</p>
+            <p className="text-[9px] font-medium text-gray-400">
+              {routineOffOn ? '미션·루틴을 쉬게 해요' : '휴일 루틴을 유지해요'}
+            </p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={routineOffOn}
+            disabled={busy}
+            onClick={() => setRoutineOffOn((v) => !v)}
+            className={`relative h-7 w-12 shrink-0 rounded-full border-2 transition ${
+              routineOffOn
+                ? 'border-emerald-400 bg-emerald-100 shadow-inner'
+                : 'border-gray-200 bg-gray-100'
+            } disabled:opacity-50`}
+          >
+            <span
+              className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${
+                routineOffOn ? 'left-[calc(100%-1.35rem)]' : 'left-0.5'
+              }`}
+            />
+            <span className="sr-only">이날 루틴 끄기 {routineOffOn ? '켜짐' : '꺼짐'}</span>
+          </button>
+        </div>
+      ) : null}
+
+      <div className="mt-3 flex gap-2">
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() =>
+            void onRegister({
+              routineOffOn,
+              eventType: selectedEventType,
+              description: descriptionDraft,
+            })
+          }
+          className="min-w-0 flex-1 rounded-xl bg-emerald-500 py-2.5 text-[11px] font-black text-white shadow-sm active:scale-[0.99] disabled:opacity-50"
+        >
+          등록하기
+        </button>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => void onCancel()}
+          className="min-w-0 flex-1 rounded-xl border border-rose-100 bg-rose-50 py-2.5 text-[11px] font-black text-rose-900 shadow-sm active:scale-[0.99] disabled:opacity-50"
+        >
+          취소
+        </button>
+      </div>
+    </div>
+  )
+}
+
 /**
  * PNG·WebP 등을 JPEG 로 바꿔 용량을 줄입니다.
  * (서버가 예전처럼 JPEG 만 가정해도 되고, JSON 본문이 너무 커지는 것도 막습니다.)
@@ -346,6 +609,8 @@ export default function RoutineAgentSchedulePanel({
   familyLinkId,
   childId,
   onToast,
+  onAssistantRepliesWhileClosed,
+  onPanelOpened,
 }: Props) {
   const [mounted, setMounted] = useState(false)
   /** 채팅 말풍선 목록(위에서 아래로 시간 순) */
@@ -356,6 +621,8 @@ export default function RoutineAgentSchedulePanel({
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [imageBase64, setImageBase64] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  /** 통합 제안 카드에서 POST /agent-b/approve 연속 호출 중 — `parseMsgId` 또는 `parseMsgId:slotIndex` */
+  const [suggestionSubmitKey, setSuggestionSubmitKey] = useState<string | null>(null)
   /** [직접 입력하기] 펼침 여부 */
   const [directOpen, setDirectOpen] = useState(false)
   /**
@@ -387,10 +654,27 @@ export default function RoutineAgentSchedulePanel({
 
   const fileRef = useRef<HTMLInputElement>(null)
   const listEndRef = useRef<HTMLDivElement>(null)
+  /** 비동기(parse)가 끝날 때 패널이 열려 있는지 — 닫힌 뒤 완료되면 미읽음만 올립니다 */
+  const openRef = useRef(open)
+  useEffect(() => {
+    openRef.current = open
+  }, [open])
+
+  /** 자녀·가족 연결이 바뀌면 대화를 새로 시작합니다(닫기만으로는 초기화하지 않음) */
+  const agentSessionScopeRef = useRef<string | null>(null)
 
   useEffect(() => {
     setMounted(true)
   }, [])
+
+  /** 패널이 열릴 때마다(닫았다가 다시 열기 포함) 플로팅 배지를 초기화합니다 */
+  const prevOpenRef = useRef(false)
+  useEffect(() => {
+    if (open && !prevOpenRef.current) {
+      onPanelOpened?.()
+    }
+    prevOpenRef.current = open
+  }, [open, onPanelOpened])
 
   useEffect(() => {
     if (!open) return
@@ -421,7 +705,11 @@ export default function RoutineAgentSchedulePanel({
     }
   }, [open])
 
-  /** 패널을 닫을 때 입력·대화를 비웁니다 */
+  /**
+   * 대화·입력 폼을 비웁니다.
+   * - **자녀 또는 가족 연결이 바뀔 때만** 호출해 새 아이 기준으로 챗을 시작합니다.
+   * - 패널을 닫을 때는 호출하지 않아, 부모가 나중에 다시 열어도 말풍선이 그대로 남습니다.
+   */
   const resetAll = useCallback(() => {
     setMessages([])
     setComposerText('')
@@ -441,17 +729,27 @@ export default function RoutineAgentSchedulePanel({
   }, [])
 
   /**
-   * 패널 닫힘: 입력·대화 초기화
-   * 패널 열림: 먼저 폼을 비운 뒤 환영 인사로 새 대화 시작(이전 세션 잔여 입력 방지)
+   * `childId` / `familyLinkId` 가 바뀌면 이전 아이와의 대화를 지우고 환영 말풍선만 둡니다.
+   * (같은 아이로 루틴 탭을 벗어났다가 돌아오면 컴포넌트가 다시 마운트되면서 ref 가 초기화될 수 있어,
+   *  그때도 한 번 환영이 붙을 수 있습니다 — 의도된 “새 세션” 동작에 가깝습니다.)
    */
   useEffect(() => {
-    if (!open) {
-      resetAll()
-      return
-    }
+    if (!childId || !familyLinkId) return
+    const scope = `${familyLinkId}:${childId}`
+    if (agentSessionScopeRef.current === scope) return
+    agentSessionScopeRef.current = scope
     resetAll()
     setMessages([{ id: newId(), kind: 'text', role: 'assistant', text: WELCOME_TEXT }])
-  }, [open, resetAll])
+  }, [childId, familyLinkId, resetAll])
+
+  /** 패널이 닫혀 있는 동안 새 AI 답장이 생기면 부모에게 숫자만 넘깁니다 */
+  const bumpUnreadIfClosed = useCallback(
+    (delta: number) => {
+      if (delta < 1) return
+      if (!openRef.current) onAssistantRepliesWhileClosed?.(delta)
+    },
+    [onAssistantRepliesWhileClosed],
+  )
 
   /** 새 말풍선이 생기면 목록 맨 아래로 스크롤 */
   useEffect(() => {
@@ -508,6 +806,28 @@ export default function RoutineAgentSchedulePanel({
           }))
         : undefined
       const sug: SuggestionUi[] = (res.suggestions ?? []).map((s) => ({ ...s, status: 'pending' as const }))
+      /**
+       * 단건인데 제목/설명에 추출 오류·503 이 섞여 오면 성공이 아님 — 캘린더 동기화·파싱 카드 모두 생략.
+       * (그대로 두면 오늘 날짜에 사용자 문장 전체가 제목인 일정이 생김)
+       */
+      if (!isMulti && shouldSkipSyncAgentEvent(res.event)) {
+        onToast('AI 서버가 잠시 바빠 일정을 읽지 못했어요. 잠시 후 다시 시도해 주세요.', false, true)
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: newId(),
+            kind: 'text',
+            role: 'assistant',
+            text: '지금은 요청이 많아 응답이 지연되고 있어요. 잠시 후 같은 내용으로 다시 보내 주세요.',
+          },
+        ])
+        bumpUnreadIfClosed(1)
+        return
+      }
+      /** 단건 파싱: 서버 초안과 동일 일정을 부모 캘린더(localStorage)에도 반영 */
+      if (!isMulti) {
+        syncAgentEventToLocalCalendar(childId, res.event, res.saved_event_id ?? null)
+      }
       setMessages((prev) => [
         ...prev,
         {
@@ -521,6 +841,7 @@ export default function RoutineAgentSchedulePanel({
           multiIndex: isMulti ? 0 : undefined,
         },
       ])
+      bumpUnreadIfClosed(1)
       onToast(isMulti ? `일정 ${multiSlots?.length ?? 0}건을 찾았어요. 한 건씩 확인해 주세요` : 'AI 분석이 완료됐어요')
     } catch (err) {
       onToast(err instanceof Error ? err.message : '분석에 실패했어요', false, true)
@@ -633,6 +954,10 @@ export default function RoutineAgentSchedulePanel({
         text_input: call.text_input,
         event: slot.event,
       })
+      if (shouldSkipSyncAgentEvent(out.event)) {
+        onToast('일정을 저장하지 못했어요. AI 서버가 잠시 바쁩니다. 잠시 후 다시 시도해 주세요.', false, true)
+        return
+      }
       const slotSuggestions: SuggestionUi[] = (out.suggestions ?? []).map(
         (s): SuggestionUi => ({
           type: s.type,
@@ -641,12 +966,21 @@ export default function RoutineAgentSchedulePanel({
           status: 'pending',
         }),
       )
+      /** 다건 중 한 줄 커밋: 캘린더 UI(localStorage)에도 같은 일정을 붙여 달력 점이 보이게 함 */
+      syncAgentEventToLocalCalendar(childId, out.event, out.saved_event_id ?? null)
       setMultiEdit((cur) => (cur?.parseMsgId === parseMsgId && cur.slotIndex === slotIndex ? null : cur))
       setMessages((prev) =>
         prev.map((m) => {
           if (m.kind !== 'parse' || m.id !== parseMsgId || !m.multiSlots) return m
           const nextSlots = m.multiSlots.map((s, j) =>
-            j === slotIndex ? { ...s, status: 'committed' as const, slotSuggestions } : s,
+            j === slotIndex
+              ? {
+                  ...s,
+                  status: 'committed' as const,
+                  slotSuggestions,
+                  savedEventId: out.saved_event_id ?? null,
+                }
+              : s,
           )
           const n = nextSlots.length
           const nextIdx = Math.min(slotIndex + 1, Math.max(0, n - 1))
@@ -659,7 +993,8 @@ export default function RoutineAgentSchedulePanel({
           }
         }),
       )
-      onToast('이 일정을 등록했어요. 아래 제안을 적용할지 골라 주세요')
+      bumpUnreadIfClosed(1)
+      onToast('이 일정을 등록했어요. 아래에서 루틴 제안을 한 번에 적용해 주세요')
     } catch (err) {
       onToast(err instanceof Error ? err.message : '등록에 실패했어요', false, true)
     } finally {
@@ -740,46 +1075,103 @@ export default function RoutineAgentSchedulePanel({
     onToast('이 일정 내용을 수정했어요')
   }
 
-  /** 제안 카드의 적용/거절 — suggestion_id 가 있을 때만 서버로 갑니다 */
-  const handleApproveRow = async (parseMsgId: string, row: SuggestionUi, action: 'approved' | 'rejected') => {
-    if (!row.suggestion_id) {
-      onToast('이 제안은 서버에 저장되지 않아 처리할 수 없어요. 에이전트를 최신 버전으로 배포했는지 확인해 주세요.', false)
-      return
-    }
-    try {
-      await postAgentApprove(row.suggestion_id, action)
-      setMessages((prev) =>
-        prev.map((m) => {
-          if (m.kind !== 'parse' || m.id !== parseMsgId) return m
-          return {
-            ...m,
-            suggestions: m.suggestions.map((s) =>
-              s.suggestion_id === row.suggestion_id
-                ? { ...s, status: action === 'approved' ? 'approved' : 'rejected' }
-                : s,
-            ),
-          }
-        }),
-      )
-      onToast(action === 'approved' ? '적용했어요' : '거절했어요')
-    } catch (e) {
-      onToast(e instanceof Error ? e.message : '처리 실패', false)
+  /**
+   * 통합 카드 [등록하기] — 대기 제안마다 POST /agent-b/approve.
+   * `special_mission`·`extra_reward` 는 UI에 안 보이지만 여기서 **자동 승인**합니다.
+   */
+  const approvePendingSuggestionsBatch = async (
+    pending: SuggestionUi[],
+    routineOffOn: boolean,
+  ): Promise<void> => {
+    for (const s of pending) {
+      if (!s.suggestion_id) {
+        onToast('연결되지 않은 제안이 있어 건너뛰었어요. 에이전트를 최신으로 배포했는지 확인해 주세요.', false)
+        continue
+      }
+      const action: 'approved' | 'rejected' =
+        isRoutineOffSuggestion(s) && !routineOffOn ? 'rejected' : 'approved'
+      await postAgentApprove(s.suggestion_id, action)
     }
   }
 
-  /** 다건 일정 중 한 줄에 붙은 제안만 골라 승인/거절합니다 */
-  const handleApproveRowInMultiSlot = async (
+  const rejectPendingSuggestionsBatch = async (pending: SuggestionUi[]): Promise<void> => {
+    for (const s of pending) {
+      if (!s.suggestion_id) continue
+      await postAgentApprove(s.suggestion_id, 'rejected')
+    }
+  }
+
+  const handleUnifiedRegisterSingle = async (
+    parseMsgId: string,
+    suggestions: SuggestionUi[],
+    payload: ScheduleConfirmRegisterPayload,
+    savedCalendarEventId: string | null,
+  ) => {
+    const pending = pendingSuggestions(suggestions)
+    if (pending.length === 0) return
+    setSuggestionSubmitKey(parseMsgId)
+    try {
+      /** 로컬 캘린더(달력 점)에 반영된 행을 부모가 고친 유형·설명·루틴으로 맞춤 */
+      patchLocalCalendarEventInStorage(savedCalendarEventId, {
+        eventType: payload.eventType,
+        description: payload.description,
+        routineOverride: payload.routineOffOn ? 'none' : 'weekend',
+      })
+      await approvePendingSuggestionsBatch(pending, payload.routineOffOn)
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.kind === 'parse' && m.id === parseMsgId
+            ? { ...m, suggestions: mapSuggestionsAfterApprove(m.suggestions, payload.routineOffOn) }
+            : m,
+        ),
+      )
+      onToast('적용했어요')
+    } catch (e) {
+      onToast(e instanceof Error ? e.message : '처리 실패', false)
+    } finally {
+      setSuggestionSubmitKey(null)
+    }
+  }
+
+  const handleUnifiedCancelSingle = async (parseMsgId: string, suggestions: SuggestionUi[]) => {
+    const pending = pendingSuggestions(suggestions)
+    if (pending.length === 0) return
+    setSuggestionSubmitKey(parseMsgId)
+    try {
+      await rejectPendingSuggestionsBatch(pending)
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.kind === 'parse' && m.id === parseMsgId
+            ? { ...m, suggestions: mapSuggestionsAfterRejectAll(m.suggestions) }
+            : m,
+        ),
+      )
+      onToast('취소했어요')
+    } catch (e) {
+      onToast(e instanceof Error ? e.message : '처리 실패', false)
+    } finally {
+      setSuggestionSubmitKey(null)
+    }
+  }
+
+  const handleUnifiedRegisterMulti = async (
     parseMsgId: string,
     slotIndex: number,
-    row: SuggestionUi,
-    action: 'approved' | 'rejected',
+    payload: ScheduleConfirmRegisterPayload,
+    slotSuggestions: SuggestionUi[],
+    savedCalendarEventId: string | null,
   ) => {
-    if (!row.suggestion_id) {
-      onToast('이 제안은 서버에 저장되지 않아 처리할 수 없어요.', false)
-      return
-    }
+    const pending = pendingSuggestions(slotSuggestions)
+    if (pending.length === 0) return
+    const key = `${parseMsgId}:${slotIndex}`
+    setSuggestionSubmitKey(key)
     try {
-      await postAgentApprove(row.suggestion_id, action)
+      patchLocalCalendarEventInStorage(savedCalendarEventId, {
+        eventType: payload.eventType,
+        description: payload.description,
+        routineOverride: payload.routineOffOn ? 'none' : 'weekend',
+      })
+      await approvePendingSuggestionsBatch(pending, payload.routineOffOn)
       setMessages((prev) =>
         prev.map((m) => {
           if (m.kind !== 'parse' || m.id !== parseMsgId || !m.multiSlots) return m
@@ -788,24 +1180,47 @@ export default function RoutineAgentSchedulePanel({
               ? slot
               : {
                   ...slot,
-                  slotSuggestions: slot.slotSuggestions.map((s): SuggestionUi =>
-                    s.suggestion_id === row.suggestion_id
-                      ? {
-                          type: s.type,
-                          detail: s.detail,
-                          suggestion_id: s.suggestion_id,
-                          status: action === 'approved' ? 'approved' : 'rejected',
-                        }
-                      : s,
-                  ),
+                  slotSuggestions: mapSuggestionsAfterApprove(slot.slotSuggestions, payload.routineOffOn),
                 },
           )
           return { ...m, multiSlots: nextSlots }
         }),
       )
-      onToast(action === 'approved' ? '적용했어요' : '거절했어요')
+      onToast('적용했어요')
     } catch (e) {
       onToast(e instanceof Error ? e.message : '처리 실패', false)
+    } finally {
+      setSuggestionSubmitKey(null)
+    }
+  }
+
+  const handleUnifiedCancelMulti = async (
+    parseMsgId: string,
+    slotIndex: number,
+    slotSuggestions: SuggestionUi[],
+  ) => {
+    const pending = pendingSuggestions(slotSuggestions)
+    if (pending.length === 0) return
+    const key = `${parseMsgId}:${slotIndex}`
+    setSuggestionSubmitKey(key)
+    try {
+      await rejectPendingSuggestionsBatch(pending)
+      setMessages((prev) =>
+        prev.map((m) => {
+          if (m.kind !== 'parse' || m.id !== parseMsgId || !m.multiSlots) return m
+          const nextSlots = m.multiSlots.map((slot, j) =>
+            j !== slotIndex
+              ? slot
+              : { ...slot, slotSuggestions: mapSuggestionsAfterRejectAll(slot.slotSuggestions) },
+          )
+          return { ...m, multiSlots: nextSlots }
+        }),
+      )
+      onToast('취소했어요')
+    } catch (e) {
+      onToast(e instanceof Error ? e.message : '처리 실패', false)
+    } finally {
+      setSuggestionSubmitKey(null)
     }
   }
 
@@ -852,56 +1267,63 @@ export default function RoutineAgentSchedulePanel({
               </button>
             </div>
 
-            {/* 인텐트: 카테고리 탭 4개 항상 표시 → 탭 클릭 시에만 아래 세부 칩 2개 펼침 */}
+            {/*
+              인텐트 상단: 대분류·세부 칩 모두 가로 스크롤(막대 숨김) + 우측 페이드로 더 스크롤됨을 힌트.
+              버튼은 shrink-0 로 폭이 줄지 않게 해 키워드가 늘어나도 슬라이드로 탐색합니다.
+            */}
             <div className="shrink-0 border-b border-gray-100 bg-white px-3 py-2">
               <p className="mb-1.5 text-[10px] font-bold text-gray-400">무엇을 도와드릴까요?</p>
-              <div
-                className="grid grid-cols-4 gap-1"
-                role="tablist"
-                aria-label="루틴 도우미 인텐트 카테고리"
-              >
-                {INTENT_CATEGORIES.map((cat) => {
-                  const selected = cat.id === expandedIntentCategoryId
-                  return (
-                    <button
-                      key={cat.id}
-                      type="button"
-                      role="tab"
-                      aria-selected={selected}
-                      aria-expanded={selected}
-                      onClick={() => onIntentCategoryTabClick(cat.id)}
-                      className={`rounded-lg border px-1 py-2 text-center text-[10px] font-black leading-tight transition active:scale-[0.98] ${
-                        selected ? cat.tabActiveClass : cat.tabInactiveClass
-                      }`}
-                    >
-                      {cat.label}
-                    </button>
-                  )
-                })}
-              </div>
-              {activeIntentCategory ? (
+              <div className="routine-agent-intent-scroll-fade relative">
                 <div
-                  className="mt-2 grid grid-cols-2 gap-2"
-                  role="group"
-                  aria-label={`${activeIntentCategory.label} 세부 인텐트`}
+                  className="routine-agent-hide-scrollbar flex touch-pan-x gap-2 overflow-x-auto pb-1.5 pt-0.5"
+                  role="tablist"
+                  aria-label="루틴 도우미 인텐트 카테고리"
                 >
-                  {activeIntentCategory.intents.map((chip, idx) => {
-                    const pair = SUBCHIP_STYLES_BY_CATEGORY[activeIntentCategory.id] ?? [
-                      'border-gray-200 bg-gray-50 text-gray-900',
-                      'border-gray-200 bg-gray-50 text-gray-900',
-                    ]
-                    const chipClass = pair[idx % 2] ?? pair[0]
+                  {INTENT_CATEGORIES.map((cat) => {
+                    const selected = cat.id === expandedIntentCategoryId
                     return (
                       <button
-                        key={chip.id}
+                        key={cat.id}
                         type="button"
-                        onClick={() => pushIntentQuestionSet(chip.prompt)}
-                        className={`rounded-xl border px-2 py-2.5 text-center text-[11px] font-black leading-snug shadow-sm transition active:scale-[0.98] ${chipClass}`}
+                        role="tab"
+                        aria-selected={selected}
+                        aria-expanded={selected}
+                        onClick={() => onIntentCategoryTabClick(cat.id)}
+                        className={`shrink-0 rounded-lg border px-3 py-2 text-center text-[10px] font-black leading-tight transition active:scale-[0.98] ${
+                          selected ? cat.tabActiveClass : cat.tabInactiveClass
+                        }`}
                       >
-                        {chip.label}
+                        {cat.label}
                       </button>
                     )
                   })}
+                </div>
+              </div>
+              {activeIntentCategory ? (
+                <div className="routine-agent-intent-scroll-fade relative mt-2">
+                  <div
+                    className="routine-agent-hide-scrollbar flex touch-pan-x gap-2 overflow-x-auto pb-1 pt-0.5"
+                    role="group"
+                    aria-label={`${activeIntentCategory.label} 세부 인텐트`}
+                  >
+                    {activeIntentCategory.intents.map((chip, idx) => {
+                      const pair = SUBCHIP_STYLES_BY_CATEGORY[activeIntentCategory.id] ?? [
+                        'border-gray-200 bg-gray-50 text-gray-900',
+                        'border-gray-200 bg-gray-50 text-gray-900',
+                      ]
+                      const chipClass = pair[idx % 2] ?? pair[0]
+                      return (
+                        <button
+                          key={chip.id}
+                          type="button"
+                          onClick={() => pushIntentQuestionSet(chip.prompt)}
+                          className={`shrink-0 whitespace-nowrap rounded-xl border px-3 py-2.5 text-center text-[11px] font-black leading-snug shadow-sm transition active:scale-[0.98] ${chipClass}`}
+                        >
+                          {chip.label}
+                        </button>
+                      )
+                    })}
+                  </div>
                 </div>
               ) : (
                 <p className="mt-2 rounded-lg border border-dashed border-gray-200 bg-gray-50/80 px-2 py-2 text-center text-[10px] font-bold text-gray-400">
@@ -948,7 +1370,11 @@ export default function RoutineAgentSchedulePanel({
                     const multiTypeOptions = ['school', 'holiday', 'vacation', 'etc', 'travel', 'birthday'] as const
                     return (
                       <li key={m.id} className="flex w-full justify-start">
-                        <div className="max-w-[95%] space-y-2 rounded-2xl border border-indigo-100 bg-white p-3 shadow-md ring-1 ring-indigo-50">
+                        {/*
+                          다건 일정 카드: max-w만 두면 flex 안에서 **내용만큼만** 너비가 잡혀 좁아 보임.
+                          w-full 로 스크롤 영역(좌우 px-3 안쪽) 가로를 꽉 채워 하단 「직접 입력하기」와 폭을 맞춤.
+                        */}
+                        <div className="w-full min-w-0 space-y-2 rounded-2xl border border-indigo-100 bg-white p-3 shadow-md ring-1 ring-indigo-50">
                           <p className="text-center text-xs font-black text-indigo-950">
                             📋 {total}개 일정을 찾았어요!
                           </p>
@@ -1081,43 +1507,25 @@ export default function RoutineAgentSchedulePanel({
                             <p className="text-center text-[10px] font-bold text-gray-400">건너뛴 일정이에요</p>
                           ) : null}
                           {slot.status === 'committed' && slot.slotSuggestions.length > 0 ? (
-                            <ul className="space-y-2 pl-0.5">
-                              {slot.slotSuggestions.map((s, si) => (
-                                <li
-                                  key={`${s.suggestion_id ?? si}-${s.type}`}
-                                  className="rounded-2xl border border-emerald-100/80 bg-white/95 p-3 text-[11px] shadow-sm"
-                                >
-                                  <p className="font-bold text-emerald-950">{s.type}</p>
-                                  <p className="mt-1 leading-snug text-gray-700">{s.detail}</p>
-                                  {s.status === 'pending' ? (
-                                    <div className="mt-2 flex gap-2">
-                                      <button
-                                        type="button"
-                                        onClick={() =>
-                                          void handleApproveRowInMultiSlot(m.id, idx, s, 'approved')
-                                        }
-                                        className="flex-1 rounded-xl bg-emerald-500 py-2 text-[10px] font-black text-white active:scale-[0.99]"
-                                      >
-                                        적용하기
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={() =>
-                                          void handleApproveRowInMultiSlot(m.id, idx, s, 'rejected')
-                                        }
-                                        className="flex-1 rounded-xl bg-rose-100 py-2 text-[10px] font-black text-rose-800 active:scale-[0.99]"
-                                      >
-                                        거절하기
-                                      </button>
-                                    </div>
-                                  ) : (
-                                    <p className="mt-2 text-[10px] font-bold text-gray-500">
-                                      {s.status === 'approved' ? '✓ 적용됨' : '거절됨'}
-                                    </p>
-                                  )}
-                                </li>
-                              ))}
-                            </ul>
+                            <UnifiedScheduleConfirmCard
+                              key={`${m.id}-${idx}-sug`}
+                              layout="compact"
+                              event={slot.event}
+                              suggestions={slot.slotSuggestions}
+                              busy={suggestionSubmitKey === `${m.id}:${idx}` || loading}
+                              onRegister={(payload) =>
+                                void handleUnifiedRegisterMulti(
+                                  m.id,
+                                  idx,
+                                  payload,
+                                  slot.slotSuggestions,
+                                  slot.savedEventId ?? null,
+                                )
+                              }
+                              onCancel={() =>
+                                void handleUnifiedCancelMulti(m.id, idx, slot.slotSuggestions)
+                              }
+                            />
                           ) : null}
                           {slot.status === 'committed' && slot.slotSuggestions.length === 0 ? (
                             <p className="text-[10px] text-gray-500">이 일정에 대한 추가 제안이 없어요.</p>
@@ -1133,53 +1541,46 @@ export default function RoutineAgentSchedulePanel({
                   }
 
                   const ev = m.parseResult.event
+                  const evWk = weekdayKoFromYmd(ev.start_date)
+                  const evDateLine = `${ev.start_date}${evWk ? ` (${evWk})` : ''}`
                   return (
                     <li key={m.id} className="flex w-full justify-start">
-                      <div className="max-w-[95%] space-y-2">
-                        <div className="whitespace-pre-wrap rounded-2xl rounded-bl-md bg-sky-100/90 px-3 py-2 text-xs leading-relaxed text-gray-900 shadow-sm">
-                          <p className="font-black text-sky-950">분석된 일정</p>
-                          <p className="mt-1 font-bold">{ev.title || '일정'}</p>
-                          <p className="mt-0.5 text-[10px] text-gray-600">
-                            유형: {ev.type} · {ev.start_date}
-                            {ev.end_date ? ` ~ ${ev.end_date}` : ''}
-                          </p>
-                        </div>
+                      {/*
+                        단건: 제안이 있으면 통합 카드 하나만(타입 영문 미노출).
+                        제안이 없으면 요약만 파스텔 박스로 표시합니다.
+                      */}
+                      <div className="w-full min-w-0 space-y-2">
                         {m.suggestions.length > 0 ? (
-                          <ul className="space-y-2 pl-0.5">
-                            {m.suggestions.map((s, idx) => (
-                              <li
-                                key={`${s.suggestion_id ?? idx}-${s.type}`}
-                                className="rounded-2xl border border-emerald-100/80 bg-white/95 p-3 text-[11px] shadow-sm"
-                              >
-                                <p className="font-bold text-emerald-950">{s.type}</p>
-                                <p className="mt-1 leading-snug text-gray-700">{s.detail}</p>
-                                {s.status === 'pending' ? (
-                                  <div className="mt-2 flex gap-2">
-                                    <button
-                                      type="button"
-                                      onClick={() => void handleApproveRow(m.id, s, 'approved')}
-                                      className="flex-1 rounded-xl bg-emerald-500 py-2 text-[10px] font-black text-white active:scale-[0.99]"
-                                    >
-                                      적용하기
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => void handleApproveRow(m.id, s, 'rejected')}
-                                      className="flex-1 rounded-xl bg-rose-100 py-2 text-[10px] font-black text-rose-800 active:scale-[0.99]"
-                                    >
-                                      거절하기
-                                    </button>
-                                  </div>
-                                ) : (
-                                  <p className="mt-2 text-[10px] font-bold text-gray-500">
-                                    {s.status === 'approved' ? '✓ 적용됨' : '거절됨'}
-                                  </p>
-                                )}
-                              </li>
-                            ))}
-                          </ul>
+                          <UnifiedScheduleConfirmCard
+                            key={`${m.id}-sug`}
+                            layout="full"
+                            event={ev}
+                            suggestions={m.suggestions}
+                            busy={suggestionSubmitKey === m.id || loading}
+                            onRegister={(payload) =>
+                              void handleUnifiedRegisterSingle(
+                                m.id,
+                                m.suggestions,
+                                payload,
+                                m.parseResult.saved_event_id ?? null,
+                              )
+                            }
+                            onCancel={() => void handleUnifiedCancelSingle(m.id, m.suggestions)}
+                          />
                         ) : (
-                          <p className="text-[10px] text-gray-500">추가 제안이 없어요.</p>
+                          <div className="rounded-2xl border border-sky-100 bg-sky-50/85 px-3 py-2.5 text-xs leading-relaxed text-gray-900 shadow-sm ring-1 ring-sky-100/60">
+                            <p className="font-black text-sky-950">분석된 일정</p>
+                            <p className="mt-1 font-bold">{ev.title || '일정'}</p>
+                            <p className="mt-0.5 text-[10px] text-gray-600">
+                              📅 {evDateLine}
+                              {ev.end_date && ev.end_date !== ev.start_date ? ` ~ ${ev.end_date}` : ''}
+                            </p>
+                            <p className="mt-0.5 text-[10px] text-gray-600">유형: {agentEventTypeLabel(ev.type)}</p>
+                            {ev.description ? (
+                              <p className="mt-1 text-[10px] text-gray-600">📝 {ev.description}</p>
+                            ) : null}
+                            <p className="mt-2 text-[10px] font-bold text-gray-400">추가 제안이 없어요.</p>
+                          </div>
                         )}
                       </div>
                     </li>

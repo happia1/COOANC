@@ -38,6 +38,8 @@ export type AgentParseEvent = {
   end_date: string | null
   /** 서버가 넣는 설명(다건 커밋 후에도 올 수 있음) */
   description?: string
+  /** 이미지 1회 파싱 등에서만 올 수 있음 — 커밋 시 routine_off 제안 생성에 씁니다 */
+  routine_off?: boolean
 }
 
 /** 에이전트가 `type`/`schedules_api` 로 주는 경우를 프론트 `mode`/`schedules` 로 맞출 때 씁니다. */
@@ -49,6 +51,7 @@ export type AgentParseApiRow = {
   type?: string
   description?: string
   note?: string
+  routine_off?: boolean
 }
 
 export type AgentParseSuggestion = {
