@@ -5,7 +5,7 @@ import { fetchKasiHolidaysForYear, kasiItemsToPublicHolidayRows } from '@/lib/ho
 /**
  * GET /api/public-holidays/sync?year=2026
  * - 천문연 특일 API 를 **해당 연도에 아직 동기화하지 않았을 때만** 호출합니다.
- * - 결과는 `public_holidays` 에 upsert 되고, `public_holiday_sync_log` 에 연도가 기록됩니다.
+ * - 결과는 RPC `replace_public_holidays_for_year` 로 `public_holidays` 를 갈아끼운 뒤, `public_holiday_sync_log` 에 기록합니다.
  * - 인증키: `NEXT_PUBLIC_HOLIDAY_API_KEY` (서버에서만 읽음 — 클라이언트 번들에 넣지 마세요)
  */
 
@@ -72,37 +72,34 @@ export async function GET(req: NextRequest) {
   const nowIso = new Date().toISOString()
 
   /**
-   * `public_holidays` 컬럼: id, date, name, year, created_at
-   * 컬럼명 `date` 가 Postgres 예약어라 PostgREST `upsert(..., onConflict: 'year,date')` 가 500 을 내는 경우가 있어,
-   * 해당 연도 행을 지운 뒤 `insert` 로 맞춥니다(연도 단위 동기화라 동작이 동일합니다).
+   * `public_holidays`(id, date, name, year, created_at) — 컬럼 `date` 예약어·PostgREST bulk insert 이슈를 피하려
+   * Supabase RPC `replace_public_holidays_for_year`(058 마이그레이션)로 연도 단위 DELETE 후 INSERT 합니다.
    */
-  const { error: delErr } = await admin.from('public_holidays').delete().eq('year', year)
-  if (delErr) {
-    console.error('[public-holidays/sync] Supabase delete(public_holidays)', {
-      message: delErr.message,
-      code: delErr.code,
-      details: delErr.details,
-      hint: delErr.hint,
-    })
-    return NextResponse.json({ ok: false, error: delErr.message }, { status: 500 })
-  }
+  console.log('[public-holidays/sync] DB 반영 직전', {
+    year,
+    rowCount: rows.length,
+    sample: rows.slice(0, 3),
+  })
 
-  if (rows.length > 0) {
-    if (process.env.NODE_ENV === 'development') {
-      console.log('[public-holidays/sync] insert 샘플', rows.slice(0, 3))
-    }
-    const { error: insErr } = await admin.from('public_holidays').insert(rows)
-    if (insErr) {
-      console.error('[public-holidays/sync] Supabase insert(public_holidays)', {
-        message: insErr.message,
-        code: insErr.code,
-        details: insErr.details,
-        hint: insErr.hint,
-        rowCount: rows.length,
-        firstRow: rows[0],
-      })
-      return NextResponse.json({ ok: false, error: insErr.message }, { status: 500 })
-    }
+  const { error: rpcErr } = await admin.rpc('replace_public_holidays_for_year', {
+    p_year: year,
+    p_rows: rows,
+  })
+  if (rpcErr) {
+    console.error('[public-holidays/sync] Supabase RPC replace_public_holidays_for_year', {
+      message: rpcErr.message,
+      code: rpcErr.code,
+      details: rpcErr.details,
+      hint: rpcErr.hint,
+    })
+    return NextResponse.json(
+      {
+        ok: false,
+        error: rpcErr.message,
+        hint: 'Supabase에 마이그레이션 058_replace_public_holidays_for_year.sql 적용 여부를 확인하세요.',
+      },
+      { status: 500 },
+    )
   }
 
   const { error: logErr } = await admin.from('public_holiday_sync_log').insert({
