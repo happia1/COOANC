@@ -1314,6 +1314,19 @@ export default function RoutineAgentSchedulePanel({
               </button>
             </div>
 
+            {/* 일정 대화 중: 웰컴(두 카드) 화면으로 돌아가기 — 말풍선 기록은 유지 */}
+            {shell === 'schedule_chat' ? (
+              <div className="flex shrink-0 border-b border-gray-100 bg-gray-50/90 px-2 py-2">
+                <button
+                  type="button"
+                  onClick={() => setShell('welcome')}
+                  className="rounded-lg px-3 py-2 text-left text-xs font-black text-gray-700 transition hover:bg-white active:scale-[0.99]"
+                >
+                  이전으로
+                </button>
+              </div>
+            ) : null}
+
             {/* 웰컴: 짧은 인사 + 일정 등록 / 루틴 관리 카드(모바일 1열, 넓은 화면 2열) */}
             {shell === 'welcome' ? (
               <div className="shrink-0 space-y-4 border-b border-gray-100 bg-white px-3 pb-4 pt-4">
@@ -1325,11 +1338,20 @@ export default function RoutineAgentSchedulePanel({
                     type="button"
                     onClick={() => {
                       setShell('schedule_chat')
-                      setMessages((prev) => [
-                        ...prev,
-                        { id: newId(), kind: 'text', role: 'assistant', text: SCHEDULE_REGISTER_INTRO },
-                      ])
-                      bumpUnreadIfClosed(1)
+                      /** 이미 안내 말풍선이 있으면(이전으로 후 재입장 등) 같은 문구를 또 붙이지 않음 */
+                      const hasIntro = messages.some(
+                        (m) =>
+                          m.kind === 'text' &&
+                          m.role === 'assistant' &&
+                          m.text === SCHEDULE_REGISTER_INTRO,
+                      )
+                      if (!hasIntro) {
+                        setMessages((prev) => [
+                          ...prev,
+                          { id: newId(), kind: 'text', role: 'assistant', text: SCHEDULE_REGISTER_INTRO },
+                        ])
+                        bumpUnreadIfClosed(1)
+                      }
                     }}
                     className="rounded-2xl border border-sky-200 bg-sky-50/95 px-4 py-4 text-center text-sm font-black text-sky-950 shadow-sm transition active:scale-[0.99]"
                   >
