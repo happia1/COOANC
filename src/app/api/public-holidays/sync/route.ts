@@ -71,12 +71,37 @@ export async function GET(req: NextRequest) {
   const rows = kasiItemsToPublicHolidayRows(year, items)
   const nowIso = new Date().toISOString()
 
-  if (rows.length > 0) {
-    const { error: upErr } = await admin.from('public_holidays').upsert(rows, {
-      onConflict: 'year,date',
+  /**
+   * `public_holidays` 컬럼: id, date, name, year, created_at
+   * 컬럼명 `date` 가 Postgres 예약어라 PostgREST `upsert(..., onConflict: 'year,date')` 가 500 을 내는 경우가 있어,
+   * 해당 연도 행을 지운 뒤 `insert` 로 맞춥니다(연도 단위 동기화라 동작이 동일합니다).
+   */
+  const { error: delErr } = await admin.from('public_holidays').delete().eq('year', year)
+  if (delErr) {
+    console.error('[public-holidays/sync] Supabase delete(public_holidays)', {
+      message: delErr.message,
+      code: delErr.code,
+      details: delErr.details,
+      hint: delErr.hint,
     })
-    if (upErr) {
-      return NextResponse.json({ ok: false, error: upErr.message }, { status: 500 })
+    return NextResponse.json({ ok: false, error: delErr.message }, { status: 500 })
+  }
+
+  if (rows.length > 0) {
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[public-holidays/sync] insert 샘플', rows.slice(0, 3))
+    }
+    const { error: insErr } = await admin.from('public_holidays').insert(rows)
+    if (insErr) {
+      console.error('[public-holidays/sync] Supabase insert(public_holidays)', {
+        message: insErr.message,
+        code: insErr.code,
+        details: insErr.details,
+        hint: insErr.hint,
+        rowCount: rows.length,
+        firstRow: rows[0],
+      })
+      return NextResponse.json({ ok: false, error: insErr.message }, { status: 500 })
     }
   }
 
@@ -86,6 +111,12 @@ export async function GET(req: NextRequest) {
     synced_at: nowIso,
   })
   if (logErr) {
+    console.error('[public-holidays/sync] Supabase insert(public_holiday_sync_log)', {
+      message: logErr.message,
+      code: logErr.code,
+      details: logErr.details,
+      hint: logErr.hint,
+    })
     return NextResponse.json({ ok: false, error: logErr.message }, { status: 500 })
   }
 

@@ -19,14 +19,21 @@ export type KasiHolidayApiItem = {
 const HOLI_DE_INFO_URL =
   'http://apis.data.go.kr/B090041/openapi/service/SpcdeInfoService/getHoliDeInfo'
 
-/** locdate(8자리) → YYYY-MM-DD (파싱 실패 시 null) */
+/**
+ * locdate(예: 20260101, "20260101") → DB·ISO 문자열 "2026-01-01"
+ * API 가 긴 숫자열을 줄 때는 앞 8자리(YYYYMMDD)만 사용합니다.
+ */
 export function locdateToIsoDate(locdate: number | string | null | undefined): string | null {
   if (locdate == null) return null
   const digits = String(locdate).replace(/\D/g, '')
-  if (digits.length !== 8) return null
-  const y = digits.slice(0, 4)
-  const m = digits.slice(4, 6)
-  const d = digits.slice(6, 8)
+  if (digits.length < 8) return null
+  const ymd = digits.slice(0, 8)
+  const y = ymd.slice(0, 4)
+  const m = ymd.slice(4, 6)
+  const d = ymd.slice(6, 8)
+  const mi = Number(m)
+  const di = Number(d)
+  if (mi < 1 || mi > 12 || di < 1 || di > 31) return null
   return `${y}-${m}-${d}`
 }
 
