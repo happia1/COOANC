@@ -1314,12 +1314,18 @@ export default function RoutineAgentSchedulePanel({
               </button>
             </div>
 
-            {/* 일정 대화 중: 웰컴(두 카드) 화면으로 돌아가기 — 말풍선 기록은 유지 */}
-            {shell === 'schedule_chat' ? (
+            {/* 일정 대화·루틴 관리: 웰컴(두 카드) 화면으로 돌아가기 — 일정은 말풍선 기록 유지 */}
+            {shell === 'schedule_chat' || shell === 'routine_manage' ? (
               <div className="flex shrink-0 border-b border-gray-100 bg-gray-50/90 px-2 py-2">
                 <button
                   type="button"
-                  onClick={() => setShell('welcome')}
+                  onClick={() => {
+                    if (shell === 'routine_manage') {
+                      closeRoutineEmbedded()
+                    } else {
+                      setShell('welcome')
+                    }
+                  }}
                   className="rounded-lg px-3 py-2 text-left text-xs font-black text-gray-700 transition hover:bg-white active:scale-[0.99]"
                 >
                   이전으로
