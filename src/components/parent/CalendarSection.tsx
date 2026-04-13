@@ -230,7 +230,7 @@ export default function CalendarSection({ childId }: Props) {
   }
   /**
    * 법정 공휴일(`public_holidays`)은 별도 localStorage 행 없이도 **공휴일(빨간) 점**이 찍히게 합니다.
-   * id 는 `__public_holiday__:` 로 시작해 일반 일정과 구분합니다(상세 시트에서는 숨김).
+   * id 는 `__public_holiday__:` 로 시작해 일반 일정과 구분합니다(일정 상세에서는 읽기 전용으로 표시).
    * 다른 유형만 필터한 상태에서는 범례와 맞추기 위해 공휴일 점은 넣지 않습니다.
    */
   const showPublicHolidayDots = legendFilter == null || legendFilter === 'holiday'
@@ -265,12 +265,32 @@ export default function CalendarSection({ childId }: Props) {
 
   function handleDayClick(dk: string) {
     const raw = dateEventMap[dk] ?? []
+    /** 사용자가 등록한 일정만(법정 공휴일 가짜 행은 아래에서 따로 붙임) */
     const userOnly = raw.filter((e) => !e.id.startsWith('__public_holiday__:'))
+    const fromMap = raw.find((e) => e.id.startsWith('__public_holiday__:'))
+    const phName = holidayNamesByDate[dk]?.trim()
+    /** 범례에서 공휴일 점을 뺀 달에도, DB 에 이름이 있으면 세부 시트에 표시 */
+    const publicHolidayEv: LocalCalendarEvent | null =
+      fromMap ??
+      (phName
+        ? {
+            id: `__public_holiday__:${dk}`,
+            childId: null,
+            title: phName,
+            startDate: dk,
+            endDate: dk,
+            eventType: 'holiday',
+            routineOverride: 'none',
+          }
+        : null)
+
     const byId = new Map(userOnly.map((e) => [e.id, e]))
-    const uniq = [...byId.values()]
-    if (uniq.length > 0) {
+    const uniqUser = [...byId.values()]
+    const detailList: LocalCalendarEvent[] = publicHolidayEv ? [publicHolidayEv, ...uniqUser] : uniqUser
+
+    if (detailList.length > 0) {
       setEmptyDayKey(null)
-      setDetailEvents(uniq)
+      setDetailEvents(detailList)
     } else {
       setDetailEvents(null)
       setEmptyDayKey(dk)
@@ -845,7 +865,10 @@ function EventDetailBottomSheet({
           </div>
 
           <div className="flex flex-col gap-3">
-            {events.map((ev) => (
+            {events.map((ev) => {
+              /** 캘린더가 만든 법정 공휴일 행 — localStorage 에 없으므로 편집·삭제 불가 */
+              const isReadonlyPublicHoliday = ev.id.startsWith('__public_holiday__:')
+              return (
               <div
                 key={ev.id}
                 className={`rounded-2xl border border-gray-100 p-3 ${EVENT_COLORS[ev.eventType].bg}`}
@@ -861,6 +884,11 @@ function EventDetailBottomSheet({
                 {ev.description?.trim() && (
                   <p className="mt-2 whitespace-pre-wrap text-xs leading-relaxed text-gray-600">{ev.description.trim()}</p>
                 )}
+                {isReadonlyPublicHoliday ? (
+                  <p className="mt-3 text-[11px] font-bold leading-snug text-gray-500">
+                    법정 공휴일은 서비스에서 자동으로 표시되며, 편집하거나 삭제할 수 없어요.
+                  </p>
+                ) : (
                 <div className="mt-3 flex gap-2">
                   <button
                     type="button"
@@ -877,8 +905,10 @@ function EventDetailBottomSheet({
                     삭제
                   </button>
                 </div>
+                )}
               </div>
-            ))}
+              )
+            })}
           </div>
         </div>
 
