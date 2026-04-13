@@ -1,23 +1,34 @@
 /**
  * 루틴 도우미 — 이미지를 `/agent-b/parse` 로 보냈을 때 실패하면,
- * HTTP 상태 코드와 응답 본문 문자열로 429 / 503 / 기타를 나눠 채팅 말풍선 문구를 고릅니다.
- * (비개발자: “한도 초과”와 “서버가 바쁨”은 안내 문장을 다르게 보여 줍니다.)
+ * HTTP 상태·응답 JSON(`error: "quota_exceeded"` 등)·본문 문자열로 안내 문구를 고릅니다.
+ * (비개발자: 한도·503·쿼터 초과는 같은 “오늘 사용량 소진” 안내로 통일합니다.)
  */
 
-export type RoutineAgentImageParseErrorKind = 'rate_limit' | 'server_busy' | 'generic'
+export type RoutineAgentImageParseErrorKind = 'daily_quota' | 'generic'
 
-const MSGS: Record<RoutineAgentImageParseErrorKind, string> = {
-  rate_limit: `오늘 이미지 분석 사용량이 
+const DAILY_QUOTA_MSG = `오늘 이미지 분석 사용량이 
 모두 소진됐어요.
 내일 다시 시도해주세요.
 
 텍스트로 직접 입력하시면
-지금 바로 일정을 등록할 수 있어요!`,
-  server_busy: `지금 잠시 서버가 혼잡해요.
-1~2분 후 다시 시도해주세요.`,
+지금 바로 일정을 등록할 수 있어요!`
+
+const MSGS: Record<RoutineAgentImageParseErrorKind, string> = {
+  daily_quota: DAILY_QUOTA_MSG,
   generic: `이미지 분석 중 오류가 발생했어요.
 텍스트로 직접 입력해주시면
 바로 등록해드릴게요.`,
+}
+
+/** 에이전트가 주는 `{"error":"quota_exceeded",...}` 형태를 본문에서 찾습니다. */
+function detailIndicatesQuotaExceeded(detail: string): boolean {
+  if (detail.includes('quota_exceeded')) return true
+  try {
+    const o = JSON.parse(detail) as { error?: string }
+    return o.error === 'quota_exceeded'
+  } catch {
+    return false
+  }
 }
 
 /**
@@ -30,20 +41,15 @@ export function classifyRoutineAgentImageParseError(
 ): RoutineAgentImageParseErrorKind {
   const d = detail
   const lower = d.toLowerCase()
-  /** 429: 상태 코드, 본문의 429, Gemini 할당량·요청 과다 키워드 */
-  if (
-    httpStatus === 429 ||
-    d.includes('429') ||
-    lower.includes('resource_exhausted') ||
-    lower.includes('too many requests') ||
-    lower.includes('rate limit') ||
-    (lower.includes('429') && lower.includes('too many'))
-  ) {
-    return 'rate_limit'
+  /** cooanc-agent 503 + `error: "quota_exceeded"` 또는 503/429 상태 */
+  if (httpStatus === 503 || httpStatus === 429 || detailIndicatesQuotaExceeded(d)) {
+    return 'daily_quota'
   }
-  /** 503: 상태 코드, 본문의 503, 과부하·가용성 문구 */
+  if (d.includes('429') || lower.includes('resource_exhausted') || lower.includes('too many requests') || lower.includes('rate limit')) {
+    return 'daily_quota'
+  }
+  /** 이전에 503 안내로 쓰이던 Gemini 과부하 문구도 동일(일일 한도) 안내로 통합 */
   if (
-    httpStatus === 503 ||
     d.includes('503') ||
     lower.includes('unavailable') ||
     lower.includes('overloaded') ||
@@ -52,7 +58,7 @@ export function classifyRoutineAgentImageParseError(
     lower.includes('"code":503') ||
     lower.includes("'code': 503")
   ) {
-    return 'server_busy'
+    return 'daily_quota'
   }
   return 'generic'
 }
