@@ -114,9 +114,9 @@ export default function ParentAgentHomeCards({ childId }: Props) {
 
       {showCollecting && !loading ? (
         <div className="rounded-2xl bg-gradient-to-br from-emerald-50 via-sky-50 to-violet-50 p-4 shadow-sm ring-1 ring-white/80">
-          <p className="text-center text-sm font-black text-gray-800">🌱 아이의 데이터를 모으는 중이에요</p>
+          <p className="text-center text-sm font-black text-gray-800">🌱 데이터 모으는 중</p>
           <p className="mt-2 text-center text-[11px] font-semibold leading-relaxed text-gray-600">
-            미션을 7일 이상 진행하면 AI 분석이 시작돼요
+            미션을 7일 이상 진행하면 AI 분석이 시작돼요!
           </p>
         </div>
       ) : null}

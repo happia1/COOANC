@@ -2,7 +2,7 @@
 
 /**
  * 앱 설정 화면
- * - 프로필 이름 편집
+ * - 부모 프로필: 이름만 편집(이미지 없음), 흰 카드 래퍼 없이 페이지 배경 위에 표시
  * - 부모: 자녀 프로필은 홈 탭과 같은 카드 레이아웃(아바타·이름·Lv·메타) + 오른쪽 수정/삭제만(크레딧 숫자 없음)
  * - 계정 삭제(로그아웃 아래 회색 링크)
  * - 로그아웃
@@ -91,7 +91,13 @@ export default function SettingsPage() {
     }
   }, [])
 
-  const loadLinkedChildren = useCallback(async () => {
+  /**
+   * 자녀 목록을 Supabase 에서 다시 읽습니다.
+   * - `trustedAvatarFromSave`: 프로필 저장 직후 재조회가 아직 옛 `avatar_url` 을 줄 때(읽기 지연 등),
+   *   방금 API 가 확인한 값으로 **한 번 더 덮어** 카드 원형 사진이 바로 바뀌게 합니다.
+   */
+  const loadLinkedChildren = useCallback(
+    async (opts?: { trustedAvatarFromSave?: { childId: string; avatar_url: string | null } }) => {
     if (!profileLoaded || userRole !== 'parent') {
       setLinkedChildren([])
       setChildrenLoading(false)
@@ -142,23 +148,28 @@ export default function SettingsPage() {
         return [row.child_id, lv] as const
       }),
     )
-    setLinkedChildren(
-      (rows ?? []).map((r) => ({
-        id: r.id,
-        name: (r.name ?? '').trim() || '이름 없음',
-        birth_date: (r as { birth_date?: string | null }).birth_date ?? null,
-        age: typeof (r as { age?: number | null }).age === 'number' ? (r as { age: number }).age : null,
-        institution_type: (r as { institution_type?: string | null }).institution_type ?? null,
-        age_group: (r as { age_group?: string | null }).age_group ?? null,
-        avatar_url:
-          typeof (r as { avatar_url?: string | null }).avatar_url === 'string'
-            ? (r as { avatar_url: string }).avatar_url
-            : null,
-        current_level: levelByChild[r.id] ?? 0,
-      })),
-    )
+    let nextRows = (rows ?? []).map((r) => ({
+      id: r.id,
+      name: (r.name ?? '').trim() || '이름 없음',
+      birth_date: (r as { birth_date?: string | null }).birth_date ?? null,
+      age: typeof (r as { age?: number | null }).age === 'number' ? (r as { age: number }).age : null,
+      institution_type: (r as { institution_type?: string | null }).institution_type ?? null,
+      age_group: (r as { age_group?: string | null }).age_group ?? null,
+      avatar_url:
+        typeof (r as { avatar_url?: string | null }).avatar_url === 'string'
+          ? (r as { avatar_url: string }).avatar_url
+          : null,
+      current_level: levelByChild[r.id] ?? 0,
+    }))
+    const trust = opts?.trustedAvatarFromSave
+    if (trust?.childId) {
+      nextRows = nextRows.map((c) => (c.id === trust.childId ? { ...c, avatar_url: trust.avatar_url } : c))
+    }
+    setLinkedChildren(nextRows)
     setChildrenLoading(false)
-  }, [profileLoaded, userRole])
+  },
+  [profileLoaded, userRole],
+)
 
   /** 부모이고 프로필 확정 후에만 자녀 목록 로드 (역할 null 구간에 자녀 블록이 잠깐 뜨는 현상 방지) */
   useEffect(() => {
@@ -239,76 +250,72 @@ export default function SettingsPage() {
           </button>
         </div>
 
-        <div className="flex flex-col gap-3 rounded-2xl bg-white p-5 shadow-sm">
-          <p className="text-xs font-bold uppercase tracking-wider text-gray-400">프로필</p>
+        {/** 부모·자녀 계정 이름만 — 프로필 사진은 두지 않고, 자녀 프로필처럼 흰 박스 없음 */}
+        <div className="flex flex-col gap-3">
+          <p className="text-xs font-bold uppercase tracking-wider text-gray-400">
+            {userRole === 'parent' ? '부모 프로필' : '프로필'}
+          </p>
           {!profileLoaded ? (
-            <div className="flex items-center gap-3 animate-pulse" aria-hidden>
-              <div className="h-12 w-12 shrink-0 rounded-2xl bg-gray-200" />
-              <div className="min-w-0 flex-1 space-y-2">
-                <div className="h-4 w-36 rounded bg-gray-200" />
-                <div className="h-3 w-24 rounded bg-gray-200" />
-              </div>
+            <div className="space-y-2 animate-pulse" aria-hidden>
+              <div className="h-4 w-36 rounded bg-gray-200" />
+              <div className="h-3 w-24 rounded bg-gray-200" />
             </div>
           ) : (
-            <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#4A90E2]/20 to-[#7ED321]/20 text-2xl">
-                {userRole === 'parent' ? '👩‍💼' : '🧒'}
-              </div>
-              <div className="min-w-0 flex-1">
-                {editingName ? (
-                  <div className="flex flex-col gap-2">
-                    <input
-                      value={profileName}
-                      onChange={(e) => setProfileName(e.target.value)}
-                      className="w-full max-w-[200px] rounded-xl border border-gray-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/40"
-                      autoFocus
-                    />
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={handleNameSave}
-                        disabled={nameSaving}
-                        className="rounded-xl bg-[#4A90E2] px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50"
-                      >
-                        {nameSaving ? '저장 중' : '저장'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEditingName(false)
-                          setProfileName(userName)
-                        }}
-                        className="rounded-xl bg-gray-100 px-3 py-1.5 text-xs font-bold text-gray-500"
-                      >
-                        취소
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="font-bold text-gray-800">{userName || '(이름 없음)'}</p>
-                      <p className="text-[11px] text-gray-400">
-                        {userRole === 'parent' ? '부모' : '자녀'} 계정
-                      </p>
-                    </div>
+            <div className="min-w-0">
+              {editingName ? (
+                <div className="flex flex-col gap-2">
+                  <input
+                    value={profileName}
+                    onChange={(e) => setProfileName(e.target.value)}
+                    className="w-full max-w-[200px] rounded-xl border border-gray-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/40"
+                    autoFocus
+                  />
+                  <div className="flex flex-wrap gap-2">
                     <button
                       type="button"
-                      onClick={() => setEditingName(true)}
-                      className="shrink-0 rounded-xl bg-[#4A90E2]/10 px-3 py-1.5 text-xs font-bold text-[#4A90E2]"
+                      onClick={handleNameSave}
+                      disabled={nameSaving}
+                      className="rounded-xl bg-[#4A90E2] px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50"
                     >
-                      편집
+                      {nameSaving ? '저장 중' : '저장'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingName(false)
+                        setProfileName(userName)
+                      }}
+                      className="rounded-xl bg-gray-100 px-3 py-1.5 text-xs font-bold text-gray-500"
+                    >
+                      취소
                     </button>
                   </div>
-                )}
-              </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="font-bold text-gray-800">{userName || '(이름 없음)'}</p>
+                    <p className="text-[11px] text-gray-400">
+                      {userRole === 'parent' ? '부모' : '자녀'} 계정
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setEditingName(true)}
+                    className="shrink-0 rounded-xl bg-[#4A90E2]/10 px-3 py-1.5 text-xs font-bold text-[#4A90E2]"
+                  >
+                    편집
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>
 
         {profileLoaded && userRole === 'parent' ? (
-          <div className="flex flex-col gap-3 rounded-2xl border border-amber-100 bg-amber-50/40 p-5 shadow-sm">
-            <p className="text-xs font-bold uppercase tracking-wider text-amber-800">자녀 프로필</p>
+          <div className="flex flex-col gap-3">
+            {/** 위「부모 프로필」·아래「알림」과 같이 페이지 배경만 둡니다. */}
+            <p className="text-xs font-bold uppercase tracking-wider text-gray-400">자녀 프로필</p>
             {childrenLoading ? (
               <p className="text-sm font-bold text-gray-700">불러오는 중…</p>
             ) : linkedChildren.length === 0 ? (
@@ -364,7 +371,7 @@ export default function SettingsPage() {
                                   setDeleteMsg(null)
                                   setEditingChild(c)
                                 }}
-                                className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#4A90E2]/30 bg-[#4A90E2]/5 text-[#4A90E2] transition-colors hover:bg-[#4A90E2]/15 active:scale-95"
+                                className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#4A90E2]/10 text-[#4A90E2] transition-colors hover:bg-[#4A90E2]/18 active:scale-95"
                                 aria-label={`${c.name} 프로필 수정`}
                               >
                                 <PencilIcon className="h-[18px] w-[18px]" />
@@ -375,7 +382,7 @@ export default function SettingsPage() {
                                   setDeleteMsg(null)
                                   setPendingDeleteId(c.id)
                                 }}
-                                className="flex h-9 w-9 items-center justify-center rounded-lg border border-red-200 bg-red-50 text-red-600 transition-colors hover:bg-red-100 active:scale-95"
+                                className="flex h-9 w-9 items-center justify-center rounded-lg bg-red-50 text-red-600 transition-colors hover:bg-red-100 active:scale-95"
                                 aria-label={`${c.name} 프로필 삭제`}
                               >
                                 <TrashIcon className="h-[18px] w-[18px]" />
@@ -414,9 +421,28 @@ export default function SettingsPage() {
         open={editingChild !== null}
         child={editingChild}
         onClose={() => setEditingChild(null)}
-        onSaved={() => {
-          void loadLinkedChildren()
-          router.refresh()
+        onSaved={(result, childId, sentAvatarUrl) => {
+          /**
+           * API 응답의 `profile.avatar_url` 을 `loadLinkedChildren` 안에서 병합합니다.
+           * (먼저 `setLinkedChildren` 만 하고 곧바로 `loadLinkedChildren()` 을 호출하면,
+           * 비동기 재조회가 끝날 때 옛 DB 값으로 덮어써서 원형 사진이 안 바뀐 것처럼 보입니다.)
+           */
+          const fromApi = result?.profile?.avatar_url
+          const av =
+            typeof fromApi === 'string' || fromApi === null
+              ? fromApi
+              : typeof sentAvatarUrl === 'string' || sentAvatarUrl === null
+                ? sentAvatarUrl
+                : undefined
+          if (childId && (typeof av === 'string' || av === null)) {
+            void loadLinkedChildren({ trustedAvatarFromSave: { childId, avatar_url: av } })
+          } else {
+            void loadLinkedChildren()
+          }
+          /**
+           * 이 페이지는 전부 클라이언트 컴포넌트라 `router.refresh()` 는 필수가 아닙니다.
+           * 저장 직후 동기적으로 호출하면 일부 환경에서 오래 막혀 모달의 `onClose` 가 실행되지 않을 수 있어 제거했습니다.
+           */
         }}
       />
     </div>

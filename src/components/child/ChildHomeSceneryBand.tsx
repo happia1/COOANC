@@ -54,6 +54,11 @@ type Props = {
    * `circleContain`: **원형** 안에 그림 전체를 넣음(`object-contain`) — 가장자리가 잘리지 않습니다.
    */
   backgroundLayout?: 'fullscreen' | 'circleContain'
+  /**
+   * true(기본): `main` 의 `px-4`·`pt-4` 를 상쇄해 배경이 좌우·상단까지 닿게 `-mx-4 -mt-4` 를 붙입니다.
+   * false: 바깥 래퍼가 이미 풀 블리드를 맡을 때 — 이중 마진을 막기 위해 여백 상쇄를 끕니다.
+   */
+  edgeBleed?: boolean
 }
 
 /**
@@ -77,6 +82,7 @@ export default function ChildHomeSceneryBand({
   backgroundSrc,
   backgroundObjectClassName = 'object-cover object-center',
   backgroundLayout = 'fullscreen',
+  edgeBleed = true,
 }: Props) {
   /** `showBackground` 가 켜졌을 때 실제로 깔리는 이미지 URL */
   const sceneryImageSrc = backgroundSrc ?? DEFAULT_SCENERY_BACKGROUND_SRC
@@ -97,10 +103,12 @@ export default function ChildHomeSceneryBand({
    * 가로 넘침은 `max-w`·부모 패딩으로 막습니다.
    */
   const overflowClass = 'overflow-visible'
+  /** 홈 전체 배경 래퍼가 풀 블리드를 맡을 때는 이중 `-mx-4` 를 피합니다. */
+  const edgeBleedClass = edgeBleed ? '-mx-4 -mt-4' : ''
 
   return (
     <section
-      className={`relative isolate -mx-4 -mt-4 flex flex-col ${overflowClass} ${heightClass} ${className}`.trim()}
+      className={`relative isolate ${edgeBleedClass} flex flex-col ${overflowClass} ${heightClass} ${className}`.trim()}
       aria-label={ariaLabel}
     >
       {showBackground && backgroundLayout === 'circleContain' ? (

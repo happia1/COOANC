@@ -7,6 +7,7 @@
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import BunnyRunLoader from '@/components/ui/BunnyRunLoader'
+import { ASSETS } from '@/constants/assets'
 import { createClient } from '@/lib/supabase/client'
 
 export default function RootPage() {
@@ -42,7 +43,10 @@ export default function RootPage() {
   }, [router])
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-sky-100 via-white to-green-50">
+    <div
+      className="flex min-h-screen items-center justify-center bg-cover bg-center bg-no-repeat"
+      style={{ backgroundImage: `url(${ASSETS.layouts.sharedAppBackground})` }}
+    >
       <BunnyRunLoader />
     </div>
   )

@@ -36,7 +36,7 @@ type Props = {
  * 아이 앱 홈 탭
  * - **한 화면**: 상단 풍경·하단 꾸미기가 **6:4** 비율(`flex-[6]`/`flex-[4]`)로 나뉨
  * - 섬 무대는 `ChildHomeIslandStage` 의 `density="flex"` 로 남는 세로 공간에 맞춤
- * - 상단: 풍경 PNG 는 끄고(`showBackground={false}`) 페이지 기본 배경만 사용. 연속일·크레딧 알약(StatPill)은 표시하지 않음.
+ * - 배경: `home_background_01.png` 는 **풀 블리드 래퍼 뒤 한 겹**만 깝니다(이동·확대·overflow 잘림 없음 → 가장자리가 잘리지 않게). `ChildHomeSceneryBand` 는 콘텐츠만 담고 `showBackground={false}` 입니다. 옛 잔디·섬 합성 PNG는 `showIslandArt={false}` 로 끕니다.
  * - 칭찬 스티커(곰)는 무대 **오른쪽 상단**(기존 날씨 자리), 성장 지도는 무대 **왼쪽** 지도 단추로 엽니다.
  * - 부모가 칭찬 스티커를 내면 팝업 후 곰돌이 판에서 붙일 수 있음
  */
@@ -331,12 +331,38 @@ export default function HomeTab({
   const homeBottomPanelClass =
     'relative z-10 mt-5 flex min-h-0 flex-[4] basis-0 flex-col gap-1 overflow-hidden px-3 pb-2 pt-0.5 sm:mt-6'
 
+  /**
+   * 홈 탭 전체(캐릭터 무대 + 「내 캐릭터 꾸미기」)를 `main` 패딩 밖까지 넓혀, 배경 PNG 가 좌우·상단에 닿게 합니다.
+   * (미션 탭 `mission/layout.tsx` 와 같은 `calc(100%+2rem)` 원리 — 비개발자용: 화면 가장자리까지 그림이 이어집니다.)
+   */
+  const homeFullBleedShellClass =
+    'relative -mx-4 -mt-4 box-border flex min-h-0 min-w-0 w-[calc(100%+2rem)] max-w-none flex-1 shrink-0 flex-col self-stretch overflow-visible'
+
+  /**
+   * 홈 탭 전체 높이를 덮는 배경 한 겹.
+   * - 예전: `overflow-hidden` + 잔디만 올리는 `translate`/`scale` 을 쓰면 **세로로 긴 영역**에서 가장자리가 잘려 보였습니다.
+   * - 지금: 잘리지 않게 `overflow` 를 건드리지 않고, `object-cover` 만으로 화면을 채웁니다(비개발자용: 그림이 프레임 밖으로 잘리지 않게 맞춤).
+   */
+  const homeTabFullBackground = (
+    <div className="pointer-events-none absolute inset-0 z-0" aria-hidden>
+      <Image
+        src={ASSETS.layouts.childHomeBackground01}
+        alt=""
+        fill
+        className="object-cover object-center"
+        sizes="(max-width: 448px) 100vw, 448px"
+        priority
+      />
+    </div>
+  )
+
   if (!stats) {
     return (
       <>
-        <div className="flex min-h-0 flex-1 flex-col">
-          {/** `showBackground={false}`: 큰 풍경 그림 없이 깔끔한 상단 영역만 */}
-          <ChildHomeSceneryBand flexFill showBackground={false} ariaLabel="홈 상단">
+        <div className={homeFullBleedShellClass}>
+          {homeTabFullBackground}
+          {/** 통계가 아직 없을 때도 동일한 홈 배경·캐릭터 무대. 배경은 `homeTabFullBackground` 한 겹뿐입니다. */}
+          <ChildHomeSceneryBand edgeBleed={false} flexFill showBackground={false} ariaLabel="홈 상단">
             <div className="shrink-0 space-y-2 py-1 text-center">
               <p className="text-sm text-gray-500">부모님이 미션을 만들어주실 거야.</p>
             </div>
@@ -363,7 +389,7 @@ export default function HomeTab({
                 </div>
                 {/** 기존 날씨 위치에 곰 스티커 단추를 배치합니다. */}
                 {stickerTopRightButton}
-                <ChildHomeIslandStage density="flex" homeAvatarUrl={childAvatarUrl} />
+                <ChildHomeIslandStage density="flex" homeAvatarUrl={childAvatarUrl} showIslandArt={false} />
               </div>
             </div>
           </ChildHomeSceneryBand>
@@ -385,9 +411,10 @@ export default function HomeTab({
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <ChildHomeSceneryBand flexFill flexFillWeight={5.5} showBackground={false} ariaLabel="홈 상단">
-        {/** 토끼·섬 무대: `-mt` 는 하단 꾸미기와 살짝 겹치게만 두고, 과하게 당기지 않아 잔디·섬이 조금 더 아래에 보입니다. */}
+    <div className={homeFullBleedShellClass}>
+      {homeTabFullBackground}
+      <ChildHomeSceneryBand edgeBleed={false} flexFill flexFillWeight={5.5} showBackground={false} ariaLabel="홈 상단">
+        {/** 캐릭터 무대: `-mt` 로 하단 꾸미기와 살짝만 겹칩니다. 배경은 셸의 `homeTabFullBackground` 가 담당합니다. */}
         <div className="flex min-h-0 flex-1 flex-col justify-end gap-1.5">
           <div className="relative mx-auto flex min-h-0 w-full max-w-sm flex-1 flex-col items-center justify-end -mt-2 sm:-mt-4">
             {/**
@@ -403,7 +430,7 @@ export default function HomeTab({
             </div>
             {/** 기존 날씨 위치(우상단)에 곰 스티커 단추를 동일하게 배치합니다. */}
             {stickerTopRightButton}
-            <ChildHomeIslandStage density="flex" homeAvatarUrl={childAvatarUrl} />
+            <ChildHomeIslandStage density="flex" homeAvatarUrl={childAvatarUrl} showIslandArt={false} />
           </div>
         </div>
       </ChildHomeSceneryBand>

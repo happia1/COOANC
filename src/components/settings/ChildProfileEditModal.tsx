@@ -20,19 +20,28 @@ export type LinkedChildForEdit = {
   institution_type: string | null
   /** DB 에 있으면 생일 추정보다 우선해 연령대 칩을 맞춥니다 */
   age_group: string | null
-  /** 저장된 값이 허용 목록에 없으면(예: 옛 데이터) UI 에서는 「기본」으로 보입니다 */
+  /** 저장된 값이 허용 목록에 없으면(예: 옛 데이터) UI 에서는 아무 캐릭터도 선택되지 않은 것처럼 보입니다(null) */
   avatar_url: string | null
 }
 
 type AgeGroup = 'preschool' | 'school'
 type InstitutionType = 'home' | 'daycare' | 'kindergarten' | 'school'
 
+/** 저장 API 가 돌려주는 프로필 일부 — 설정 목록을 즉시 맞출 때 사용 */
+export type ChildProfileSaveResult = {
+  ok?: boolean
+  profile?: { avatar_url?: string | null }
+}
+
 type Props = {
   open: boolean
   child: LinkedChildForEdit | null
   onClose: () => void
-  /** 저장 성공 후 목록 갱신용 */
-  onSaved: () => void
+  /**
+   * 저장 성공 후 목록 갱신용.
+   * - `sentAvatarUrl`: 요청에 실어 보낸 값(응답에 `profile` 이 없어도 카드에 바로 반영).
+   */
+  onSaved: (result: ChildProfileSaveResult | undefined, childId: string, sentAvatarUrl: string | null) => void
 }
 
 function institutionGrid(ag: AgeGroup): { value: InstitutionType; label: string }[] {
@@ -63,7 +72,7 @@ export default function ChildProfileEditModal({ open, child, onClose, onSaved }:
   const [draftBirth, setDraftBirth] = useState('')
   const [ageGroup, setAgeGroup] = useState<AgeGroup>('preschool')
   const [institution, setInstitution] = useState<InstitutionType>('home')
-  /** 허용된 URL 만 두고, DB 값이 이상하면 null 로 맞춰 「기본」과 동일하게 동작 */
+  /** 허용된 URL 만 두고, DB 값이 이상하면 null (선택 없음·저장 시 사진 없음과 동일 취급) */
   const [draftAvatarUrl, setDraftAvatarUrl] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -108,26 +117,41 @@ export default function ChildProfileEditModal({ open, child, onClose, onSaved }:
     setSaving(true)
     setError(null)
     try {
+      /**
+       * `JSON.stringify` 는 값이 `undefined` 인 키를 통째로 빼므로,
+       * `avatarUrl` 이 빠지면 서버는 `avatar_url` 을 전혀 갱신하지 않습니다. 항상 `null`/`string` 만 넘깁니다.
+       */
+      const payload = {
+        childId: child.id,
+        name: draftName.trim(),
+        birthDate: draftBirth.trim(),
+        institutionType: institution,
+        /** 카드·루틴에 표시할 연령대를 DB 와 맞춥니다 */
+        ageGroup,
+        /** null 이면 프로필 사진 칸을 비웁니다 */
+        avatarUrl: draftAvatarUrl ?? null,
+      }
       const res = await fetch('/api/child/update-profile', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          childId: child.id,
-          name: draftName.trim(),
-          birthDate: draftBirth.trim(),
-          institutionType: institution,
-          /** 카드·루틴에 표시할 연령대를 DB 와 맞춥니다 */
-          ageGroup,
-          /** null 이면 프로필 사진 칸을 비웁니다 */
-          avatarUrl: draftAvatarUrl,
-        }),
+        body: JSON.stringify(payload),
+        /** 응답이 끝없이 기다려지면 모달이 영원히 닫히지 않으므로 상한을 둡니다. */
+        signal: typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal ? AbortSignal.timeout(45_000) : undefined,
       })
       const j = await res.json().catch(() => ({}))
       if (!res.ok) {
         setError(typeof j.error === 'string' ? j.error : '저장에 실패했어요.')
         return
       }
-      onSaved()
+      /**
+       * 부모 `onSaved` 안에서 예외가 나면(예: 예전 `router.refresh()` 가 막혀 있을 때) 여기까지 와도 `onClose` 가
+       * 호출되지 않아 슬라이드 시트가 내려가지 않는 것처럼 보일 수 있어, 콜백만 감쌉니다.
+       */
+      try {
+        onSaved(j as ChildProfileSaveResult, child.id, payload.avatarUrl)
+      } catch (e) {
+        console.error('[ChildProfileEditModal] onSaved', e)
+      }
       onClose()
     } catch {
       setError('네트워크 오류가 났어요.')

@@ -316,15 +316,6 @@ export default function ChildHomeIslandStage({
   const [animatedWalletIdx, setAnimatedWalletIdx] = useState(walletTargetIdx)
   const animatedWalletIdxRef = useRef(animatedWalletIdx)
 
-  /**
-   * 디버그(ff7212): 미션 무대·스케일 레이어·숫자 그리드·맵 래퍼의 실제 DOM 크기를 잽니다.
-   * (리사이즈 시 잘림 원인이 스케일인지, 맵 110% 너비인지, 슬롯 그리드 넘침인지 구분)
-   */
-  const missionStageBoxRef = useRef<HTMLDivElement | null>(null)
-  const missionScaleLayerRef = useRef<HTMLDivElement | null>(null)
-  const missionSlotGridRef = useRef<HTMLDivElement | null>(null)
-  const missionMapBackdropRef = useRef<HTMLDivElement | null>(null)
-
   /** 9단계 중 마지막 두 칸은 왕관 돼지(343) — 위로 길어 `min-h`·`pt` 로 잘림을 줄입니다. */
   const piggyStageCount = piggyBankStageCount()
   const tallCrownStartIdx = Math.max(0, piggyStageCount - 2)
@@ -382,142 +373,6 @@ export default function ChildHomeIslandStage({
     return () => clearInterval(tick)
   }, [walletTargetIdx])
 
-  /**
-   * DEBUG(세션 22d9a1): 넓은 화면에서 숫자·맵 겹침 원인 추적
-   * - H-A: `sm:` 에서 크레딧 숫자 줄이 `top-[45%]` 로 내려가 건물/맵과 겹침
-   * - H-B: `BOX_FLEX` 의 `sm:max-h` 로 무대가 커지면서 퍼센트 배치가 상대적으로 어긋남
-   */
-  useEffect(() => {
-    if (density !== 'flex' || scene !== 'gippybank' || !missionCredits) return
-    const send = () => {
-      const w = window.innerWidth
-      const h = window.innerHeight
-      const sm640 = window.matchMedia('(min-width: 640px)').matches
-      // #region agent log
-      fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '22d9a1' },
-        body: JSON.stringify({
-          sessionId: '22d9a1',
-          runId: 'post-fix',
-          hypothesisId: 'verify',
-          location: 'ChildHomeIslandStage.tsx:missionLayoutProbe',
-          message: 'gippybank flex layout probe (unified sm/narrow placement)',
-          data: {
-            innerWidth: w,
-            innerHeight: h,
-            sm640,
-            creditNumberRowTopPct: 11,
-            mapRowBottomPct: 26,
-            boxFlexMaxH: 'min(46dvh,380px)',
-            layoutFixVersion: 4,
-          },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {})
-      // #endregion
-    }
-    send()
-    window.addEventListener('resize', send)
-    return () => window.removeEventListener('resize', send)
-  }, [density, scene, missionCredits])
-
-  /**
-   * DEBUG 세션 ff7212: 좌우 잘림 가설 검증
-   * - H-A: `scale()` 적용 후 시각적 너비가 무대(`stage`)보다 커서 잘림
-   * - H-B: 맵 `Image` 가 래퍼보다 넓음(`w-[110%]` 등)
-   * - H-C: 숫자 슬롯 그리드가 `scrollWidth > clientWidth` 로 가로 넘침
-   * - H-D: 상위 조상 중 `overflow-x: hidden` 이 확대된 자식을 클리핑
-   * - H-E: `100cqw/320` 기반 스케일이 뷰포트 기준이라 부모 실제 너비와 어긋남
-   */
-  useEffect(() => {
-    if (density !== 'flex' || scene !== 'gippybank' || !missionCredits) return
-    const stage = missionStageBoxRef.current
-    const scaleEl = missionScaleLayerRef.current
-    if (!stage || !scaleEl) return
-
-    /** CSS `transform: matrix(...)` 에서 대략적인 균일 스케일만 뽑습니다. */
-    const parseUniformScale = (transform: string): number | null => {
-      if (!transform || transform === 'none') return 1
-      const m = transform.match(/matrix\(([^)]+)\)/)
-      if (!m) return null
-      const parts = m[1].split(',').map((x) => parseFloat(x.trim()))
-      if (parts.length < 4 || parts.some((n) => Number.isNaN(n))) return null
-      const a = parts[0]
-      const b = parts[1]
-      return Math.hypot(a, b)
-    }
-
-    const measure = () => {
-      const stageRect = stage.getBoundingClientRect()
-      const scaleRect = scaleEl.getBoundingClientRect()
-      const cs = getComputedStyle(scaleEl)
-      const uniformScale = parseUniformScale(cs.transform)
-      const grid = missionSlotGridRef.current
-      const mapHost = missionMapBackdropRef.current
-      const mapImg = mapHost?.querySelector('img')
-      const mapImgRectW = mapImg ? mapImg.getBoundingClientRect().width : null
-
-      /** 바로 위 조상 몇 단계의 overflow — hidden 이면 자식 transform 이 잘릴 수 있음 */
-      const overflowAncestors: { depth: number; ox: string; oy: string; cls: string }[] = []
-      let p: HTMLElement | null = stage.parentElement
-      for (let d = 1; d <= 10 && p; d += 1) {
-        const s = getComputedStyle(p)
-        const cls =
-          typeof p.className === 'string' ? p.className.slice(0, 100) : ''
-        overflowAncestors.push({ depth: d, ox: s.overflowX, oy: s.overflowY, cls })
-        p = p.parentElement
-      }
-
-      // #region agent log
-      fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'ff7212' },
-        body: JSON.stringify({
-          sessionId: 'ff7212',
-          runId: 'pre-fix',
-          hypothesisId: 'H-A_B_C_D_E',
-          location: 'ChildHomeIslandStage.tsx:missionClipGeometry',
-          message: 'mission flex stage: rects, scale, slot/map widths, ancestor overflow',
-          data: {
-            innerWidth: window.innerWidth,
-            innerHeight: window.innerHeight,
-            stageClientW: stage.clientWidth,
-            stageClientH: stage.clientHeight,
-            stageRectW: stageRect.width,
-            scaleRectW: scaleRect.width,
-            scaleRectH: scaleRect.height,
-            scaleUniformFromMatrix: uniformScale,
-            scaleMinusStageW: scaleRect.width - stageRect.width,
-            slotGridClientW: grid?.clientWidth ?? null,
-            slotGridScrollW: grid?.scrollWidth ?? null,
-            slotGridOverflowX: grid ? grid.scrollWidth - grid.clientWidth : null,
-            mapHostClientW: mapHost?.clientWidth ?? null,
-            mapImgRectW,
-            mapImgMinusHostW:
-              mapHost && mapImgRectW != null ? mapImgRectW - mapHost.clientWidth : null,
-            overflowAncestors,
-          },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {})
-      // #endregion
-    }
-
-    const ro = new ResizeObserver(() => {
-      requestAnimationFrame(measure)
-    })
-    ro.observe(stage)
-    ro.observe(scaleEl)
-    window.addEventListener('resize', measure)
-    const raf = requestAnimationFrame(measure)
-    return () => {
-      ro.disconnect()
-      window.removeEventListener('resize', measure)
-      cancelAnimationFrame(raf)
-    }
-  }, [density, scene, missionCredits])
-
   /** 섬·토끼·돼지 레이어 (flex / 비-flex 공통 JSX) */
   const stageLayers = (
     <>
@@ -535,24 +390,30 @@ export default function ChildHomeIslandStage({
       ) : null}
 
       {scene === 'bunny' ? (
-        <div className="pointer-events-none absolute inset-x-0 bottom-[7%] z-[2] flex justify-center">
+        <div
+          className={
+            /** `bottom` 을 줄이고 `translateY` 를 키우면 무대 기준으로 캐릭터 전체가 아래로 내려갑니다(종 동일). */
+            'pointer-events-none absolute inset-x-0 bottom-0 z-[2] flex justify-center'
+          }
+        >
           {density === 'flex' ? (
-            /** flex: 섬·무대 스케일과 별도로 토끼만 약간 축소(`scale(0.9)`) */
+            /** flex: 섬·무대 스케일과 별도로 캐릭터만 약간 축소(`scale(0.9)`) + 살짝 아래로 밀어 잔디와 맞춤 */
             <div
               role="img"
               aria-label="나의 쿠앵이 캐릭터"
-              className="origin-bottom [transform:translateY(0.125rem)_scale(0.9)]"
+              className="origin-bottom [transform:translateY(2.45rem)_scale(0.9)]"
             >
               <HomeIslandHeroSprite sprite={homeStageSprite} />
             </div>
           ) : (
             /**
-             * 비-flex: 토끼만 뷰포트 너비 기준으로 살짝 키움/줄임(섬과 따로 놀지 않게 이미 상한을 둠).
+             * 비-flex: 캐릭터만 뷰포트 너비 기준으로 살짝 키움/줄임(섬과 따로 놀지 않게 이미 상한을 둠).
+             * 세로는 flex 경로와 같은 느낌으로 `translateY` 를 조금 더 줍니다.
              */
             <div
               role="img"
               aria-label="나의 쿠앵이 캐릭터"
-              className="origin-bottom [transform:translateY(0.25rem)_scale(calc(clamp(0.72,calc(min(100vw,20rem)/300),1.08)*0.9))]"
+              className="origin-bottom [transform:translateY(2.85rem)_scale(calc(clamp(0.72,calc(min(100vw,20rem)/300),1.08)*0.9))]"
             >
               <HomeIslandHeroSprite sprite={homeStageSprite} />
             </div>
@@ -572,10 +433,7 @@ export default function ChildHomeIslandStage({
              * `items-end`: 한 자리·두 자리 숫자도 **밑변**을 맞춤.
              */}
             <div className="pointer-events-none absolute inset-x-0 top-[11%] z-[7] flex -translate-y-1/2 justify-center">
-              <div
-                ref={missionSlotGridRef}
-                className="grid w-full max-w-[320px] grid-cols-3 items-end justify-items-center gap-x-2 px-1 sm:max-w-[340px] sm:gap-x-3 sm:px-2"
-              >
+              <div className="grid w-full max-w-[320px] grid-cols-3 items-end justify-items-center gap-x-2 px-1 sm:max-w-[340px] sm:gap-x-3 sm:px-2">
                 <div className="flex min-h-[1.35em] w-full items-end justify-center" aria-hidden>
                   <SlotNumber
                     value={missionCredits.piggy}
@@ -615,7 +473,6 @@ export default function ChildHomeIslandStage({
                * `bottom-0` 대신 `bottom-2` 등: 그리드 **바닥에서 띄운 만큼** 맵 전체가 위로 올라감(돼지·지갑은 그대로).
                */}
               <div
-                ref={missionMapBackdropRef}
                 className="pointer-events-none absolute inset-x-0 bottom-2 z-0 flex h-[12rem] items-end justify-center sm:bottom-2 sm:h-[12.5rem]"
                 aria-hidden
               >
@@ -770,12 +627,9 @@ export default function ChildHomeIslandStage({
     const flexOuterContainClass =
       scene === 'gippybank' && missionCredits ? 'contain-none [container-type:size]' : '[container-type:size]'
     return (
-      <div
-        ref={missionStageBoxRef}
-        className={`relative mx-auto w-full ${stageMaxClass} ${box} ${flexOuterContainClass} overflow-visible`}
-      >
+      <div className={`relative mx-auto w-full ${stageMaxClass} ${box} ${flexOuterContainClass} overflow-visible`}>
         <div className="pointer-events-none absolute inset-0 flex items-end justify-center overflow-visible">
-          <div ref={missionScaleLayerRef} className={flexScaleLayerClass}>
+          <div className={flexScaleLayerClass}>
             <div className="relative h-full w-full overflow-visible">{stageLayers}</div>
           </div>
         </div>

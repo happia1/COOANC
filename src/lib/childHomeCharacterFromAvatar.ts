@@ -45,13 +45,38 @@ const BEAR_HOME_ISLAND_SCALE = 0.42
 const BEAR_HOME_ISLAND_WIDTH = Math.round(BEAR1_NATURAL_WIDTH * BEAR_HOME_ISLAND_SCALE)
 const BEAR_HOME_ISLAND_HEIGHT = Math.round(BEAR1_NATURAL_HEIGHT * BEAR_HOME_ISLAND_SCALE)
 
+/**
+ * 햄스터·병아리는 토끼·여우보다 작게 둡니다(작은 펫 전용).
+ * 각각 `HAMSTER_*`, `CHICK_*` 상수로 가로·세로를 따로 둡니다.
+ */
+
+/**
+ * 햄스터 홈 무대 가로: 예전 기본(66px)보다 넓혀 옆으로 더 시원하게 보이게 합니다.
+ */
+const HAMSTER_HOME_STAGE_WIDTH = 88
+
+/**
+ * 햄스터 홈 무대 세로(키): 병아리보다 키를 더 주어 무대에서 덩치가 나오게 합니다.
+ */
+const HAMSTER_HOME_STAGE_HEIGHT = 170
+
+/**
+ * 병아리 홈 무대 가로·세로: 전체 크기를 조금 키워 작은 펫이어도 잘 보이게 합니다.
+ */
+const CHICK_HOME_STAGE_WIDTH = 98
+const CHICK_HOME_STAGE_HEIGHT = 152
+
 /** 프로필 URL → 홈 무대용 스프라이트(정면 프레임) */
 const STAGE_BY_AVATAR_URL: Record<string, HomeIslandStageSprite> = {
   [publicUrlForChildProfileAvatar('fox_profile.png')]: {
     character: 'fox',
     frame: 'fox(2)',
-    width: 112,
-    height: 238,
+    /**
+     * 홈 화면 무대: 여우만 가로를 살짝 넓히고, 세로는 토끼 기본(238)보다 조금 짧게 두어
+     * 덩치가 한 단계 작아 보이게 합니다(픽셀 박스 크기 = 화면에 그려지는 크기).
+     */
+    width: 118,
+    height: 200,
   },
   [publicUrlForChildProfileAvatar('bunny_profile.png')]: {
     character: 'bunny',
@@ -72,14 +97,18 @@ const STAGE_BY_AVATAR_URL: Record<string, HomeIslandStageSprite> = {
   [publicUrlForChildProfileAvatar('hamster_profile.png')]: {
     character: 'hamster',
     frame: 'hams (1)',
-    width: 108,
-    height: 238,
+    width: HAMSTER_HOME_STAGE_WIDTH,
+    height: HAMSTER_HOME_STAGE_HEIGHT,
   },
+  /**
+   * 병아리: 시트에서 `(2)` 는 뒤·`(3)` 은 옆에 가깝고, 오른쪽 `(1)` 이 정면에 가깝습니다.
+   * 표시 크기는 `CHICK_HOME_STAGE_WIDTH` × `CHICK_HOME_STAGE_HEIGHT` 로 무대에 올립니다.
+   */
   [publicUrlForChildProfileAvatar('chick_profile.png')]: {
     character: 'chicks',
-    frame: 'chics (3)',
-    width: 118,
-    height: 228,
+    frame: 'chics (1)',
+    width: CHICK_HOME_STAGE_WIDTH,
+    height: CHICK_HOME_STAGE_HEIGHT,
   },
 }
 

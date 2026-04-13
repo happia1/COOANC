@@ -6,7 +6,7 @@ import { getActorChildContext } from '@/lib/getActorChildContext'
 /**
  * 아이 앱 공통 레이아웃
  * - 모바일 컨테이너 (max-w-md)
- * - 기본은 연한 그라디언트 배경(홈 상단 풍경은 `HomeTab` 안에서만)
+ * - 기본은 연한 그라디언트 배경(홈 탭은 `HomeTab` 안에서 상단~꾸미기까지 풀 블리드 풍경 PNG 로 덮음)
  * - 상단 내비게이션 바 (자녀 이름 칩 + 나가기)
  * - 하단 내비게이션 바 60px (홈·미션·마켓 3탭)
  *

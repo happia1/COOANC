@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import { useState, useEffect, useMemo, useCallback, useRef, type MouseEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
@@ -18,6 +19,7 @@ import { BANNERS, ICONS } from '@/constants/sprites'
 import { MISSION_ROUTINES_ATLAS } from '@/constants/missionRoutineAtlas'
 import { missionRoutineIconFrame } from '@/lib/missionRoutineIconFrame'
 import { resolveRoutineMissionPngUrl } from '@/lib/routineMissionThumbnail'
+import { ASSETS } from '@/constants/assets'
 
 import MissionCreditToPiggyOverlay from '@/components/child/MissionCreditToPiggyOverlay'
 import MissionCreditMoveDialog, {
@@ -177,7 +179,7 @@ function isMissionRolledBackPayload(v: unknown): v is { dailyMissionId: string; 
 
 /**
  * 미션 탭
- * - 배경: 미션 상단 잔디 PNG 는 쓰지 않고, 자녀 레이아웃 배경만 보입니다.
+ * - 배경: 탭 루트 전체(상단 크레딧+하단 오늘의 미션)에 공용 배경 한 겹(`ASSETS.layouts.sharedAppBackground` — 로딩 화면과 동일). `main` 패딩 상쇄는 `mission/layout.tsx` 의 풀 블리드 래퍼.
  * - **오늘의 미션** 바깥·제목·카드 줄 **패딩**, 카드 **비율·간격** 모두 `missionTodayLayoutSpec.ts` 픽스. 임의 수정 금지.
  * - 미션 탭 본문은 세로 스크롤로 상단(저금통·돈바구니·지갑 무대)·하단(카드)을 이어서 볼 수 있습니다.
  * - 카드 썸네일: `resolveRoutineMissionPngUrl`(제목 우선) 또는 `routines_01` 아틀라스(`missionRoutineIconFrame`)
@@ -645,9 +647,28 @@ export default function MissionTab({
     </div>
   )
 
+  /**
+   * 배경은 `heroBand` 가 아니라 `MissionTab` 루트 한 겹에서만 깝니다(상단+하단 카드까지 세로 전체).
+   * (비개발자용) 아이가 보는 미션 화면 뒤쪽 큰 그림입니다. 탭 안 콘텐츠는 그 위 `z-[1]` 레이어에 올라갑니다.
+   */
+  const missionTabBackdrop = (
+    <div className="pointer-events-none absolute inset-0 z-0" aria-hidden>
+      <Image
+        src={ASSETS.layouts.sharedAppBackground}
+        alt=""
+        fill
+        className="object-cover object-center"
+        sizes="100vw"
+        priority
+      />
+    </div>
+  )
+
+  /** 상단 크레딧 카드만 — 배경은 루트 `missionTabBackdrop` 가 담당 */
   const heroBand = (
-    <div className="flex min-h-0 flex-[5.5] basis-0 items-center justify-center px-3">
-      <div className="w-full max-w-sm">
+    <div className="relative flex min-h-0 w-full flex-[5.5] basis-0 items-center justify-center self-stretch">
+      {/** `max-w-sm` 보다 좁게 — 세 칸 카드 가로를 줄이고 양옆에 배경이 조금 더 보이게 */}
+      <div className="relative z-10 w-full max-w-[18rem] px-3 sm:max-w-[18.5rem] sm:px-4">
         <MissionCreditCards
           piggy={piggyCredits}
           floating={floatingCredits}
@@ -950,27 +971,36 @@ export default function MissionTab({
     </div>
   ) : null
 
+  /**
+   * 가로·상단 패딩 상쇄는 `(child)/mission/layout.tsx` 한 곳에서만 처리합니다.
+   * 여기서는 하단 독과 겹치지 않도록 아래쪽 마진만 둡니다.
+   */
+  const missionTabRootClassName =
+    'relative isolate box-border -mb-[calc(60px+0.35rem)] flex min-h-0 min-w-0 flex-1 flex-col bg-transparent'
+
   if (isFullRestDay) {
-    /** 휴식일은 전체 배경을 건드리지 않고, 위 `heroBand`(상단)에서만 이미지가 보입니다. */
     return (
-      <div className="relative -mx-4 -mb-[calc(60px+0.35rem)] -mt-4 flex min-h-0 min-w-0 flex-1 flex-col bg-transparent">
-        <MissionSleepMorningLayer
-          childId={childId}
-          today={today}
-          isFullRestDay={isFullRestDay}
-          completedCount={completedCount}
-          totalMissions={total}
-        />
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-          {heroBand}
-          <div className="flex min-h-0 flex-[4.5] basis-0 flex-col items-center justify-center gap-2 overflow-y-auto overscroll-contain px-4 py-2 text-center sm:gap-3 sm:px-6 sm:py-4">
-            <span className="text-sm font-black text-gray-400">휴식</span>
-            <p className="text-lg font-black text-brand-text sm:text-xl">오늘은 쉬는 날이에요!</p>
-            <p className="text-xs text-gray-400 sm:text-sm">푹 쉬고 내일 또 열심히 해봐요.</p>
+      <div className={missionTabRootClassName}>
+        {missionTabBackdrop}
+        <div className="relative z-[1] flex min-h-0 min-w-0 flex-1 flex-col">
+          <MissionSleepMorningLayer
+            childId={childId}
+            today={today}
+            isFullRestDay={isFullRestDay}
+            completedCount={completedCount}
+            totalMissions={total}
+          />
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+            {heroBand}
+            <div className="flex min-h-0 flex-[4.5] basis-0 flex-col items-center justify-center gap-2 overflow-y-auto overscroll-contain px-4 py-2 text-center sm:gap-3 sm:px-6 sm:py-4">
+              <span className="text-sm font-black text-gray-400">휴식</span>
+              <p className="text-lg font-black text-brand-text sm:text-xl">오늘은 쉬는 날이에요!</p>
+              <p className="text-xs text-gray-400 sm:text-sm">푹 쉬고 내일 또 열심히 해봐요.</p>
+            </div>
           </div>
+          {popupBlock}
+          {rollbackPopupBlock}
         </div>
-        {popupBlock}
-        {rollbackPopupBlock}
 
         <MissionCreditActionSheet
           open={creditSheetBucket !== null}
@@ -997,54 +1027,56 @@ export default function MissionTab({
     )
   }
 
-  /** 일반일도 전체 배경은 투명 유지, 상단 영역(`heroBand`)에서만 새 이미지를 표시합니다. */
   return (
-    <div className="relative -mx-4 -mb-[calc(60px+0.35rem)] -mt-4 flex min-h-0 min-w-0 flex-1 flex-col bg-transparent">
-      <MissionSleepMorningLayer
-        childId={childId}
-        today={today}
-        isFullRestDay={isFullRestDay}
-        completedCount={completedCount}
-        totalMissions={total}
-      />
-      {popupBlock}
-      {rollbackPopupBlock}
-      {/**
-       * 토스트는 `main`(z-10) 안에 두면 상단바(z-40)·하단 독(z-50)보다 뒤 레이어라 가려집니다.
-       * `document.body`로 포털을 열고 화면 정중앙에 두어 항상 위에 보이게 합니다.
-       * 바깥은 `pointer-events-none` — 짧은 표시 동안에도 탭은 아래로 통과합니다.
-       */}
-      {toast &&
-        typeof document !== 'undefined' &&
-        createPortal(
-          <div
-            className="fixed inset-0 z-[200] flex items-center justify-center px-5 pointer-events-none"
-            role="status"
-            aria-live="polite"
-          >
-            <div className="max-w-[min(22rem,calc(100vw-2.5rem))] rounded-2xl bg-brand-blue px-5 py-3 text-center text-sm font-bold leading-snug text-white shadow-2xl ring-2 ring-white/25 pointer-events-auto">
-              {toast}
-            </div>
-          </div>,
-          document.body,
-        )}
-      {creditFxOn ? (
-        <MissionCreditToPiggyOverlay
-          playId={creditFxNonce}
-          onFinish={endCreditFx}
-          startX={creditFxStart.x}
-          startY={creditFxStart.y}
+    <div className={missionTabRootClassName}>
+      {missionTabBackdrop}
+      <div className="relative z-[1] flex min-h-0 min-w-0 flex-1 flex-col">
+        <MissionSleepMorningLayer
+          childId={childId}
+          today={today}
+          isFullRestDay={isFullRestDay}
+          completedCount={completedCount}
+          totalMissions={total}
         />
-      ) : null}
-      {/**
-       * 세로 `overflow-y-auto`: 상단·하단을 스크롤로 볼 수 있음.
-       * 가로는 `hidden` — `overflow-y-auto`+`visible` 조합이 브라우저에서 전체 가로 스크롤을 만들기 때문.
-       * 카드 가로 스와이프는 하단 `MISSION_CARD_SCROLLER` 안에서만 됩니다.
-       */}
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-        {heroBand}
-        <div className="flex min-h-0 flex-[4.5] basis-0 flex-col overflow-y-auto overscroll-contain">
-          {bottomPanel}
+        {popupBlock}
+        {rollbackPopupBlock}
+        {/**
+         * 토스트는 `main`(z-10) 안에 두면 상단바(z-40)·하단 독(z-50)보다 뒤 레이어라 가려집니다.
+         * `document.body`로 포털을 열고 화면 정중앙에 두어 항상 위에 보이게 합니다.
+         * 바깥은 `pointer-events-none` — 짧은 표시 동안에도 탭은 아래로 통과합니다.
+         */}
+        {toast &&
+          typeof document !== 'undefined' &&
+          createPortal(
+            <div
+              className="fixed inset-0 z-[200] flex items-center justify-center px-5 pointer-events-none"
+              role="status"
+              aria-live="polite"
+            >
+              <div className="max-w-[min(22rem,calc(100vw-2.5rem))] rounded-2xl bg-brand-blue px-5 py-3 text-center text-sm font-bold leading-snug text-white shadow-2xl ring-2 ring-white/25 pointer-events-auto">
+                {toast}
+              </div>
+            </div>,
+            document.body,
+          )}
+        {creditFxOn ? (
+          <MissionCreditToPiggyOverlay
+            playId={creditFxNonce}
+            onFinish={endCreditFx}
+            startX={creditFxStart.x}
+            startY={creditFxStart.y}
+          />
+        ) : null}
+        {/**
+         * 세로 `overflow-y-auto`: 상단·하단을 스크롤로 볼 수 있음.
+         * 가로는 `hidden` — `overflow-y-auto`+`visible` 조합이 브라우저에서 전체 가로 스크롤을 만들기 때문.
+         * 카드 가로 스와이프는 하단 `MISSION_CARD_SCROLLER` 안에서만 됩니다.
+         */}
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+          {heroBand}
+          <div className="flex min-h-0 flex-[4.5] basis-0 flex-col overflow-y-auto overscroll-contain">
+            {bottomPanel}
+          </div>
         </div>
       </div>
 

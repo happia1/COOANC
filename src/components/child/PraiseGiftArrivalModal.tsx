@@ -44,9 +44,9 @@ export default function PraiseGiftArrivalModal({ open, onGoStickers }: Props) {
           <div className="relative z-[1] mx-3 mb-4 mt-12 flex flex-col items-center rounded-2xl bg-white/90 px-5 py-6 text-center shadow-md backdrop-blur-[2px]">
             {!bannerOk && <span className="mb-2 text-4xl" aria-hidden>🔔</span>}
             <p className="text-lg font-black leading-snug text-brand-text">
-              엄마가 칭찬스티커를
+              칭찬스티커를
               <br />
-              선물해줬어요!
+              선물 받았어요!
             </p>
             <p className="mt-2 text-xs text-gray-600">지금 곰돌이 판에 붙여 볼까요?</p>
 

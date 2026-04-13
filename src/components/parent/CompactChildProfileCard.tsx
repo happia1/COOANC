@@ -68,12 +68,14 @@ export function CompactChildProfileCard({
   const secondaryParts = [...metaParts, ...(age != null ? [`${age}세`] : [])]
   const secondaryLine = secondaryParts.length > 0 ? secondaryParts.join('·') : null
 
+  /** 카드 바깥: 얇은 링·그림자(테두리처럼 보이던 것) 없이 흰 배경만 — 홈·루틴·설정 동일 */
   return (
-    <div className={`bg-white rounded-xl px-2.5 py-2 shadow-sm ring-1 ring-black/[0.04] ${className}`.trim()}>
+    <div className={`rounded-xl bg-white px-2.5 py-2 ${className}`.trim()}>
       {/** 한 행 전체를 세로 가운데 정렬 — 자녀 정보 텍스트 블록이 프로필 사진(원)의 중앙과 맞도록 합니다 */}
       <div className="flex items-center gap-2.5">
         <div className="flex min-w-0 min-h-0 flex-1 items-center gap-3">
-          <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-full bg-gradient-to-br from-sky-100 to-sky-200 shadow-inner ring-2 ring-white">
+          {/** 원형 뒤는 흰색만 — 예전 하늘색 그라데이션·흰 링은 제거했습니다. */}
+          <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-full bg-white">
             {avatarUrl ? (
               /**
                * 프로필 PNG 는 귀·턱이 길어 `object-cover` 만 쓰면 원 밖으로 잘려 보입니다.
@@ -84,7 +86,7 @@ export function CompactChildProfileCard({
                 <img src={avatarUrl} alt="" className="h-full w-full object-contain object-center" />
               </div>
             ) : (
-              <span className="flex h-full w-full items-center justify-center px-1 text-center text-[11px] font-black leading-tight text-sky-800">
+              <span className="flex h-full w-full items-center justify-center px-1 text-center text-[11px] font-black leading-tight text-gray-700">
                 {stageName}
               </span>
             )}

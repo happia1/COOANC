@@ -57,7 +57,6 @@ const PNG_BY_TITLE: Record<string, string> = {
   독서활동: `${BASE}/p.m/book.png`,
   '모두 제자리': `${BASE}/p.m/organize_toys.png`,
   '목욕/샤워': `${BASE}/p.m/shower.png`,
-  '잠자리 세수': `${BASE}/p.m/wash_hand.png`,
   '잠자리 양치': `${BASE}/a.m/brush_teeth.png`,
   '잠옷 갈아입기': `${BASE}/p.m/pajama.png`,
   취침: `${BASE}/p.m/goodnight.png`,

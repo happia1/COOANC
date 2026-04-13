@@ -3,11 +3,11 @@
 import Image from 'next/image'
 import { useEffect, useRef, useState } from 'react'
 import SpriteImage from '@/components/common/SpriteImage'
-import { MISSION_CREDITS_STAGE_CAP } from '@/constants/piggyBankStages'
+import { MISSION_CREDITS_STAGE_CAP, PIGGY_BANK_VISUAL_MAX_SCALE } from '@/constants/piggyBankStages'
 import { EFFECT_LIGHTS } from '@/constants/sprites'
 
 type Props = {
-  /** 돈바구니에 아직 나누지 않은 크레딧(가용) — 많을수록 동전 단계·크기가 올라갑니다 */
+  /** 돈바구니에 아직 나누지 않은 크레딧(가용) — 많을수록 동전 **그림 단계**만 바뀌고, 가로 크기는 저금통 최대와 맞춘 고정값입니다 */
   floating: number
   /** 0일 때 흐리게(버튼 비활성과 맞춤) */
   dimWhenEmpty?: boolean
@@ -19,6 +19,13 @@ type Props = {
    * false(기본): 미션 가운데(돈바구니)용으로 아래쪽 기준 + 살짝 내림(`CREDIT_NUDGE_DOWN_PX`).
    */
   centerInFrame?: boolean
+  /**
+   * true: 미션 상단 카드처럼 **낮은 고정 높이** 안에 넣을 때 — 여백·전체 높이를 줄이고 항상 **아래 기준**으로만 둡니다.
+   * (`centerInFrame` 이 true여도 `tightSlot` 이면 중앙 정렬을 쓰지 않아 블록 밖으로 밀려 나가지 않습니다.)
+   */
+  tightSlot?: boolean
+  /** `tightSlot` 과 함께: 내부 레이아웃이 이 높이를 넘으면 **비율 축소**해 카드 안에 맞춥니다(px). */
+  maxOuterHeightPx?: number
 }
 
 /** 저금통 단계와 맞춘 상한(`piggyBankStages`) — 넘치면 마지막(`home_credit10`) 그림·크기로 고정 */
@@ -38,14 +45,19 @@ const COIN_STAGE_COUNT = COIN_STAGE_IMAGE_URLS.length
 
 /** PNG 비율이 제각각이라 레이아웃만 맞출 때 쓰는 대략적인 세로/가로 비율(높이 쪽이 조금 더 김) */
 const CREDIT_IMAGE_LAYOUT_HEIGHT_RATIO = 1.12
+/**
+ * 미션 카드 `tightSlot`: `home_credit*.png` 가로 대비 세로가 들쭉날쭉해, 예상 높이를 넉넉히 잡습니다.
+ * (`stageBox` 가 `overflow-hidden` 일 때 실제보다 박스가 짧으면 아래가 잘립니다.)
+ */
+const CREDIT_IMAGE_TIGHT_SLOT_HEIGHT_RATIO = 1.38
 
 /**
  * 표시 너비(`coinSpriteWidth`)를 기준으로, 잘리지 않게 잡는 예상 높이(px).
  * 실제 그림은 `object-contain` 으로 이 박스 안에 들어갑니다.
  */
-function estimatedCreditImageHeightPx(targetWidth: number): number {
+function estimatedCreditImageHeightPx(targetWidth: number, heightRatio = CREDIT_IMAGE_LAYOUT_HEIGHT_RATIO): number {
   const w = Math.max(22, Math.round(targetWidth))
-  return Math.max(1, Math.round(w * CREDIT_IMAGE_LAYOUT_HEIGHT_RATIO))
+  return Math.max(1, Math.round(w * heightRatio))
 }
 
 /** 번짐 그림자·아래로 살짝 내린 연출이 박스 밖으로 나가도 잘리지 않게 하는 여백(px) */
@@ -77,7 +89,9 @@ function coinStageIndex(amount: number): number {
 }
 
 /**
- * 가운데 가용 크레딧: 동전 PNG 10단계, 구간 안에서는 크기만 부드럽게 증가.
+ * 가운데 가용 크레딧: 동전 PNG 10단계.
+ * - 그림 **가로 크기**는 `PIGGY_BANK_VISUAL_MAX_SCALE`(저금통 왕관 단계와 동일)으로만 계산합니다.
+ * - 잔액이 바뀌면 **목표 단계**까지 `displayStage` 를 한 칸씩 올리거나 내려 미션 카드 저금통·지갑과 같은 리듬으로 맞춥니다.
  */
 export default function FloatingCreditsStackVisual({
   floating,
@@ -85,23 +99,29 @@ export default function FloatingCreditsStackVisual({
   displayWidth = 58,
   className = '',
   centerInFrame = false,
+  tightSlot = false,
+  maxOuterHeightPx,
 }: Props) {
   const targetCredit = Math.max(0, Math.min(Math.floor(floating), MAX_FLOATING_FOR_STAGE))
-  const [displayedCredit, setDisplayedCredit] = useState(targetCredit)
-
-  /** 실제 숫자가 갑자기 바뀌어도 화면 숫자처럼 조금씩 따라가게 해서 단계 전환이 여러 번 보이게 함 */
+  /** 잔액에 맞는 동전 그림 단계(0~9) — 실제 목표 */
+  const targetStage = coinStageIndex(targetCredit)
+  /** 화면에 그리는 단계 — `targetStage` 로 한 칸씩 따라감 */
+  const [displayStage, setDisplayStage] = useState(() => coinStageIndex(targetCredit))
+  const displayStageRef = useRef(displayStage)
   useEffect(() => {
-    if (displayedCredit === targetCredit) return
+    displayStageRef.current = displayStage
+  }, [displayStage])
+
+  useEffect(() => {
+    if (targetStage === displayStageRef.current) return
     const tick = setInterval(() => {
-      setDisplayedCredit((prev) => {
-        if (prev === targetCredit) return prev
-        const diff = targetCredit - prev
-        const step = Math.max(1, Math.floor(Math.abs(diff) / 8))
-        return prev + Math.sign(diff) * step
+      setDisplayStage((prev) => {
+        if (prev === targetStage) return prev
+        return prev + (targetStage > prev ? 1 : -1)
       })
-    }, 45)
+    }, 150)
     return () => clearInterval(tick)
-  }, [targetCredit, displayedCredit])
+  }, [targetStage])
 
   const prevCreditRef = useRef(targetCredit)
   const [sparkleOn, setSparkleOn] = useState(false)
@@ -129,27 +149,32 @@ export default function FloatingCreditsStackVisual({
     return
   }, [targetCredit])
 
-  const clamped = Math.max(0, Math.min(displayedCredit, MAX_FLOATING_FOR_STAGE))
-  const stage = coinStageIndex(clamped)
-  const creditImageSrc = COIN_STAGE_IMAGE_URLS[stage]!
-  /**
-   * 요청사항 반영:
-   * - 돈이 많아질수록 가운데 크레딧이 점점 커지게 합니다.
-   * - `displayWidth`를 기준 크기로 두고, 0~MAX(1000) 비율에 따라 부드럽게 확대합니다.
-   * - 너무 작거나 너무 커 보이지 않게 최소/최대 배율을 제한합니다.
-   */
-  const creditRatio = clamped / Math.max(1, MAX_FLOATING_FOR_STAGE)
-  const scaleMin = 0.72
-  const scaleMax = 1.2
-  const sizeMul = scaleMin + (scaleMax - scaleMin) * creditRatio
-  const coinSpriteWidth = Math.max(22, Math.round(displayWidth * sizeMul))
+  const creditImageSrc = COIN_STAGE_IMAGE_URLS[displayStage]!
+  /** 저금통이 가장 클 때와 같은 배율로만 너비를 잡아, 단계·잔액과 무관하게 한 덩어리 크기로 보입니다 */
+  const coinSpriteWidth = Math.max(22, Math.round(displayWidth * PIGGY_BANK_VISUAL_MAX_SCALE))
 
-  const rh = estimatedCreditImageHeightPx(coinSpriteWidth)
+  /** `tightSlot` 일 때는 동전 PNG 가 더 길 수 있어 비율만 살짝 올려 하단 클립을 막습니다 */
+  const rh = estimatedCreditImageHeightPx(
+    coinSpriteWidth,
+    tightSlot ? CREDIT_IMAGE_TIGHT_SLOT_HEIGHT_RATIO : CREDIT_IMAGE_LAYOUT_HEIGHT_RATIO,
+  )
   const rw = coinSpriteWidth
-  const layoutWidth = Math.ceil(rw + BLEED_X)
-  const displayHeight = centerInFrame
-    ? Math.ceil(rh + BLEED_Y_TOP + BLEED_Y_BOTTOM + 10)
-    : Math.ceil(rh + CREDIT_NUDGE_DOWN_PX + BLEED_Y_TOP + BLEED_Y_BOTTOM)
+  /** 미션 카드 슬롯: 번짐·상하 여백을 줄여 한 블록 안에 들어가게 합니다. */
+  const bleedX = tightSlot ? 10 : BLEED_X
+  const bleedTop = tightSlot ? 6 : BLEED_Y_TOP
+  /** 하단 번짐 — `tightSlot` 은 아래 앵커 연산과 맞춰 넉넉히 둡니다 */
+  const bleedBottom = tightSlot ? 28 : BLEED_Y_BOTTOM
+  const layoutWidth = Math.ceil(rw + bleedX)
+  /**
+   * `tightSlot` 높이에 예전처럼 `nudgeDown` 을 더하면 안 됩니다.
+   * `bottom-0` 인 span 에 `translateY(양수)` 를 주면 그림이 박스 **아래**로 나가 `overflow-hidden` 에 잘립니다.
+   * 미션 카드에서는 `translateY(0)` 만 쓰고, 아래 여백은 `bleedBottom` 으로만 잡습니다.
+   */
+  const displayHeight = tightSlot
+    ? Math.ceil(rh + bleedTop + bleedBottom)
+    : centerInFrame
+      ? Math.ceil(rh + BLEED_Y_TOP + BLEED_Y_BOTTOM + 10)
+      : Math.ceil(rh + CREDIT_NUDGE_DOWN_PX + BLEED_Y_TOP + BLEED_Y_BOTTOM)
 
   const opacityClass = targetCredit <= 0 && dimWhenEmpty ? 'opacity-30' : 'opacity-100'
 
@@ -160,23 +185,32 @@ export default function FloatingCreditsStackVisual({
    */
   const morphClass = 'opacity-100'
 
-  const anchorYClass = centerInFrame ? 'top-1/2' : 'bottom-0'
+  const useVerticalCenter = centerInFrame && !tightSlot
+  const anchorYClass = useVerticalCenter ? 'top-1/2' : 'bottom-0'
   const anchorTransform = (extra: string) =>
-    centerInFrame
+    useVerticalCenter
       ? `translate(-50%, -50%) ${extra}`.trim()
-      : `translateX(-50%) translateY(${CREDIT_NUDGE_DOWN_PX}px) ${extra}`.trim()
+      : `translateX(-50%) translateY(${tightSlot ? 0 : CREDIT_NUDGE_DOWN_PX}px) ${extra}`.trim()
 
   const outerShellClass = [
-    'relative inline-flex max-w-none shrink-0 flex-col items-center overflow-visible px-1.5 pb-2 pt-1.5',
+    tightSlot
+      ? 'relative inline-flex max-w-none shrink-0 flex-col items-center overflow-hidden px-0.5 pb-0 pt-0'
+      : 'relative inline-flex max-w-none shrink-0 flex-col items-center overflow-visible px-1.5 pb-2 pt-1.5',
     className.trim() || 'drop-shadow-[0_3px_12px_rgba(0,0,0,0.16)]',
     opacityClass,
   ]
     .filter(Boolean)
     .join(' ')
 
-  return (
-    <div className={outerShellClass} aria-hidden>
-      <div className="relative overflow-visible" style={{ width: layoutWidth, height: displayHeight }}>
+  const useSlotCap = Boolean(tightSlot && typeof maxOuterHeightPx === 'number' && maxOuterHeightPx > 0)
+  const slotScale = useSlotCap ? Math.min(1, maxOuterHeightPx! / displayHeight) : 1
+
+  /**
+   * `translateY(0)` 로 하단 클립을 막은 뒤에도, PNG·서브픽셀 여유를 위해 `overflow-visible` 을 둡니다.
+   * (슬롯 바깥은 `useSlotCap` 쪽 flex 의 `overflow-hidden` 이 한 번 더 막습니다.)
+   */
+  const stageBox = (
+    <div className="relative overflow-visible" style={{ width: layoutWidth, height: displayHeight }}>
         {sparkleOn ? (
           <>
             {lightFx.map((fx, i) => (
@@ -223,7 +257,32 @@ export default function FloatingCreditsStackVisual({
             style={{ width: coinSpriteWidth, height: 'auto' }}
           />
         </span>
-      </div>
+    </div>
+  )
+
+  return (
+    <div
+      className={outerShellClass}
+      style={useSlotCap ? { height: maxOuterHeightPx, width: '100%', maxWidth: '100%' } : undefined}
+      aria-hidden
+    >
+      {useSlotCap ? (
+        <div className="flex h-full min-h-0 w-full items-end justify-center overflow-hidden">
+          <div
+            className="shrink-0"
+            style={{
+              width: layoutWidth,
+              height: displayHeight,
+              transform: `scale(${slotScale})`,
+              transformOrigin: 'bottom center',
+            }}
+          >
+            {stageBox}
+          </div>
+        </div>
+      ) : (
+        stageBox
+      )}
     </div>
   )
 }

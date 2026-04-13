@@ -3,10 +3,14 @@
  * (서버에서 내려오는 래퍼이므로, 실제 애니메이션은 클라이언트 컴포넌트가 담당합니다.)
  */
 import BunnyRunLoader from '@/components/ui/BunnyRunLoader'
+import { ASSETS } from '@/constants/assets'
 
 export default function Loading() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-sky-100 via-white to-green-50">
+    <div
+      className="flex min-h-screen items-center justify-center bg-cover bg-center bg-no-repeat"
+      style={{ backgroundImage: `url(${ASSETS.layouts.sharedAppBackground})` }}
+    >
       <BunnyRunLoader />
     </div>
   )

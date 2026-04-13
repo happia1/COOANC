@@ -8,7 +8,11 @@
  *   프레임마다 잘린 영역을 캔버스에 그립니다.
  * - 일부 프레임은 시트 안에서 90° 돌아가 저장되어 있어(`rotated: true`),
  *   그릴 때 반대로 회전해 원래 모습으로 되돌립니다.
- * - 프레임이 바뀔 때 잠깐 이전 그림과 다음 그림을 겹쳐 그려(크로스페이드) 달리기가 덜 끊기게 보이게 합니다.
+ * - 프레임은 한 장씩만 그립니다. 두 장을 반투명으로 겹치면(크로스페이드) 가장자리가 매 프레임 섞이며 “반짝”이는 경우가 많아 제거했습니다.
+ * - 캔버스는 매 프레임 투명으로 비워 부모(`ASSETS.layouts.sharedAppBackground` 등) 배경이 비치게 하고, 그릴 위치는 픽셀 정수로 맞춥니다.
+ * - 토끼 아래에는 가로 로딩 막대만 둡니다(문구 없음). `progressPercent`를 주면 그 값(0~100)을 쓰고,
+ *   없으면 에셋 로드 전·후 경과로 추정해 “진행 중” 느낌을 줍니다.
+ * - `role="status"`·막대의 `role="progressbar"`로 보조 기기에 로딩 중임을 알립니다.
  */
 
 import { useEffect, useRef, useState } from 'react'
@@ -17,24 +21,12 @@ import { useEffect, useRef, useState } from 'react'
 const ATLAS_JSON_URL = '/assets/img/characters/onboarding/bunny_run.json'
 const SHEET_IMAGE_URL = '/assets/img/characters/onboarding/bunny_run.png'
 
-/**
- * 한 “발자국” 주기(ms) = 이 프레임을 주로 보여 주는 시간 + 다음 프레임으로 스며드는 시간.
- * 숫자를 줄이면 더 빨리 달립니다.
- */
-const FRAME_HOLD_MS = 68
-/** 이전 자세와 다음 자세가 겹쳐 보이는 시간 — 짧은 영화 필름처럼 이어집니다. */
-const CROSSFADE_MS = 52
-const FRAME_CELL_MS = FRAME_HOLD_MS + CROSSFADE_MS
+/** 한 장의 스프라이트를 보여 주는 시간(ms) — 줄이면 더 빨리 달립니다. */
+const FRAME_CELL_MS = 120
 
-/** 화면에 보이는 캔버스 박스(px) — 예전 200×380 의 절반 크기입니다. */
-const DISPLAY_CSS_W = 100
-const DISPLAY_CSS_H = 190
-
-/** 0~1 값을 부드럽게 꺾어 주는 smoothstep — 깜빡임 대신 천천히 섞입니다. */
-function smoothstep01(t: number) {
-  const x = Math.min(1, Math.max(0, t))
-  return x * x * (3 - 2 * x)
-}
+/** 화면에 보이는 캔버스 박스(px) — 토끼 표시를 더 작게(기존 100×190 대비 절반). */
+const DISPLAY_CSS_W = 50
+const DISPLAY_CSS_H = 95
 
 /** TexturePacker `frame` 객체 — 시트 안의 픽셀 사각형입니다. */
 type TpRect = { x: number; y: number; w: number; h: number }
@@ -50,6 +42,39 @@ type TpFrameEntry = {
 type BunnyRunAtlas = {
   frames: Record<string, TpFrameEntry>
   meta: { size: { w: number; h: number } }
+}
+
+type Props = {
+  /** 바깥 컨테이너에 Tailwind 등을 더할 때 사용합니다. */
+  className?: string
+  /**
+   * 0~100 진행률(상위에서 알 때만 전달). 생략 시 내부 추정(토끼 PNG·JSON 로드 전 구간,
+   * 로드 후에도 앱 준비가 끝날 때까지 천천히 올라가되 100%에는 고정하지 않음).
+   */
+  progressPercent?: number
+}
+
+/**
+ * 달리는 토끼 바로 아래 가로 막대 — 비개발자: 회색 통 안에서 핑크 막대가 길어질수록 진행된 것처럼 보입니다.
+ * 스크린 리더는 `progressbar`로 읽습니다.
+ */
+function LoadingProgressBar({ percent }: { percent: number }) {
+  const clamped = Math.min(100, Math.max(0, percent))
+  return (
+    <div
+      className="h-1.5 w-full max-w-[min(20rem,calc(100vw-2rem))] overflow-hidden rounded-full bg-black/10 shadow-sm ring-1 ring-black/5"
+      role="progressbar"
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={Math.round(clamped)}
+      aria-label="로딩 진행 표시"
+    >
+      <div
+        className="h-full rounded-full bg-pink-500 transition-[width] duration-200 ease-out"
+        style={{ width: `${clamped}%` }}
+      />
+    </div>
+  )
 }
 
 /**
@@ -79,13 +104,6 @@ function maxSourceSize(frames: Record<string, TpFrameEntry>, keys: string[]) {
   return { mw, mh }
 }
 
-type Props = {
-  /** 로딩 문구 — 기본은 「열심히 달려가는 중!」입니다. */
-  message?: string
-  /** 바깥 컨테이너에 Tailwind 등을 더할 때 사용합니다. */
-  className?: string
-}
-
 /**
  * 아틀라스의 한 프레임을 논리 좌표(0,0)~(canvasW, canvasH) 안 가운데에 그립니다.
  *
@@ -113,25 +131,32 @@ function drawFrame(
 
   if (!entry.rotated) {
     // 회전 없음: JSON frame 좌표 그대로 잘라 sourceSize 크기로 그립니다.
-    ctx.drawImage(sheet, sx, sy, swSheet, shSheet, cx - dw / 2, cy - dh / 2, dw, dh)
+    // 목적지 좌표·크기를 정수 픽셀로 맞춰 브라우저가 매 프레임 다른 소수점에 얹을 때 생기는 번짐을 줄입니다.
+    const dx = Math.round(cx - dw / 2)
+    const dy = Math.round(cy - dh / 2)
+    const rw = Math.round(dw)
+    const rh = Math.round(dh)
+    ctx.drawImage(sheet, sx, sy, swSheet, shSheet, dx, dy, rw, rh)
     return
   }
 
   // 시트 안에는 “누운” 직사각형(swSheet×shSheet)으로 들어 있으므로,
   // 화면 중심에서 반시계 90° 돌린 뒤 그 영역을 붙이면 세로로 선 토끼(dh×dw)가 됩니다.
+  const rdx = Math.round(dh)
+  const rdy = Math.round(dw)
   ctx.save()
-  ctx.translate(cx, cy)
+  ctx.translate(Math.round(cx), Math.round(cy))
   ctx.rotate(-Math.PI / 2)
-  ctx.drawImage(sheet, sx, sy, swSheet, shSheet, -dh / 2, -dw / 2, dh, dw)
+  ctx.drawImage(sheet, sx, sy, swSheet, shSheet, Math.round(-dh / 2), Math.round(-dw / 2), rdx, rdy)
   ctx.restore()
 }
 
 export default function BunnyRunLoader({
-  message = '열심히 달려가는 중!',
   className = '',
+  progressPercent: progressPercentProp,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
-  /** 이미지·JSON이 모두 준비되면 true — 그 전에는 토끼 대신 짧은 안내를 보여줍니다. */
+  /** 이미지·JSON이 모두 준비되면 true — 그 전에는 캔버스 영역을 비워 두고 투명하게 둡니다. */
   const [ready, setReady] = useState(false)
   /** PNG/JSON 요청이 실패하면 true — 예전처럼 싹 이모지로 대체합니다. */
   const [loadError, setLoadError] = useState(false)
@@ -140,6 +165,12 @@ export default function BunnyRunLoader({
   const keysRef = useRef<string[]>([])
   /** 애니메이션 타임라인 시작 시각 — requestAnimationFrame 으로 경과 시간을 잽니다. */
   const animStartRef = useRef(0)
+  /** 클라이언트에서 이 컴포넌트가 붙은 시각 — 내부 진행률 추정에 씁니다. */
+  const mountMsRef = useRef(performance.now())
+  /** 토끼 PNG·JSON이 모두 끝난 시각 — 그 이후 구간의 막대 채움에 씁니다. */
+  const assetsReadyAtRef = useRef<number | null>(null)
+  /** 외부에서 진행률을 안 줄 때, 막대를 주기적으로 다시 그리기 위한 틱입니다. */
+  const [, setProgressTick] = useState(0)
 
   // JSON + PNG 병렬 로드
   useEffect(() => {
@@ -165,6 +196,7 @@ export default function BunnyRunLoader({
       atlasRef.current = atlas
       sheetRef.current = img
       keysRef.current = orderedFrameKeys(atlas.frames)
+      assetsReadyAtRef.current = performance.now()
       setReady(true)
     }
 
@@ -179,6 +211,30 @@ export default function BunnyRunLoader({
       cancelled = true
     }
   }, [])
+
+  // 외부 진행률이 없을 때만: 막대가 시간에 따라 천천히 차 보이게 합니다(실제 라우팅 완료와 무관한 추정치).
+  useEffect(() => {
+    if (progressPercentProp !== undefined) return
+    const id = window.setInterval(() => setProgressTick((n) => n + 1), 120)
+    return () => window.clearInterval(id)
+  }, [progressPercentProp])
+
+  /** 0~100 — `progressPercent` prop이 있으면 그대로, 없으면 마운트·에셋 준비 시각 기준 추정. */
+  const shownProgressPercent =
+    progressPercentProp !== undefined
+      ? Math.min(100, Math.max(0, progressPercentProp))
+      : (() => {
+          const now = performance.now()
+          const sinceMount = now - mountMsRef.current
+          if (!ready) {
+            // 에셋 받기 전: 약 1초 안에 0→35% 정도로만 올려 “기다리는 중”을 표시합니다.
+            return Math.min(35, sinceMount / 28)
+          }
+          const t0 = assetsReadyAtRef.current ?? now
+          const sinceAssets = now - t0
+          // 에셋 이후: 천천히 38%→90%까지(100%는 “완료”에 가까워 오해를 줄이기 위해 안 씀).
+          return Math.min(90, 38 + sinceAssets / 70)
+        })()
 
   // 프레임 인덱스 순환 + 캔버스에 그리기
   useEffect(() => {
@@ -206,36 +262,28 @@ export default function BunnyRunLoader({
     animStartRef.current = performance.now()
 
     const paint = (now: number) => {
-      const elapsed = now - animStartRef.current
+      // rAF 시각(now)이 아주 잠깐 animStartRef보다 작을 수 있어 elapsed가 음수가 되면,
+      // JS의 음수 % 연산(-1 % 6 === -1) 때문에 keys[-1]이 되어 entry가 undefined로 터집니다.
+      const elapsedRaw = now - animStartRef.current
+      const elapsed = Math.max(0, elapsedRaw)
       const n = keys.length
-      /** 지금이 몇 번째 “발자국” 칸인지 — 이 값이 바뀔 때마다 주 프레임이 바뀝니다. */
+      /** 지금이 몇 번째 “발자국” 칸인지 — 이 값이 바뀔 때마다 한 장의 스프라이트가 바뀝니다. */
       const cell = Math.floor(elapsed / FRAME_CELL_MS)
-      /** 한 칸 안에서의 진행도(0 ~ FRAME_CELL_MS) — 끝부분에서만 크로스페이드합니다. */
-      const local = elapsed - cell * FRAME_CELL_MS
-      const curKey = keys[cell % n]
-      const nextKey = keys[(cell + 1) % n]
+      // 음수 cell이 생기지 않도록 elapsed를 위에서 막았고, % 보정으로 인덱스를 항상 [0, n)에 둡니다.
+      const curIdx = ((cell % n) + n) % n
+      const curKey = keys[curIdx]
       const curEntry = atlas.frames[curKey]
-      const nextEntry = atlas.frames[nextKey]
 
       ctx.setTransform(1, 0, 0, 1, 0, 0)
       ctx.scale(dpr, dpr)
       ctx.imageSmoothingEnabled = true
+      ctx.imageSmoothingQuality = 'high'
+
+      // 부모 div에 깔린 배경 이미지가 비치도록 이전 프레임을 지웁니다(단색 채움은 배경을 가립니다).
       ctx.clearRect(0, 0, canvasW, canvasH)
 
-      if (local < FRAME_HOLD_MS || CROSSFADE_MS <= 0) {
-        // 아직 다음 자세로 넘어가기 전 — 현재 프레임만 선명하게 그립니다.
-        ctx.globalAlpha = 1
-        drawFrame(ctx, sheet, curEntry, canvasW, canvasH)
-      } else {
-        // 끝 구간: 이전 자세는 서서히 사라지고, 다음 자세가 서서히 드러납니다.
-        const rawMix = (local - FRAME_HOLD_MS) / CROSSFADE_MS
-        const mix = smoothstep01(rawMix)
-        ctx.globalAlpha = 1 - mix
-        drawFrame(ctx, sheet, curEntry, canvasW, canvasH)
-        ctx.globalAlpha = mix
-        drawFrame(ctx, sheet, nextEntry, canvasW, canvasH)
-        ctx.globalAlpha = 1
-      }
+      // 한 장만 그립니다. 두 장을 알파로 겹치면 가장자리가 매 프레임 섞여 반짝이는 현상이 잘 납니다.
+      drawFrame(ctx, sheet, curEntry, canvasW, canvasH)
     }
 
     let raf = 0
@@ -254,6 +302,7 @@ export default function BunnyRunLoader({
       role="status"
       aria-live="polite"
       aria-busy={!loadError}
+      aria-label="로딩 중"
     >
       {loadError ? (
         <div
@@ -271,16 +320,17 @@ export default function BunnyRunLoader({
             className={`flex items-center justify-center ${ready ? 'opacity-100' : 'opacity-0'}`.trim()}
             style={{ width: DISPLAY_CSS_W, height: DISPLAY_CSS_H }}
           >
-            <canvas ref={canvasRef} className="block max-h-full max-w-full" aria-hidden />
+            {/* translateZ(0): 일부 브라우저에서 캔버스를 별도 합성 레이어로 올려 깜빡임을 줄일 수 있습니다. */}
+            <canvas
+              ref={canvasRef}
+              className="block max-h-full max-w-full"
+              style={{ transform: 'translateZ(0)' }}
+              aria-hidden
+            />
           </div>
-
-          {!ready ? (
-            <p className="text-xs font-semibold text-gray-400">토끼 준비 중…</p>
-          ) : null}
+          <LoadingProgressBar percent={shownProgressPercent} />
         </>
       )}
-
-      <p className="text-sm font-bold text-gray-400">{message}</p>
     </div>
   )
 }

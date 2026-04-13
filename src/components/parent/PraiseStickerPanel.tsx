@@ -73,7 +73,7 @@ export default function PraiseStickerPanel({ childId, childName }: Props) {
         <div className="min-w-0 flex-1">
           <h2 className="text-sm font-bold text-brand-text">칭찬 스티커 보상</h2>
           <p className="mt-1 text-[11px] leading-snug text-gray-600">
-            스티커를 클릭하면 자녀에게 선물 할 수 있어요!
+            스티커를 클릭하면 선물할 수 있어요!
           </p>
         </div>
         <button
@@ -130,7 +130,7 @@ export default function PraiseStickerPanel({ childId, childName }: Props) {
       {confirmKey && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/40 p-6">
           <div className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl">
-            <p className="text-center text-base font-black text-brand-text">자녀에게 스티커를 선물하시겠어요?</p>
+            <p className="text-center text-base font-black text-brand-text">스티커를 선물하시겠어요?</p>
             <p className="mt-1 text-center text-xs text-gray-500">{childName}에게 전달돼요</p>
             <div className="mt-5 flex gap-2">
               <button
