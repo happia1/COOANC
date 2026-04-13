@@ -46,10 +46,10 @@ function applyPublicHolidayToEvent(
 ): { event: AgentParseEvent; changed: boolean } {
   const hit = expandYmdInclusive(ev.start_date, ev.end_date).some((d) => holidaySet.has(d))
   if (!hit) return { event: ev, changed: false }
-  return {
-    event: { ...ev, type: 'holiday', routine_off: true },
-    changed: true,
-  }
+  const next: AgentParseEvent = { ...ev, type: 'holiday', routine_off: true }
+  /** 이미 휴일·루틴끔이면 UI 안내(배너)는 생략 */
+  const changed = (ev.type || '').toLowerCase() !== 'holiday' || !ev.routine_off
+  return { event: next, changed }
 }
 
 /**
