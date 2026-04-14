@@ -965,7 +965,7 @@ export default function RoutineAgentSchedulePanel({
       pushAssistantText(`저는 일정 등록을 도와드리는
 루틴 도우미예요.
 날짜와 일정 내용을 입력하시거나
-학사일정표 사진을 올려주세요.`)
+일정과 관련된 사진을 올려주세요.`)
       return
     }
 
@@ -1051,7 +1051,7 @@ export default function RoutineAgentSchedulePanel({
       },
     ])
     bumpUnreadIfClosed(1)
-    onToast('입력 내용을 반영했어요. 아래 카드를 확인해 주세요')
+    /** TC-03: 키워드 폼 제출 시 토스트 없이 확인 블록만 바로 노출 */
     setShell('schedule_text')
   }
 
@@ -1619,7 +1619,7 @@ export default function RoutineAgentSchedulePanel({
                 ) : (
                   <div className="shrink-0 space-y-2 border-b border-gray-100 bg-white px-3 py-3">
                     <p className="text-center text-sm font-bold leading-snug text-gray-800">
-                      학사일정표나 가정통신문 사진을 올려 주시면 자동으로 읽어 드릴게요.
+                      일정 사진을 올려 주시면 자동으로 읽어 드릴게요.
                     </p>
                   </div>
                 )}

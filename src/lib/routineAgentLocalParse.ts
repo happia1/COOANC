@@ -34,6 +34,27 @@ const AMBIGUOUS = /다음달쯤|곧|언젠가|미정|추후|언제든|나중에|
 
 const CONJ = /(그리고|하지만|그런데|및|또한|그러나|또|그래서|그런|하지만|그러면)/g
 
+/** 일정 의도 판단용 최소 키워드(요청 사양) */
+const SCHEDULE_INTENT_WORDS = [
+  '등록',
+  '추가',
+  '넣어',
+  '일정',
+  '행사',
+  '여행',
+  '방학',
+  '병원',
+  '체육',
+  '소풍',
+  '기념일',
+  '생일',
+  '학교',
+  '유치원',
+  '출발',
+  '도착',
+  '예약',
+]
+
 /** 키워드 길이 내림차순으로 매칭하기 위해 정렬된 목록 */
 const KEYWORD_GROUPS: { type: EventType; words: string[] }[] = [
   {
@@ -497,6 +518,11 @@ function hasMappedKeyword(text: string): boolean {
   return matchedKeyword(text) != null
 }
 
+/** 날짜가 있어도 문장 자체가 일정 등록 의도인지 먼저 판별합니다 */
+function hasScheduleIntent(text: string): boolean {
+  return SCHEDULE_INTENT_WORDS.some((w) => text.includes(w))
+}
+
 function multipleSchedulesHeuristic(text: string): boolean {
   const c = (text.match(CONJ) || []).length
   if (c >= 2) return true
@@ -529,6 +555,8 @@ export function classifyTextBeforeApi(
   if (!t) return 'irrelevant'
   const hasDate = hasConfidentDatePattern(t)
   const hasKeyword = hasMappedKeyword(t)
+  const hasIntent = hasScheduleIntent(t)
+  if (!hasIntent) return 'irrelevant'
   if (!hasDate && hasKeyword) return 'missing_date'
   if (hasDate && !hasKeyword) return 'missing_content'
   if (!hasDate && !hasKeyword) return 'irrelevant'
