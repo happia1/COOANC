@@ -3,7 +3,7 @@
 /**
  * 루틴 탭 — 우측 하단에서 열리는 「챗봇」슬라이딩 패널입니다.
  * - Framer Motion 으로 오른쪽에서 패널이 들어옵니다. 패널·대화 스크롤 영역 배경은 흰색으로 통일합니다.
- * - 웰컴: 짧은 인사 + 「일정 등록」「루틴 관리」카드. 일정 등록 → 안내 말풍선 후 채팅·이미지 흐름. 루틴 관리 → 탭으로 `RoutineKeywordBuilderSheet`·`SpecialMissionAddSheet` 를 패널 안에 embedded 재사용.
+ * - 홈(STEP 0): 인사 + 「일정 등록」「루틴 관리」카드. 일정 등록은 메뉴→텍스트/이미지/빠른 키워드 스텝으로 나뉘며, 루틴 관리는 탭+주간 루틴 위저드로 `RoutineKeywordBuilderSheet`·`SpecialMissionAddSheet` 를 embedded 재사용합니다.
  * - 가로·세로 스크롤 **막대(슬라이드 바)** 는 `globals.css` 의 `.routine-agent-hide-scrollbar` 로 숨기되, 스크롤 동작은 그대로 둡니다.
  * - 부모 탭 `<main>` 이 스크롤 컨테이너라 막대가 오버레이 위에 겹칠 수 있어, 열릴 때 `overflow` 를 잠그고 z-index 를 시트들보다 높입니다.
  * - 텍스트·이미지는 `/agent-b/parse` 로 보냅니다. 한 건만 나오면 곧바로 DB 초안 + 제안이 붙고, 여러 건이면 `< 1/N >` 로 한 줄씩 확인한 뒤 [등록] 시 `/agent-b/commit-schedule` 로 저장합니다.
@@ -29,7 +29,6 @@ import {
 import { getSeoulDateString } from '@/lib/koreaDate'
 import { TOPBAR_LOGO_SRC } from '@/constants/branding'
 import { PARENT_TABS_MAIN_SCROLL_EL_ID } from '@/lib/parentTabsMainScrollId'
-import type { LocalCalendarEvent } from '@/types/database'
 import { COOANC_CALENDAR_EVENTS_STORAGE_KEY } from '@/lib/localStorageChildScope'
 import {
   RoutineAgentDateSlotPicker,
@@ -41,7 +40,9 @@ import {
   agentTypeToLocalCalendarType,
   agentTypeToPickerLabel,
   buildAgentParseResponseFromLocal,
+  buildDirectFormAuditLine,
   buildScheduleFromText,
+  localBuiltScheduleFromParentForm,
   normalizeAgentTypeForPicker,
   shouldCallAPI,
 } from '@/lib/routineAgentLocalParse'
@@ -52,8 +53,10 @@ import {
 } from '@/lib/syncAgentEventToLocalCalendar'
 import { enrichAgentParseResponseWithHolidayRoutineOff } from '@/lib/publicHolidaysRoutineOff'
 import { routineAgentImageParseAssistantMessage } from '@/lib/routineAgentImageParseErrors'
-import type { Mission } from '@/types/database'
-import RoutineKeywordBuilderSheet from '@/components/parent/RoutineKeywordBuilderSheet'
+import type { LocalCalendarEvent, Mission } from '@/types/database'
+import RoutineKeywordBuilderSheet, {
+  type RoutinePanelWizardStep,
+} from '@/components/parent/RoutineKeywordBuilderSheet'
 import SpecialMissionAddSheet from '@/components/parent/SpecialMissionAddSheet'
 
 type Props = {
@@ -75,14 +78,24 @@ type Props = {
   onPanelOpened?: () => void
 }
 
-/** 일정 등록 카드 클릭 후 채팅에 넣는 안내(줄바꿈 유지) */
-const SCHEDULE_REGISTER_INTRO = `날짜와 일정 내용을 입력하시거나
+/** 예전 버전에서 넣었던 안내 말풍선 — 스텝 UI로 바뀐 뒤에는 목록에서 숨깁니다 */
+const LEGACY_SCHEDULE_INTRO = `날짜와 일정 내용을 입력하시거나
 학사일정표 사진을 올려주세요.
 
 예) '4월 25일 체육대회'
     '다음주 토요일 가족여행'`
 
-type AgentPanelShell = 'welcome' | 'schedule_chat' | 'routine_manage'
+/** 패널 상단 스텝 — 홈 / 일정 등록 분기 / 루틴 관리 */
+type AgentPanelShell =
+  | 'welcome'
+  | 'schedule_menu'
+  | 'schedule_text'
+  | 'schedule_image'
+  | 'schedule_keyword'
+  | 'routine_manage'
+
+/** 빠른 입력 칩 → 에이전트 event_type 및 폼 기본값 */
+type KeywordPresetId = 'school' | 'travel' | 'vacation' | 'birthday' | 'etc'
 
 type SuggestionUi = AgentParseSuggestion & { status: 'pending' | 'approved' | 'rejected' }
 
@@ -469,22 +482,22 @@ function UnifiedScheduleConfirmCard(props: {
           <button
             type="button"
             disabled={busy}
-            onClick={() => setRoutineOffOn(true)}
-            className={`min-w-0 flex-1 rounded-lg py-1.5 text-[11px] font-black transition ${
-              routineOffOn ? 'bg-violet-500 text-white shadow-sm' : 'text-gray-500'
-            }`}
-          >
-            끄기
-          </button>
-          <button
-            type="button"
-            disabled={busy}
             onClick={() => setRoutineOffOn(false)}
             className={`min-w-0 flex-1 rounded-lg py-1.5 text-[11px] font-black transition ${
               !routineOffOn ? 'bg-sky-500 text-white shadow-sm' : 'text-gray-500'
             }`}
           >
             유지
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => setRoutineOffOn(true)}
+            className={`min-w-0 flex-1 rounded-lg py-1.5 text-[11px] font-black transition ${
+              routineOffOn ? 'bg-violet-500 text-white shadow-sm' : 'text-gray-500'
+            }`}
+          >
+            끄기
           </button>
         </div>
         <p className="mt-1 text-[9px] font-medium text-gray-400">
@@ -582,6 +595,40 @@ function newId() {
   return crypto.randomUUID()
 }
 
+/** 키워드 칩에 보이는 한글 제목 */
+function keywordPresetLabel(id: KeywordPresetId): string {
+  const map: Record<KeywordPresetId, string> = {
+    school: '행사',
+    travel: '여행',
+    vacation: '방학',
+    birthday: '기념일',
+    etc: '기타',
+  }
+  return map[id]
+}
+
+/** 로컬 캘린더 타입 — `localBuiltScheduleFromParentForm` 과 맞춥니다 */
+function keywordToCalendarType(id: KeywordPresetId): LocalCalendarEvent['eventType'] {
+  switch (id) {
+    case 'school':
+      return 'event'
+    case 'travel':
+      return 'travel'
+    case 'vacation':
+      return 'vacation'
+    case 'birthday':
+      return 'special'
+    case 'etc':
+    default:
+      return 'other'
+  }
+}
+
+/** 여행·방학은 기본으로 루틴 끄기(휴식), 나머지는 유지 */
+function defaultRoutineOffForPreset(id: KeywordPresetId): boolean {
+  return id === 'travel' || id === 'vacation'
+}
+
 export default function RoutineAgentSchedulePanel({
   open,
   onClose,
@@ -605,10 +652,18 @@ export default function RoutineAgentSchedulePanel({
   const [loading, setLoading] = useState(false)
   /** 통합 제안 카드에서 POST /agent-b/approve 연속 호출 중 — `parseMsgId` 또는 `parseMsgId:slotIndex` */
   const [suggestionSubmitKey, setSuggestionSubmitKey] = useState<string | null>(null)
-  /** 웰컴(카드 2개) / 일정 채팅 / 루틴·스페셜 탭 */
+  /** 홈 / 일정 스텝 / 루틴 관리 */
   const [shell, setShell] = useState<AgentPanelShell>('welcome')
-  /** 루틴 관리 — 일반 루틴 vs 스페셜 미션 */
+  /** 루틴 관리 — 주간 루틴 vs 스페셜 미션 */
   const [routineSubTab, setRoutineSubTab] = useState<'routine' | 'special'>('routine')
+  /** 주간 루틴 탭 안 단계(위저드) — `RoutineKeywordBuilderSheet` 와 동기 */
+  const [weeklyWizardStep, setWeeklyWizardStep] = useState<RoutinePanelWizardStep>('route')
+  /** STEP 1A-3 빠른 키워드가 고른 preset — null 이면 키워드 폼 비표시 */
+  const [keywordPreset, setKeywordPreset] = useState<KeywordPresetId | null>(null)
+  const [kwTitle, setKwTitle] = useState('')
+  const [kwDate, setKwDate] = useState('')
+  const [kwRoutineOff, setKwRoutineOff] = useState(false)
+  const [kwDesc, setKwDesc] = useState('')
   /**
    * 다건 일정 카드에서 [수정하기] 로 연 필드 임시값.
    * parse 말풍선 id + 슬롯 인덱스가 일치할 때만 해당 슬롯 위에 편집 폼을 띄웁니다.
@@ -689,6 +744,12 @@ export default function RoutineAgentSchedulePanel({
     if (fileRef.current) fileRef.current.value = ''
     setShell('welcome')
     setRoutineSubTab('routine')
+    setWeeklyWizardStep('route')
+    setKeywordPreset(null)
+    setKwTitle('')
+    setKwDate('')
+    setKwRoutineOff(false)
+    setKwDesc('')
     setMultiEdit(null)
   }, [])
 
@@ -719,30 +780,6 @@ export default function RoutineAgentSchedulePanel({
     if (!open) return
     listEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, loading, open, shell])
-
-  const onPickImage = (e: React.ChangeEvent<HTMLInputElement>) => {
-    void (async () => {
-      const f = e.target.files?.[0]
-      if (!f) return
-      if (!f.type.startsWith('image/')) {
-        onToast('이미지 파일만 선택할 수 있어요', false)
-        return
-      }
-      const compressed = await compressImageFileToJpegPayload(f)
-      if (compressed) {
-        setImagePreview(compressed.previewUrl)
-        setImageBase64(compressed.base64)
-        return
-      }
-      const reader = new FileReader()
-      reader.onload = () => {
-        const r = String(reader.result ?? '')
-        setImagePreview(r)
-        setImageBase64(stripDataUrlBase64(r))
-      }
-      reader.readAsDataURL(f)
-    })()
-  }
 
   /** `/agent-b/parse` 공통 호출 — 성공 시 파싱 결과 말풍선을 붙입니다 */
   const runParse = async (body: {
@@ -848,72 +885,214 @@ export default function RoutineAgentSchedulePanel({
     }
   }
 
-  /** 채팅창에서 [보내기] — 텍스트와(선택) 이미지를 함께 보냅니다 */
+  /**
+   * 이미지 선택 — STEP 1A-2 에서만 쓰이며, 선택 직후 Vision 파싱(`runParse`)을 호출합니다.
+   * `runParse` 정의 뒤에 두어 호출 순서 오류를 막습니다.
+   */
+  const onPickImage = (e: React.ChangeEvent<HTMLInputElement>) => {
+    void (async () => {
+      const f = e.target.files?.[0]
+      if (!f) return
+      if (!f.type.startsWith('image/')) {
+        onToast('이미지 파일만 선택할 수 있어요', false)
+        return
+      }
+      const fireScheduleImageParse = async (previewUrl: string, b64: string) => {
+        setImagePreview(previewUrl)
+        setImageBase64(b64)
+        if (shell !== 'schedule_image' || !familyLinkId || !childId) return
+        setMessages((prev) => [...prev, { id: newId(), kind: 'text', role: 'user', text: '이미지를 보냈어요' }])
+        await runParse({
+          family_link_id: familyLinkId,
+          child_id: childId,
+          input_type: 'image',
+          image_base64: b64,
+        })
+        setImagePreview(null)
+        setImageBase64(null)
+        if (fileRef.current) fileRef.current.value = ''
+      }
+
+      const compressed = await compressImageFileToJpegPayload(f)
+      if (compressed) {
+        await fireScheduleImageParse(compressed.previewUrl, compressed.base64)
+        return
+      }
+      const reader = new FileReader()
+      reader.onload = () => {
+        const r = String(reader.result ?? '')
+        void fireScheduleImageParse(r, stripDataUrlBase64(r))
+      }
+      reader.readAsDataURL(f)
+    })()
+  }
+
+  /** STEP 1A-1 텍스트 [보내기] — 로컬 파싱 후 필요 시에만 Gemini */
   const handleSendComposer = async () => {
     if (!familyLinkId || !childId) {
       onToast('가족 연결 정보를 찾을 수 없어요. 잠시 후 다시 시도해 주세요.', false)
       return
     }
     const trimmed = composerText.trim()
-    const hasImg = Boolean(imageBase64 && imageBase64.length > 0)
-    if (!hasImg && !trimmed) {
-      onToast('메시지를 입력하거나 이미지를 첨부해 주세요', false)
+    if (!trimmed) {
+      onToast('메시지를 입력해 주세요', false)
       return
     }
-    setMessages((prev) => [...prev, { id: newId(), kind: 'text', role: 'user', text: trimmed || '(이미지 첨부)' }])
+    setMessages((prev) => [...prev, { id: newId(), kind: 'text', role: 'user', text: trimmed }])
     setComposerText('')
-    const b64 = imageBase64
-    setImagePreview(null)
-    setImageBase64(null)
-    if (fileRef.current) fileRef.current.value = ''
 
-    if (hasImg) {
-      await runParse({
-        family_link_id: familyLinkId,
-        child_id: childId,
-        input_type: 'image',
-        image_base64: b64!,
-        text_input: trimmed || undefined,
-      })
-    } else {
-      /** 날짜·행사 키워드가 분명하면 브라우저에서만 JSON 을 만들고, 애매할 때만 에이전트를 부릅니다 */
-      if (!shouldCallAPI(trimmed, false)) {
-        const localPlan = buildScheduleFromText(trimmed)
-        if (localPlan) {
-          const resLocal = buildAgentParseResponseFromLocal(localPlan)
-          const res = await enrichAgentParseResponseWithHolidayRoutineOff(resLocal)
-          const sug: SuggestionUi[] = (res.suggestions ?? []).map((s) => ({ ...s, status: 'pending' as const }))
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: newId(),
-              kind: 'parse',
-              role: 'assistant',
-              parseResult: res,
-              suggestions: sug,
-              deferCalendarSync: true,
-              calendarRowId: null,
-            },
-          ])
-          bumpUnreadIfClosed(1)
-          onToast('문장을 바로 해석했어요. 아래에서 확인 후 등록해 주세요')
-          return
-        }
+    if (!shouldCallAPI(trimmed, false)) {
+      const localPlan = buildScheduleFromText(trimmed)
+      if (localPlan) {
+        const resLocal = buildAgentParseResponseFromLocal(localPlan)
+        const res = await enrichAgentParseResponseWithHolidayRoutineOff(resLocal)
+        const sug: SuggestionUi[] = (res.suggestions ?? []).map((s) => ({ ...s, status: 'pending' as const }))
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: newId(),
+            kind: 'parse',
+            role: 'assistant',
+            parseResult: res,
+            suggestions: sug,
+            deferCalendarSync: true,
+            calendarRowId: null,
+          },
+        ])
+        bumpUnreadIfClosed(1)
+        onToast('문장을 바로 해석했어요. 아래에서 확인 후 등록해 주세요')
+        return
       }
-      await runParse({
-        family_link_id: familyLinkId,
-        child_id: childId,
-        input_type: 'text',
-        text_input: trimmed,
-      })
     }
+    await runParse({
+      family_link_id: familyLinkId,
+      child_id: childId,
+      input_type: 'text',
+      text_input: trimmed,
+    })
   }
 
-  /** 루틴 관리 탭에서 취소·저장 후 웰컴으로 */
+  /** STEP 1A-3 키워드 폼 [등록하기] — ISO 날짜가 맞으면 로컬 초안, 아니면 API */
+  const handleKeywordFormSubmit = async () => {
+    if (!familyLinkId || !childId || !keywordPreset) {
+      onToast('가족 연결 정보를 찾을 수 없어요. 잠시 후 다시 시도해 주세요.', false)
+      return
+    }
+    const title = kwTitle.trim()
+    if (!title) {
+      onToast('일정 이름을 입력해 주세요', false)
+      return
+    }
+    const built = localBuiltScheduleFromParentForm({
+      title,
+      start_date: kwDate.trim(),
+      end_date: kwDate.trim(),
+      calendarEventType: keywordToCalendarType(keywordPreset),
+      routine_off: kwRoutineOff,
+      note: kwDesc.trim(),
+    })
+    if (!built) {
+      onToast('날짜를 YYYY-MM-DD 형식으로 입력해 주세요', false)
+      return
+    }
+    const audit = buildDirectFormAuditLine({
+      title,
+      start: kwDate.trim(),
+      end: kwDate.trim(),
+      eventLabel: keywordPresetLabel(keywordPreset),
+      description: kwDesc.trim(),
+    })
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: newId(),
+        kind: 'text',
+        role: 'user',
+        text: `[${keywordPresetLabel(keywordPreset)}] ${title}`,
+      },
+    ])
+    if (!shouldCallAPI(audit, false)) {
+      const resLocal = buildAgentParseResponseFromLocal(built)
+      const res = await enrichAgentParseResponseWithHolidayRoutineOff(resLocal)
+      const sug: SuggestionUi[] = (res.suggestions ?? []).map((s) => ({ ...s, status: 'pending' as const }))
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: newId(),
+          kind: 'parse',
+          role: 'assistant',
+          parseResult: res,
+          suggestions: sug,
+          deferCalendarSync: true,
+          calendarRowId: null,
+        },
+      ])
+      bumpUnreadIfClosed(1)
+      onToast('입력 내용을 반영했어요. 아래 카드를 확인해 주세요')
+      setShell('schedule_text')
+      return
+    }
+    await runParse({
+      family_link_id: familyLinkId,
+      child_id: childId,
+      input_type: 'text',
+      text_input: audit,
+    })
+    setShell('schedule_text')
+  }
+
+  /** 루틴 관리 탭에서 나가면 홈(STEP 0)으로 */
   const closeRoutineEmbedded = useCallback(() => {
     setShell('welcome')
     setRoutineSubTab('routine')
+    setWeeklyWizardStep('route')
   }, [])
+
+  /** 처음 루틴 관리로 들어올 때만 주간 위저드를 1단계로 초기화(탭 안에서 뒤로 이동한 상태는 유지) */
+  const prevShellRef = useRef<AgentPanelShell>('welcome')
+  useEffect(() => {
+    if (shell === 'routine_manage' && prevShellRef.current !== 'routine_manage') {
+      setWeeklyWizardStep('route')
+    }
+    prevShellRef.current = shell
+  }, [shell])
+
+  /** 상단 [← 이전] — 스텝 스택을 한 단계만 줄입니다 */
+  const goBack = useCallback(() => {
+    if (shell === 'welcome') return
+    if (shell === 'schedule_menu') {
+      setShell('welcome')
+      return
+    }
+    if (shell === 'schedule_text' || shell === 'schedule_image' || shell === 'schedule_keyword') {
+      if (shell === 'schedule_keyword') setKeywordPreset(null)
+      setShell('schedule_menu')
+      return
+    }
+    if (shell === 'routine_manage') {
+      if (routineSubTab === 'special') {
+        closeRoutineEmbedded()
+        return
+      }
+      if (weeklyWizardStep === 'holiday' || weeklyWizardStep === 'holiday_direct') {
+        setWeeklyWizardStep(weeklyWizardStep === 'holiday_direct' ? 'route' : 'weekend')
+        return
+      }
+      if (weeklyWizardStep === 'weekend') {
+        setWeeklyWizardStep('weekday')
+        return
+      }
+      if (weeklyWizardStep === 'weekday') {
+        setWeeklyWizardStep('route')
+        return
+      }
+      if (weeklyWizardStep === 'done') {
+        setWeeklyWizardStep('route')
+        return
+      }
+      closeRoutineEmbedded()
+    }
+  }, [shell, routineSubTab, weeklyWizardStep, closeRoutineEmbedded])
 
   /** 다건 스캔 중 한 줄을 DB 에 올리고, 그 줄에 대한 루틴 제안을 받아옵니다(말풍선에서 넘긴 slot/call 을 그대로 씀) */
   const handleMultiCommitSlot = async (
@@ -1273,6 +1452,11 @@ export default function RoutineAgentSchedulePanel({
 
   if (!mounted || typeof document === 'undefined') return null
 
+  /** 예전 안내 말풍선은 새 스텝 UI와 겹치므로 목록에서 제외합니다 */
+  const filteredMessages = messages.filter(
+    (m) => !(m.kind === 'text' && m.role === 'assistant' && m.text === LEGACY_SCHEDULE_INTRO),
+  )
+
   return createPortal(
     <AnimatePresence>
       {open ? (
@@ -1294,46 +1478,34 @@ export default function RoutineAgentSchedulePanel({
             transition={{ type: 'spring', damping: 28, stiffness: 300 }}
             onClick={(e) => e.stopPropagation()}
           >
-            {/* 상단 바: 파비콘 + 제목 + 닫기(브라우저 탭과 같은 아이콘) */}
-            <div className="flex shrink-0 items-center justify-between border-b border-gray-100 bg-white px-3 py-3">
-              <span className="flex min-w-0 items-center gap-2">
-                {/* eslint-disable-next-line @next/next/no-img-element -- 작은 브랜드 마크(`/assets/**`) */}
-                <img
-                  src={TOPBAR_LOGO_SRC}
-                  alt=""
-                  className="h-7 w-7 shrink-0 rounded-lg object-contain"
-                />
-                <p className="truncate text-sm font-black text-brand-text">루틴 도우미</p>
-              </span>
-              <button
-                type="button"
-                onClick={onClose}
-                className="rounded-lg px-2 py-1 text-xs font-bold text-gray-600 hover:bg-white/80"
-              >
-                닫기
-              </button>
-            </div>
-
-            {/* 일정 대화·루틴 관리: 웰컴(두 카드) 화면으로 돌아가기 — 일정은 말풍선 기록 유지 */}
-            {shell === 'schedule_chat' || shell === 'routine_manage' ? (
-              <div className="flex shrink-0 border-b border-gray-100 bg-gray-50/90 px-2 py-2">
+            {/* 모든 스텝 공통 상단: 홈만 [닫기], 그 외 [← 이전] */}
+            <div className="flex shrink-0 items-center gap-2 border-b border-gray-100 bg-gradient-to-r from-sky-50/50 to-violet-50/40 px-3 py-2.5">
+              {shell === 'welcome' ? (
                 <button
                   type="button"
-                  onClick={() => {
-                    if (shell === 'routine_manage') {
-                      closeRoutineEmbedded()
-                    } else {
-                      setShell('welcome')
-                    }
-                  }}
-                  className="rounded-lg px-3 py-2 text-left text-xs font-black text-gray-700 transition hover:bg-white active:scale-[0.99]"
+                  onClick={onClose}
+                  className="shrink-0 rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-black text-gray-800 shadow-sm active:scale-[0.99]"
                 >
-                  이전으로
+                  닫기
                 </button>
-              </div>
-            ) : null}
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => goBack()}
+                  className="shrink-0 rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-black text-gray-800 shadow-sm active:scale-[0.99]"
+                >
+                  ← 이전
+                </button>
+              )}
+              <span className="flex min-w-0 flex-1 items-center justify-center gap-2">
+                {/* eslint-disable-next-line @next/next/no-img-element -- 작은 브랜드 마크(`/assets/**`) */}
+                <img src={TOPBAR_LOGO_SRC} alt="" className="h-6 w-6 shrink-0 rounded-md object-contain" />
+                <span className="truncate text-xs font-black text-brand-text">루틴 도우미</span>
+              </span>
+              <span className="w-[3.25rem] shrink-0" aria-hidden />
+            </div>
 
-            {/* 웰컴: 짧은 인사 + 일정 등록 / 루틴 관리 카드(모바일 1열, 넓은 화면 2열) */}
+            {/* STEP 0 — 홈 */}
             {shell === 'welcome' ? (
               <div className="shrink-0 space-y-4 border-b border-gray-100 bg-white px-3 pb-4 pt-4">
                 <p className="text-center text-[15px] font-bold leading-snug text-gray-800">
@@ -1342,23 +1514,7 @@ export default function RoutineAgentSchedulePanel({
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <button
                     type="button"
-                    onClick={() => {
-                      setShell('schedule_chat')
-                      /** 이미 안내 말풍선이 있으면(이전으로 후 재입장 등) 같은 문구를 또 붙이지 않음 */
-                      const hasIntro = messages.some(
-                        (m) =>
-                          m.kind === 'text' &&
-                          m.role === 'assistant' &&
-                          m.text === SCHEDULE_REGISTER_INTRO,
-                      )
-                      if (!hasIntro) {
-                        setMessages((prev) => [
-                          ...prev,
-                          { id: newId(), kind: 'text', role: 'assistant', text: SCHEDULE_REGISTER_INTRO },
-                        ])
-                        bumpUnreadIfClosed(1)
-                      }
-                    }}
+                    onClick={() => setShell('schedule_menu')}
                     className="rounded-2xl border border-sky-200 bg-sky-50/95 px-4 py-4 text-center text-sm font-black text-sky-950 shadow-sm transition active:scale-[0.99]"
                   >
                     일정 등록
@@ -1379,12 +1535,84 @@ export default function RoutineAgentSchedulePanel({
               </div>
             ) : null}
 
-            {shell === 'schedule_chat' ? (
-              <>
-            {/* 대화창 전체 영역 — 스크롤 배경도 흰색으로 통일(스크롤바는 숨기고 위·아래 스크롤은 그대로) */}
-            <div className="routine-agent-hide-scrollbar min-h-0 flex-1 overflow-y-auto bg-white px-3 py-2">
+            {/* STEP 1A — 일정 등록 메뉴 */}
+            {shell === 'schedule_menu' ? (
+              <div className="routine-agent-hide-scrollbar flex min-h-0 flex-1 flex-col overflow-y-auto bg-white px-3 py-4">
+                <p className="mb-4 text-center text-sm font-bold text-gray-800">일정을 어떻게 등록하시겠어요?</p>
+                <div className="grid grid-cols-1 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShell('schedule_text')}
+                    className="rounded-2xl border border-sky-200 bg-sky-50/90 py-3 text-sm font-black text-sky-950 shadow-sm active:scale-[0.99]"
+                  >
+                    텍스트로 입력하기
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShell('schedule_image')}
+                    className="rounded-2xl border border-violet-200 bg-violet-50/90 py-3 text-sm font-black text-violet-950 shadow-sm active:scale-[0.99]"
+                  >
+                    이미지로 등록하기
+                  </button>
+                </div>
+                <div className="my-4 border-t border-gray-100" />
+                <p className="mb-2 text-center text-[11px] font-bold text-gray-500">빠른 입력</p>
+                <div className="flex flex-wrap justify-center gap-2">
+                  {(
+                    [
+                      ['school', '행사'],
+                      ['travel', '여행'],
+                      ['vacation', '방학'],
+                      ['birthday', '기념일'],
+                      ['etc', '기타'],
+                    ] as const
+                  ).map(([id, label]) => (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => {
+                        setKeywordPreset(id)
+                        setKwTitle('')
+                        setKwDate('')
+                        setKwRoutineOff(defaultRoutineOffForPreset(id))
+                        setKwDesc('')
+                        setShell('schedule_keyword')
+                      }}
+                      className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-[11px] font-black text-gray-700 shadow-sm active:scale-[0.99]"
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            {/* STEP 1A-1 텍스트 / STEP 1A-2 이미지 — 결과 카드는 동일 스크롤 영역 */}
+            {shell === 'schedule_text' || shell === 'schedule_image' ? (
+              <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+                {shell === 'schedule_text' ? (
+                  <div className="shrink-0 space-y-3 border-b border-gray-100 bg-white px-3 py-3">
+                    <p className="text-center text-sm font-bold text-gray-800">아래 형식으로 입력해 주세요.</p>
+                    <div className="rounded-2xl border border-sky-100 bg-sky-50/80 px-3 py-3 text-left shadow-sm ring-1 ring-sky-100/60">
+                      <p className="text-[11px] font-black text-sky-950">날짜 + 일정 내용</p>
+                      <p className="mt-2 whitespace-pre-wrap text-[10px] font-medium leading-relaxed text-gray-700">
+                        {`예) 4월 25일 체육대회
+다음주 토요일 여행
+7월 말부터 여름방학`}
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="shrink-0 space-y-2 border-b border-gray-100 bg-white px-3 py-3">
+                    <p className="text-center text-sm font-bold leading-snug text-gray-800">
+                      학사일정표나 가정통신문 사진을 올려 주시면 자동으로 읽어 드릴게요.
+                    </p>
+                  </div>
+                )}
+                {/* 대화·등록 카드 스크롤(막대는 CSS 로 숨김) */}
+                <div className="routine-agent-hide-scrollbar min-h-0 flex-1 overflow-y-auto bg-white px-3 py-2">
               <ul className="flex flex-col gap-2">
-                {messages.map((m) => {
+                {filteredMessages.map((m) => {
                   if (m.kind === 'text') {
                     const isUser = m.role === 'user'
                     return (
@@ -1633,48 +1861,128 @@ export default function RoutineAgentSchedulePanel({
                 ) : null}
               </ul>
               <div ref={listEndRef} />
-            </div>
+                </div>
 
-            {/* 하단: 이미지 + 입력창 + 보내기 */}
-            <div className="shrink-0 border-t border-gray-100 bg-white px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2">
-              <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onPickImage} />
+                {shell === 'schedule_text' ? (
+                  <div className="shrink-0 border-t border-gray-100 bg-white px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2">
+                    <textarea
+                      value={composerText}
+                      onChange={(e) => setComposerText(e.target.value)}
+                      rows={3}
+                      placeholder="날짜와 일정을 입력해 주세요"
+                      className="routine-agent-hide-scrollbar mb-2 w-full resize-none rounded-xl border border-gray-200 bg-white px-2.5 py-2 text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-brand-blue/30"
+                    />
+                    <button
+                      type="button"
+                      disabled={loading}
+                      onClick={() => void handleSendComposer()}
+                      className="w-full rounded-xl bg-gradient-to-r from-sky-400 to-violet-400 py-3 text-xs font-black text-white shadow-md disabled:opacity-50"
+                    >
+                      보내기
+                    </button>
+                  </div>
+                ) : (
+                  <div className="shrink-0 border-t border-gray-100 bg-white px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-3">
+                    <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={onPickImage} />
+                    <button
+                      type="button"
+                      disabled={loading}
+                      onClick={() => fileRef.current?.click()}
+                      className="flex w-full items-center justify-center gap-2 rounded-2xl border border-violet-200 bg-violet-50 py-3 text-sm font-black text-violet-950 shadow-sm disabled:opacity-50"
+                    >
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="shrink-0 text-violet-700" aria-hidden>
+                        <path
+                          d="M4 7a2 2 0 0 1 2-2h2l1-1h6l1 1h2a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7Z"
+                          stroke="currentColor"
+                          strokeWidth="1.5"
+                          strokeLinejoin="round"
+                        />
+                        <circle cx="12" cy="13" r="3.25" stroke="currentColor" strokeWidth="1.5" />
+                      </svg>
+                      사진 선택하기
+                    </button>
+                    {imagePreview ? (
+                      // eslint-disable-next-line @next/next/no-img-element -- 로컬 미리보기
+                      <img src={imagePreview} alt="" className="mt-2 max-h-28 w-full rounded-lg object-contain ring-1 ring-violet-100" />
+                    ) : null}
+                  </div>
+                )}
+              </div>
+            ) : null}
 
-              <div className="mb-2 flex gap-2">
+            {/* STEP 1A-3 — 빠른 키워드 입력 폼 */}
+            {shell === 'schedule_keyword' && keywordPreset ? (
+              <div className="routine-agent-hide-scrollbar flex min-h-0 flex-1 flex-col overflow-y-auto bg-white px-3 py-3">
+                <p className="mb-3 text-center text-sm font-bold text-gray-900">
+                  {keywordPresetLabel(keywordPreset)} 일정을 등록해 드릴게요.
+                </p>
+                <div className="space-y-3 rounded-2xl border border-violet-100 bg-violet-50/40 p-3 shadow-sm ring-1 ring-violet-100/50">
+                  <label className="block text-[10px] font-black text-gray-600">
+                    일정 이름
+                    <input
+                      value={kwTitle}
+                      onChange={(e) => setKwTitle(e.target.value)}
+                      className="mt-1 w-full rounded-xl border border-gray-200 bg-white px-2.5 py-2 text-xs font-bold text-gray-900"
+                      placeholder="예) 체육대회"
+                    />
+                  </label>
+                  <label className="block text-[10px] font-black text-gray-600">
+                    날짜 (YYYY-MM-DD)
+                    <input
+                      type="date"
+                      value={kwDate}
+                      onChange={(e) => setKwDate(e.target.value)}
+                      className="mt-1 w-full rounded-xl border border-gray-200 bg-white px-2.5 py-2 text-xs font-bold text-gray-900"
+                    />
+                  </label>
+                  <div>
+                    <p className="text-[10px] font-black text-gray-600">루틴 설정</p>
+                    <div className="mt-1 flex rounded-xl border border-gray-200 bg-white p-0.5">
+                      <button
+                        type="button"
+                        onClick={() => setKwRoutineOff(false)}
+                        className={`min-w-0 flex-1 rounded-lg py-2 text-[11px] font-black ${
+                          !kwRoutineOff ? 'bg-sky-500 text-white shadow-sm' : 'text-gray-500'
+                        }`}
+                      >
+                        유지
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setKwRoutineOff(true)}
+                        className={`min-w-0 flex-1 rounded-lg py-2 text-[11px] font-black ${
+                          kwRoutineOff ? 'bg-violet-500 text-white shadow-sm' : 'text-gray-500'
+                        }`}
+                      >
+                        끄기
+                      </button>
+                    </div>
+                  </div>
+                  <label className="block text-[10px] font-black text-gray-600">
+                    추가 설명 (선택)
+                    <textarea
+                      value={kwDesc}
+                      onChange={(e) => setKwDesc(e.target.value)}
+                      rows={2}
+                      className="routine-agent-hide-scrollbar mt-1 w-full resize-none rounded-xl border border-gray-200 bg-white px-2.5 py-2 text-xs text-gray-900"
+                      placeholder="메모를 남길 수 있어요"
+                    />
+                  </label>
+                </div>
                 <button
                   type="button"
-                  onClick={() => fileRef.current?.click()}
-                  className="shrink-0 rounded-xl border border-sky-200 bg-sky-50 px-2.5 py-2 text-[10px] font-black leading-tight text-sky-900 shadow-sm active:scale-[0.98]"
-                  aria-label="이미지 첨부"
+                  disabled={loading}
+                  onClick={() => void handleKeywordFormSubmit()}
+                  className="mt-4 w-full rounded-xl bg-emerald-500 py-3 text-xs font-black text-white shadow-md disabled:opacity-50"
                 >
-                  사진
+                  등록하기
                 </button>
-                <textarea
-                  value={composerText}
-                  onChange={(e) => setComposerText(e.target.value)}
-                  rows={2}
-                  placeholder="메시지를 입력하세요"
-                  className="routine-agent-hide-scrollbar min-h-0 flex-1 resize-none rounded-xl border border-gray-200 bg-white px-2 py-2 text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-brand-blue/30"
-                />
               </div>
-              {imagePreview ? (
-                // eslint-disable-next-line @next/next/no-img-element -- 로컬 미리보기
-                <img src={imagePreview} alt="" className="mb-2 max-h-24 w-full rounded-lg object-contain ring-1 ring-sky-100" />
-              ) : null}
-              <button
-                type="button"
-                disabled={loading}
-                onClick={() => void handleSendComposer()}
-                className="w-full rounded-xl bg-gradient-to-r from-rose-300 to-sky-400 py-3 text-xs font-black text-white shadow-md disabled:opacity-50"
-              >
-                보내기
-              </button>
-            </div>
-              </>
             ) : null}
 
             {shell === 'routine_manage' && childId ? (
               <div className="flex min-h-0 flex-1 flex-col gap-2 border-t border-gray-100 bg-white px-2 pb-2 pt-2">
-                <div className="flex shrink-0 gap-2" role="tablist" aria-label="루틴 관리 하위 탭">
+                <div className="flex shrink-0 gap-1.5" role="tablist" aria-label="루틴 관리 하위 탭">
                   <button
                     type="button"
                     role="tab"
@@ -1686,7 +1994,7 @@ export default function RoutineAgentSchedulePanel({
                         : 'border-gray-200 bg-white text-gray-600'
                     }`}
                   >
-                    일반 루틴
+                    주간 루틴
                   </button>
                   <button
                     type="button"
@@ -1704,27 +2012,43 @@ export default function RoutineAgentSchedulePanel({
                 </div>
                 <div className="routine-agent-hide-scrollbar flex min-h-0 flex-1 flex-col overflow-hidden">
                   {routineSubTab === 'routine' ? (
-                    <RoutineKeywordBuilderSheet
-                      key={`agent-routine-kw-${childId}`}
-                      embedded
-                      open
-                      onClose={closeRoutineEmbedded}
-                      linkedChildId={childId}
-                      hasSchool={hasSchool}
-                      routineMissions={routineMissions}
-                      onSuccess={() => onToast('루틴이 업데이트됐어요!')}
-                    />
+                    <>
+                      <p className="shrink-0 px-1 pb-2 text-center text-[11px] font-medium leading-relaxed text-gray-600">
+                        아이의 일상 루틴을 설정해요. 주중과 주말/공휴일을 따로 설정할 수 있어요.
+                      </p>
+                      <RoutineKeywordBuilderSheet
+                        key={`agent-routine-kw-${childId}`}
+                        embedded
+                        embeddedPanelWizard
+                        wizardStep={weeklyWizardStep}
+                        onWizardStepChange={setWeeklyWizardStep}
+                        suppressCloseAfterSuccess
+                        open
+                        onClose={closeRoutineEmbedded}
+                        linkedChildId={childId}
+                        hasSchool={hasSchool}
+                        routineMissions={routineMissions}
+                        onSuccess={() => onToast('루틴이 업데이트됐어요!')}
+                      />
+                    </>
                   ) : (
-                    <SpecialMissionAddSheet
-                      key={`agent-routine-sp-${childId}`}
-                      embedded
-                      open
-                      onClose={closeRoutineEmbedded}
-                      childId={childId}
-                      specialMissions={specialMissions}
-                      onToast={onToast}
-                      successToastOverride="미션이 업데이트됐어요!"
-                    />
+                    <>
+                      <p className="shrink-0 px-1 pb-2 text-center text-[11px] font-medium leading-relaxed text-gray-600">
+                        매일 반복되는 특별 미션을 설정해요. 이벤트 키워드를 선택하거나 목록에서 직접 추가할 수 있어요.
+                      </p>
+                      <SpecialMissionAddSheet
+                        key={`agent-routine-sp-${childId}`}
+                        embedded
+                        embeddedMinimalChrome
+                        parentHandlesCloseOnSuccess
+                        open
+                        onClose={closeRoutineEmbedded}
+                        childId={childId}
+                        specialMissions={specialMissions}
+                        onToast={onToast}
+                        successToastOverride="스페셜 미션이 업데이트됐어요!"
+                      />
+                    </>
                   )}
                 </div>
               </div>

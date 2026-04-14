@@ -27,6 +27,10 @@ type Props = {
   embedded?: boolean
   /** 저장 성공 시(변경이 있을 때) 기본 토스트 대신 이 문구를 씁니다 */
   successToastOverride?: string
+  /** embedded 일 때 손잡이·제목 줄을 숨겨 패널 상단 레이아웃과 겹치지 않게 합니다 */
+  embeddedMinimalChrome?: boolean
+  /** true면 저장 성공 후 `onClose` 를 호출하지 않아 패널이 열린 채로 유지됩니다 */
+  parentHandlesCloseOnSuccess?: boolean
 }
 
 export default function SpecialMissionAddSheet({
@@ -37,6 +41,8 @@ export default function SpecialMissionAddSheet({
   onToast,
   embedded = false,
   successToastOverride,
+  embeddedMinimalChrome = false,
+  parentHandlesCloseOnSuccess = false,
 }: Props) {
   const router = useRouter()
   const [selectedIds, setSelectedIds] = useState<string[]>([])
@@ -184,13 +190,13 @@ export default function SpecialMissionAddSheet({
       } else {
         onToast('변경할 내용이 없어요')
       }
-      onClose()
+      if (!parentHandlesCloseOnSuccess) onClose()
     } catch {
       onToast('네트워크 오류가 발생했어요', false)
     } finally {
       setLoading(false)
     }
-  }, [childId, selectedIds, dailyAutoIds, router, onToast, onClose, successToastOverride])
+  }, [childId, selectedIds, dailyAutoIds, router, onToast, onClose, successToastOverride, parentHandlesCloseOnSuccess])
 
   if (!open) return null
 
@@ -207,12 +213,20 @@ export default function SpecialMissionAddSheet({
         embedded ? 'h-full max-h-full rounded-xl border border-gray-100' : 'max-h-[88vh] rounded-t-2xl'
       }`}
     >
-        <div className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-gray-200" aria-hidden />
-        <div className="border-b border-gray-100 px-4 pb-2 pt-3">
-          <p id="sp-sheet-title" className="text-center text-sm font-black text-gray-900">
+        {embedded && embeddedMinimalChrome ? (
+          <div className="sr-only" id="sp-sheet-title">
             스페셜 미션
-          </p>
-        </div>
+          </div>
+        ) : (
+          <>
+            <div className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-gray-200" aria-hidden />
+            <div className="border-b border-gray-100 px-4 pb-2 pt-3">
+              <p id="sp-sheet-title" className="text-center text-sm font-black text-gray-900">
+                스페셜 미션
+              </p>
+            </div>
+          </>
+        )}
 
         <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-3 pb-3 pt-2">
           <div className="rounded-xl border border-gray-100 bg-white p-2 shadow-sm">
