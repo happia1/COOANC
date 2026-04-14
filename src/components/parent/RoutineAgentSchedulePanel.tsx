@@ -89,6 +89,7 @@ type AgentPanelShell =
   | 'welcome'
   | 'schedule_menu'
   | 'schedule_text'
+  | 'chat'
   | 'schedule_image'
   | 'schedule_keyword'
   | 'routine_manage'
@@ -1051,8 +1052,8 @@ export default function RoutineAgentSchedulePanel({
       },
     ])
     bumpUnreadIfClosed(1)
-    /** TC-03: 키워드 폼 제출 시 토스트 없이 확인 블록만 바로 노출 */
-    setShell('schedule_text')
+    /** TC-03: 키워드 폼 등록 후 팝업 없이 확인 카드만 보이는 채팅 화면으로 전환 */
+    setShell('chat')
   }
 
   /** 루틴 관리 탭에서 나가면 홈(STEP 0)으로 */
@@ -1078,7 +1079,7 @@ export default function RoutineAgentSchedulePanel({
       setShell('welcome')
       return
     }
-    if (shell === 'schedule_text' || shell === 'schedule_image' || shell === 'schedule_keyword') {
+    if (shell === 'schedule_text' || shell === 'chat' || shell === 'schedule_image' || shell === 'schedule_keyword') {
       setKeywordPreset(null)
       setShell('schedule_menu')
       return
@@ -1602,7 +1603,7 @@ export default function RoutineAgentSchedulePanel({
             ) : null}
 
             {/* STEP 1A-1 텍스트 / STEP 1A-2 이미지 — 결과 카드는 동일 스크롤 영역 */}
-            {shell === 'schedule_text' || shell === 'schedule_image' ? (
+            {shell === 'schedule_text' || shell === 'chat' || shell === 'schedule_image' ? (
               <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
                 {shell === 'schedule_text' ? (
                   <div className="shrink-0 space-y-3 border-b border-gray-100 bg-white px-3 py-3">
@@ -1616,13 +1617,13 @@ export default function RoutineAgentSchedulePanel({
                       </p>
                     </div>
                   </div>
-                ) : (
+                ) : shell === 'schedule_image' ? (
                   <div className="shrink-0 space-y-2 border-b border-gray-100 bg-white px-3 py-3">
                     <p className="text-center text-sm font-bold leading-snug text-gray-800">
-                      일정 사진을 올려 주시면 자동으로 읽어 드릴게요.
+                      일정과 관련된 사진을 올려 주시면 자동으로 읽어 드려요.
                     </p>
                   </div>
-                )}
+                ) : null}
                 {/* 대화·등록 카드 스크롤(막대는 CSS 로 숨김) */}
                 <div className="routine-agent-hide-scrollbar min-h-0 flex-1 overflow-y-auto bg-white px-3 py-2">
               <ul className="flex flex-col gap-2">
@@ -1877,7 +1878,7 @@ export default function RoutineAgentSchedulePanel({
               <div ref={listEndRef} />
                 </div>
 
-                {shell === 'schedule_text' ? (
+                {shell === 'schedule_text' || shell === 'chat' ? (
                   <div className="shrink-0 border-t border-gray-100 bg-white px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2">
                     <textarea
                       value={composerText}
