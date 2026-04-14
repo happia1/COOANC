@@ -27,7 +27,6 @@ import {
   type AgentParseSuggestion,
 } from '@/lib/agentApi'
 import { getSeoulDateString } from '@/lib/koreaDate'
-import { TOPBAR_LOGO_SRC } from '@/constants/branding'
 import { PARENT_TABS_MAIN_SCROLL_EL_ID } from '@/lib/parentTabsMainScrollId'
 import { COOANC_CALENDAR_EVENTS_STORAGE_KEY } from '@/lib/localStorageChildScope'
 import {
@@ -40,8 +39,8 @@ import {
   agentTypeToLocalCalendarType,
   agentTypeToPickerLabel,
   buildAgentParseResponseFromLocal,
-  buildDirectFormAuditLine,
   buildScheduleFromText,
+  classifyTextBeforeApi,
   localBuiltScheduleFromParentForm,
   normalizeAgentTypeForPicker,
   shouldCallAPI,
@@ -661,7 +660,9 @@ export default function RoutineAgentSchedulePanel({
   /** STEP 1A-3 빠른 키워드가 고른 preset — null 이면 키워드 폼 비표시 */
   const [keywordPreset, setKeywordPreset] = useState<KeywordPresetId | null>(null)
   const [kwTitle, setKwTitle] = useState('')
-  const [kwDate, setKwDate] = useState('')
+  /** 키워드 폼: 시작일/종료일을 분리해 TC-03 종료일 입력 버그를 방지 */
+  const [kwStartDate, setKwStartDate] = useState('')
+  const [kwEndDate, setKwEndDate] = useState('')
   const [kwRoutineOff, setKwRoutineOff] = useState(false)
   const [kwDesc, setKwDesc] = useState('')
   /**
@@ -747,7 +748,8 @@ export default function RoutineAgentSchedulePanel({
     setWeeklyWizardStep('route')
     setKeywordPreset(null)
     setKwTitle('')
-    setKwDate('')
+    setKwStartDate('')
+    setKwEndDate('')
     setKwRoutineOff(false)
     setKwDesc('')
     setMultiEdit(null)
@@ -774,6 +776,12 @@ export default function RoutineAgentSchedulePanel({
     },
     [onAssistantRepliesWhileClosed],
   )
+
+  /** 요구 메시지를 말풍선으로 즉시 보여 줄 때 공통으로 씁니다 */
+  function pushAssistantText(text: string) {
+    setMessages((prev) => [...prev, { id: newId(), kind: 'text', role: 'assistant', text }])
+    bumpUnreadIfClosed(1)
+  }
 
   /** 새 말풍선이 생기면 목록 맨 아래로 스크롤 */
   useEffect(() => {
@@ -941,6 +949,26 @@ export default function RoutineAgentSchedulePanel({
     setMessages((prev) => [...prev, { id: newId(), kind: 'text', role: 'user', text: trimmed }])
     setComposerText('')
 
+    /** TC-05~07: API 호출 전에 프론트에서 즉시 분기합니다 */
+    const precheck = classifyTextBeforeApi(trimmed)
+    if (precheck === 'missing_date') {
+      pushAssistantText(`날짜가 언제인가요?
+예) 4월 25일, 다음주 토요일`)
+      return
+    }
+    if (precheck === 'missing_content') {
+      pushAssistantText(`어떤 일정인가요?
+예) 체육대회, 가족여행, 병원`)
+      return
+    }
+    if (precheck === 'irrelevant') {
+      pushAssistantText(`저는 일정 등록을 도와드리는
+루틴 도우미예요.
+날짜와 일정 내용을 입력하시거나
+학사일정표 사진을 올려주세요.`)
+      return
+    }
+
     if (!shouldCallAPI(trimmed, false)) {
       const localPlan = buildScheduleFromText(trimmed)
       if (localPlan) {
@@ -972,7 +1000,7 @@ export default function RoutineAgentSchedulePanel({
     })
   }
 
-  /** STEP 1A-3 키워드 폼 [등록하기] — ISO 날짜가 맞으면 로컬 초안, 아니면 API */
+  /** STEP 1A-3 키워드 폼 [등록하기] — 키워드 선택값을 그대로 사용해 로컬에서 즉시 처리 */
   const handleKeywordFormSubmit = async () => {
     if (!familyLinkId || !childId || !keywordPreset) {
       onToast('가족 연결 정보를 찾을 수 없어요. 잠시 후 다시 시도해 주세요.', false)
@@ -985,8 +1013,8 @@ export default function RoutineAgentSchedulePanel({
     }
     const built = localBuiltScheduleFromParentForm({
       title,
-      start_date: kwDate.trim(),
-      end_date: kwDate.trim(),
+      start_date: kwStartDate.trim(),
+      end_date: kwEndDate.trim(),
       calendarEventType: keywordToCalendarType(keywordPreset),
       routine_off: kwRoutineOff,
       note: kwDesc.trim(),
@@ -995,13 +1023,6 @@ export default function RoutineAgentSchedulePanel({
       onToast('날짜를 YYYY-MM-DD 형식으로 입력해 주세요', false)
       return
     }
-    const audit = buildDirectFormAuditLine({
-      title,
-      start: kwDate.trim(),
-      end: kwDate.trim(),
-      eventLabel: keywordPresetLabel(keywordPreset),
-      description: kwDesc.trim(),
-    })
     setMessages((prev) => [
       ...prev,
       {
@@ -1011,33 +1032,26 @@ export default function RoutineAgentSchedulePanel({
         text: `[${keywordPresetLabel(keywordPreset)}] ${title}`,
       },
     ])
-    if (!shouldCallAPI(audit, false)) {
-      const resLocal = buildAgentParseResponseFromLocal(built)
-      const res = await enrichAgentParseResponseWithHolidayRoutineOff(resLocal)
-      const sug: SuggestionUi[] = (res.suggestions ?? []).map((s) => ({ ...s, status: 'pending' as const }))
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: newId(),
-          kind: 'parse',
-          role: 'assistant',
-          parseResult: res,
-          suggestions: sug,
-          deferCalendarSync: true,
-          calendarRowId: null,
-        },
-      ])
-      bumpUnreadIfClosed(1)
-      onToast('입력 내용을 반영했어요. 아래 카드를 확인해 주세요')
-      setShell('schedule_text')
-      return
-    }
-    await runParse({
-      family_link_id: familyLinkId,
-      child_id: childId,
-      input_type: 'text',
-      text_input: audit,
-    })
+    /**
+     * TC-03: 키워드 칩 폼은 `public_holidays` 자동 보정 없이,
+     * 사용자가 고른 키워드(event_type)를 그대로 사용합니다.
+     */
+    const res = buildAgentParseResponseFromLocal(built)
+    const sug: SuggestionUi[] = (res.suggestions ?? []).map((s) => ({ ...s, status: 'pending' as const }))
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: newId(),
+        kind: 'parse',
+        role: 'assistant',
+        parseResult: res,
+        suggestions: sug,
+        deferCalendarSync: true,
+        calendarRowId: null,
+      },
+    ])
+    bumpUnreadIfClosed(1)
+    onToast('입력 내용을 반영했어요. 아래 카드를 확인해 주세요')
     setShell('schedule_text')
   }
 
@@ -1478,31 +1492,28 @@ export default function RoutineAgentSchedulePanel({
             transition={{ type: 'spring', damping: 28, stiffness: 300 }}
             onClick={(e) => e.stopPropagation()}
           >
-            {/* 모든 스텝 공통 상단: 홈만 [닫기], 그 외 [← 이전] */}
+            {/* 모든 스텝 공통 상단: 왼쪽 < 이전(텍스트), 오른쪽 닫기(항상 노출) */}
             <div className="flex shrink-0 items-center gap-2 border-b border-gray-100 bg-gradient-to-r from-sky-50/50 to-violet-50/40 px-3 py-2.5">
-              {shell === 'welcome' ? (
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="shrink-0 rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-black text-gray-800 shadow-sm active:scale-[0.99]"
-                >
-                  닫기
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => goBack()}
-                  className="shrink-0 rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-black text-gray-800 shadow-sm active:scale-[0.99]"
-                >
-                  ← 이전
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={() => goBack()}
+                disabled={shell === 'welcome'}
+                className="shrink-0 text-xs font-medium text-gray-700 transition-opacity active:opacity-60 disabled:opacity-30"
+                aria-label="이전으로"
+              >
+                {'< 이전'}
+              </button>
               <span className="flex min-w-0 flex-1 items-center justify-center gap-2">
-                {/* eslint-disable-next-line @next/next/no-img-element -- 작은 브랜드 마크(`/assets/**`) */}
-                <img src={TOPBAR_LOGO_SRC} alt="" className="h-6 w-6 shrink-0 rounded-md object-contain" />
                 <span className="truncate text-xs font-black text-brand-text">루틴 도우미</span>
               </span>
-              <span className="w-[3.25rem] shrink-0" aria-hidden />
+              <button
+                type="button"
+                onClick={onClose}
+                className="shrink-0 text-xs font-medium text-gray-700 transition-opacity active:opacity-60"
+                aria-label="닫기"
+              >
+                닫기
+              </button>
             </div>
 
             {/* STEP 0 — 홈 */}
@@ -1573,7 +1584,10 @@ export default function RoutineAgentSchedulePanel({
                       onClick={() => {
                         setKeywordPreset(id)
                         setKwTitle('')
-                        setKwDate('')
+                        /** TC-03: 시작일/종료일 기본값은 오늘 날짜 */
+                        const today = getSeoulDateString()
+                        setKwStartDate(today)
+                        setKwEndDate(today)
                         setKwRoutineOff(defaultRoutineOffForPreset(id))
                         setKwDesc('')
                         setShell('schedule_keyword')
@@ -1927,11 +1941,25 @@ export default function RoutineAgentSchedulePanel({
                     />
                   </label>
                   <label className="block text-[10px] font-black text-gray-600">
-                    날짜 (YYYY-MM-DD)
+                    시작일 (YYYY-MM-DD)
                     <input
                       type="date"
-                      value={kwDate}
-                      onChange={(e) => setKwDate(e.target.value)}
+                      value={kwStartDate}
+                      onChange={(e) => {
+                        const nextStart = e.target.value
+                        setKwStartDate(nextStart)
+                        if (kwEndDate && kwEndDate < nextStart) setKwEndDate(nextStart)
+                      }}
+                      className="mt-1 w-full rounded-xl border border-gray-200 bg-white px-2.5 py-2 text-xs font-bold text-gray-900"
+                    />
+                  </label>
+                  <label className="block text-[10px] font-black text-gray-600">
+                    종료일 (YYYY-MM-DD)
+                    <input
+                      type="date"
+                      value={kwEndDate}
+                      min={kwStartDate}
+                      onChange={(e) => setKwEndDate(e.target.value)}
                       className="mt-1 w-full rounded-xl border border-gray-200 bg-white px-2.5 py-2 text-xs font-bold text-gray-900"
                     />
                   </label>

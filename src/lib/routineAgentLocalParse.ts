@@ -521,6 +521,20 @@ export function shouldCallAPI(input: string, hasImage: boolean): boolean {
   return false
 }
 
+/** 프론트 즉시응답용: 텍스트 입력을 API 호출 전에 1차 분류합니다 */
+export function classifyTextBeforeApi(
+  input: string,
+): 'ok' | 'missing_date' | 'missing_content' | 'irrelevant' {
+  const t = input.trim()
+  if (!t) return 'irrelevant'
+  const hasDate = hasConfidentDatePattern(t)
+  const hasKeyword = hasMappedKeyword(t)
+  if (!hasDate && hasKeyword) return 'missing_date'
+  if (hasDate && !hasKeyword) return 'missing_content'
+  if (!hasDate && !hasKeyword) return 'irrelevant'
+  return 'ok'
+}
+
 /** 로컬에서 만든 일정을 `postAgentParse` 와 같은 형태로 감쌉니다 */
 export function buildAgentParseResponseFromLocal(schedule: LocalBuiltSchedule): AgentParseResponse {
   const suggestions: AgentParseSuggestion[] = schedule.routine_off
