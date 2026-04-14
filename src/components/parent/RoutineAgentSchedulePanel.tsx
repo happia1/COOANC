@@ -1065,7 +1065,7 @@ export default function RoutineAgentSchedulePanel({
       return
     }
     if (shell === 'schedule_text' || shell === 'schedule_image' || shell === 'schedule_keyword') {
-      if (shell === 'schedule_keyword') setKeywordPreset(null)
+      setKeywordPreset(null)
       setShell('schedule_menu')
       return
     }
