@@ -1,0 +1,93 @@
+graph TD
+    subgraph User Interface
+        KidsUI[자녀 앱: 미션 수행, 보상 확인, 상점 이용]
+        ParentUI[부모 앱: 미션 설정, 승인/반려, 모니터링]
+    end
+
+    subgraph Core System
+        DB[(데이터베이스)]
+        ExternalAPI[외부 API: 배송, 결제]
+        RAG_KB[RAG 지식 베이스: 경제 교육 커리큘럼]
+    end
+
+    subgraph AI Agents LangGraph Orchestration
+        OnboardingAgent[온보딩 에이전트: 초기 설정]
+        ScheduleAgent[스케줄 에이전트: 일정 관리]
+        AnalysisAgent[분석/코칭 에이전트: 행동 분석]
+    end
+
+    subgraph Patentable Core Logic
+        MissionGeneration[멀티모달 미션 자동 생성]
+        DynamicReward[동적 보상 가치 산정]
+        ClosedLoopPayment[보호자 개입형 폐쇄 루프 결제]
+        AdaptiveUI[성취도 기반 적응형 UI 제어]
+    end
+
+    KidsUI -- 미션 수행 데이터 --> DB
+    ParentUI -- 미션 설정, 승인/반려 --> DB
+
+    DB -- 사용자 데이터 --> OnboardingAgent
+    OnboardingAgent -- 초기 루틴/보상 설정 --> DB
+
+    KidsUI -- 사진/음성/텍스트 입력 --> ScheduleAgent
+    ScheduleAgent -- 일정 분석 및 루틴 최적화 --> DB
+
+    DB -- 행동 데이터 --> AnalysisAgent
+    AnalysisAgent -- 커리큘럼 참조 --> RAG_KB
+    AnalysisAgent -- 부모 코칭 가이드 --> ParentUI
+
+    KidsUI -- 가상 재화 사용 --> ClosedLoopPayment
+    ClosedLoopPayment -- 보호자 승인 --> ExternalAPI
+    ExternalAPI -- 실제 소비/배송 --> KidsUI
+
+    DB -- 아동 성장 데이터 --> AdaptiveUI
+    AdaptiveUI -- UI/기능 동적 제어 --> KidsUI
+
+    MissionGeneration -- 미션 생성 --> DB
+    DynamicReward -- 보상 가치 산정 --> DB
+    ClosedLoopPayment -- 결제 로직 --> DB
+    AdaptiveUI -- UI 로직 --> DB
+
+    MissionGeneration -- (실생활 행동 기반) --> KidsUI
+    DynamicReward -- (가상 보상 전환) --> KidsUI
+    ClosedLoopPayment -- (실제 소비 연계) --> KidsUI
+
+    style MissionGeneration fill:#f9f,stroke:#333,stroke-width:2px
+    style DynamicReward fill:#f9f,stroke:#333,stroke-width:2px
+    style ClosedLoopPayment fill:#f9f,stroke:#333,stroke-width:2px
+    style AdaptiveUI fill:#f9f,stroke:#333,stroke-width:2px
+
+    linkStyle 10 stroke:#f9f,stroke-width:2px,color:red
+    linkStyle 11 stroke:#f9f,stroke-width:2px,color:red
+    linkStyle 12 stroke:#f9f,stroke-width:2px,color:red
+    linkStyle 13 stroke:#f9f,stroke-width:2px,color:red
+
+    classDef patentable fill:#FFD700,stroke:#DAA520,stroke-width:2px;
+    class MissionGeneration,DynamicReward,ClosedLoopPayment,AdaptiveUI patentable;
+
+    classDef agent fill:#ADD8E6,stroke:#87CEEB,stroke-width:2px;
+    class OnboardingAgent,ScheduleAgent,AnalysisAgent agent;
+
+    classDef ui fill:#90EE90,stroke:#3CB371,stroke-width:2px;
+    class KidsUI,ParentUI ui;
+
+    classDef core fill:#D3D3D3,stroke:#A9A9A9,stroke-width:2px;
+    class DB,ExternalAPI,RAG_KB core;
+
+    linkStyle 0,1,2,3,4,5,6,7,8,9,14,15,16,17 stroke:#666,stroke-width:1px;
+
+    subgraph "COO-ANC: 항해하는 경제 성장 플랫폼"
+        direction LR
+        KidsUI
+        ParentUI
+        DB
+        ExternalAPI
+        RAG_KB
+        OnboardingAgent
+        ScheduleAgent
+        AnalysisAgent
+        MissionGeneration
+        DynamicReward
+        ClosedLoopPayment
+        AdaptiveUI
+    end
