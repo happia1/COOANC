@@ -36,7 +36,7 @@ type Props = {
  * 아이 앱 홈 탭
  * - **한 화면**: 상단 풍경·하단 꾸미기가 **6:4** 비율(`flex-[6]`/`flex-[4]`)로 나뉨
  * - 섬 무대는 `ChildHomeIslandStage` 의 `density="flex"` 로 남는 세로 공간에 맞춤
- * - 배경: 미션 탭과 **같은** 큰 그림(`ASSETS.layouts.sharedAppBackground`, `background_01.png`)을 풀 블리드 셸 **뒤 한 겹**만 깝니다(`MissionTab` 의 `missionTabBackdrop` 와 동일). `ChildHomeSceneryBand` 는 캐릭터 무대만 담고 `showBackground={false}` 입니다. 옛 잔디·섬 합성 PNG는 `showIslandArt={false}` 로 끕니다.
+ * - 배경: 홈 전용 큰 그림(`ASSETS.layouts.childHomeBackgroundSecondScreen`, `second_screen_room_background.png`)을 풀 블리드 셸 **뒤 한 겹**만 깝니다. `ChildHomeSceneryBand` 는 캐릭터 무대만 담고 `showBackground={false}` 입니다. 옛 잔디·섬 합성 PNG는 `showIslandArt={false}` 로 끕니다.
  * - 칭찬 스티커(곰)는 무대 **오른쪽 상단**(기존 날씨 자리), 성장 지도는 무대 **왼쪽** 지도 단추로 엽니다.
  * - 부모가 칭찬 스티커를 내면 팝업 후 곰돌이 판에서 붙일 수 있음
  */
@@ -347,16 +347,22 @@ export default function HomeTab({
     'relative isolate -mx-4 -mt-4 box-border flex min-h-0 min-w-0 w-[calc(100%+2rem)] max-w-none flex-1 shrink-0 flex-col self-stretch overflow-visible'
 
   /**
-   * 홈 전체 뒤쪽 배경 — 미션 탭 `missionTabBackdrop` 과 같은 PNG·같은 깔기 방식입니다.
-   * (비개발자용) 아이가 보는 큰 하늘·풍경 그림이고, 버튼·캐릭터는 이 위 `z-[1]` 레이어에 있습니다.
+   * 홈 전체 뒤쪽 배경입니다.
+   * (비개발자용) 아이가 보는 방 배경 그림이고, 버튼·캐릭터는 이 위 `z-[1]` 레이어에 있습니다.
    */
+  /**
+   * 배경 그림이 화면에서 살짝 위로 올라가 보이도록 기준점을 아래쪽(세로 58%)으로 둡니다.
+   * - 비개발자용: 숫자를 50보다 크게 하면 그림이 위로, 작게 하면 아래로 움직인 것처럼 보입니다.
+   */
+  const homeBackgroundObjectPositionClass = 'object-cover object-[center_90%]'
+
   const homeTabFullBackground = (
     <div className="pointer-events-none absolute inset-0 z-0" aria-hidden>
       <Image
-        src={ASSETS.layouts.sharedAppBackground}
+        src={ASSETS.layouts.childHomeBackgroundSecondScreen}
         alt=""
         fill
-        className="object-cover object-center"
+        className={homeBackgroundObjectPositionClass}
         sizes="100vw"
         priority
       />
@@ -368,7 +374,7 @@ export default function HomeTab({
       <>
         <div className={homeFullBleedShellClass}>
           {homeTabFullBackground}
-          {/** 통계가 없을 때도 배경은 미션과 동일 PNG, 콘텐츠만 이 래퍼 위에 올립니다. */}
+          {/** 통계가 없을 때도 홈 전용 배경은 동일하게 깔고, 콘텐츠만 이 래퍼 위에 올립니다. */}
           <div className="relative z-[1] flex min-h-0 min-w-0 flex-1 flex-col">
             <ChildHomeSceneryBand edgeBleed={false} flexFill showBackground={false} ariaLabel="홈 상단">
               <div className="shrink-0 space-y-2 py-1 text-center">

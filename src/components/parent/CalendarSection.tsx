@@ -874,6 +874,13 @@ function EventDetailBottomSheet({
                 className={`rounded-2xl border border-gray-100 p-3 ${EVENT_COLORS[ev.eventType].bg}`}
               >
                 <p className={`text-sm font-black ${EVENT_COLORS[ev.eventType].text}`}>{ev.title}</p>
+                {isReadonlyPublicHoliday ? (
+                  <>
+                    {/* 법정 공휴일은 요청에 맞춰 최소 정보(이름 + 분류)만 단순 표시합니다. */}
+                    <p className="mt-1 text-[11px] font-bold text-gray-600">법정공휴일</p>
+                  </>
+                ) : (
+                <>
                 <p className="mt-1 text-[11px] font-bold text-gray-600">{EVENT_TYPE_LABELS[ev.eventType]}</p>
                 <p className="mt-1 text-xs text-gray-600">
                   기간: {ev.startDate} ~ {ev.endDate}
@@ -884,11 +891,6 @@ function EventDetailBottomSheet({
                 {ev.description?.trim() && (
                   <p className="mt-2 whitespace-pre-wrap text-xs leading-relaxed text-gray-600">{ev.description.trim()}</p>
                 )}
-                {isReadonlyPublicHoliday ? (
-                  <p className="mt-3 text-[11px] font-bold leading-snug text-gray-500">
-                    법정 공휴일은 편집하거나 삭제할 수 없어요.
-                  </p>
-                ) : (
                 <div className="mt-3 flex gap-2">
                   <button
                     type="button"
@@ -905,6 +907,7 @@ function EventDetailBottomSheet({
                     삭제
                   </button>
                 </div>
+                </>
                 )}
               </div>
               )

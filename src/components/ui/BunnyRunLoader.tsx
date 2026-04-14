@@ -165,8 +165,8 @@ export default function BunnyRunLoader({
   const keysRef = useRef<string[]>([])
   /** 애니메이션 타임라인 시작 시각 — requestAnimationFrame 으로 경과 시간을 잽니다. */
   const animStartRef = useRef(0)
-  /** 클라이언트에서 이 컴포넌트가 붙은 시각 — 내부 진행률 추정에 씁니다. */
-  const mountMsRef = useRef(performance.now())
+  /** 클라이언트에서 이 컴포넌트가 붙은 시각 — SSR/하이드레이션 불일치를 피하려고 마운트 후에만 채웁니다. */
+  const mountMsRef = useRef<number | null>(null)
   /** 토끼 PNG·JSON이 모두 끝난 시각 — 그 이후 구간의 막대 채움에 씁니다. */
   const assetsReadyAtRef = useRef<number | null>(null)
   /** 외부에서 진행률을 안 줄 때, 막대를 주기적으로 다시 그리기 위한 틱입니다. */
@@ -175,6 +175,8 @@ export default function BunnyRunLoader({
   // JSON + PNG 병렬 로드
   useEffect(() => {
     let cancelled = false
+    // 초기 SSR HTML과 첫 클라이언트 렌더 HTML을 같게 유지하기 위해, 시간 기준점은 이 시점에 기록합니다.
+    mountMsRef.current = performance.now()
 
     async function load() {
       const [jsonRes, img] = await Promise.all([
@@ -224,6 +226,8 @@ export default function BunnyRunLoader({
     progressPercentProp !== undefined
       ? Math.min(100, Math.max(0, progressPercentProp))
       : (() => {
+          // 아직 마운트 이펙트가 돌기 전(SSR + 첫 하이드레이션 렌더)은 0으로 고정해 마크업 불일치를 막습니다.
+          if (mountMsRef.current === null) return 0
           const now = performance.now()
           const sinceMount = now - mountMsRef.current
           if (!ready) {

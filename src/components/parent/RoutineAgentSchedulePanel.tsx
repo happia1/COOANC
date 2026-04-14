@@ -84,6 +84,9 @@ const LEGACY_SCHEDULE_INTRO = `날짜와 일정 내용을 입력하시거나
 예) '4월 25일 체육대회'
     '다음주 토요일 가족여행'`
 
+/** 루틴도우미 대화 내역 자동 리셋 시간(1시간) */
+const CHAT_HISTORY_RESET_MS = 60 * 60 * 1000
+
 /** 패널 상단 스텝 — 홈 / 일정 등록 분기 / 루틴 관리 */
 type AgentPanelShell =
   | 'welcome'
@@ -683,6 +686,10 @@ export default function RoutineAgentSchedulePanel({
   const listEndRef = useRef<HTMLDivElement>(null)
   /** 비동기(parse)가 끝날 때 패널이 열려 있는지 — 닫힌 뒤 완료되면 미읽음만 올립니다 */
   const openRef = useRef(open)
+  /** 마지막 대화 활동 시각(말풍선/입력/스텝 변화 등) */
+  const chatLastActiveAtRef = useRef<number>(Date.now())
+  /** 1시간 경과 시 대화를 비우는 타이머 핸들 */
+  const chatResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => {
     openRef.current = open
   }, [open])
@@ -757,6 +764,20 @@ export default function RoutineAgentSchedulePanel({
   }, [])
 
   /**
+   * 1시간 타이머를 다시 걸어, 시간이 지나면 대화를 자동으로 초기화합니다.
+   * - 기존 타이머가 있으면 지우고 다시 시작합니다.
+   */
+  const scheduleChatResetTimer = useCallback(() => {
+    if (chatResetTimerRef.current) clearTimeout(chatResetTimerRef.current)
+    const elapsed = Date.now() - chatLastActiveAtRef.current
+    const remain = Math.max(0, CHAT_HISTORY_RESET_MS - elapsed)
+    chatResetTimerRef.current = setTimeout(() => {
+      resetAll()
+      chatLastActiveAtRef.current = Date.now()
+    }, remain)
+  }, [resetAll])
+
+  /**
    * `childId` / `familyLinkId` 가 바뀌면 이전 아이와의 대화를 지우고 웰컴(카드) 화면으로 돌립니다.
    * (같은 아이로 루틴 탭을 벗어났다가 돌아오면 컴포넌트가 다시 마운트되면서 ref 가 초기화될 수 있어,
    *  그때도 한 번 초기화가 붙을 수 있습니다 — 의도된 “새 세션” 동작에 가깝습니다.)
@@ -767,6 +788,37 @@ export default function RoutineAgentSchedulePanel({
     if (agentSessionScopeRef.current === scope) return
     agentSessionScopeRef.current = scope
     resetAll()
+    chatLastActiveAtRef.current = Date.now()
+    scheduleChatResetTimer()
+  }, [childId, familyLinkId, resetAll, scheduleChatResetTimer])
+
+  /**
+   * 대화·입력 상태가 바뀌면 "활동 중"으로 보고 1시간 카운트를 다시 시작합니다.
+   * 비개발자: 채팅을 계속 쓰는 동안은 초기화되지 않고, 1시간 비활동일 때만 리셋됩니다.
+   */
+  useEffect(() => {
+    chatLastActiveAtRef.current = Date.now()
+    scheduleChatResetTimer()
+  }, [messages, composerText, imagePreview, imageBase64, shell, scheduleChatResetTimer])
+
+  /**
+   * 닫아 둔 상태에서 시간이 지났을 수 있으므로, 다시 열 때 만료 여부를 한 번 더 확인합니다.
+   */
+  useEffect(() => {
+    if (!open) return
+    const elapsed = Date.now() - chatLastActiveAtRef.current
+    if (elapsed >= CHAT_HISTORY_RESET_MS) {
+      resetAll()
+      chatLastActiveAtRef.current = Date.now()
+    }
+    scheduleChatResetTimer()
+  }, [open, resetAll, scheduleChatResetTimer])
+
+  /** 컴포넌트가 사라질 때 타이머를 정리해 메모리 누수를 막습니다. */
+  useEffect(() => {
+    return () => {
+      if (chatResetTimerRef.current) clearTimeout(chatResetTimerRef.current)
+    }
   }, [childId, familyLinkId, resetAll])
 
   /** 패널이 닫혀 있는 동안 새 AI 답장이 생기면 부모에게 숫자만 넘깁니다 */

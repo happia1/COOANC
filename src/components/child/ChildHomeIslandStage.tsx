@@ -402,23 +402,28 @@ export default function ChildHomeIslandStage({
           }
         >
           {density === 'flex' ? (
-            /** flex: 섬·무대 스케일과 별도로 캐릭터만 약간 축소(`scale(0.9)`) + 살짝 아래로 밀어 잔디와 맞춤 */
+            /**
+             * flex(홈 반응형) 캐릭터 위치 고정:
+             * - 기존 `translateY(2.45rem)` 고정값은 화면 높이 변화에서 러그 기준이 흔들릴 수 있어요.
+             * - `cqh`(컨테이너 높이 비율) + `clamp` 로 바꿔, 작아져도/커져도 같은 자리(러그 위)를 더 안정적으로 유지합니다.
+             * - 비개발자용: 화면이 바뀌어도 "캐릭터 발 위치"가 배경 기준으로 덜 떠다니게 고정하는 장치입니다.
+             */
             <div
               role="img"
               aria-label="나의 쿠앵이 캐릭터"
-              className="origin-bottom [transform:translateY(2.45rem)_scale(0.9)]"
+              className="origin-bottom [transform:translateY(clamp(1.9rem,9.2cqh,3.6rem))_scale(0.9)]"
             >
               <HomeIslandHeroSprite sprite={homeStageSprite} />
             </div>
           ) : (
             /**
              * 비-flex: 캐릭터만 뷰포트 너비 기준으로 살짝 키움/줄임(섬과 따로 놀지 않게 이미 상한을 둠).
-             * 세로는 flex 경로와 같은 느낌으로 `translateY` 를 조금 더 줍니다.
+             * 세로도 `clamp` 로 바꿔 화면 크기에 따라 부드럽게 따라가게 해서 러그 기준 이탈을 줄입니다.
              */
             <div
               role="img"
               aria-label="나의 쿠앵이 캐릭터"
-              className="origin-bottom [transform:translateY(2.85rem)_scale(calc(clamp(0.72,calc(min(100vw,20rem)/300),1.08)*0.9))]"
+              className="origin-bottom [transform:translateY(clamp(2.2rem,8.8vh,3.9rem))_scale(calc(clamp(0.72,calc(min(100vw,20rem)/300),1.08)*0.9))]"
             >
               <HomeIslandHeroSprite sprite={homeStageSprite} />
             </div>

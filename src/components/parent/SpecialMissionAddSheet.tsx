@@ -11,8 +11,13 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Mission } from '@/types/database'
 import { buildSpecialMissionDescription } from '@/lib/specialMissionDescription'
+import SpriteImage from '@/components/common/SpriteImage'
+import { MISSION_ROUTINES_ATLAS } from '@/constants/missionRoutineAtlas'
+import { missionRoutineIconFrame } from '@/lib/missionRoutineIconFrame'
+import { resolveRoutineMissionPngUrl } from '@/lib/routineMissionThumbnail'
 import {
   SPECIAL_MISSION_CHIPS,
+  SPECIAL_MISSION_CHIP_CATEGORIES,
   deriveSpecialMissionSheetState,
   type SpecialMissionSheetBaseline,
 } from '@/lib/specialMissionChips'
@@ -31,6 +36,40 @@ type Props = {
   embeddedMinimalChrome?: boolean
   /** true면 저장 성공 후 `onClose` 를 호출하지 않아 패널이 열린 채로 유지됩니다 */
   parentHandlesCloseOnSuccess?: boolean
+}
+
+/**
+ * 스페셜 미션 칩 아이콘
+ * - 자녀 앱 카드와 같은 규칙(제목 우선 PNG -> 아틀라스 폴백)으로 렌더링해
+ *   부모 앱의 선택 리스트와 자녀 앱 표시 이미지를 일치시킵니다.
+ */
+function SpecialMissionChipIcon({ title, fallbackEmoji }: { title: string; fallbackEmoji: string }) {
+  const png = resolveRoutineMissionPngUrl({ title, iconEmoji: null })
+  if (png) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element -- public 정적 미션 썸네일 직접 표시
+      <img src={png} alt="" className="h-6 w-6 object-contain" draggable={false} />
+    )
+  }
+
+  const frame = missionRoutineIconFrame(title, null)
+  if (frame) {
+    return (
+      <SpriteImage
+        sheet={MISSION_ROUTINES_ATLAS}
+        frame={frame}
+        width={24}
+        clipRotated={false}
+        className="h-6 w-6 select-none object-contain"
+      />
+    )
+  }
+
+  return (
+    <span className="text-lg leading-none" aria-hidden>
+      {fallbackEmoji}
+    </span>
+  )
 }
 
 export default function SpecialMissionAddSheet({
@@ -206,6 +245,7 @@ export default function SpecialMissionAddSheet({
 
   const dailyChips = selectedChips.filter((c) => dailyAutoIds.includes(c.id))
   const eventChips = selectedChips.filter((c) => !dailyAutoIds.includes(c.id))
+  const chipById = new Map(SPECIAL_MISSION_CHIPS.map((chip) => [chip.id, chip]))
 
   const card = (
     <div
@@ -231,27 +271,68 @@ export default function SpecialMissionAddSheet({
         <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-3 pb-3 pt-2">
           <div className="rounded-xl border border-gray-100 bg-white p-2 shadow-sm">
             <p className="mb-1.5 text-xs font-black text-gray-900">이벤트 미션 키워드</p>
-            <div className="-mx-1 overflow-x-auto pb-1 [scrollbar-width:thin]">
-              <div className="flex w-max min-w-full snap-x snap-mandatory gap-2 px-1">
-                {SPECIAL_MISSION_CHIPS.map((chip) => {
-                  const selected = selectedIds.includes(chip.id)
-                  return (
-                    <button
-                      key={chip.id}
-                      type="button"
-                      onClick={() => toggleChip(chip.id)}
-                      className={[
-                        'snap-start shrink-0 whitespace-nowrap rounded-full border px-2.5 py-1.5 text-[11px] font-bold transition-all',
-                        selected
-                          ? 'border-violet-500 bg-violet-50 text-violet-800'
-                          : 'border-gray-200 text-gray-400',
-                      ].join(' ')}
-                    >
-                      {chip.title}
-                    </button>
-                  )
-                })}
-              </div>
+            <div className="space-y-2">
+              {SPECIAL_MISSION_CHIP_CATEGORIES.map((category) => {
+                const chips = category.chipIds
+                  .map((chipId) => chipById.get(chipId))
+                  .filter((chip): chip is (typeof SPECIAL_MISSION_CHIPS)[number] => Boolean(chip))
+                if (chips.length === 0) return null
+                return (
+                  <section key={category.id} className="space-y-1">
+                    <p className="text-[11px] font-black text-gray-500">{category.label}</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {chips.map((chip) => {
+                        const selected = selectedIds.includes(chip.id)
+                        return (
+                          <button
+                            key={chip.id}
+                            type="button"
+                            onClick={() => toggleChip(chip.id)}
+                            className={[
+                              'rounded-full border px-2.5 py-1.5 text-[11px] font-bold transition-all',
+                              selected
+                                ? 'border-violet-500 bg-violet-50 text-violet-800'
+                                : 'border-gray-200 text-gray-400',
+                            ].join(' ')}
+                          >
+                            {chip.title}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </section>
+                )
+              })}
+              {/* 카테고리에 없는 칩이 생겨도 숨지 않도록 마지막에 기타로 노출 */}
+              {SPECIAL_MISSION_CHIPS.some(
+                (chip) => !SPECIAL_MISSION_CHIP_CATEGORIES.some((category) => category.chipIds.includes(chip.id)),
+              ) ? (
+                <section className="space-y-1">
+                  <p className="text-[11px] font-black text-gray-500">기타</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {SPECIAL_MISSION_CHIPS.filter(
+                      (chip) => !SPECIAL_MISSION_CHIP_CATEGORIES.some((category) => category.chipIds.includes(chip.id)),
+                    ).map((chip) => {
+                      const selected = selectedIds.includes(chip.id)
+                      return (
+                        <button
+                          key={chip.id}
+                          type="button"
+                          onClick={() => toggleChip(chip.id)}
+                          className={[
+                            'rounded-full border px-2.5 py-1.5 text-[11px] font-bold transition-all',
+                            selected
+                              ? 'border-violet-500 bg-violet-50 text-violet-800'
+                              : 'border-gray-200 text-gray-400',
+                          ].join(' ')}
+                        >
+                          {chip.title}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </section>
+              ) : null}
             </div>
           </div>
 
@@ -270,9 +351,7 @@ export default function SpecialMissionAddSheet({
                         className="flex items-center justify-between gap-2 rounded-lg bg-white/90 px-2.5 py-2 shadow-sm"
                       >
                         <div className="flex min-w-0 items-center gap-2">
-                          <span className="text-lg leading-none" aria-hidden>
-                            {chip.emoji}
-                          </span>
+                          <SpecialMissionChipIcon title={chip.title} fallbackEmoji={chip.emoji} />
                           <span className="min-w-0 text-[11px] font-bold text-gray-800">{chip.title}</span>
                         </div>
                         <button
@@ -302,9 +381,7 @@ export default function SpecialMissionAddSheet({
                         className="flex items-center justify-between gap-2 rounded-lg bg-white/90 px-2.5 py-2 shadow-sm"
                       >
                         <div className="flex min-w-0 items-center gap-2">
-                          <span className="text-lg leading-none" aria-hidden>
-                            {chip.emoji}
-                          </span>
+                          <SpecialMissionChipIcon title={chip.title} fallbackEmoji={chip.emoji} />
                           <span className="min-w-0 text-[11px] font-bold text-gray-800">{chip.title}</span>
                         </div>
                         <button

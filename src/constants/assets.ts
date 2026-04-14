@@ -101,8 +101,21 @@ export const ASSETS = {
     backgrounds: `${ASSETS_IMG_BASE}/layouts/backgrounds`,
     banners: `${ASSETS_IMG_BASE}/layouts/banners`,
     missionCards: `${ASSETS_IMG_BASE}/layouts/mission-cards`,
-    /** 자녀 홈: 캐릭터 뒤 전체 풍경(잔디 섬 PNG 대신 이 한 장을 깔 때 사용) */
-    childHomeBackground01: assetImg('layouts', 'backgrounds', 'home_background_01.png'),
+    /**
+     * 자녀 홈 기본 배경(레거시 호환 키)
+     * - 예전 이름(`childHomeBackground01`)을 쓰는 화면도 새 방 배경이 보이도록 같은 파일을 가리킵니다.
+     */
+    childHomeBackground01: assetImg('layouts', 'backgrounds', 'second_screen_room_background.png'),
+    /**
+     * 자녀 앱 홈 전용 배경(두 번째 방 버전)입니다.
+     * - 요청 파일: `public/assets/img/layouts/backgrounds/second_screen_room_background.png`
+     * - 홈 탭에서만 교체하고, 미션/로딩 등 공용 화면에는 영향이 없도록 분리해 둡니다.
+     */
+    childHomeBackgroundSecondScreen: assetImg(
+      'layouts',
+      'backgrounds',
+      'second_screen_room_background.png',
+    ),
     /**
      * 공용 로딩(`loading.tsx`), 루트(`/`) 리다이렉트, 자녀 「미션」 탭 전체 배경을 **같은 PNG**로 맞출 때 이 경로만 바꾸면 됩니다.
      * (현재 파일: `public/assets/img/layouts/backgrounds/background_01.png`)

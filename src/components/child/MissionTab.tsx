@@ -119,6 +119,35 @@ function orderedMissionsForSlider(list: DailyMissionWithTemplate[]): DailyMissio
   return [...sortedRoutine, ...sortedSpecial]
 }
 
+/** 오전/오후 판별에 쓰는 서울 현재 시각(클라이언트 기준) */
+function getSeoulNowParts(): { hour: number; minute: number } {
+  const parts = new Intl.DateTimeFormat('ko-KR', {
+    timeZone: 'Asia/Seoul',
+    hour12: false,
+    hour: '2-digit',
+    minute: '2-digit',
+  }).formatToParts(new Date())
+  const hour = Number(parts.find((p) => p.type === 'hour')?.value ?? '0')
+  const minute = Number(parts.find((p) => p.type === 'minute')?.value ?? '0')
+  return { hour, minute }
+}
+
+/** 현재가 오전인지(00:00~11:59) */
+function isMorningInSeoulNow(): boolean {
+  return getSeoulNowParts().hour < 12
+}
+
+/** 미션 카드가 오후 시간대(afternoon/evening/bedtime 또는 12시 이후 시각)인지 */
+function isAfternoonMission(dm: DailyMissionWithTemplate): boolean {
+  const block = dm.missions?.block
+  if (block === 'afternoon' || block === 'evening' || block === 'bedtime') return true
+  if (block === 'morning') return false
+  const hhmm = dm.scheduled_time
+  if (!hhmm || hhmm.length < 2) return false
+  const hour = Number(hhmm.slice(0, 2))
+  return Number.isFinite(hour) && hour >= 12
+}
+
 /**
  * 부모 「다시하기」 후 서버 롤백이 끝난 뒤 오는 브로드캐스트 페이로드 검사 — 형식이 맞지 않으면 무시합니다.
  */
@@ -232,6 +261,8 @@ export default function MissionTab({
 
   /** 하트 5개 채움 축하 팝업 (하루 1회) */
   const [heartsFullPopup, setHeartsFullPopup] = useState(false)
+  /** 오전에 오후 미션을 눌렀을 때 띄우는 안내 팝업 */
+  const [truthPopupOpen, setTruthPopupOpen] = useState(false)
 
   const router = useRouter()
   /** 부모가 오늘 일정을 넣은 뒤 날짜 비교에 쓰는 최신 today 문자열 */
@@ -544,6 +575,14 @@ export default function MissionTab({
 
   function handleComplete(dm: DailyMissionWithTemplate, ev: MouseEvent<HTMLButtonElement>) {
     if (done.has(dm.id)) return
+    /**
+     * 오전에는 오후 시간대 미션 완료를 막습니다.
+     * 사용자가 카드 여러 장을 빠르게 눌러도 이 조건을 먼저 검사해 API 호출 전에 차단합니다.
+     */
+    if (isMorningInSeoulNow() && isAfternoonMission(dm)) {
+      setTruthPopupOpen(true)
+      return
+    }
 
     if (!isFullRestDay) {
       /**
@@ -671,7 +710,7 @@ export default function MissionTab({
         src={ASSETS.layouts.sharedAppBackground}
         alt=""
         fill
-        className="object-cover object-center"
+        className="object-cover object-center brightness-110"
         sizes="100vw"
         priority
       />
@@ -953,6 +992,45 @@ export default function MissionTab({
     </div>
   ) : null
 
+  /** 오전에 오후 미션을 눌렀을 때 보여 주는 경고 팝업 */
+  const truthPopupBlock = truthPopupOpen ? (
+    <div
+      className="fixed inset-0 z-[210] flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="truth-pop-title"
+    >
+      <button
+        type="button"
+        className="absolute inset-0 bg-black/55"
+        aria-label="닫기"
+        onClick={() => setTruthPopupOpen(false)}
+      />
+      <div className="relative z-[1] w-full max-w-xs rounded-2xl bg-white p-4 shadow-2xl">
+        <p id="truth-pop-title" className="text-center text-lg font-black text-brand-text">
+          거짓말은 안돼!
+        </p>
+        <div className="mt-3 flex justify-center">
+          {/** 요청 이미지 경로: public/assets/img/missions/routine/dont.png */}
+          {/* eslint-disable-next-line @next/next/no-img-element -- public 정적 경로 팝업 이미지 직접 표시 */}
+          <img
+            src="/assets/img/missions/routine/dont.png"
+            alt="거짓말은 안돼 경고 이미지"
+            className="h-auto w-40 select-none object-contain"
+            draggable={false}
+          />
+        </div>
+        <button
+          type="button"
+          onClick={() => setTruthPopupOpen(false)}
+          className="mt-4 w-full rounded-xl bg-brand-blue py-3 text-sm font-bold text-white"
+        >
+          알겠어요
+        </button>
+      </div>
+    </div>
+  ) : null
+
   /**
    * 롤백된 미션의 카드 일러스트를 같은 규칙으로 계산합니다.
    * - dailyMissionId 로 오늘 카드 목록에서 찾기
@@ -1042,6 +1120,7 @@ export default function MissionTab({
           </div>
           {popupBlock}
           {rollbackPopupBlock}
+          {truthPopupBlock}
         </div>
 
         <MissionCreditActionSheet
@@ -1082,6 +1161,7 @@ export default function MissionTab({
         />
         {popupBlock}
         {rollbackPopupBlock}
+        {truthPopupBlock}
         {/**
          * 토스트는 `main`(z-10) 안에 두면 상단바(z-40)·하단 독(z-50)보다 뒤 레이어라 가려집니다.
          * `document.body`로 포털을 열고 화면 정중앙에 두어 항상 위에 보이게 합니다.

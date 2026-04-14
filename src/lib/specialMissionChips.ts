@@ -15,11 +15,18 @@ export type SpecialMissionChipDef = {
   defaultPopupMessage: string
 }
 
+/** 스페셜 미션 칩 카테고리(시트에서 섹션별로 묶어 표시) */
+export type SpecialMissionChipCategoryDef = {
+  id: string
+  label: string
+  chipIds: string[]
+}
+
 /** 부모가 고를 수 있는 스페셜 키워드 목록 (제목은 카드·칩에 짧게 표시) */
 export const SPECIAL_MISSION_CHIPS: SpecialMissionChipDef[] = [
   {
     id: 'sp-meal',
-    title: '식사준비',
+    title: '식사준비돕기',
     emoji: '🥗',
     defaultPopupMessage: '식사 준비를 함께 도와주어요.',
   },
@@ -48,6 +55,36 @@ export const SPECIAL_MISSION_CHIPS: SpecialMissionChipDef[] = [
     defaultPopupMessage: '오늘은 몸을 조금 움직여 보아요!',
   },
   {
+    id: 'sp-water-plant',
+    title: '화분 물주기',
+    emoji: '🪴',
+    defaultPopupMessage: '화분 흙 상태를 보고 알맞게 물을 주세요.',
+  },
+  {
+    id: 'sp-saving',
+    title: '저축하기',
+    emoji: '💰',
+    defaultPopupMessage: '오늘 쓴 돈을 확인하고 조금씩 저축해 보아요.',
+  },
+  {
+    id: 'sp-fold-laundry',
+    title: '빨래개기',
+    emoji: '👕',
+    defaultPopupMessage: '빨래한 옷을 가지런히 개어 정리해요.',
+  },
+  {
+    id: 'sp-meditation',
+    title: '명상하기',
+    emoji: '🧘',
+    defaultPopupMessage: '잠깐 눈을 감고 천천히 숨을 쉬어 보아요.',
+  },
+  {
+    id: 'sp-homework',
+    title: '숙제하기',
+    emoji: '📘',
+    defaultPopupMessage: '해야 할 숙제를 스스로 끝내 보아요.',
+  },
+  {
     id: 'sp-veggies',
     title: '야채먹기',
     emoji: '🥬',
@@ -61,19 +98,19 @@ export const SPECIAL_MISSION_CHIPS: SpecialMissionChipDef[] = [
   },
   {
     id: 'sp-laundry-basket',
-    title: '빨래통에 넣기',
+    title: '빨래통에넣기',
     emoji: '🧺',
     defaultPopupMessage: '입었던 옷을 빨래통에 넣어 두어요.',
   },
   {
     id: 'sp-laundry-tidy',
-    title: '외투 걸어두기',
+    title: '외투걸어놓기',
     emoji: '🧥',
     defaultPopupMessage: '다녀온 외투를 옷걸이나 지정한 곳에 걸어 두어요.',
   },
   {
     id: 'sp-bag-tidy',
-    title: '가방정리하기',
+    title: '가방정리',
     emoji: '🎒',
     defaultPopupMessage: '가방 안을 깔끔하게 정리해요.',
   },
@@ -85,21 +122,59 @@ export const SPECIAL_MISSION_CHIPS: SpecialMissionChipDef[] = [
   },
 ]
 
+/** 스페셜 미션 시트에서 보여줄 카테고리 순서 */
+export const SPECIAL_MISSION_CHIP_CATEGORIES: SpecialMissionChipCategoryDef[] = [
+  {
+    id: 'household',
+    label: '집안일',
+    chipIds: [
+      'sp-fold-laundry',
+      'sp-laundry-basket',
+      'sp-laundry-tidy',
+      'sp-meal',
+      'sp-finish-meal',
+      'sp-bag-tidy',
+      'sp-recycle',
+    ],
+  },
+  {
+    id: 'manners',
+    label: '예절',
+    chipIds: ['sp-greet', 'sp-massage'],
+  },
+  {
+    id: 'health-beauty',
+    label: '건강/미용',
+    chipIds: ['sp-nails', 'sp-meditation', 'sp-exercise', 'sp-veggies'],
+  },
+]
+
 /**
  * 예전에 저장된 미션 제목 → 현재 칩 제목(표시·매칭용)
  * DB에 옛 짧은 이름(인사, 어깨)이 남아 있어도 시트·카드에서 새 이름으로 이어집니다.
  */
 const LEGACY_SPECIAL_TITLE_TO_SHORT: Record<string, string> = {
-  '식사준비 돕기': '식사준비',
+  식사준비: '식사준비돕기',
+  식사준비하기: '식사준비돕기',
+  '식사준비 돕기': '식사준비돕기',
   '인사 잘하기': '인사잘하기',
   인사: '인사잘하기',
+  화분에물주기: '화분 물주기',
+  저금하기: '저축하기',
+  '옷 개키기': '빨래개기',
   '부모님 어깨 주물러드리기': '어깨마사지',
   어깨: '어깨마사지',
   분리수거하기: '분리수거',
+  가방정리하기: '가방정리',
+  '빨래통에 넣기': '빨래통에넣기',
+  '외투 걸어두기': '외투걸어놓기',
   /** 예전 칩 이름 → 지금 시트에 맞는 짧은 제목(썸네일·시트 매칭) */
   '밥 다먹기': '식사후 정리',
-  빨래정리: '외투 걸어두기',
-  '빨래 정리': '외투 걸어두기',
+  밥그릇비우기: '식사후 정리',
+  '밥그릇 비우기': '식사후 정리',
+  식사후정리: '식사후 정리',
+  빨래정리: '외투걸어놓기',
+  '빨래 정리': '외투걸어놓기',
 }
 
 /** 루틴 탭 스페셜 카드 등에 표시할 짧은 제목 */
@@ -119,6 +194,11 @@ const RETIRED_SPECIAL_DISPLAY_TITLES = new Set<string>([
   '심부름하기',
   '방 청소하기',
   '골고루먹기',
+  /** 과거 시드/레거시 미션: 더 이상 사용하지 않음 */
+  '스스로양말신기',
+  '양말신기',
+  '신발신기',
+  '신발 신기',
 ])
 
 /** 저장된 제목이 폐지된 스페셜 키워드인지 (레거시 별칭을 짧은 제목으로 푼 뒤에도 검사) */
