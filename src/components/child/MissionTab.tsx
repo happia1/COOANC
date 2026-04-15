@@ -1,8 +1,8 @@
 'use client'
 
-import Image from 'next/image'
 import { useState, useEffect, useMemo, useCallback, useRef, type MouseEvent } from 'react'
 import { createPortal } from 'react-dom'
+import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/client'
@@ -577,9 +577,10 @@ export default function MissionTab({
     if (done.has(dm.id)) return
     /**
      * 오전에는 오후 시간대 미션 완료를 막습니다.
+     * 단, 스페셜 미션은 오전/오후 구분 없이 수행 가능해야 하므로 차단 대상에서 제외합니다.
      * 사용자가 카드 여러 장을 빠르게 눌러도 이 조건을 먼저 검사해 API 호출 전에 차단합니다.
      */
-    if (isMorningInSeoulNow() && isAfternoonMission(dm)) {
+    if (isMorningInSeoulNow() && isAfternoonMission(dm) && !isSpecialSectionMission(dm.missions)) {
       setTruthPopupOpen(true)
       return
     }
@@ -701,24 +702,7 @@ export default function MissionTab({
   )
 
   /**
-   * 배경은 `heroBand` 가 아니라 `MissionTab` 루트 한 겹에서만 깝니다(상단+하단 카드까지 세로 전체).
-   * (비개발자용) 아이가 보는 미션 화면 뒤쪽 큰 그림입니다. 탭 안 콘텐츠는 그 위 `z-[1]` 레이어에 올라갑니다.
-   */
-  const missionTabBackdrop = (
-    <div className="pointer-events-none absolute inset-0 z-0" aria-hidden>
-      <Image
-        src={ASSETS.layouts.sharedAppBackground}
-        alt=""
-        fill
-        className="object-cover object-center brightness-110"
-        sizes="100vw"
-        priority
-      />
-    </div>
-  )
-
-  /**
-   * 상단 크레딧 카드만 — 배경은 루트 `missionTabBackdrop` 가 담당.
+   * 상단 크레딧 카드만 보여 줍니다.
    * 세로로 `flex-[3]` 빈칸 + 카드 + `flex-1` 빈칸 → 남는 높이를 **3:1**로 나눔.
    * (비개발자용) 중앙(`1:1`)과 맨 아래 붙임(`전부 위`)의 **가운데**쯤, 즉 “절반만” 아래로 내린 위치와 같습니다.
    * `pb-1 sm:pb-1.5`: 하단 경계와 살짝 간격. 하단 `bottomPanel` 스펙은 그대로입니다.
@@ -1089,10 +1073,27 @@ export default function MissionTab({
   const missionTabRootClassName =
     'relative isolate box-border -mb-[calc(60px+0.35rem)] flex min-h-0 min-w-0 flex-1 flex-col bg-transparent'
 
+  /**
+   * 미션 화면 맨 뒤 풀블리드 배경입니다.
+   * 비개발자 설명: `mission/layout.tsx` 가 좌우·위로 넓혀 주므로, 이 그림이 탭 가장자리까지 보입니다.
+   * `pointer-events-none`: 배경이 버튼·카드의 터치를 가리지 않습니다.
+   */
+  const missionAreaBackground = (
+    <div className="pointer-events-none absolute inset-0 z-0" aria-hidden>
+      <Image
+        src={ASSETS.layouts.missionTabBackground}
+        alt=""
+        fill
+        className="object-cover object-[center_88%]"
+        sizes="100vw"
+      />
+    </div>
+  )
+
   if (isFullRestDay) {
     return (
       <div className={missionTabRootClassName}>
-        {missionTabBackdrop}
+        {missionAreaBackground}
         <div className="relative z-[1] flex min-h-0 min-w-0 flex-1 flex-col">
           <MissionSleepMorningLayer
             childId={childId}
@@ -1150,7 +1151,7 @@ export default function MissionTab({
 
   return (
     <div className={missionTabRootClassName}>
-      {missionTabBackdrop}
+      {missionAreaBackground}
       <div className="relative z-[1] flex min-h-0 min-w-0 flex-1 flex-col">
         <MissionSleepMorningLayer
           childId={childId}

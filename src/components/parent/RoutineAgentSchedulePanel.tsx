@@ -3,7 +3,7 @@
 /**
  * 루틴 탭 — 우측 하단에서 열리는 「챗봇」슬라이딩 패널입니다.
  * - Framer Motion 으로 오른쪽에서 패널이 들어옵니다. 패널·대화 스크롤 영역 배경은 흰색으로 통일합니다.
- * - 홈(STEP 0): 인사 + 「일정 등록」「루틴 관리」카드. 일정 등록은 메뉴→텍스트/이미지/빠른 키워드 스텝으로 나뉘며, 루틴 관리는 탭+주간 루틴 위저드로 `RoutineKeywordBuilderSheet`·`SpecialMissionAddSheet` 를 embedded 재사용합니다.
+ * - 홈(STEP 0): 인사 + 「일정 등록」「루틴 관리」카드. 일정 등록은 메뉴→텍스트/이미지/빠른 키워드(칩 누르면 **별도 폼 없이** 채팅에 확인 카드가 바로 붙음)로 나뉘며, 루틴 관리는 탭+주간 루틴 위저드로 `RoutineKeywordBuilderSheet`·`SpecialMissionAddSheet` 를 embedded 재사용합니다.
  * - 가로·세로 스크롤 **막대(슬라이드 바)** 는 `globals.css` 의 `.routine-agent-hide-scrollbar` 로 숨기되, 스크롤 동작은 그대로 둡니다.
  * - 부모 탭 `<main>` 이 스크롤 컨테이너라 막대가 오버레이 위에 겹칠 수 있어, 열릴 때 `overflow` 를 잠그고 z-index 를 시트들보다 높입니다.
  * - 텍스트·이미지는 `/agent-b/parse` 로 보냅니다. 한 건만 나오면 곧바로 DB 초안 + 제안이 붙고, 여러 건이면 `< 1/N >` 로 한 줄씩 확인한 뒤 [등록] 시 `/agent-b/commit-schedule` 로 저장합니다.
@@ -94,7 +94,6 @@ type AgentPanelShell =
   | 'schedule_text'
   | 'chat'
   | 'schedule_image'
-  | 'schedule_keyword'
   | 'routine_manage'
 
 /** 빠른 입력 칩 → 에이전트 event_type 및 폼 기본값 */
@@ -306,6 +305,11 @@ function UnifiedScheduleConfirmCard(props: {
   cancelledComplete?: boolean
   /** 법정 공휴일(`public_holidays`)과 겹쳐 휴일·루틴 끔을 자동 적용한 경우 안내 문구 */
   showPublicHolidayAutoBanner?: boolean
+  /**
+   * 빠른 키워드 칩으로 채팅에 붙인 일정일 때 true 입니다.
+   * 비개발자 설명: 별도 팝업에서 이름을 치지 않아도, 확인 카드에서 바로 제목을 고칠 수 있게 제목 칸이 열려 있습니다.
+   */
+  autoEditTitleOnMount?: boolean
   onRegister: (payload: ScheduleConfirmRegisterPayload) => void | Promise<void>
   onCancel: () => void | Promise<void>
 }) {
@@ -317,6 +321,7 @@ function UnifiedScheduleConfirmCard(props: {
     registrationComplete,
     cancelledComplete,
     showPublicHolidayAutoBanner,
+    autoEditTitleOnMount = false,
     onRegister,
     onCancel,
   } = props
@@ -324,7 +329,8 @@ function UnifiedScheduleConfirmCard(props: {
   const pending = pendingSuggestions(suggestions)
 
   const [titleDraft, setTitleDraft] = useState(() => (ev.title || '일정').trim())
-  const [editingTitle, setEditingTitle] = useState(false)
+  /** `autoEditTitleOnMount` 이면 마운트 직후 제목을 바로 수정할 수 있게 입력칸을 켭니다 */
+  const [editingTitle, setEditingTitle] = useState(() => Boolean(autoEditTitleOnMount))
   const [startIso, setStartIso] = useState(() => (ev.start_date || '').trim() || getSeoulDateString())
   const [endIso, setEndIso] = useState(() => {
     const e = (ev.end_date && String(ev.end_date).trim()) || ''
@@ -346,9 +352,10 @@ function UnifiedScheduleConfirmCard(props: {
     setEndIso(e || s)
     setAgentCode(normalizeAgentTypeForPicker(ev.type))
     setDescriptionDraft(ev.description ?? '')
-    setEditingTitle(false)
+    /** 빠른 칩으로 연 제목 편집 모드는 유지하고, 그 외에는 접습니다 */
+    if (!autoEditTitleOnMount) setEditingTitle(false)
     setOpenPicker(null)
-  }, [ev.title, ev.type, ev.start_date, ev.end_date, ev.description, ev.routine_off])
+  }, [ev.title, ev.type, ev.start_date, ev.end_date, ev.description, ev.routine_off, autoEditTitleOnMount])
 
   useEffect(() => {
     const pend = suggestions.filter((s) => s.status === 'pending')
@@ -661,14 +668,16 @@ export default function RoutineAgentSchedulePanel({
   const [routineSubTab, setRoutineSubTab] = useState<'routine' | 'special'>('routine')
   /** 주간 루틴 탭 안 단계(위저드) — `RoutineKeywordBuilderSheet` 와 동기 */
   const [weeklyWizardStep, setWeeklyWizardStep] = useState<RoutinePanelWizardStep>('route')
-  /** STEP 1A-3 빠른 키워드가 고른 preset — null 이면 키워드 폼 비표시 */
-  const [keywordPreset, setKeywordPreset] = useState<KeywordPresetId | null>(null)
-  const [kwTitle, setKwTitle] = useState('')
-  /** 키워드 폼: 시작일/종료일을 분리해 TC-03 종료일 입력 버그를 방지 */
-  const [kwStartDate, setKwStartDate] = useState('')
-  const [kwEndDate, setKwEndDate] = useState('')
-  const [kwRoutineOff, setKwRoutineOff] = useState(false)
-  const [kwDesc, setKwDesc] = useState('')
+  /**
+   * 빠른 입력 칩으로 만든 파싱 말풍선 id 모음(ref) — 확인 카드에만 쓰며 리렌더는 `messages` 갱신으로 충분합니다.
+   * 비개발자 설명: 칩으로 넣은 일정은 처음부터 제목을 고칠 수 있게 입력칸이 열려 있어야 해서 id 를 표시해 둡니다.
+   */
+  const quickChipParseMessageIdsRef = useRef<Set<string>>(new Set())
+  /**
+   * 방금 칩으로 붙인 확인 카드를 잠깐 강조(테두리)하고 스크롤을 맞출 때 쓰는 id 입니다.
+   * 몇 초 뒤 null 로 돌려도, 제목 자동 편집은 위 ref 로 계속 구분합니다.
+   */
+  const [emphasizedParseMessageId, setEmphasizedParseMessageId] = useState<string | null>(null)
   /**
    * 다건 일정 카드에서 [수정하기] 로 연 필드 임시값.
    * parse 말풍선 id + 슬롯 인덱스가 일치할 때만 해당 슬롯 위에 편집 폼을 띄웁니다.
@@ -754,12 +763,8 @@ export default function RoutineAgentSchedulePanel({
     setShell('welcome')
     setRoutineSubTab('routine')
     setWeeklyWizardStep('route')
-    setKeywordPreset(null)
-    setKwTitle('')
-    setKwStartDate('')
-    setKwEndDate('')
-    setKwRoutineOff(false)
-    setKwDesc('')
+    quickChipParseMessageIdsRef.current.clear()
+    setEmphasizedParseMessageId(null)
     setMultiEdit(null)
   }, [])
 
@@ -830,6 +835,59 @@ export default function RoutineAgentSchedulePanel({
     [onAssistantRepliesWhileClosed],
   )
 
+  /**
+   * 일정 등록 메뉴의 「빠른 입력」칩을 눌렀을 때 — 별도 폼 없이 채팅에 확인 카드를 바로 붙입니다.
+   * 기본 제목은 칩 라벨(행사·여행 등), 날짜는 오늘(서울), 루틴 on/off 는 프리셋 기본값을 씁니다.
+   */
+  const appendQuickKeywordPresetToChat = useCallback(
+    (preset: KeywordPresetId) => {
+      if (!familyLinkId || !childId) {
+        onToast('가족 연결 정보를 찾을 수 없어요. 잠시 후 다시 시도해 주세요.', false)
+        return
+      }
+      const today = getSeoulDateString()
+      const title = keywordPresetLabel(preset)
+      const built = localBuiltScheduleFromParentForm({
+        title,
+        start_date: today,
+        end_date: today,
+        calendarEventType: keywordToCalendarType(preset),
+        routine_off: defaultRoutineOffForPreset(preset),
+        note: '',
+      })
+      if (!built) {
+        onToast('날짜를 준비하는 데 문제가 있어요. 잠시 후 다시 시도해 주세요.', false)
+        return
+      }
+      const res = buildAgentParseResponseFromLocal(built)
+      const sug: SuggestionUi[] = (res.suggestions ?? []).map((s) => ({ ...s, status: 'pending' as const }))
+      const parseMsgId = newId()
+      quickChipParseMessageIdsRef.current.add(parseMsgId)
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: newId(),
+          kind: 'text',
+          role: 'user',
+          text: `[${keywordPresetLabel(preset)}] ${title}`,
+        },
+        {
+          id: parseMsgId,
+          kind: 'parse',
+          role: 'assistant',
+          parseResult: res,
+          suggestions: sug,
+          deferCalendarSync: true,
+          calendarRowId: null,
+        },
+      ])
+      setEmphasizedParseMessageId(parseMsgId)
+      bumpUnreadIfClosed(1)
+      setShell('chat')
+    },
+    [familyLinkId, childId, onToast, bumpUnreadIfClosed],
+  )
+
   /** 요구 메시지를 말풍선으로 즉시 보여 줄 때 공통으로 씁니다 */
   function pushAssistantText(text: string) {
     setMessages((prev) => [...prev, { id: newId(), kind: 'text', role: 'assistant', text }])
@@ -841,6 +899,24 @@ export default function RoutineAgentSchedulePanel({
     if (!open) return
     listEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, loading, open, shell])
+
+  /**
+   * 빠른 칩으로 붙인 확인 카드가 보이도록 스크롤을 맞추고, 잠깐 테두리 강조를 켭니다.
+   * 비개발자 설명: 새로 생긴 일정 카드가 화면 안으로 들어오게 자동으로 내려갑니다.
+   */
+  useEffect(() => {
+    if (!open || !emphasizedParseMessageId) return
+    const id = emphasizedParseMessageId
+    const raf = requestAnimationFrame(() => {
+      const el = document.querySelector(`[data-routine-agent-parse-focus="${CSS.escape(id)}"]`)
+      el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    })
+    const t = window.setTimeout(() => setEmphasizedParseMessageId(null), 2600)
+    return () => {
+      cancelAnimationFrame(raf)
+      window.clearTimeout(t)
+    }
+  }, [emphasizedParseMessageId, open])
 
   /** `/agent-b/parse` 공통 호출 — 성공 시 파싱 결과 말풍선을 붙입니다 */
   const runParse = async (body: {
@@ -1053,61 +1129,6 @@ export default function RoutineAgentSchedulePanel({
     })
   }
 
-  /** STEP 1A-3 키워드 폼 [등록하기] — 키워드 선택값을 그대로 사용해 로컬에서 즉시 처리 */
-  const handleKeywordFormSubmit = async () => {
-    if (!familyLinkId || !childId || !keywordPreset) {
-      onToast('가족 연결 정보를 찾을 수 없어요. 잠시 후 다시 시도해 주세요.', false)
-      return
-    }
-    const title = kwTitle.trim()
-    if (!title) {
-      onToast('일정 이름을 입력해 주세요', false)
-      return
-    }
-    const built = localBuiltScheduleFromParentForm({
-      title,
-      start_date: kwStartDate.trim(),
-      end_date: kwEndDate.trim(),
-      calendarEventType: keywordToCalendarType(keywordPreset),
-      routine_off: kwRoutineOff,
-      note: kwDesc.trim(),
-    })
-    if (!built) {
-      onToast('날짜를 YYYY-MM-DD 형식으로 입력해 주세요', false)
-      return
-    }
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: newId(),
-        kind: 'text',
-        role: 'user',
-        text: `[${keywordPresetLabel(keywordPreset)}] ${title}`,
-      },
-    ])
-    /**
-     * TC-03: 키워드 칩 폼은 `public_holidays` 자동 보정 없이,
-     * 사용자가 고른 키워드(event_type)를 그대로 사용합니다.
-     */
-    const res = buildAgentParseResponseFromLocal(built)
-    const sug: SuggestionUi[] = (res.suggestions ?? []).map((s) => ({ ...s, status: 'pending' as const }))
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: newId(),
-        kind: 'parse',
-        role: 'assistant',
-        parseResult: res,
-        suggestions: sug,
-        deferCalendarSync: true,
-        calendarRowId: null,
-      },
-    ])
-    bumpUnreadIfClosed(1)
-    /** TC-03: 키워드 폼 등록 후 팝업 없이 확인 카드만 보이는 채팅 화면으로 전환 */
-    setShell('chat')
-  }
-
   /** 루틴 관리 탭에서 나가면 홈(STEP 0)으로 */
   const closeRoutineEmbedded = useCallback(() => {
     setShell('welcome')
@@ -1131,8 +1152,7 @@ export default function RoutineAgentSchedulePanel({
       setShell('welcome')
       return
     }
-    if (shell === 'schedule_text' || shell === 'chat' || shell === 'schedule_image' || shell === 'schedule_keyword') {
-      setKeywordPreset(null)
+    if (shell === 'schedule_text' || shell === 'chat' || shell === 'schedule_image') {
       setShell('schedule_menu')
       return
     }
@@ -1620,7 +1640,10 @@ export default function RoutineAgentSchedulePanel({
                   </button>
                 </div>
                 <div className="my-4 border-t border-gray-100" />
-                <p className="mb-2 text-center text-[11px] font-bold text-gray-500">빠른 입력</p>
+                <p className="mb-0.5 text-center text-[11px] font-bold text-gray-500">빠른 입력</p>
+                <p className="mb-2 text-center text-[10px] font-medium leading-snug text-gray-400">
+                  칩을 누르면 대화창에 바로 일정 카드가 생기고, 제목·날짜는 카드에서 바로 고칠 수 있어요.
+                </p>
                 <div className="flex flex-wrap justify-center gap-2">
                   {(
                     [
@@ -1634,17 +1657,7 @@ export default function RoutineAgentSchedulePanel({
                     <button
                       key={id}
                       type="button"
-                      onClick={() => {
-                        setKeywordPreset(id)
-                        setKwTitle('')
-                        /** TC-03: 시작일/종료일 기본값은 오늘 날짜 */
-                        const today = getSeoulDateString()
-                        setKwStartDate(today)
-                        setKwEndDate(today)
-                        setKwRoutineOff(defaultRoutineOffForPreset(id))
-                        setKwDesc('')
-                        setShell('schedule_keyword')
-                      }}
+                      onClick={() => appendQuickKeywordPresetToChat(id)}
                       className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-[11px] font-black text-gray-700 shadow-sm active:scale-[0.99]"
                     >
                       {label}
@@ -1886,8 +1899,18 @@ export default function RoutineAgentSchedulePanel({
                   }
 
                   const ev = m.parseResult.event
+                  /** 빠른 칩으로 넣은 말풍선이면 확인 카드에서 제목 입력을 바로 켭니다 */
+                  const fromQuickChip = quickChipParseMessageIdsRef.current.has(m.id)
                   return (
-                    <li key={m.id} className="flex w-full justify-start">
+                    <li
+                      key={m.id}
+                      data-routine-agent-parse-focus={m.id}
+                      className={`flex w-full justify-start ${
+                        emphasizedParseMessageId === m.id
+                          ? 'rounded-2xl p-0.5 ring-2 ring-sky-400 ring-offset-1 ring-offset-white'
+                          : ''
+                      }`}
+                    >
                       {/*
                         단건: 제안이 있으면 통합 카드 하나만(타입 영문 미노출).
                         제안이 없으면 요약만 파스텔 박스로 표시합니다.
@@ -1902,6 +1925,7 @@ export default function RoutineAgentSchedulePanel({
                           registrationComplete={Boolean(m.confirmComplete)}
                           cancelledComplete={Boolean(m.confirmCancelled)}
                           busy={suggestionSubmitKey === m.id || loading}
+                          autoEditTitleOnMount={fromQuickChip}
                           onRegister={(payload) =>
                             void handleUnifiedRegisterSingle(
                               m.id,
@@ -1974,90 +1998,6 @@ export default function RoutineAgentSchedulePanel({
                     ) : null}
                   </div>
                 )}
-              </div>
-            ) : null}
-
-            {/* STEP 1A-3 — 빠른 키워드 입력 폼 */}
-            {shell === 'schedule_keyword' && keywordPreset ? (
-              <div className="routine-agent-hide-scrollbar flex min-h-0 flex-1 flex-col overflow-y-auto bg-white px-3 py-3">
-                <p className="mb-3 text-center text-sm font-bold text-gray-900">
-                  {keywordPresetLabel(keywordPreset)} 일정을 등록해 드릴게요.
-                </p>
-                <div className="space-y-3 rounded-2xl border border-violet-100 bg-violet-50/40 p-3 shadow-sm ring-1 ring-violet-100/50">
-                  <label className="block text-[10px] font-black text-gray-600">
-                    일정 이름
-                    <input
-                      value={kwTitle}
-                      onChange={(e) => setKwTitle(e.target.value)}
-                      className="mt-1 w-full rounded-xl border border-gray-200 bg-white px-2.5 py-2 text-xs font-bold text-gray-900"
-                      placeholder="예) 체육대회"
-                    />
-                  </label>
-                  <label className="block text-[10px] font-black text-gray-600">
-                    시작일 (YYYY-MM-DD)
-                    <input
-                      type="date"
-                      value={kwStartDate}
-                      onChange={(e) => {
-                        const nextStart = e.target.value
-                        setKwStartDate(nextStart)
-                        if (kwEndDate && kwEndDate < nextStart) setKwEndDate(nextStart)
-                      }}
-                      className="mt-1 w-full rounded-xl border border-gray-200 bg-white px-2.5 py-2 text-xs font-bold text-gray-900"
-                    />
-                  </label>
-                  <label className="block text-[10px] font-black text-gray-600">
-                    종료일 (YYYY-MM-DD)
-                    <input
-                      type="date"
-                      value={kwEndDate}
-                      min={kwStartDate}
-                      onChange={(e) => setKwEndDate(e.target.value)}
-                      className="mt-1 w-full rounded-xl border border-gray-200 bg-white px-2.5 py-2 text-xs font-bold text-gray-900"
-                    />
-                  </label>
-                  <div>
-                    <p className="text-[10px] font-black text-gray-600">루틴 설정</p>
-                    <div className="mt-1 flex rounded-xl border border-gray-200 bg-white p-0.5">
-                      <button
-                        type="button"
-                        onClick={() => setKwRoutineOff(false)}
-                        className={`min-w-0 flex-1 rounded-lg py-2 text-[11px] font-black ${
-                          !kwRoutineOff ? 'bg-sky-500 text-white shadow-sm' : 'text-gray-500'
-                        }`}
-                      >
-                        유지
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setKwRoutineOff(true)}
-                        className={`min-w-0 flex-1 rounded-lg py-2 text-[11px] font-black ${
-                          kwRoutineOff ? 'bg-violet-500 text-white shadow-sm' : 'text-gray-500'
-                        }`}
-                      >
-                        끄기
-                      </button>
-                    </div>
-                  </div>
-                  <label className="block text-[10px] font-black text-gray-600">
-                    추가 설명 (선택)
-                    <textarea
-                      value={kwDesc}
-                      onChange={(e) => setKwDesc(e.target.value)}
-                      rows={2}
-                      className="routine-agent-hide-scrollbar mt-1 w-full resize-none rounded-xl border border-gray-200 bg-white px-2.5 py-2 text-xs text-gray-900"
-                      placeholder="메모를 남길 수 있어요"
-                    />
-                  </label>
-                </div>
-                <button
-                  type="button"
-                  disabled={loading}
-                  onClick={() => void handleKeywordFormSubmit()}
-                  className="mt-4 w-full rounded-xl bg-emerald-500 py-3 text-xs font-black text-white shadow-md disabled:opacity-50"
-                >
-                  등록하기
-                </button>
               </div>
             ) : null}
 
