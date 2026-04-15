@@ -12,6 +12,8 @@ const MARKET_ROOF_CACHE_BUST = '2'
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  /** Next.js 텔레메트리(익명 사용 통계 전송) 비활성화 */
+  telemetry: false,
   /** 예전 디바이스 모드 설정 URL(/setup) — 라우트 파일 제거 후 루트로 보냄 */
   async redirects() {
     return [{ source: '/setup', destination: '/', permanent: false }]
