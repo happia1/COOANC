@@ -76,9 +76,16 @@ export default function ParentAgentHomeCards({ childId }: Props) {
     setLoading(true)
     try {
       /** 서버 fetch 없이 클라이언트에서만 비동기로 가져옵니다. */
-      const data = await fetch(`${agentBaseUrl}/agent-a/latest?child_id=${encodeURIComponent(childId)}`)
+            // ✅ 수정 (5초 timeout)
+      const controller = new AbortController()
+      const timeoutId = window.setTimeout(() => controller.abort(), 5000)
+      const data = await fetch(
+        `${agentBaseUrl}/agent-a/latest?child_id=${encodeURIComponent(childId)}`,
+        { signal: controller.signal }
+      )
         .then((res) => (res.ok ? res.json() : null))
         .catch(() => null)
+        .finally(() => window.clearTimeout(timeoutId))
       setRow((data as AgentLatestReportRow | null) ?? null)
     } catch {
       /** 에이전트가 느리거나 404여도 홈 전체는 계속 그려야 하므로 폴백 카드로 유지합니다. */
