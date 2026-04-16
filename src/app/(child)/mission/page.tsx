@@ -103,8 +103,8 @@ export default async function MissionPage() {
       : missionDb.from('missions').select('*').order('scheduled_time', { ascending: true, nullsFirst: false })
 
   /**
-   * 달력을 제외한 나머지는 모두 childId 만 있으면 됩니다.
-   * `calendar_events` 는 부모 id 가 필요해 family_links 를 받은 뒤 한 번 더 요청합니다.
+   * 첫 번째 묶음에는 childId·부모 링크가 필요한 나머지가 들어갑니다.
+   * 그 다음 단계에서 `calendar_events`(parentId 필요)와 오늘 `daily_missions` 를 병렬로 둡니다.
    */
   const [statsRes, profileRow, familyRows, grantsRes, placementsRes, templatesRes] = await Promise.all([
     supabase.from('child_stats').select('*').eq('child_id', childId).maybeSingle(),
@@ -128,16 +128,26 @@ export default async function MissionPage() {
 
   const parentId = familyRows[0]?.parent_id ?? null
 
-  const calRes =
+  /**
+   * `calendar_events` 와 오늘 `daily_missions` 는 서로 독립적이라 동시에 조회해 왕복 1회를 줄입니다.
+   */
+  const [calRes, dailyMissionsRes] = await Promise.all([
     parentId != null
-      ? await missionDb
+      ? missionDb
           .from('calendar_events')
           .select('start_date, end_date, routine_override')
           .eq('parent_id', parentId)
           .lte('start_date', today)
           .gte('end_date', today)
           .limit(5)
-      : { data: [] as CalEventRow[], error: null }
+      : Promise.resolve({ data: [] as CalEventRow[], error: null }),
+    missionDb
+      .from('daily_missions')
+      .select(`*, missions(${missionJoin})`)
+      .eq('child_id', childId)
+      .eq('date', today)
+      .order('scheduled_time', { ascending: true, nullsFirst: false }),
+  ])
 
   const calEvents = calRes.data ?? []
   const routineType: RoutineType =
@@ -153,13 +163,7 @@ export default async function MissionPage() {
    * 오늘 일일 미션을 한 번 읽은 뒤, 행이 없고 휴일이 아니며 넣을 템플릿이 있을 때만 백필합니다.
    * (이전: `mission_template_id` 만 먼저 조회 → 항상 2번의 daily_missions 왕복)
    */
-  let { data: existingRows, error: existingErr } = await missionDb
-    .from('daily_missions')
-    .select(`*, missions(${missionJoin})`)
-    .eq('child_id', childId)
-    .eq('date', today)
-    .order('scheduled_time', { ascending: true, nullsFirst: false })
-
+  let { data: existingRows, error: existingErr } = dailyMissionsRes
   if (existingErr) {
     console.error('[child/mission] daily_missions select', existingErr.message)
   }
