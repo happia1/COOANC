@@ -97,21 +97,6 @@ export default async function MissionPage() {
 
   const parentId = familyRes.data?.parent_id ?? null
 
-  let routineType: RoutineType = getTodayRoutineType(today, [])
-  if (parentId) {
-    const { data: calEvents } = await supabase
-      .from('calendar_events')
-      .select('start_date, end_date, routine_override')
-      .eq('parent_id', parentId)
-      .lte('start_date', today)
-      .gte('end_date', today)
-      .limit(5)
-
-    if (calEvents && calEvents.length > 0) {
-      routineType = getTodayRoutineType(today, calEvents)
-    }
-  }
-
   /** embed 에 템플릿 보상·배율을 넣어 자녀 카드 숫자와 완료 API가 맞춰집니다. */
   const missionJoin =
     'title, icon_emoji, description, credit_reward, heart_reward, exp_reward, reward_multiplier, difficulty, block, repeat_type'
@@ -122,43 +107,62 @@ export default async function MissionPage() {
    */
   const missionDb = createServiceRoleClient() ?? supabase
 
-  const { data: templates, error: templatesErr } = await missionDb
-    .from('missions')
-    .select('*')
-    .order('scheduled_time', { ascending: true, nullsFirst: false })
+  type CalEventRow = { start_date: string; end_date: string; routine_override: string }
 
-  if (templatesErr) {
-    console.error('[child/mission] missions select', templatesErr.message)
+  /**
+   * 달력(휴가/방학)·전체 미션 템플릿·오늘 이미 있는 daily_missions 는 서로 독립이므로 한꺼번에 요청합니다.
+   * (예전: 달력 → 템플릿 → 기존 행 순차 대기로 체감 로딩이 길어짐)
+   */
+  const calendarP =
+    parentId != null
+      ? missionDb
+          .from('calendar_events')
+          .select('start_date, end_date, routine_override')
+          .eq('parent_id', parentId)
+          .lte('start_date', today)
+          .gte('end_date', today)
+          .limit(5)
+      : Promise.resolve({ data: [] as CalEventRow[], error: null })
+
+  const [calRes, templatesRes, existingBeforeRes] = await Promise.all([
+    calendarP,
+    missionDb.from('missions').select('*').order('scheduled_time', { ascending: true, nullsFirst: false }),
+    missionDb.from('daily_missions').select('mission_template_id').eq('child_id', childId).eq('date', today),
+  ])
+
+  const calEvents = calRes.data ?? []
+  const routineType: RoutineType =
+    calEvents.length > 0 ? getTodayRoutineType(today, calEvents) : getTodayRoutineType(today, [])
+
+  if (templatesRes.error) {
+    console.error('[child/mission] missions select', templatesRes.error.message)
   }
 
-  const pool = templatePoolForToday((templates ?? []) as Mission[], childId, level, routineType)
+  const pool = templatePoolForToday((templatesRes.data ?? []) as Mission[], childId, level, routineType)
 
-  const { data: existingBefore } = await missionDb
-    .from('daily_missions')
-    .select('mission_template_id')
-    .eq('child_id', childId)
-    .eq('date', today)
+  const existingBefore = existingBeforeRes.data
 
   const haveIds = new Set((existingBefore ?? []).map((r) => r.mission_template_id))
   const missing = pool.filter((m) => !haveIds.has(m.id))
 
-  let firstDailyInsertErr: { code?: string; message?: string } | null = null
+  /** 누락 분 백필은 행마다 `await` 하지 않고 동시에 넣어 왕복 시간을 줄입니다(중복은 23505 무시). */
   if (missing.length > 0 && routineType !== 'holiday') {
-    for (const m of missing) {
-      const row = {
-        child_id: childId,
-        mission_template_id: m.id,
-        date: today,
-        scheduled_time: m.scheduled_time ?? null,
-        routine_type: routineType,
-        is_completed: false,
-      }
-      const { error } = await missionDb.from('daily_missions').insert(row)
-      if (error && error.code !== '23505') {
-        console.error('[child/mission] daily_missions insert', error)
-        if (!firstDailyInsertErr) firstDailyInsertErr = { code: error.code, message: error.message }
-      }
-    }
+    await Promise.all(
+      missing.map(async (m) => {
+        const row = {
+          child_id: childId,
+          mission_template_id: m.id,
+          date: today,
+          scheduled_time: m.scheduled_time ?? null,
+          routine_type: routineType,
+          is_completed: false,
+        }
+        const { error } = await missionDb.from('daily_missions').insert(row)
+        if (error && error.code !== '23505') {
+          console.error('[child/mission] daily_missions insert', error)
+        }
+      }),
+    )
   }
 
   const { data: existing, error: existingErr } = await missionDb

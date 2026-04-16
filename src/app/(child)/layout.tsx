@@ -33,7 +33,11 @@ export default async function ChildLayout({ children }: { children: ReactNode })
       <main className="relative z-10 mx-auto flex min-h-0 w-full max-w-md flex-1 flex-col overflow-visible px-4 pb-[calc(60px+0.35rem)] pt-4">
         {children}
       </main>
-      <ChildNavBar />
+      {/**
+       * 부모 미리보기 모드에서는 Next `Link` 소프트 네비게이션 대신 전체 문서 이동(`<a>`)을 써서
+       * HttpOnly 미리보기 쿠키가 항상 포함되도록 합니다(미션 탭에서 부모 홈으로 튕기는 현상 완화).
+       */}
+      <ChildNavBar isParentPreview={ctx.isParentPreview} />
     </div>
   )
 }

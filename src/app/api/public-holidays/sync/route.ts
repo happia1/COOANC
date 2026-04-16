@@ -4,8 +4,8 @@ import { fetchKasiHolidaysForYear, kasiItemsToPublicHolidayRows } from '@/lib/ho
 
 /**
  * GET /api/public-holidays/sync?year=2026
- * - 천문연 특일 API 를 **해당 연도에 아직 동기화하지 않았을 때만** 호출합니다.
- * - 결과는 RPC `replace_public_holidays_for_year` 로 `public_holidays` 를 갈아끼운 뒤, `public_holiday_sync_log` 에 기록합니다.
+ * - `public_holidays` 에 해당 연도 행이 이미 있으면 특일 API 를 호출하지 않습니다.
+ * - 없을 때만 천문연 API를 받아 RPC `replace_public_holidays_for_year` 로 저장하고 `public_holiday_sync_log` 에 기록합니다.
  * - 인증키: `NEXT_PUBLIC_HOLIDAY_API_KEY` (서버에서만 읽음 — 클라이언트 번들에 넣지 마세요)
  */
 
@@ -22,27 +22,35 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'year 파라미터(1990~2100)가 필요합니다' }, { status: 400 })
   }
 
+  const admin = createServiceRoleClient()
+  if (!admin) {
+    return NextResponse.json({ error: serviceRoleEnvMissingMessage() }, { status: 503 })
+  }
+
+  /**
+   * `public_holidays` 에 해당 연도 행이 이미 있으면 특일 API 를 호출하지 않습니다.
+   * (sync_log 만 있고 데이터가 비어 있는 예외는 다시 받을 수 있게 log 단독으로는 스킵하지 않습니다.)
+   */
+  const { count: existingRows, error: countErr } = await admin
+    .from('public_holidays')
+    .select('*', { count: 'exact', head: true })
+    .eq('year', year)
+
+  if (!countErr && existingRows != null && existingRows > 0) {
+    return NextResponse.json({
+      ok: true,
+      skipped: true,
+      year,
+      message: 'public_holidays에 이미 해당 연도 데이터가 있습니다',
+    })
+  }
+
   const serviceKey = process.env.NEXT_PUBLIC_HOLIDAY_API_KEY?.trim()
   if (!serviceKey) {
     return NextResponse.json(
       { error: 'NEXT_PUBLIC_HOLIDAY_API_KEY 가 설정되지 않았습니다' },
       { status: 503 },
     )
-  }
-
-  const admin = createServiceRoleClient()
-  if (!admin) {
-    return NextResponse.json({ error: serviceRoleEnvMissingMessage() }, { status: 503 })
-  }
-
-  const { data: already } = await admin
-    .from('public_holiday_sync_log')
-    .select('year')
-    .eq('year', year)
-    .maybeSingle()
-
-  if (already?.year === year) {
-    return NextResponse.json({ ok: true, skipped: true, year, message: '이미 동기화된 연도입니다' })
   }
 
   const { items, headerCode, headerMsg } = await fetchKasiHolidaysForYear(serviceKey, year, {

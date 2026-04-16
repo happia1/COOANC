@@ -269,6 +269,25 @@ export default function MissionTab({
   const todayRef = useRef(today)
   todayRef.current = today
 
+  /**
+   * Realtime INSERT·브로드캐스트가 짧은 간격으로 여러 번 오면 `router.refresh()` 가 연속 호출되어
+   * 서버 컴포넌트 전체가 불필요하게 여러 번 다시 그려질 수 있어, 한 번으로 묶습니다.
+   */
+  const refreshDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const scheduleRefresh = useCallback(() => {
+    if (refreshDebounceRef.current) clearTimeout(refreshDebounceRef.current)
+    refreshDebounceRef.current = setTimeout(() => {
+      refreshDebounceRef.current = null
+      router.refresh()
+    }, 450)
+  }, [router])
+
+  useEffect(() => {
+    return () => {
+      if (refreshDebounceRef.current) clearTimeout(refreshDebounceRef.current)
+    }
+  }, [])
+
   /** 자정 00:00:00 에 router.refresh() — 하트·완료 집합을 새 날짜 기준으로 리셋합니다 */
   useEffect(() => {
     const now = new Date()
@@ -395,7 +414,7 @@ export default function MissionTab({
         (payload) => {
           const row = payload.new as { date?: string }
           const d = typeof row.date === 'string' ? row.date.slice(0, 10) : ''
-          if (d === todayRef.current) router.refresh()
+          if (d === todayRef.current) scheduleRefresh()
         },
       )
       .on('broadcast', { event: 'assign_today_ok' }, (msg) => {
@@ -408,9 +427,11 @@ export default function MissionTab({
         const p = (msg as { payload?: P }).payload
         const d = typeof p?.date === 'string' ? p.date.slice(0, 10) : ''
         const shouldRefresh = !d || d === todayRef.current
+        let didOptimistic = false
         if (shouldRefresh && p && !p.alreadyAssigned && p.dailyMission && p.missionTemplate) {
           const optimisticDm = dailyMissionFromAssignPayload(childId, p.dailyMission, p.missionTemplate)
           if (optimisticDm) {
+            didOptimistic = true
             setMissionList((prev) =>
               prev.some((x) => x.id === optimisticDm.id) ? prev : [...prev, optimisticDm],
             )
@@ -418,13 +439,14 @@ export default function MissionTab({
             if (fields) setSpecialPopup(fields)
           }
         }
-        if (shouldRefresh) router.refresh()
+        /** 낙관적 UI로 이미 카드를 합쳤으면 전체 RSC 재요청을 생략합니다(탭 체감 속도·중복 fetch 완화). */
+        if (shouldRefresh && !didOptimistic) scheduleRefresh()
       })
       .subscribe()
     return () => {
       void supabase.removeChannel(channel)
     }
-  }, [childId, router])
+  }, [childId, scheduleRefresh])
 
   const showToast = (msg: string) => {
     setToast(msg)

@@ -214,7 +214,7 @@ export default function HomeTab({ childrenData }: Props) {
       .subscribe()
 
     return () => {
-      supabase.removeChannel(dm)
+      void supabase.removeChannel(dm)
     }
   }, [child?.id])
 
