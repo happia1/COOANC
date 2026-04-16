@@ -708,7 +708,7 @@ export default function MarketTab({
       if ('credits_wallet' in json) setCurrentWallet(readChildStatInt(json.credits_wallet))
       else setCurrentWallet((w) => w - item.credit_price)
       if (json.request) setMyRequests((prev) => [json.request as PurchaseRequest, ...prev])
-      showToast('부모님께 요청했어요!')
+      /** 축하 오버레이에서 안내하므로 별도 토스트는 띄우지 않음(문구 겹침 방지) */
       return true
     } catch {
       showToast('네트워크 오류가 발생했어요', false)

@@ -41,8 +41,12 @@ export default function NavigationMapSheet({
   const currentLevel = stats?.current_level ?? 0
 
   return (
-    <ChildBottomSheetShell open={open} onClose={onClose} titleId={SHEET_TITLE_ID}>
-      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain px-4 pb-6">
+    <ChildBottomSheetShell open={open} onClose={onClose} titleId={SHEET_TITLE_ID} swipeToClose={true}>
+      {/*
+        부모 `ChildBottomSheetShell` 이 `flex-1 min-h-0` 를 잡아 주므로,
+        여기서 세로 스크롤이 생기면 **뷰포트 안**에서만 돌게 됩니다(모바일에서 아래가 잘리는 현상 완화).
+      */}
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain px-4 pb-6 pt-0">
         {/* 헤더 */}
         <div className="mb-4 mt-1 flex shrink-0 items-center justify-between">
           <h2 id={SHEET_TITLE_ID} className="text-lg font-black text-brand-text">

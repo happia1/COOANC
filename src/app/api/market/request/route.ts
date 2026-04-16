@@ -41,14 +41,33 @@ export async function POST(req: NextRequest) {
   }
   const childId = resolved.childId
 
-  // 상품 조회
-  const { data: item } = await supabase
-    .from('store_items')
-    .select('*')
-    .eq('id', itemId)
-    .eq('is_active', true)
-    .maybeSingle()
+  /**
+   * 상품·스탯·가격 덮어쓰기를 한 번에 병렬 조회해 왕복 지연을 줄입니다.
+   * (이전에는 순차 await 로 네트워크 왕복이 여러 번 이어졌음)
+   */
+  const [itemRes, statsRes, creditOvRes, existingPendingRes] = await Promise.all([
+    supabase.from('store_items').select('*').eq('id', itemId).eq('is_active', true).maybeSingle(),
+    supabase
+      .from('child_stats')
+      .select('credits, credits_wallet, credits_piggy, current_level')
+      .eq('child_id', childId)
+      .maybeSingle(),
+    supabase
+      .from('child_store_item_credit_overrides')
+      .select('credit_price')
+      .eq('child_id', childId)
+      .eq('store_item_id', itemId)
+      .maybeSingle(),
+    supabase
+      .from('purchase_requests')
+      .select('id')
+      .eq('child_id', childId)
+      .eq('item_id', itemId)
+      .eq('status', 'pending')
+      .maybeSingle(),
+  ])
 
+  const item = itemRes.data
   if (!item) {
     return NextResponse.json({ error: '상품을 찾을 수 없어요' }, { status: 404 })
   }
@@ -59,24 +78,13 @@ export async function POST(req: NextRequest) {
 
   /** 자녀별 덮어쓰기가 있으면 그 크레딧으로 결제합니다(없거나 테이블 미적용 시 기본가). */
   let effectivePrice = item.credit_price
-  const { data: creditOverride, error: creditOvErr } = await supabase
-    .from('child_store_item_credit_overrides')
-    .select('credit_price')
-    .eq('child_id', childId)
-    .eq('store_item_id', itemId)
-    .maybeSingle()
-
+  const creditOverride = creditOvRes.data
+  const creditOvErr = creditOvRes.error
   if (!creditOvErr && typeof creditOverride?.credit_price === 'number') {
     effectivePrice = creditOverride.credit_price
   }
 
-  // 스탯 조회 — 마켓 결제는 지갑(credits_wallet)에서만 차감합니다
-  const { data: stats } = await supabase
-    .from('child_stats')
-    .select('credits, credits_wallet, credits_piggy, current_level')
-    .eq('child_id', childId)
-    .maybeSingle()
-
+  const stats = statsRes.data
   if (!stats) {
     return NextResponse.json({ error: '스탯 정보를 찾을 수 없어요' }, { status: 404 })
   }
@@ -94,15 +102,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: '레벨이 부족해요' }, { status: 400 })
   }
 
-  // 이미 pending 요청이 있는지 확인
-  const { data: existing } = await supabase
-    .from('purchase_requests')
-    .select('id')
-    .eq('child_id', childId)
-    .eq('item_id', itemId)
-    .eq('status', 'pending')
-    .maybeSingle()
-
+  const existing = existingPendingRes.data
   if (existing) {
     return NextResponse.json({ error: '이미 요청 중인 상품이에요' }, { status: 409 })
   }
