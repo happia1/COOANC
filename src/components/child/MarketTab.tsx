@@ -11,7 +11,6 @@ import MarketPurchaseConfirmDialog from '@/components/child/MarketPurchaseConfir
 import MarketPurchaseSuccessOverlay from '@/components/child/MarketPurchaseSuccessOverlay'
 import MarketRequestsBottomSheet from '@/components/child/MarketRequestsBottomSheet'
 import MarketWishlistBottomSheet from '@/components/child/MarketWishlistBottomSheet'
-import { createClient } from '@/lib/supabase/client'
 import { marketFrameKeyForItemId, type MarketItemFrameKey } from '@/lib/marketItemFrame'
 import { formatMarketCreditLabel } from '@/lib/applyStoreItemCreditOverrides'
 import { readChildStatInt } from '@/lib/childCreditsSplit'
@@ -486,34 +485,34 @@ export default function MarketTab({
   const prevPurchaseRequestsRef = useRef<PurchaseRequest[]>(requests)
 
   useEffect(() => {
-    const supabase = createClient()
     let cancelled = false
 
+    /**
+     * Supabase JS 가 브라우저에서 직접 REST 를 부를 때(anon + RLS) 환경에 따라 400 이 난 경우가 있어,
+     * 동일 쿼리를 서버 라우트(`/api/market/child-sync`)에서 실행합니다 — 쿠키 세션과 `resolveApiActorChildId` 로 child_id 를 고릅니다.
+     */
     const syncMarketFromDb = async () => {
-      const [hiddenRes, prRes, statsRes] = await Promise.all([
-        supabase.from('child_market_hidden_items').select('store_item_id').eq('child_id', childId),
-        /** `purchase_requests` 는 `requested_at` 만 있음 — 존재하지 않는 `created_at` 으로 정렬하면 400 */
-        supabase
-          .from('purchase_requests')
-          .select('*')
-          .eq('child_id', childId)
-          .order('requested_at', { ascending: false })
-          .limit(12),
-        supabase.from('child_stats').select('credits_wallet').eq('child_id', childId).maybeSingle(),
-      ])
-      if (cancelled) return
-
-      if (!hiddenRes.error && hiddenRes.data) {
-        const sorted = hiddenRes.data.map((r: { store_item_id: string }) => r.store_item_id).sort()
-        setHiddenStoreItemIds(sorted)
-      }
-
-      if (statsRes.data && 'credits_wallet' in statsRes.data) {
-        setCurrentWallet(readChildStatInt(statsRes.data.credits_wallet))
-      }
-
-      if (!prRes.error && prRes.data) {
-        const next = prRes.data as PurchaseRequest[]
+      try {
+        const res = await fetch(
+          `/api/market/child-sync?childId=${encodeURIComponent(childId)}`,
+          { credentials: 'same-origin' },
+        )
+        if (cancelled) return
+        if (!res.ok) {
+          console.warn('[MarketTab] child-sync HTTP', res.status, await res.text().catch(() => ''))
+          return
+        }
+        const json = (await res.json()) as {
+          hiddenStoreItemIds: string[]
+          purchaseRequests: PurchaseRequest[]
+          creditsWallet: number | null
+          partial?: boolean
+        }
+        setHiddenStoreItemIds([...json.hiddenStoreItemIds].sort())
+        if (json.creditsWallet !== null && json.creditsWallet !== undefined) {
+          setCurrentWallet(json.creditsWallet)
+        }
+        const next = json.purchaseRequests
         const prev = prevPurchaseRequestsRef.current
         for (const row of next) {
           const old = prev.find((p) => p.id === row.id)
@@ -529,6 +528,8 @@ export default function MarketTab({
         }
         prevPurchaseRequestsRef.current = next
         setMyRequests(next)
+      } catch (e) {
+        console.warn('[MarketTab] child-sync', e)
       }
     }
 
