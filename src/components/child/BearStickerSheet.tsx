@@ -17,7 +17,6 @@ import {
 } from '@/lib/bearBoardLayout'
 import type { PraiseStickerGrant, PraiseStickerPlacement } from '@/types/database'
 import { mergePraiseStickerGrantsFromServer } from '@/lib/mergePraiseStickerGrantsFromServer'
-import { createClient } from '@/lib/supabase/client'
 import PraiseGiftConfetti from '@/components/child/PraiseGiftConfetti'
 import BearBoardCompleteModal from '@/components/child/BearBoardCompleteModal'
 
