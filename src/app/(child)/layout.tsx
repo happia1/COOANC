@@ -8,7 +8,7 @@ import { getActorChildContext } from '@/lib/getActorChildContext'
 /**
  * 아이 앱 공통 레이아웃
  * - 모바일 컨테이너 (max-w-md)
- * - 셸(바깥 래퍼)에는 장식용 배경색을 두지 않음 — 브라우저/문서 기본 배경이 보임(홈 탭 풍경 PNG 등은 각 탭 컴포넌트에서 처리)
+ * - 기본은 연한 그라디언트 배경(홈 탭은 `HomeTab` 안에서 상단~꾸미기까지 풀 블리드 풍경 PNG 로 덮음)
  * - 상단 내비게이션 바 (자녀 이름 칩 + 나가기)
  * - 하단 내비게이션 바 60px (홈·미션·마켓 3탭)
  *
@@ -40,8 +40,7 @@ export default async function ChildLayout({ children }: { children: ReactNode })
         familyLinks: familyRows,
       }}
     >
-      {/** 전체 화면 래퍼: 예전 하늘~초원 그라디언트는 제거(요청에 따라 배경 없음) */}
-      <div className="relative flex h-dvh max-h-dvh min-h-0 flex-col overflow-x-hidden">
+      <div className="relative flex h-dvh max-h-dvh min-h-0 flex-col overflow-x-hidden bg-gradient-to-b from-sky-100/90 via-amber-50/50 to-green-50/80">
         <ChildTopBar isParentPreview={ctx.isParentPreview} />
         {/**
          * `min-h-0` + `flex` 로 자식이 뷰포트 높이를 넘지 않게 할 수 있음(홈·미션 한 화면).
