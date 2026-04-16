@@ -11,7 +11,7 @@
  * - 구매 승인 대기 안내는 홈이 아니라 상단 종(알림·루틴 알람) 시트에서 보여 줍니다.
  */
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import ParentEnterChildUiLink from '@/components/parent/ParentEnterChildUiLink'
 import { createClient } from '@/lib/supabase/client'
@@ -84,6 +84,12 @@ type Props = {
 
 export default function HomeTab({ childrenData }: Props) {
   const { selectedChildId, setSelectedChildId } = useParentStore()
+  /** 부모 홈에서 쓰는 Supabase 브라우저 클라이언트(싱글톤 재사용) */
+  const supabaseRef = useRef(createClient())
+  /** child_stats 실시간 채널(선택 자녀 1개만 유지) */
+  const childStatsChannelRef = useRef<ReturnType<typeof supabaseRef.current.channel> | null>(null)
+  /** weekly routine 재조회용 daily_missions 채널(선택 자녀 1개만 유지) */
+  const dailyMissionChannelRef = useRef<ReturnType<typeof supabaseRef.current.channel> | null>(null)
 
   const currentId = selectedChildId ?? childrenData[0]?.id
   const child = childrenData.find((c) => c.id === currentId) ?? childrenData[0]
@@ -106,7 +112,12 @@ export default function HomeTab({ childrenData }: Props) {
 
   useEffect(() => {
     if (!child?.id) return
-    const supabase = createClient()
+    const supabase = supabaseRef.current
+    /** 자녀 변경 시 이전 채널이 남아 중복 수신하지 않도록 먼저 제거 */
+    if (childStatsChannelRef.current) {
+      void supabase.removeChannel(childStatsChannelRef.current)
+      childStatsChannelRef.current = null
+    }
     const ch = supabase
       .channel(`parent_home_cs:${child.id}`)
       .on(
@@ -138,8 +149,10 @@ export default function HomeTab({ childrenData }: Props) {
         },
       )
       .subscribe()
+    childStatsChannelRef.current = ch
 
     return () => {
+      if (childStatsChannelRef.current === ch) childStatsChannelRef.current = null
       void supabase.removeChannel(ch)
     }
   }, [child?.id])
@@ -178,7 +191,7 @@ export default function HomeTab({ childrenData }: Props) {
   useEffect(() => {
     if (!child) return
 
-    const supabase = createClient()
+    const supabase = supabaseRef.current
 
     const loadWeek = async () => {
       const today = getSeoulDateString()
@@ -197,6 +210,14 @@ export default function HomeTab({ childrenData }: Props) {
       }
       setWeeklyRoutine(buildWeeklyRoutineDays(today, data ?? []))
     }
+    /** 채널 연결 전에 1회 즉시 조회해 첫 렌더 체감 지연을 줄입니다 */
+    void loadWeek()
+
+    /** 자녀 변경 시 이전 daily_missions 채널 정리 후 현재 자녀 채널만 유지 */
+    if (dailyMissionChannelRef.current) {
+      void supabase.removeChannel(dailyMissionChannelRef.current)
+      dailyMissionChannelRef.current = null
+    }
 
     const dm = supabase
       .channel(`parent_home_dm:${child.id}`)
@@ -213,8 +234,10 @@ export default function HomeTab({ childrenData }: Props) {
         },
       )
       .subscribe()
+    dailyMissionChannelRef.current = dm
 
     return () => {
+      if (dailyMissionChannelRef.current === dm) dailyMissionChannelRef.current = null
       void supabase.removeChannel(dm)
     }
   }, [child?.id])

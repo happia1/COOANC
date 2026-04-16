@@ -63,17 +63,15 @@ type Props = {
 export default function ParentAgentHomeCards({ childId }: Props) {
   const [row, setRow] = useState<AgentLatestReportRow | null | undefined>(undefined)
   const [loading, setLoading] = useState(true)
-  const [fetchErr, setFetchErr] = useState<string | null>(null)
   const [sheet, setSheet] = useState<SheetKind>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
-    setFetchErr(null)
     try {
       const data = await fetchAgentLatestReport(childId)
       setRow(data)
-    } catch (e) {
-      setFetchErr(e instanceof Error ? e.message : '불러오기 실패')
+    } catch {
+      /** 에이전트가 느리거나 404여도 홈 전체는 계속 그려야 하므로 수집중 카드로 폴백 */
       setRow(null)
     } finally {
       setLoading(false)
@@ -104,12 +102,6 @@ export default function ParentAgentHomeCards({ childId }: Props) {
           />
           <span className="text-xs font-bold text-sky-800">AI 요약 불러오는 중…</span>
         </div>
-      ) : null}
-
-      {fetchErr && !loading ? (
-        <p className="rounded-xl bg-rose-50 px-3 py-2 text-center text-[11px] font-semibold text-rose-700 ring-1 ring-rose-100">
-          {fetchErr}
-        </p>
       ) : null}
 
       {showCollecting && !loading ? (

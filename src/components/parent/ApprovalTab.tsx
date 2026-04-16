@@ -118,6 +118,18 @@ export default function ApprovalTab({
   hiddenItemIdsByChild: initialHidden,
   initialCreditOverridesByChild,
 }: Props) {
+  /** 승인 탭에서 Realtime 채널들이 같은 클라이언트를 공유하도록 고정합니다. */
+  const supabaseRef = useRef(createClient())
+  /** 선택 자녀 기준 mission_logs postgres_changes 채널 */
+  const missionLogsChannelRef = useRef<ReturnType<typeof supabaseRef.current.channel> | null>(null)
+  /** 선택 자녀 기준 child_completed_mission 브로드캐스트 채널 */
+  const missionBroadcastChannelRef = useRef<ReturnType<typeof supabaseRef.current.channel> | null>(null)
+  /** 가족 전체 purchase_requests 채널 */
+  const purchaseRequestsChannelRef = useRef<ReturnType<typeof supabaseRef.current.channel> | null>(null)
+  /** 선택 자녀 기준 mission_rolled_back 전송 채널(재사용) */
+  const missionRedoChannelRef = useRef<ReturnType<typeof supabaseRef.current.channel> | null>(null)
+  const missionRedoReadyChildIdRef = useRef<string | null>(null)
+
   const pathname = usePathname()
   const { selectedChildId, setSelectedChildId } = useParentStore()
 
@@ -346,7 +358,7 @@ export default function ApprovalTab({
   /** 선택 자녀의 완료 로그 20건을 다시 가져와 state 에 합칩니다(다른 자녀 행은 유지) */
   const refreshChildMissionLogs = useCallback(async () => {
     if (!currentId) return
-    const supabase = createClient()
+    const supabase = supabaseRef.current
     const { data, error } = await supabase
       .from('mission_logs')
       .select(MISSION_LOG_SELECT_FOR_LIST)
@@ -387,7 +399,11 @@ export default function ApprovalTab({
   /** postgres_changes + 자녀 완료 브로드캐스트 둘 다 같은 재조회로 반영합니다 */
   useEffect(() => {
     if (!currentId) return
-    const supabase = createClient()
+    const supabase = supabaseRef.current
+    if (missionLogsChannelRef.current) {
+      void supabase.removeChannel(missionLogsChannelRef.current)
+      missionLogsChannelRef.current = null
+    }
     const channel = supabase
       .channel(`approval_mission_logs:${currentId}`)
       .on(
@@ -403,7 +419,9 @@ export default function ApprovalTab({
         },
       )
       .subscribe()
+    missionLogsChannelRef.current = channel
     return () => {
+      if (missionLogsChannelRef.current === channel) missionLogsChannelRef.current = null
       void supabase.removeChannel(channel)
     }
   }, [currentId, refreshChildMissionLogs])
@@ -411,14 +429,20 @@ export default function ApprovalTab({
   /** 자녀 미션 완료 직후 MissionTab 이 보내는 브로드캐스트 — Realtime 보다 빨리 목록을 맞출 수 있음 */
   useEffect(() => {
     if (!currentId) return
-    const supabase = createClient()
+    const supabase = supabaseRef.current
+    if (missionBroadcastChannelRef.current) {
+      void supabase.removeChannel(missionBroadcastChannelRef.current)
+      missionBroadcastChannelRef.current = null
+    }
     const channel = supabase
       .channel(`parent_mission_log_refresh:${currentId}`)
       .on('broadcast', { event: 'child_completed_mission' }, () => {
         void refreshChildMissionLogs()
       })
       .subscribe()
+    missionBroadcastChannelRef.current = channel
     return () => {
+      if (missionBroadcastChannelRef.current === channel) missionBroadcastChannelRef.current = null
       void supabase.removeChannel(channel)
     }
   }, [currentId, refreshChildMissionLogs])
@@ -439,7 +463,11 @@ export default function ApprovalTab({
   useEffect(() => {
     const childIdSet = new Set(childrenProfiles.map((c) => c.id))
     if (childIdSet.size === 0) return
-    const supabase = createClient()
+    const supabase = supabaseRef.current
+    if (purchaseRequestsChannelRef.current) {
+      void supabase.removeChannel(purchaseRequestsChannelRef.current)
+      purchaseRequestsChannelRef.current = null
+    }
     const channel = supabase
       .channel(`approval_purchase_requests:${familyChildIdsKey}`)
       .on(
@@ -485,10 +513,39 @@ export default function ApprovalTab({
         },
       )
       .subscribe()
+    purchaseRequestsChannelRef.current = channel
     return () => {
+      if (purchaseRequestsChannelRef.current === channel) purchaseRequestsChannelRef.current = null
       void supabase.removeChannel(channel)
     }
   }, [familyChildIdsKey, childrenProfiles])
+
+  /** 현재 자녀의 롤백 브로드캐스트 채널을 미리 붙여 두고 재사용합니다. */
+  useEffect(() => {
+    if (!currentId) {
+      missionRedoReadyChildIdRef.current = null
+      missionRedoChannelRef.current = null
+      return
+    }
+    const supabase = supabaseRef.current
+    if (missionRedoChannelRef.current) {
+      void supabase.removeChannel(missionRedoChannelRef.current)
+      missionRedoChannelRef.current = null
+      missionRedoReadyChildIdRef.current = null
+    }
+    const channel = supabase.channel(`mission_redo:${currentId}`, { config: { broadcast: { ack: false } } })
+    channel.subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        missionRedoChannelRef.current = channel
+        missionRedoReadyChildIdRef.current = currentId
+      }
+    })
+    return () => {
+      if (missionRedoChannelRef.current === channel) missionRedoChannelRef.current = null
+      if (missionRedoReadyChildIdRef.current === currentId) missionRedoReadyChildIdRef.current = null
+      void supabase.removeChannel(channel)
+    }
+  }, [currentId])
 
   const hiddenSetForCurrent = useMemo((): Set<string> => {
     if (!currentId) return new Set()
@@ -660,44 +717,17 @@ export default function ApprovalTab({
 
       await refreshChildMissionLogs()
 
-      const supabase = createClient()
-      const channel = supabase.channel(`mission_redo:${currentId}`, { config: { broadcast: { ack: false } } })
-      await new Promise<void>((resolve) => {
-        let settled = false
-        const timeout = window.setTimeout(() => {
-          if (settled) return
-          settled = true
-          void supabase.removeChannel(channel)
-          resolve()
-        }, 4000)
-        channel.subscribe((status) => {
-          if (status === 'SUBSCRIBED') {
-            void (async () => {
-              await channel.send({
-                type: 'broadcast',
-                event: 'mission_rolled_back',
-                payload: {
-                  dailyMissionId,
-                  title: log.missions?.title ?? '미션',
-                },
-              })
-              if (settled) return
-              settled = true
-              window.clearTimeout(timeout)
-              void supabase.removeChannel(channel)
-              resolve()
-            })()
-            return
-          }
-          if (status === 'CHANNEL_ERROR') {
-            if (settled) return
-            settled = true
-            window.clearTimeout(timeout)
-            void supabase.removeChannel(channel)
-            resolve()
-          }
+      const readyChannel = missionRedoChannelRef.current
+      if (readyChannel && missionRedoReadyChildIdRef.current === currentId) {
+        await readyChannel.send({
+          type: 'broadcast',
+          event: 'mission_rolled_back',
+          payload: {
+            dailyMissionId,
+            title: log.missions?.title ?? '미션',
+          },
         })
-      })
+      }
 
       showToast('미션을 되돌렸어요. 자녀에게 알림을 보냈어요.')
     } catch {

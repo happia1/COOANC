@@ -112,13 +112,21 @@ export class AgentParseRequestError extends Error {
 export async function fetchAgentLatestReport(childId: string): Promise<AgentLatestReportRow | null> {
   const base = getAgentBaseUrl()
   const url = `${base}/agent-a/latest?child_id=${encodeURIComponent(childId)}`
-  const res = await fetch(url, { method: 'GET', cache: 'no-store' })
-  if (res.status === 404) return null
-  if (!res.ok) {
-    const t = await res.text().catch(() => '')
-    throw new Error(t || `에이전트 오류 (${res.status})`)
+  /** Render 슬립/콜드스타트를 고려해 5초 안에 응답이 없으면 홈 UI를 막지 않고 포기합니다. */
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 5000)
+  try {
+    const res = await fetch(url, { method: 'GET', cache: 'no-store', signal: controller.signal })
+    if (res.status === 404) return null
+    if (!res.ok) {
+      return null
+    }
+    return (await res.json()) as AgentLatestReportRow
+  } catch {
+    return null
+  } finally {
+    clearTimeout(timeout)
   }
-  return (await res.json()) as AgentLatestReportRow
 }
 
 /** 일정 텍스트/이미지 파싱 + 제안 생성 */

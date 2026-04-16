@@ -465,6 +465,8 @@ export default function RoutineTab({
   todayDailyMissions = [],
   familyLinkByChild = {},
 }: Props) {
+  /** 루틴 탭 Realtime은 같은 Supabase 클라이언트를 계속 재사용합니다. */
+  const supabaseRef = useRef(createClient())
   const pathname = usePathname()
   const { selectedChildId, setSelectedChildId } = useParentStore()
   /** multiline: 긴 안내(예: API hint) — 줄바꿈·너비·표시 시간 확대 */
@@ -527,21 +529,36 @@ export default function RoutineTab({
 
   /** assign-today 브로드캐스트를 SUBSCRIBED 직후 바로 쏠 수 있게 미리 붙여 둡니다(매번 subscribe 대기 제거). */
   const assignNotifyChannelRef = useRef<RealtimeChannel | null>(null)
+  /** SUBSCRIBED 전에 보낸 요청은 대기시켜 채널 중복 생성 없이 한 번만 전송합니다. */
+  const pendingAssignPayloadRef = useRef<{ childId: string; payload: Record<string, unknown> } | null>(null)
 
   useEffect(() => {
     if (!currentId) {
       assignNotifyChannelRef.current = null
+      pendingAssignPayloadRef.current = null
       return
     }
-    const supabase = createClient()
+    const supabase = supabaseRef.current
+    if (assignNotifyChannelRef.current) {
+      void supabase.removeChannel(assignNotifyChannelRef.current)
+      assignNotifyChannelRef.current = null
+    }
     const ch = supabase.channel(`daily_missions_child_refresh:${currentId}`, {
       config: { broadcast: { ack: false } },
     })
     ch.subscribe((status) => {
-      if (status === 'SUBSCRIBED') assignNotifyChannelRef.current = ch
+      if (status === 'SUBSCRIBED') {
+        assignNotifyChannelRef.current = ch
+        const pending = pendingAssignPayloadRef.current
+        if (pending && pending.childId === currentId) {
+          void ch.send({ type: 'broadcast', event: 'assign_today_ok', payload: pending.payload })
+          pendingAssignPayloadRef.current = null
+        }
+      }
     })
     return () => {
       assignNotifyChannelRef.current = null
+      pendingAssignPayloadRef.current = null
       void supabase.removeChannel(ch)
     }
   }, [currentId])
@@ -552,16 +569,7 @@ export default function RoutineTab({
       void ready.send({ type: 'broadcast', event: 'assign_today_ok', payload })
       return
     }
-    const supabase = createClient()
-    const ch = supabase.channel(`daily_missions_child_refresh:${childId}`, {
-      config: { broadcast: { ack: false } },
-    })
-    ch.subscribe((status) => {
-      if (status === 'SUBSCRIBED') {
-        void ch.send({ type: 'broadcast', event: 'assign_today_ok', payload })
-        void supabase.removeChannel(ch)
-      }
-    })
+    pendingAssignPayloadRef.current = { childId, payload }
   }, [])
 
   /** 온보딩과 동일: 집 보육이 아니면 학교·기관 루틴으로 봅니다 */
