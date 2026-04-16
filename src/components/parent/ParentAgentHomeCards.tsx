@@ -10,7 +10,6 @@
 import Link from 'next/link'
 import { useCallback, useEffect, useState } from 'react'
 import {
-  getAgentBaseUrl,
   type AgentEqScores,
   type AgentLatestReportRow,
 } from '@/lib/agentApi'
@@ -64,25 +63,25 @@ export default function ParentAgentHomeCards({ childId }: Props) {
   const [row, setRow] = useState<AgentLatestReportRow | null | undefined>(undefined)
   const [loading, setLoading] = useState(true)
   const [sheet, setSheet] = useState<SheetKind>(null)
-  const agentBaseUrl = getAgentBaseUrl()
+  /** 서버 렌더 중 호출을 막기 위해 공개 환경변수 URL만 클라이언트에서 읽습니다. */
+  const agentBaseUrl = process.env.NEXT_PUBLIC_AGENT_URL?.trim()?.replace(/\/$/, '') ?? ''
 
   const load = useCallback(async () => {
+    if (!childId || !agentBaseUrl) {
+      /** URL 미설정이면 네트워크를 치지 않고 즉시 폴백 카드로 렌더링합니다. */
+      setRow(null)
+      setLoading(false)
+      return
+    }
     setLoading(true)
     try {
-      /** Render 콜드스타트/404가 잦아도 홈 화면 본문 렌더링은 막지 않도록 클라이언트에서만 비동기 조회합니다. */
-      const controller = new AbortController()
-      const timeout = window.setTimeout(() => controller.abort(), 5000)
-      const data = await fetch(`${agentBaseUrl}/agent-a/latest?child_id=${encodeURIComponent(childId)}`, {
-        method: 'GET',
-        cache: 'no-store',
-        signal: controller.signal,
-      })
+      /** 서버 fetch 없이 클라이언트에서만 비동기로 가져옵니다. */
+      const data = await fetch(`${agentBaseUrl}/agent-a/latest?child_id=${encodeURIComponent(childId)}`)
         .then((res) => (res.ok ? res.json() : null))
         .catch(() => null)
-      window.clearTimeout(timeout)
       setRow((data as AgentLatestReportRow | null) ?? null)
     } catch {
-      /** 에이전트가 느리거나 404여도 홈 전체는 계속 그려야 하므로 수집중 카드로 폴백 */
+      /** 에이전트가 느리거나 404여도 홈 전체는 계속 그려야 하므로 폴백 카드로 유지합니다. */
       setRow(null)
     } finally {
       setLoading(false)
