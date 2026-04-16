@@ -2,6 +2,7 @@ import { cache } from 'react'
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { getCachedProfileRowById } from '@/lib/childAppDataCache'
 import { normalizeUuidParam } from '@/lib/normalizeUuid'
 import { PARENT_AS_CHILD_COOKIE } from '@/lib/parentAsChildCookie'
 
@@ -31,7 +32,8 @@ export const getActorChildContext = cache(async (): Promise<ActorChildContext> =
     redirect('/login')
   }
 
-  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle()
+  /** 자녀 앱 탭 페이지와 동일한 `profiles` 행을 `cache` 로 한 번만 읽습니다 */
+  const profile = await getCachedProfileRowById(user.id)
   const role = profile?.role ?? null
 
   if (role === 'parent') {

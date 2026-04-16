@@ -12,6 +12,12 @@ import { requireSupabaseUrlAndAnonKey } from '@/lib/supabase/requireEnv'
  *
  * 리프레시 토큰이 서버에서 무효면(getUser 시 갱신 실패) 깨진 쿠키를 남기지 않도록
  * signOut 으로 응답 쿠키를 정리합니다. (콘솔의 AuthApiError 반복 완화)
+ *
+ * ── 자녀 앱 `/home`·`/mission`·`/market` 과 `PARENT_AS_CHILD_COOKIE` ──
+ * 부모 계정인지·미리보기 쿠키가 있는지 판별하려면 `profiles.role` 조회가 필요합니다.
+ * Edge 미들웨어에서 매 요청 DB 조회를 추가하면 오히려 부하가 늘고, JWT 만으로는 역할을 알 수 없습니다.
+ * 따라서 「부모인데 미리보기 쿠키 없음 → /parent/home」 분기는
+ * 서버 컴포넌트 `getActorChildContext` 에서 처리합니다. (탭 전환 시 `enter-child-ui` API 를 부르지 않음)
  */
 export async function middleware(request: NextRequest) {
   const { url, anonKey } = requireSupabaseUrlAndAnonKey()

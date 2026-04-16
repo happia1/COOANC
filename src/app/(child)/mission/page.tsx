@@ -1,6 +1,9 @@
 /**
  * 아이 앱 미션 탭 — 서버 컴포넌트
  *
+ * ※ `/api/parent/enter-child-ui` 는 여기서 호출하지 않습니다.
+ *   부모 미리보기 세션은 `PARENT_AS_CHILD_COOKIE`(HttpOnly) + `getActorChildContext` 만 사용합니다.
+ *
  * 오늘 daily_missions 를 조회한 뒤, 비어 있지 않아도
  * 「이 자녀 템플릿 중 오늘 넣어야 할 것」이 빠져 있으면 추가 삽입합니다.
  * (부모가 스페셜만 assign-today 로 한 줄 넣은 뒤에는 예전 로직이 전체 백필을 건너뛰어
@@ -12,6 +15,7 @@
  */
 import { createClient } from '@/lib/supabase/server'
 import { createServiceRoleClient } from '@/lib/supabase/admin'
+import { getCachedProfileRowById, getCachedFamilyLinksForChild } from '@/lib/childAppDataCache'
 import { getActorChildContext } from '@/lib/getActorChildContext'
 import MissionTab from '@/components/child/MissionTab'
 import { getSeoulDateString } from '@/lib/koreaDate'
@@ -76,10 +80,10 @@ export default async function MissionPage() {
 
   const today = getSeoulDateString()
 
-  const [statsRes, familyRes, profileRes, grantsRes, placementsRes] = await Promise.all([
+  const [statsRes, profileRow, familyRows, grantsRes, placementsRes] = await Promise.all([
     supabase.from('child_stats').select('*').eq('child_id', childId).maybeSingle(),
-    supabase.from('family_links').select('parent_id').eq('child_id', childId).limit(1).maybeSingle(),
-    supabase.from('profiles').select('name').eq('id', childId).maybeSingle(),
+    getCachedProfileRowById(childId),
+    getCachedFamilyLinksForChild(childId),
     supabase
       .from('praise_sticker_grants')
       .select('*')
@@ -91,11 +95,11 @@ export default async function MissionPage() {
   const initialStats = (statsRes.data ?? null) as ChildStats | null
   const level = initialStats?.current_level ?? 0
 
-  const childName = (profileRes.data?.name ?? '').trim() || '쿠앵이'
+  const childName = (profileRow?.name ?? '').trim() || '쿠앵이'
   const initialPraiseGrants = (grantsRes.data ?? []) as PraiseStickerGrant[]
   const initialPraisePlacements = (placementsRes.data ?? []) as PraiseStickerPlacement[]
 
-  const parentId = familyRes.data?.parent_id ?? null
+  const parentId = familyRows[0]?.parent_id ?? null
 
   /** embed 에 템플릿 보상·배율을 넣어 자녀 카드 숫자와 완료 API가 맞춰집니다. */
   const missionJoin =

@@ -4,6 +4,7 @@
  * - 부모가 켠/끈 상품은 클라이언트(MarketTab)에서 `child_market_hidden_items` 실시간 구독으로 즉시 반영합니다.
  */
 import { createClient } from '@/lib/supabase/server'
+import { getCachedFamilyLinksForChild } from '@/lib/childAppDataCache'
 import { getActorChildContext } from '@/lib/getActorChildContext'
 import MarketTab from '@/components/child/MarketTab'
 import { applyStoreItemCreditOverrides } from '@/lib/applyStoreItemCreditOverrides'
@@ -16,14 +17,14 @@ export default async function MarketPage() {
   const supabase = await createClient()
   const childId = ctx.actorChildId
 
-  const [statsRes, linksRes, itemsRes, hiddenRes, requestsRes, wishRes, creditOvRes] = await Promise.all([
+  const [statsRes, familyRows, itemsRes, hiddenRes, requestsRes, wishRes, creditOvRes] = await Promise.all([
     supabase
       .from('child_stats')
       .select('credits, credits_wallet, credits_piggy, current_level')
       .eq('child_id', childId)
       .maybeSingle(),
 
-    supabase.from('family_links').select('id').eq('child_id', childId),
+    getCachedFamilyLinksForChild(childId),
 
     supabase
       .from('store_items')
@@ -59,7 +60,7 @@ export default async function MarketPage() {
         quantity: typeof r.quantity === 'number' && r.quantity > 0 ? r.quantity : 1,
       }))
 
-  const familyLinkIds = new Set((linksRes.data ?? []).map((r: { id: string }) => r.id))
+  const familyLinkIds = new Set(familyRows.map((r) => r.id))
   const hiddenIds = new Set(
     (hiddenRes.error ? [] : (hiddenRes.data ?? [])).map((r: { store_item_id: string }) => r.store_item_id),
   )
