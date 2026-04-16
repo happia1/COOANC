@@ -533,18 +533,23 @@ export default function MarketTab({
       }
     }
 
-    /**
-     * 마운트 직시 sync 는 생략합니다 — `market/page.tsx`(RSC)가 이미 최신 행을 넘기므로
-     * 첫 폴링은 5초 후 interval 과 (탭 복귀 시) focus/visibility 에서만 돌립니다.
-     */
-    const intervalId = window.setInterval(() => {
-      if (document.visibilityState === 'visible') void syncMarketFromDb()
-    }, 5000)
+    // ✅ 수정: mount 후 2초 뒤부터 이벤트 수신
+    let listenerReady = false
+    const listenerTimer = window.setTimeout(() => { listenerReady = true }, 2000)
+
     const onVisibleOrFocus = () => {
-      if (document.visibilityState === 'visible') void syncMarketFromDb()
+      if (listenerReady && document.visibilityState === 'visible') void syncMarketFromDb()
     }
     document.addEventListener('visibilitychange', onVisibleOrFocus)
     window.addEventListener('focus', onVisibleOrFocus)
+
+    return () => {
+      cancelled = true
+      window.clearTimeout(listenerTimer)
+      window.clearInterval(intervalId)
+      document.removeEventListener('visibilitychange', onVisibleOrFocus)
+      window.removeEventListener('focus', onVisibleOrFocus)
+    }
 
     return () => {
       cancelled = true
