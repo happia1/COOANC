@@ -34,9 +34,15 @@ export const getActorChildContext = cache(async (): Promise<ActorChildContext> =
 
   /** 자녀 앱 탭 페이지와 동일한 `profiles` 행을 `cache` 로 한 번만 읽습니다 */
   const profile = await getCachedProfileRowById(user.id)
-  const role = profile?.role ?? null
+  /**
+   * 스키마는 `parent` | `child` 만 허용이나, 공백·대소문자 혼동을 막기 위해 부모 여부만 정규화합니다.
+   * - `parent` 가 아니면 전부 「자녀 본인 actor」경로(actorChildId = user.id, 나가기는 /parent/home).
+   * - 행이 없거나 role 이 비어 있으면 부모 분기로 가지 않음(리다이렉트 없음).
+   */
+  const isParentRole =
+    typeof profile?.role === 'string' && profile.role.trim().toLowerCase() === 'parent'
 
-  if (role === 'parent') {
+  if (isParentRole) {
     const jar = await cookies()
     const raw = jar.get(PARENT_AS_CHILD_COOKIE)?.value ?? ''
     const childId = normalizeUuidParam(raw)
