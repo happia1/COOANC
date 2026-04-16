@@ -4,6 +4,9 @@
  * 루트(/) — 로그인 여부와 계정 역할만 보고 이동합니다.
  * - 디바이스 모드(공유/자녀전용/부모전용) 단계는 사용하지 않습니다.
  */
+export const dynamic = 'force-dynamic'
+export const preferredRegion = 'hnd1'
+
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import BunnyRunLoader from '@/components/ui/BunnyRunLoader'

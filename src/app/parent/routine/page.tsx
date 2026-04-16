@@ -2,6 +2,9 @@
  * 부모 루틴 탭 — 서버 컴포넌트
  * 자녀 목록 + 전체 미션 조회 후 RoutineTab(Client)에 전달
  */
+export const dynamic = 'force-dynamic'
+export const preferredRegion = 'hnd1'
+
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { getCachedParentAuth } from '@/lib/parentServerAuthCache'

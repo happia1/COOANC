@@ -7,6 +7,11 @@
  * **그날짜(date)로 배정된 daily_missions 행 전부**를 분모로 씁니다.
  * (오전·오후·스페셜 등 당일 생성·배정된 카드가 빠지지 않도록 블록별 필터는 두지 않습니다.)
  */
+
+export const dynamic = 'force-dynamic'
+export const preferredRegion = 'hnd1'
+
+
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { getCachedParentAuth } from '@/lib/parentServerAuthCache'

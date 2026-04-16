@@ -32,6 +32,7 @@ import type {
  * 빌드 시 정적 사전 렌더링(prerender)을 하지 않고 요청 시점에 렌더링합니다.
  */
 export const dynamic = 'force-dynamic'
+export const preferredRegion = 'hnd1'
 
 type RoutineType = 'weekday' | 'weekend' | 'holiday' | 'vacation'
 

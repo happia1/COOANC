@@ -3,6 +3,9 @@
  * - getActorChildContext 의 자녀 id 로 통계·숨김 상품·구매 요청을 조회합니다.
  * - 부모가 켠/끈 상품은 클라이언트(MarketTab)에서 `child_market_hidden_items` 실시간 구독으로 즉시 반영합니다.
  */
+export const dynamic = 'force-dynamic'
+export const preferredRegion = 'hnd1'
+
 import { createClient } from '@/lib/supabase/server'
 import { getCachedFamilyLinksForChild } from '@/lib/childAppDataCache'
 import { getActorChildContext } from '@/lib/getActorChildContext'

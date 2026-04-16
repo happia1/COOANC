@@ -1,6 +1,10 @@
 /**
  * 부모 승인 탭 — 구매 요청 승인/반려 + 미션 롤백 + 자녀 마켓 메뉴 제어
  */
+
+export const dynamic = 'force-dynamic'
+export const preferredRegion = 'hnd1'
+
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { getCachedParentAuth } from '@/lib/parentServerAuthCache'

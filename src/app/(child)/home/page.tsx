@@ -11,6 +11,7 @@ import type { ChildStats, ChildItemUnlock, PraiseStickerGrant, PraiseStickerPlac
 
 /** 매 요청 최신 RSC 로 오래된 SSR HTML 과 클라 번들이 어긋나 hydration 이 깨지는 경우를 줄입니다. */
 export const dynamic = 'force-dynamic'
+export const preferredRegion = 'hnd1'
 
 export default async function ChildHomePage({
   searchParams,
