@@ -49,20 +49,12 @@ const PIGGY_EMPTY_BALANCE_VISUAL_MUL = 0.9 as const
 /** 예전 「첫 돼지」와 같은 화면 비율 — 중간 단계는 전부 이 크기로 통일합니다 */
 const PIGGY_BASE_VISUAL_SCALE = 0.98 as const
 /**
- * 마지막 단계(왕관 돼지)만 추가로 곱하는 배율.
- * (1.14 → 1.06 → **1.02**) 왕관만 살짝 키운 수준 — 중간 단계는 `PIGGY_BASE_VISUAL_SCALE` 만 씀.
+ * 단계별 그림 크기 배율 — 모든 단계에서 동일하게 적용(크레딧 기반 배율로만 크기 변화).
+ * 이전에 마지막 단계에만 별도 배율을 곱했으나, 단계 크기가 역전되어 커질 때·작아질 때
+ * 다른 크기 곡선이 생기는 비대칭이 발생해 제거함.
  */
-const PIGGY_CROWN_STAGE_EXTRA = 1.02 as const
-
-/**
- * 단계별 그림 크기 배율.
- * - 예전에는 진행도에 따라 점점 커졌지만, 요청에 따라 **첫 돼지 크기를 끝까지 유지**합니다.
- * - **마지막 단계(가득 찬/왕관)** 만 `PIGGY_CROWN_STAGE_EXTRA` 만큼 더 크게 보입니다.
- */
-function piggyStageVisualMultiplier(stepIndex: number, stageCount: number): number {
-  if (stageCount <= 1) return PIGGY_BASE_VISUAL_SCALE * PIGGY_CROWN_STAGE_EXTRA
-  const isLast = stepIndex === stageCount - 1
-  return isLast ? PIGGY_BASE_VISUAL_SCALE * PIGGY_CROWN_STAGE_EXTRA : PIGGY_BASE_VISUAL_SCALE
+function piggyStageVisualMultiplier(_stepIndex: number, _stageCount: number): number {
+  return PIGGY_BASE_VISUAL_SCALE
 }
 
 /**

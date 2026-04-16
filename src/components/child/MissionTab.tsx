@@ -11,7 +11,6 @@ import type {
   PraiseStickerPlacement,
 } from '@/types/database'
 import MissionCreditCards from '@/components/child/MissionCreditCards'
-import ChildMapStickerFloatingStack from '@/components/child/ChildMapStickerFloatingStack'
 import { parseSpecialMissionPopup } from '@/lib/specialMissionDescription'
 import { isRetiredSpecialMissionTitle, isSpecialSectionMission } from '@/lib/specialMissionChips'
 import { compareRoutineFlowSortable, type RoutineFlowSortable } from '@/lib/routineChips'
@@ -25,11 +24,23 @@ import { missionRoutineIconFrame } from '@/lib/missionRoutineIconFrame'
 import { resolveRoutineMissionPngUrl } from '@/lib/routineMissionThumbnail'
 
 import MissionCreditToPiggyOverlay from '@/components/child/MissionCreditToPiggyOverlay'
-import MissionCreditMoveDialog, {
-  MissionCreditActionSheet,
-  type CreditTransferApiSuccess,
-  type CreditTransferKind,
+import dynamic from 'next/dynamic'
+import type {
+  CreditTransferApiSuccess,
+  CreditTransferKind,
 } from '@/components/child/MissionCreditMoveDialog'
+
+const MissionCreditMoveDialog = dynamic(
+  () => import('@/components/child/MissionCreditMoveDialog'),
+  { ssr: false },
+)
+const MissionCreditActionSheet = dynamic(
+  () =>
+    import('@/components/child/MissionCreditMoveDialog').then((m) => ({
+      default: m.MissionCreditActionSheet,
+    })),
+  { ssr: false },
+)
 import {
   creditsFloating,
   mergeChildStatsPatch,
@@ -187,14 +198,10 @@ function trySpecialDeliveryPopupFields(
  * - **오늘의 미션** 바깥·제목·카드 줄 **패딩**, 카드 **비율·간격** 모두 `missionTodayLayoutSpec.ts` 픽스. 임의 수정 금지.
  * - 미션 탭 본문은 세로 스크롤로 상단(저금통·돈바구니·지갑 무대)·하단(카드)을 이어서 볼 수 있습니다.
  * - 카드 썸네일: `resolveRoutineMissionPngUrl`(제목 우선) 또는 `routines_01` 아틀라스(`missionRoutineIconFrame`)
- * - 항해지도·스티커 단추: 홈 `HomeTab` 과 **같은 `max-w-sm` 좌표**로 `ChildMapStickerFloatingStack` 에서 노출합니다.
  */
 export default function MissionTab({
   childId,
-  childName,
   initialStats,
-  initialPraiseGrants,
-  initialPraisePlacements,
   dailyMissions,
   today,
   isFullRestDay,
@@ -465,10 +472,7 @@ export default function MissionTab({
    * `pb-1 sm:pb-1.5`: 하단 경계와 살짝 간격. 하단 `bottomPanel` 스펙은 그대로입니다.
    */
   const heroBand = (
-    <div className="relative flex min-h-0 w-full flex-[5.5] basis-0 flex-col self-stretch pb-1 sm:pb-1.5">
-      {/** 장식용 여백 — 스크린 리더에 읽히지 않게 숨김 */}
-      <div className="min-h-0 shrink-0 flex-[3]" aria-hidden />
-      {/** `max-w-sm` 보다 좁게 — 세 칸 카드 가로를 줄이고 양옆에 배경이 조금 더 보이게 */}
+    <div className="relative flex min-h-0 w-full shrink-0 flex-col self-stretch pb-2">
       {/** `z-0`: 제목·하트(`z-[30]`)가 위로 겹칠 때 저금통 줄보다 뒤에 두어 글이 가려지지 않게 함 */}
       <div className="relative z-0 flex w-full shrink-0 justify-center px-3 sm:px-4">
         <div className="w-full max-w-[18rem] sm:max-w-[18.5rem]">
@@ -482,7 +486,6 @@ export default function MissionTab({
           />
         </div>
       </div>
-      <div className="min-h-0 shrink-0 flex-1" aria-hidden />
     </div>
   )
 
@@ -549,7 +552,7 @@ export default function MissionTab({
                   MISSION_CARD_BUTTON_BASE_CLASSNAME,
                   special
                     ? 'border-amber-300 ring-2 ring-amber-200/60 bg-gradient-to-b from-amber-50 via-amber-100 to-yellow-200'
-                    : 'border-gray-200/90',
+                    : 'border-[#ede9e0]',
                 ].join(' ')}
               >
                 {/**
@@ -571,8 +574,8 @@ export default function MissionTab({
                       <img
                         src={routineImagePath}
                         alt=""
-                        className="select-none object-contain drop-shadow-[0_2px_8px_rgba(0,0,0,0.08)]"
-                        style={{ width: MISSION_CARD_ROUTINE_SPRITE_WIDTH_PX, height: MISSION_CARD_ROUTINE_SPRITE_WIDTH_PX }}
+                        className="max-w-full select-none object-contain drop-shadow-[0_2px_8px_rgba(0,0,0,0.08)]"
+                        style={{ width: MISSION_CARD_ROUTINE_SPRITE_WIDTH_PX, height: MISSION_CARD_ROUTINE_SPRITE_WIDTH_PX, maxWidth: '100%' }}
                         draggable={false}
                       />
                     ) : (
@@ -790,18 +793,9 @@ export default function MissionTab({
             completedCount={completedCount}
             totalMissions={total}
           />
-          <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-hidden">
-            <ChildMapStickerFloatingStack
-              childId={childId}
-              childName={childName}
-              stats={stats}
-              setStats={setStats}
-              initialPraiseGrants={initialPraiseGrants}
-              initialPraisePlacements={initialPraisePlacements}
-            />
+          <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-hidden pt-16">
             {heroBand}
-            {/** `-mt-2`: 상단 크레딧 칸(5.5)은 그대로 두고, 이 하단 칸만 살짝 위로 당겨 간격을 줄임 */}
-            <div className="-mt-2 flex min-h-0 min-w-0 flex-[4.5] basis-0 flex-col items-center justify-center gap-2 overflow-x-hidden overflow-y-hidden overscroll-contain px-4 py-2 text-center sm:gap-3 sm:px-6 sm:py-4">
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col items-center justify-center gap-2 overflow-x-hidden overflow-y-hidden overscroll-contain px-4 py-2 text-center sm:gap-3 sm:px-6 sm:py-4">
               <span className="text-sm font-black text-gray-400">휴식</span>
               <p className="text-lg font-black text-brand-text sm:text-xl">오늘은 쉬는 날이에요!</p>
               <p className="text-xs text-gray-400 sm:text-sm">푹 쉬고 내일 또 열심히 해봐요.</p>
@@ -879,18 +873,10 @@ export default function MissionTab({
          * `overflow-y-hidden`: flex `min-h-0` 축소가 깨지지 않게 해 한 화면에 맞춤(`overflow-y-visible` 이면 세로 스크롤바 유발).
          * 카드만 필요 시 스크롤 — `bottomPanel` 안 래퍼에 `overflow-y-auto` + 스크롤바 숨김.
          */}
-        <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-hidden">
-          <ChildMapStickerFloatingStack
-            childId={childId}
-            childName={childName}
-            stats={stats}
-            setStats={setStats}
-            initialPraiseGrants={initialPraiseGrants}
-            initialPraisePlacements={initialPraisePlacements}
-          />
+        <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-hidden pt-16">
           {heroBand}
           {/** `z-20` + 세로 visible: 제목이 위로 나와도 잘리지 않고, 상단 크레딧(z-0)보다 앞에 그려짐 */}
-          <div className="relative z-20 -mt-2 flex min-h-0 min-w-0 flex-[4.5] basis-0 flex-col overflow-x-hidden overflow-y-hidden overscroll-contain">
+          <div className="relative z-20 flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-hidden overscroll-contain mt-2">
             {bottomPanel}
           </div>
         </div>

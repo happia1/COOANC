@@ -101,27 +101,32 @@ const IMG_BOX = 60 as const
 const ICON_DISPLAY = IMG_BOX - 8
 
 /**
+ * 저금통 displayWidth — 렌더 시 stageMul(0.98) × pre850Mul(0.81) ≈ 0.794 가 곱해져
+ * 화면에 보이는 크기는 66 × 0.794 ≈ 52px = 지갑(ICON_DISPLAY)과 동일.
+ */
+const PIGGY_DISPLAY = 66
+
+/**
  * 돈바구니(가용 크레딧) — `FloatingCreditsStackVisual` 의 `displayWidth` (원래 비율: 지갑·저금통과 맞춘 1.9배).
  */
-const FLOATING_COIN_DISPLAY_WIDTH = Math.round(ICON_DISPLAY * 1.9)
+const FLOATING_COIN_DISPLAY_WIDTH = Math.round(ICON_DISPLAY * 2.6)
 
-/**
- * 세 칸 공통 아이콘 행 높이(레이아웃) — 카드 전체 높이를 올리지 않기 위해 예전처럼 `IMG_BOX + 32` 유지.
- * (비개발자용) 돈바구니만 **절반 높이**로 그린 다음 `FLOATING_MONEY_VISUAL_SCALE` 으로 키워, **줄 높이**는 옆 칸과 같습니다.
- */
+/** 저금통·지갑 아이콘 행 높이(레이아웃) — 기존 크기 유지. */
 const FLOATING_ICON_BOX = IMG_BOX + 32
 
+/** 돈바구니 전용 아이콘 행 높이 — 저금통·지갑보다 크게. */
+const FLOATING_CENTER_ICON_BOX = IMG_BOX + 55
+
 /**
- * 돈바구니 `tightSlot` 용 세로 한도 — `FLOATING_ICON_BOX` 의 절반.
+ * 돈바구니 `tightSlot` 용 세로 한도 — `FLOATING_CENTER_ICON_BOX` 기준.
  * 바깥 `FLOATING_MONEY_VISUAL_SCALE` 과 곱해져 화면에 보이는 동전·바구니 크기가 정해집니다.
  */
-const FLOATING_TIGHT_SLOT_HEIGHT_PX = Math.max(28, Math.floor(FLOATING_ICON_BOX / 2))
+const FLOATING_TIGHT_SLOT_HEIGHT_PX = Math.max(28, Math.floor(FLOATING_CENTER_ICON_BOX / 2))
 
 /**
  * 돈바구니 그림만 키우는 배율 — 저금통·지갑·글·숫자는 그대로 두고 이 값만 조정하면 됩니다.
- * (비개발자용) `2` 보다 크면 돈바구니 그림만 더 커 보이고, 옆 칸과 겹치지 않게 가로는 잘립니다.
  */
-const FLOATING_MONEY_VISUAL_SCALE = 2.45
+const FLOATING_MONEY_VISUAL_SCALE = 3.2
 
 /**
  * 세 칸 **제목** 줄 맞춤용 아이콘 행 — `justify-end` 로 그림을 아래에 붙입니다.
@@ -131,9 +136,6 @@ const FLOATING_MONEY_VISUAL_SCALE = 2.45
 const CREDIT_ICON_ROW_CLASS =
   'flex w-full shrink-0 flex-col items-center justify-end overflow-visible'
 
-/** 돈바구니 아이콘 행 — 스크롤 방지를 위해 `overflow` 는 전부 보이게 둡니다. */
-const CREDIT_ICON_ROW_FLOATING_CLASS =
-  'relative flex w-full shrink-0 flex-col items-center justify-end overflow-visible'
 
 /**
  * 카드 테두리·패딩(`creditCardShell`)은 그대로 두고, 안의 그림+제목+숫자+설명 묶음만 위로 올립니다.
@@ -220,7 +222,7 @@ export default function MissionCreditCards({
 
   return (
     <div
-      className="mx-auto grid w-full max-w-[16.75rem] grid-cols-3 gap-2 overflow-visible sm:max-w-[17.25rem]"
+      className="flex w-full flex-row items-end justify-center gap-4 overflow-visible px-3 sm:px-4"
       aria-label="크레딧 현황"
     >
 
@@ -228,7 +230,7 @@ export default function MissionCreditCards({
       <button
         type="button"
         onClick={onPiggyTap}
-        className={`flex flex-col items-center overflow-visible ${creditCardShell}`}
+        className={`flex flex-1 flex-col items-center overflow-visible ${creditCardShell}`}
       >
         <div
           className={`flex w-full min-w-0 flex-col items-center gap-0.5 ${CREDIT_CARD_INNER_LIFT_CLASS}`}
@@ -244,7 +246,7 @@ export default function MissionCreditCards({
             >
               <PiggyBankStageVisual
                 stepIndex={animatedPiggyStep}
-                displayWidth={ICON_DISPLAY}
+                displayWidth={PIGGY_DISPLAY}
                 piggyCredits={piggyCreditsForVisual}
                 className="select-none"
               />
@@ -262,7 +264,7 @@ export default function MissionCreditCards({
         disabled={floating <= 0}
         onClick={onCenterTap}
         className={[
-          `flex flex-col items-center overflow-visible ${creditCardShell}`,
+          `flex flex-[1.8] flex-col items-center overflow-visible ${creditCardShell}`,
           floating <= 0 ? 'opacity-50' : '',
         ].join(' ')}
       >
@@ -270,21 +272,13 @@ export default function MissionCreditCards({
           className={`flex w-full min-w-0 flex-col items-center gap-0.5 ${CREDIT_CARD_INNER_LIFT_CLASS}`}
         >
           <div
-            className={CREDIT_ICON_ROW_FLOATING_CLASS}
-            style={{ height: FLOATING_ICON_BOX, minHeight: FLOATING_ICON_BOX }}
+            className="relative flex w-full shrink-0 items-end justify-center overflow-visible"
+            style={{ height: FLOATING_CENTER_ICON_BOX, minHeight: FLOATING_CENTER_ICON_BOX }}
           >
-            {/**
-             * 카드 줄 높이는 `FLOATING_ICON_BOX` 로 저금통·지갑과 동일.
-             * 돈바구니만 `maxOuterHeightPx` 를 **절반**으로 두고 `FLOATING_MONEY_VISUAL_SCALE` + `origin-bottom` 으로
-             * 그림만 키우고, 레이아웃(카드 높이·저금통·지갑·글)은 건드리지 않음.
-             */}
-            {/**
-             * `translate` + `scale` 을 한 줄에만 써야 브라우저가 덮어쓰지 않습니다. 위로 살짝 올리는 값은 예전 `translate-y-1` 정도.
-             */}
             <div
-              className="pointer-events-none absolute bottom-0 left-1/2 z-[1] flex items-end justify-center"
+              className="pointer-events-none flex items-end justify-center"
               style={{
-                transform: `translate(-50%, -0.25rem) scale(${FLOATING_MONEY_VISUAL_SCALE})`,
+                transform: `scale(${FLOATING_MONEY_VISUAL_SCALE})`,
                 transformOrigin: 'bottom center',
               }}
             >
@@ -308,7 +302,7 @@ export default function MissionCreditCards({
       <button
         type="button"
         onClick={onWalletTap}
-        className={`flex flex-col items-center overflow-visible ${creditCardShell}`}
+        className={`flex flex-1 flex-col items-center overflow-visible ${creditCardShell}`}
       >
         <div
           className={`flex w-full min-w-0 flex-col items-center gap-0.5 ${CREDIT_CARD_INNER_LIFT_CLASS}`}

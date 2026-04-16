@@ -36,8 +36,8 @@ export function missionCreditsProgressiveScaleMul(credits: number | undefined): 
   const c = Math.min(Math.max(0, Math.floor(credits)), cap)
 
   /** 900 크레딧·캡에서의 최대 시각 배율(이전 1.36 / 1.78 에서 추가 축소) */
-  const MUL_AT_900 = 1.22
-  const MUL_AT_CAP = 1.52
+  const MUL_AT_900 = 1.03
+  const MUL_AT_CAP = 1.08
 
   if (c <= 900) {
     const spanA = 900 - CREDITS_VISUAL_GROWTH_START

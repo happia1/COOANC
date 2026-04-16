@@ -377,12 +377,12 @@ export function MissionCreditActionSheet({ open, onClose, bucket, floating, wall
   } else if (bucket === 'wallet') {
     rows = []
     if (wallet > 0) {
-      rows.push({ kind: 'wallet_to_float', label: '돈바구니로 꺼내기 (다시 모아 두기)' })
+      rows.push({ kind: 'wallet_to_float', label: '돈바구니로 (다시 모아 두기)' })
       rows.push({ kind: 'wallet_to_piggy', label: '저금통으로 옮기기' })
     }
   } else {
     if (piggy > 0) {
-      rows.push({ kind: 'piggy_to_float', label: '돈바구니로 꺼내기' })
+      rows.push({ kind: 'piggy_to_float', label: '돈바구니로' })
       rows.push({ kind: 'piggy_to_wallet', label: '지갑으로 옮기기 (쓸 준비)' })
     }
   }
@@ -406,7 +406,7 @@ export function MissionCreditActionSheet({ open, onClose, bucket, floating, wall
         return { title: '저금통으로', subtitle: '모아 두기', icon: 'piggy', tone: 'sky' }
       case 'wallet_to_float':
       case 'piggy_to_float':
-        return { title: '꺼내기', subtitle: '다시 나눠 두기', icon: 'credit', tone: 'sky' }
+        return { title: '돈바구니로', subtitle: '다시 나눠 두기', icon: 'credit', tone: 'sky' }
       default:
         return { title: '선택', subtitle: '이동하기', icon: 'wallet', tone: 'amber' }
     }

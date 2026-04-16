@@ -39,16 +39,28 @@ const MAX_FLOATING_FOR_STAGE = MISSION_CREDITS_STAGE_CAP
  */
 const COIN_STAGE_IMAGE_URLS: ReadonlyArray<string> = Array.from({ length: 10 }, (_, i) => {
   const n = i + 1
-  return `/assets/img/items/rewards/home/home_credit${n}.png`
+  return `/assets/img/items/rewards/home/home_credit_${String(n).padStart(2, '0')}.png`
 })
 
 const COIN_STAGE_COUNT = COIN_STAGE_IMAGE_URLS.length
 
 /**
- * `home_credit10`(마지막 동전 PNG)만 추가로 줄임 — 저금통 왕관 단계를 줄인 것과 비슷하게 맞춤.
- * (비개발자용) 크레딧이 가득 찼을 때 동전 그림이 너무 크게만 보이지 않게 합니다.
+ * 단계별 크기 배율 — stage 0 에서 저금통·지갑과 같은 크기(≈0.44)로 시작해
+ * stage 9 현재 최대 크기(1.22)까지 선형으로 서서히 커집니다.
+ * (0.44 → +0.0867 × k → 1.22, 10단계 균등 증가)
  */
-const FLOATING_LAST_COIN_STAGE_VISUAL_MUL = 0.78 as const
+const COIN_STAGE_SCALE_MULTIPLIERS: ReadonlyArray<number> = [
+  0.60, // stage 0 — home_credit_01 (저금통·지갑과 동일 크기)
+  0.60, // stage 1 — home_credit_02
+  0.65, // stage 2 — home_credit_03
+  0.67, // stage 3 — home_credit_04
+  0.75, // stage 4 — home_credit_05
+  0.81, // stage 5 — home_credit_06
+  0.91, // stage 6 — home_credit_07
+  0.99,// stage 7 — home_credit_08
+  1.20, // stage 8 — home_credit_09
+  1.65, // stage 9 — home_credit_10 (최대 — 현재 크기 유지)
+] as const
 
 /** PNG 비율이 제각각이라 레이아웃만 맞출 때 쓰는 대략적인 세로/가로 비율(높이 쪽이 조금 더 김) */
 const CREDIT_IMAGE_LAYOUT_HEIGHT_RATIO = 1.12
@@ -213,11 +225,11 @@ export default function FloatingCreditsStackVisual({
     .join(' ')
 
   const useSlotCap = Boolean(tightSlot && typeof maxOuterHeightPx === 'number' && maxOuterHeightPx > 0)
-  /** 슬롯 안에 맞추는 축소만 담당 — 잔액 성장은 `creditsVisualMul` 을 곱해 별도로 적용합니다 */
+  /** 슬롯 안에 맞추는 축소만 담당 — 잔액 성장은 `creditsVisualMul` + 단계 배율을 곱해 별도로 적용합니다 */
   const slotScale = useSlotCap ? Math.min(1, maxOuterHeightPx! / displayHeight) : 1
-  /** 인덱스 9 = `home_credit10` — 마지막 단계만 시각적으로 축소 */
-  const lastCoinStageMul = displayStage === COIN_STAGE_COUNT - 1 ? FLOATING_LAST_COIN_STAGE_VISUAL_MUL : 1
-  const finalVisualScale = slotScale * creditsVisualMul * lastCoinStageMul
+  /** 단계별 크기 배율 — home_credit_01 기준으로 점점 커 보이게 합니다 */
+  const stageSizeMul = COIN_STAGE_SCALE_MULTIPLIERS[displayStage] ?? 1
+  const finalVisualScale = slotScale * creditsVisualMul * stageSizeMul
 
   /**
    * `translateY(0)` 로 하단 클립을 막은 뒤에도, PNG·서브픽셀 여유를 위해 `overflow-visible` 을 둡니다.
@@ -298,7 +310,7 @@ export default function FloatingCreditsStackVisual({
         <div
           className="inline-flex max-w-none shrink-0"
           style={{
-            transform: `scale(${creditsVisualMul * lastCoinStageMul})`,
+            transform: `scale(${creditsVisualMul * stageSizeMul})`,
             transformOrigin: 'bottom center',
           }}
         >
