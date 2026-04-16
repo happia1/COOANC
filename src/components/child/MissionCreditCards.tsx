@@ -222,7 +222,7 @@ export default function MissionCreditCards({
 
   return (
     <div
-      className="flex w-full flex-row items-end justify-center gap-4 overflow-visible px-3 sm:px-4"
+      className="flex w-full flex-row items-end justify-center gap-2 overflow-visible px-3 sm:px-4"
       aria-label="크레딧 현황"
     >
 

@@ -472,7 +472,7 @@ export default function MissionTab({
    * `pb-1 sm:pb-1.5`: 하단 경계와 살짝 간격. 하단 `bottomPanel` 스펙은 그대로입니다.
    */
   const heroBand = (
-    <div className="relative flex min-h-0 w-full shrink-0 flex-col self-stretch pb-2">
+    <div className="relative -mt-3 flex min-h-0 w-full shrink-0 flex-col self-stretch pb-2">
       {/** `z-0`: 제목·하트(`z-[30]`)가 위로 겹칠 때 저금통 줄보다 뒤에 두어 글이 가려지지 않게 함 */}
       <div className="relative z-0 flex w-full shrink-0 justify-center px-3 sm:px-4">
         <div className="w-full max-w-[18rem] sm:max-w-[18.5rem]">

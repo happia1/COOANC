@@ -46,20 +46,20 @@ const COIN_STAGE_COUNT = COIN_STAGE_IMAGE_URLS.length
 
 /**
  * 단계별 크기 배율 — stage 0 에서 저금통·지갑과 같은 크기(≈0.44)로 시작해
- * stage 9 현재 최대 크기(1.22)까지 선형으로 서서히 커집니다.
+ * stage 9 원래 최대 크기(1.22)까지 선형으로 서서히 커집니다.
  * (0.44 → +0.0867 × k → 1.22, 10단계 균등 증가)
  */
 const COIN_STAGE_SCALE_MULTIPLIERS: ReadonlyArray<number> = [
-  0.60, // stage 0 — home_credit_01 (저금통·지갑과 동일 크기)
-  0.60, // stage 1 — home_credit_02
-  0.65, // stage 2 — home_credit_03
-  0.67, // stage 3 — home_credit_04
-  0.75, // stage 4 — home_credit_05
-  0.81, // stage 5 — home_credit_06
-  0.91, // stage 6 — home_credit_07
-  0.99,// stage 7 — home_credit_08
-  1.20, // stage 8 — home_credit_09
-  1.65, // stage 9 — home_credit_10 (최대 — 현재 크기 유지)
+  0.44, // stage 0 — home_credit_01 (저금통·지갑과 동일 크기 ~50px)
+  0.53, // stage 1 — home_credit_02
+  0.61, // stage 2 — home_credit_03
+  0.70, // stage 3 — home_credit_04
+  0.79, // stage 4 — home_credit_05
+  0.87, // stage 5 — home_credit_06
+  0.96, // stage 6 — home_credit_07
+  1.05, // stage 7 — home_credit_08
+  1.13, // stage 8 — home_credit_09
+  1.22, // stage 9 — home_credit_10 (최대 — 원래 크기 유지)
 ] as const
 
 /** PNG 비율이 제각각이라 레이아웃만 맞출 때 쓰는 대략적인 세로/가로 비율(높이 쪽이 조금 더 김) */
