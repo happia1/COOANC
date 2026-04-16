@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import Image from 'next/image'
 import PiggyBankStageVisual from '@/components/child/PiggyBankStageVisual'
 import FloatingCreditsStackVisual from '@/components/child/FloatingCreditsStackVisual'
-import { walletImageSrcByStage, walletStageIndexByCredits } from '@/lib/walletStages'
+import { walletImageSrcByStage, walletStageIndexByCredits, WALLET_STAGE_COUNT } from '@/lib/walletStages'
 import { MISSION_CREDITS_STAGE_CAP, piggyBankStageCount } from '@/constants/piggyBankStages'
 
 /* ─────────────── 슬롯 숫자 (릴 효과) ─────────────── */
@@ -105,6 +105,12 @@ const ICON_DISPLAY = IMG_BOX - 8
  * 화면에 보이는 크기는 66 × 0.794 ≈ 52px = 지갑(ICON_DISPLAY)과 동일.
  */
 const PIGGY_DISPLAY = 66
+
+/**
+ * 지갑 최대 표시 너비(px) — 저금통 최대(`PIGGY_DISPLAY × stageMul × creditsMul`)와 동일하게 맞춥니다.
+ * stage 0 = ICON_DISPLAY(52px), stage max = 이 값(70px) 으로 선형 증가.
+ */
+const WALLET_MAX_DISPLAY_WIDTH = Math.round(PIGGY_DISPLAY * 0.98 * 1.08) // ≈ 70
 
 /**
  * 돈바구니(가용 크레딧) — `FloatingCreditsStackVisual` 의 `displayWidth` (원래 비율: 지갑·저금통과 맞춘 1.9배).
@@ -213,6 +219,13 @@ export default function MissionCreditCards({
     return () => clearInterval(tick)
   }, [walletTarget])
 
+  /** 지갑: stage 0 = ICON_DISPLAY(52px), stage max = WALLET_MAX_DISPLAY_WIDTH(70px) 선형 증가 */
+  const walletVisualWidth = Math.round(
+    ICON_DISPLAY +
+      (animatedWalletStage / Math.max(1, WALLET_STAGE_COUNT - 1)) *
+        (WALLET_MAX_DISPLAY_WIDTH - ICON_DISPLAY),
+  )
+
   /**
    * 카드 바깥 테두리·배경
    * (비개발자용) 맨 위 안쪽 여백을 거의 없앰(`pt-0`), 아래는 `pb-2` 유지로 카드 세로를 더 줄입니다.
@@ -315,9 +328,10 @@ export default function MissionCreditCards({
               <Image
                 src={walletImageSrcByStage(animatedWalletStage)}
                 alt=""
-                width={ICON_DISPLAY}
-                height={ICON_DISPLAY}
-                className="select-none object-contain"
+                width={walletVisualWidth}
+                height={walletVisualWidth}
+                className="h-auto max-w-none select-none object-contain"
+                style={{ width: walletVisualWidth, height: 'auto' }}
                 draggable={false}
               />
             </div>
