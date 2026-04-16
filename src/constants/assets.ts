@@ -102,19 +102,18 @@ export const ASSETS = {
     banners: `${ASSETS_IMG_BASE}/layouts/banners`,
     missionCards: `${ASSETS_IMG_BASE}/layouts/mission-cards`,
     /**
-     * 자녀 홈 기본 배경(레거시 호환 키)
-     * - 예전 이름(`childHomeBackground01`)을 쓰는 화면도 새 방 배경이 보이도록 같은 파일을 가리킵니다.
+     * 자녀 홈 기본 배경(레거시 호환 키) — 실제 PNG 는 `childHomeBackgroundSecondScreen` 와 동일 파일을 가리킵니다.
      */
-    childHomeBackground01: assetImg('layouts', 'backgrounds', 'second_screen_room_background.png'),
+    childHomeBackground01: assetImg('layouts', 'backgrounds', 'tablet_kidsroom_background_portrait_only.png'),
     /**
-     * 자녀 앱 홈 전용 배경(두 번째 방 버전)입니다.
-     * - 요청 파일: `public/assets/img/layouts/backgrounds/second_screen_room_background.png`
-     * - 홈 탭에서만 교체하고, 미션/로딩 등 공용 화면에는 영향이 없도록 분리해 둡니다.
+     * 자녀 앱 홈 탭 풀블리드 배경입니다.
+     * - 태블릿 키즈룸 일러스트, 세로(portrait) 전용 버전 (`tablet_kidsroom_background_portrait_only.png`).
+     * - 미션·로딩 등 다른 화면의 `sharedAppBackground` 와는 별도 파일이라 교체 시 홈만 바뀝니다.
      */
     childHomeBackgroundSecondScreen: assetImg(
       'layouts',
       'backgrounds',
-      'second_screen_room_background.png',
+      'tablet_kidsroom_background_portrait_only.png',
     ),
     /**
      * 공용 로딩(`loading.tsx`), 루트(`/`) 리다이렉트 등 — 미션 탭은 전면 배경 이미지를 쓰지 않습니다.

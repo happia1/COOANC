@@ -36,7 +36,7 @@ type Props = {
  * 아이 앱 홈 탭
  * - **한 화면**: 상단 풍경·하단 꾸미기가 **6:4** 비율(`flex-[6]`/`flex-[4]`)로 나뉨
  * - 섬 무대는 `ChildHomeIslandStage` 의 `density="flex"` 로 남는 세로 공간에 맞춤
- * - 배경: 홈 전용 큰 그림(`ASSETS.layouts.childHomeBackgroundSecondScreen`, `second_screen_room_background.png`)을 풀 블리드 셸 **뒤 한 겹**만 깝니다. `ChildHomeSceneryBand` 는 캐릭터 무대만 담고 `showBackground={false}` 입니다. 옛 잔디·섬 합성 PNG는 `showIslandArt={false}` 로 끕니다.
+ * - 배경: 홈 전용 큰 그림(`ASSETS.layouts.childHomeBackgroundSecondScreen` — 태블릿 키즈룸 세로 PNG)을 풀 블리드 셸 **뒤 한 겹**만 깝니다. `ChildHomeSceneryBand` 는 캐릭터 무대만 담고 `showBackground={false}` 입니다. 옛 잔디·섬 합성 PNG는 `showIslandArt={false}` 로 끕니다.
  * - 칭찬 스티커(곰)는 무대 **오른쪽 상단**(기존 날씨 자리), 성장 지도는 무대 **왼쪽** 지도 단추로 엽니다.
  * - 부모가 칭찬 스티커를 내면 팝업 후 곰돌이 판에서 붙일 수 있음
  */
