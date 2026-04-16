@@ -86,71 +86,7 @@ export default function ChildMapStickerFloatingStack({
     setArrivalOpen(pending)
   }, [grants])
 
-  useEffect(() => {
-    const supabase = createClient()
-    const ch = supabase
-      .channel(`praise_grants_mission_tab:${childId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'praise_sticker_grants',
-          filter: `child_id=eq.${childId}`,
-        },
-        (payload) => {
-          setGrants((prev) => [payload.new as PraiseStickerGrant, ...prev])
-        },
-      )
-      .subscribe()
-    return () => {
-      void supabase.removeChannel(ch)
-    }
-  }, [childId])
-
-  useEffect(() => {
-    const supabase = createClient()
-    const ch = supabase
-      .channel(`praise_grants_delete_mission_tab:${childId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'DELETE',
-          schema: 'public',
-          table: 'praise_sticker_grants',
-          filter: `child_id=eq.${childId}`,
-        },
-        () => {
-          void refreshGrantsOnly()
-        },
-      )
-      .subscribe()
-    return () => {
-      void supabase.removeChannel(ch)
-    }
-  }, [childId, refreshGrantsOnly])
-
-  useEffect(() => {
-    const supabase = createClient()
-    const ch = supabase
-      .channel(`praise_placements_mission_tab:${childId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'praise_sticker_placements',
-          filter: `child_id=eq.${childId}`,
-        },
-        () => {
-          void refreshStickerPlacementsOnly()
-        },
-      )
-      .subscribe()
-    return () => {
-      void supabase.removeChannel(ch)
-    }
-  }, [childId, refreshStickerPlacementsOnly])
+  /** Realtime 제거 — 스티커 시트·저장 시점의 일반 조회로만 동기화합니다. */
 
   const dismissArrival = useCallback(async () => {
     const now = new Date().toISOString()

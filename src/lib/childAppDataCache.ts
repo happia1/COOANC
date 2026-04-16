@@ -42,3 +42,23 @@ export const getCachedFamilyLinksForChild = cache(async (childId: string): Promi
   }
   return (data ?? []) as CachedFamilyLinkRow[]
 })
+
+export type CachedFamilyLinkChildRow = { child_id: string }
+
+/**
+ * 부모 계정에 연결된 자녀 목록 (`created_at` 오름차순 — enter-child-ui 등에서 「첫 자녀」 선택용).
+ * `getCachedFamilyLinksForChild` 와 짝을 이루어 같은 테이블을 요청 단위로 한 번만 읽게 합니다.
+ */
+export const getCachedFamilyLinksForParent = cache(async (parentId: string): Promise<CachedFamilyLinkChildRow[]> => {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('family_links')
+    .select('child_id')
+    .eq('parent_id', parentId)
+    .order('created_at', { ascending: true })
+  if (error) {
+    console.error('[childAppDataCache] family_links by parent', error.message)
+    return []
+  }
+  return (data ?? []) as CachedFamilyLinkChildRow[]
+})

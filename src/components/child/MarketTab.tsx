@@ -29,7 +29,7 @@ type Props = {
    * 숨김은 `initialHiddenStoreItemIds` + 실시간 DB 이벤트로 클라이언트에서 반영합니다.
    */
   marketEligibleItems: StoreItem[]
-  /** 서버에서 읽은 숨김 상품 id — 부모가 토글하면 Realtime 으로 이 목록이 갱신됩니다 */
+  /** 서버에서 읽은 숨김 상품 id — 탭에서 주기적으로 다시 읽어 반영합니다 */
   initialHiddenStoreItemIds: string[]
   requests: PurchaseRequest[]
   /** 마켓 결제에 쓰는 지갑 크레딧(돈바구니·저금통에 둔 것 제외) */
@@ -168,32 +168,6 @@ export default function MarketTab({
   useEffect(() => {
     if (Object.keys(wishlistQuantities).length === 0) setWishlistSheetOpen(false)
   }, [wishlistQuantities])
-
-  /** 미션·옮기기 등으로 child_stats 가 바뀌면 지갑 잔액을 맞춤 */
-  useEffect(() => {
-    const supabase = createClient()
-    const channel = supabase
-      .channel(`market_child_stats:${childId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'child_stats',
-          filter: `child_id=eq.${childId}`,
-        },
-        (payload) => {
-          const patch = payload.new as Record<string, unknown>
-          setCurrentWallet((w0) =>
-            'credits_wallet' in patch ? readChildStatInt(patch.credits_wallet) : w0,
-          )
-        },
-      )
-      .subscribe()
-    return () => {
-      void supabase.removeChannel(channel)
-    }
-  }, [childId])
 
   /** 숨김을 제외한 실제 선반에 올릴 상품 */
   const visibleItems = useMemo(() => {
@@ -505,63 +479,39 @@ export default function MarketTab({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- 최초 props 기준 한 번만 자동 재생
   }, [])
 
-  /** Supabase 실시간: 승인·반려를 바로 반영합니다 */
+  /**
+   * WebSocket(Realtime) 대신 주기적 일반 조회로 숨김·구매 요청·지갑 잔액을 맞춥니다.
+   * (비개발자용) 부모가 설정을 바꿔도 최대 몇 초 안에 자녀 화면이 따라갑니다.
+   */
+  const prevPurchaseRequestsRef = useRef<PurchaseRequest[]>(requests)
+
   useEffect(() => {
     const supabase = createClient()
-    const channel = supabase
-      .channel(`market_pr:${childId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'child_market_hidden_items',
-          filter: `child_id=eq.${childId}`,
-        },
-        (payload) => {
-          // 부모가 메뉴에서 숨김/표시를 바꾸면 여기서 즉시 선반 목록을 갱신합니다
-          if (payload.eventType === 'INSERT') {
-            const row = payload.new as { store_item_id?: string } | null
-            const sid = row?.store_item_id
-            if (sid) {
-              setHiddenStoreItemIds((prev) => (prev.includes(sid) ? prev : [...prev, sid]))
-            }
-          } else if (payload.eventType === 'DELETE') {
-            const oldRow = payload.old as { store_item_id?: string } | null
-            const sid = oldRow?.store_item_id
-            if (sid) {
-              setHiddenStoreItemIds((prev) => prev.filter((id) => id !== sid))
-            }
-          }
-        },
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'purchase_requests',
-          filter: `child_id=eq.${childId}`,
-        },
-        (payload) => {
-          const row = payload.new as PurchaseRequest | null
-          const old = payload.old as Partial<PurchaseRequest> | null
-          if (!row) return
+    let cancelled = false
 
-          setMyRequests((prev) => {
-            const i = prev.findIndex((r) => r.id === row.id)
-            if (i >= 0) {
-              const copy = [...prev]
-              copy[i] = row
-              return copy
-            }
-            return [row, ...prev]
-          })
+    const syncMarketFromDb = async () => {
+      const [hiddenRes, prRes, statsRes] = await Promise.all([
+        supabase.from('child_market_hidden_items').select('store_item_id').eq('child_id', childId),
+        supabase.from('purchase_requests').select('*').eq('child_id', childId).order('created_at', { ascending: false }),
+        supabase.from('child_stats').select('credits_wallet').eq('child_id', childId).maybeSingle(),
+      ])
+      if (cancelled) return
 
-          if (row.status === 'approved' && old?.status === 'pending') {
-            onRequestApproved(row)
-          }
-          if (row.status === 'approved' && old?.status === 'parent_buying') {
+      if (!hiddenRes.error && hiddenRes.data) {
+        const sorted = hiddenRes.data.map((r: { store_item_id: string }) => r.store_item_id).sort()
+        setHiddenStoreItemIds(sorted)
+      }
+
+      if (statsRes.data && 'credits_wallet' in statsRes.data) {
+        setCurrentWallet(readChildStatInt(statsRes.data.credits_wallet))
+      }
+
+      if (!prRes.error && prRes.data) {
+        const next = prRes.data as PurchaseRequest[]
+        const prev = prevPurchaseRequestsRef.current
+        for (const row of next) {
+          const old = prev.find((p) => p.id === row.id)
+          if (row.status === 'approved' && (old?.status === 'pending' || old?.status === 'parent_buying')) {
             onRequestApproved(row)
           }
           if (row.status === 'parent_buying' && old?.status === 'pending') {
@@ -570,42 +520,18 @@ export default function MarketTab({
           if (row.status === 'rejected' && (old?.status === 'pending' || old?.status === 'parent_buying')) {
             setCurrentWallet((w) => w + row.item_price)
           }
-          if (row.status === 'delivered') {
-            setMyRequests((prev) => prev.map((r) => (r.id === row.id ? row : r)))
-          }
-        },
-      )
-      .subscribe()
-
-    return () => {
-      void supabase.removeChannel(channel)
-    }
-  }, [childId, onRequestApproved])
-
-  /**
-   * Realtime 퍼블리케이션(036)이 없거나 이벤트가 안 올 때도 부모 숨김이 반영되도록
-   * DB 에서 숨김 id 목록을 다시 읽습니다. (탭 포커스·주기 폴링)
-   */
-  useEffect(() => {
-    const supabase = createClient()
-    let cancelled = false
-
-    const pullHiddenIdsFromDb = async () => {
-      const { data, error } = await supabase
-        .from('child_market_hidden_items')
-        .select('store_item_id')
-        .eq('child_id', childId)
-      if (cancelled || error) return
-      const sorted = (data ?? []).map((r: { store_item_id: string }) => r.store_item_id).sort()
-      setHiddenStoreItemIds(sorted)
+        }
+        prevPurchaseRequestsRef.current = next
+        setMyRequests(next)
+      }
     }
 
-    void pullHiddenIdsFromDb()
+    void syncMarketFromDb()
     const intervalId = window.setInterval(() => {
-      if (document.visibilityState === 'visible') void pullHiddenIdsFromDb()
+      if (document.visibilityState === 'visible') void syncMarketFromDb()
     }, 5000)
     const onVisibleOrFocus = () => {
-      if (document.visibilityState === 'visible') void pullHiddenIdsFromDb()
+      if (document.visibilityState === 'visible') void syncMarketFromDb()
     }
     document.addEventListener('visibilitychange', onVisibleOrFocus)
     window.addEventListener('focus', onVisibleOrFocus)
@@ -616,7 +542,7 @@ export default function MarketTab({
       document.removeEventListener('visibilitychange', onVisibleOrFocus)
       window.removeEventListener('focus', onVisibleOrFocus)
     }
-  }, [childId])
+  }, [childId, onRequestApproved])
 
   /** 「배송 중」단계가 잠시 지나면 낙하산 도착 단계로 넘깁니다 */
   useEffect(() => {

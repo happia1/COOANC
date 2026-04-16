@@ -4,8 +4,6 @@ import { useState, useEffect, useMemo, useCallback, useRef, type MouseEvent } fr
 import { createPortal } from 'react-dom'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
-import type { RealtimeChannel } from '@supabase/supabase-js'
-import { createClient } from '@/lib/supabase/client'
 import type {
   ChildStats,
   DailyMission,
@@ -148,33 +146,6 @@ function isAfternoonMission(dm: DailyMissionWithTemplate): boolean {
   return Number.isFinite(hour) && hour >= 12
 }
 
-/**
- * 부모 「다시하기」 후 서버 롤백이 끝난 뒤 오는 브로드캐스트 페이로드 검사 — 형식이 맞지 않으면 무시합니다.
- */
-
-/** assign-today 브로드캐스트로 온 행 + 템플릿을 자녀 카드 목록 형태로 만듭니다. */
-function dailyMissionFromAssignPayload(
-  childId: string,
-  row: Record<string, unknown> | null | undefined,
-  template: DailyMissionWithTemplate['missions'] | null | undefined,
-): DailyMissionWithTemplate | null {
-  if (!row || !template) return null
-  const id = typeof row.id === 'string' ? row.id : ''
-  if (!id) return null
-  return {
-    id,
-    child_id: typeof row.child_id === 'string' ? row.child_id : childId,
-    mission_template_id: typeof row.mission_template_id === 'string' ? row.mission_template_id : '',
-    date: typeof row.date === 'string' ? row.date.slice(0, 10) : '',
-    scheduled_time: (row.scheduled_time as string | null) ?? null,
-    routine_type: (row.routine_type as DailyMission['routine_type']) ?? 'weekday',
-    is_completed: Boolean(row.is_completed),
-    completed_at: (row.completed_at as string | null) ?? null,
-    created_at: typeof row.created_at === 'string' ? row.created_at : '',
-    missions: template,
-  }
-}
-
 /** 특별 배달 미션 팝업에 넣을 필드만 골라 냅니다(이미 본 적이면 null). */
 function trySpecialDeliveryPopupFields(
   dm: DailyMissionWithTemplate,
@@ -212,19 +183,12 @@ function trySpecialDeliveryPopupFields(
   }
 }
 
-function isMissionRolledBackPayload(v: unknown): v is { dailyMissionId: string; title: string } {
-  if (!v || typeof v !== 'object') return false
-  const o = v as Record<string, unknown>
-  return typeof o.dailyMissionId === 'string' && typeof o.title === 'string'
-}
-
 /**
  * 미션 탭
  * - 배경: 탭 루트 전체(상단 크레딧+하단 오늘의 미션)에 공용 배경 한 겹(`ASSETS.layouts.sharedAppBackground` — 로딩 화면과 동일). `main` 패딩 상쇄는 `mission/layout.tsx` 의 풀 블리드 래퍼.
  * - **오늘의 미션** 바깥·제목·카드 줄 **패딩**, 카드 **비율·간격** 모두 `missionTodayLayoutSpec.ts` 픽스. 임의 수정 금지.
  * - 미션 탭 본문은 세로 스크롤로 상단(저금통·돈바구니·지갑 무대)·하단(카드)을 이어서 볼 수 있습니다.
  * - 카드 썸네일: `resolveRoutineMissionPngUrl`(제목 우선) 또는 `routines_01` 아틀라스(`missionRoutineIconFrame`)
- * - 부모 Realtime 「다시 하기」: DB 는 서버에서 이미 되돌아가고, 여기서는 카드만 슬라이더에 다시 보이게 맞춥니다.
  * - 항해지도·스티커 단추: 홈 `HomeTab` 과 **같은 `max-w-sm` 좌표**로 `ChildMapStickerFloatingStack` 에서 노출합니다.
  */
 export default function MissionTab({
@@ -265,28 +229,6 @@ export default function MissionTab({
   const [truthPopupOpen, setTruthPopupOpen] = useState(false)
 
   const router = useRouter()
-  /** 부모가 오늘 일정을 넣은 뒤 날짜 비교에 쓰는 최신 today 문자열 */
-  const todayRef = useRef(today)
-  todayRef.current = today
-
-  /**
-   * Realtime INSERT·브로드캐스트가 짧은 간격으로 여러 번 오면 `router.refresh()` 가 연속 호출되어
-   * 서버 컴포넌트 전체가 불필요하게 여러 번 다시 그려질 수 있어, 한 번으로 묶습니다.
-   */
-  const refreshDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const scheduleRefresh = useCallback(() => {
-    if (refreshDebounceRef.current) clearTimeout(refreshDebounceRef.current)
-    refreshDebounceRef.current = setTimeout(() => {
-      refreshDebounceRef.current = null
-      router.refresh()
-    }, 450)
-  }, [router])
-
-  useEffect(() => {
-    return () => {
-      if (refreshDebounceRef.current) clearTimeout(refreshDebounceRef.current)
-    }
-  }, [])
 
   /** 자정 00:00:00 에 router.refresh() — 하트·완료 집합을 새 날짜 기준으로 리셋합니다 */
   useEffect(() => {
@@ -297,28 +239,11 @@ export default function MissionTab({
     return () => clearTimeout(timer)
   }, [router])
 
-  /**
-   * 서버 props 와 동기화하되, 부모 assign 브로드캐스트로 행이 먼저 오면 여기에 합쳐 즉시 카드·팝업을 맞춥니다.
-   */
+  /** 서버에서 내려준 오늘 미션 목록 — props 가 바뀌면 동기화합니다 */
   const [missionList, setMissionList] = useState<DailyMissionWithTemplate[]>(dailyMissions)
   useEffect(() => {
     setMissionList(dailyMissions)
   }, [dailyMissions])
-
-  /** 부모 「다시하기」로 미션이 되돌아갔을 때 띄우는 알림 팝업(토스트와 별도) */
-  const [rollbackPopup, setRollbackPopup] = useState<{
-    dailyMissionId: string
-    missionTitle: string
-  } | null>(null)
-
-  /**
-   * 브로드캐스트·DB 실시간 둘 다 올 때 팝업이 두 번 뜨지 않게, 같은 일일 미션 id 는 잠깐 동안 한 번만 안내합니다.
-   * 키: dailyMissionId, 값: 표시한 시각(ms)
-   */
-  const rollbackPopupDedupRef = useRef<Map<string, number>>(new Map())
-
-  /** 이미 SUBSCRIBED 인 채널에 바로 send — 매번 subscribe 하지 않아 부모 목록 갱신이 빨라집니다 */
-  const parentLogBroadcastRef = useRef<RealtimeChannel | null>(null)
 
   /** 미션 완료 시 돼지 저금통 위 크레딧 낙하 연출(토큰 증가 = 다시 재생) */
   const [creditFxNonce, setCreditFxNonce] = useState(0)
@@ -354,99 +279,10 @@ export default function MissionTab({
     setStats(initialStats ? normalizeChildStatsCreditsSplit(initialStats) : null)
   }, [initialStats])
 
-  useEffect(() => {
-    const supabase = createClient()
-    const channel = supabase
-      .channel(`child_stats_mission:${childId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'child_stats',
-          filter: `child_id=eq.${childId}`,
-        },
-        (payload) => {
-          setStats((prev) =>
-            normalizeChildStatsCreditsSplit(
-              mergeChildStatsPatch(prev, payload.new as Record<string, unknown>),
-            ),
-          )
-        },
-      )
-      .subscribe()
-    return () => {
-      void supabase.removeChannel(channel)
-    }
-  }, [childId])
-
-  /** 부모 앱과 같은 채널 이름으로 브로드캐스트를 구독해 「다시하기」 알림을 받습니다 */
-  useEffect(() => {
-    const supabase = createClient()
-    const refreshCh = supabase.channel(`parent_mission_log_refresh:${childId}`, {
-      config: { broadcast: { ack: false } },
-    })
-    refreshCh.subscribe((status) => {
-      if (status === 'SUBSCRIBED') parentLogBroadcastRef.current = refreshCh
-    })
-    return () => {
-      parentLogBroadcastRef.current = null
-      void supabase.removeChannel(refreshCh)
-    }
-  }, [childId])
-
   /**
-   * 부모가 assign-today 등으로 오늘 daily_missions 행을 넣으면, 서버 컴포넌트 props 는 그대로라
-   * 특별 미션 팝업이 안 뜰 수 있습니다. INSERT·부모 브로드캐스트 시 오늘 날짜면 RSC 를 다시 받아옵니다(브로드캐스트 페이로드로는 이미 낙관적 반영).
+   * Realtime(WebSocket·브로드캐스트) 제거로 자녀 앱 진입 부담을 줄였습니다.
+   * 미션 목록·통계는 페이지/탭을 다시 열거나 `router.refresh()` 가 돌 때만 최신입니다.
    */
-  useEffect(() => {
-    const supabase = createClient()
-    const channel = supabase
-      .channel(`daily_missions_child_refresh:${childId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'daily_missions',
-          filter: `child_id=eq.${childId}`,
-        },
-        (payload) => {
-          const row = payload.new as { date?: string }
-          const d = typeof row.date === 'string' ? row.date.slice(0, 10) : ''
-          if (d === todayRef.current) scheduleRefresh()
-        },
-      )
-      .on('broadcast', { event: 'assign_today_ok' }, (msg) => {
-        type P = {
-          date?: string
-          alreadyAssigned?: boolean
-          dailyMission?: Record<string, unknown> | null
-          missionTemplate?: DailyMissionWithTemplate['missions'] | null
-        }
-        const p = (msg as { payload?: P }).payload
-        const d = typeof p?.date === 'string' ? p.date.slice(0, 10) : ''
-        const shouldRefresh = !d || d === todayRef.current
-        let didOptimistic = false
-        if (shouldRefresh && p && !p.alreadyAssigned && p.dailyMission && p.missionTemplate) {
-          const optimisticDm = dailyMissionFromAssignPayload(childId, p.dailyMission, p.missionTemplate)
-          if (optimisticDm) {
-            didOptimistic = true
-            setMissionList((prev) =>
-              prev.some((x) => x.id === optimisticDm.id) ? prev : [...prev, optimisticDm],
-            )
-            const fields = trySpecialDeliveryPopupFields(optimisticDm, todayRef.current)
-            if (fields) setSpecialPopup(fields)
-          }
-        }
-        /** 낙관적 UI로 이미 카드를 합쳤으면 전체 RSC 재요청을 생략합니다(탭 체감 속도·중복 fetch 완화). */
-        if (shouldRefresh && !didOptimistic) scheduleRefresh()
-      })
-      .subscribe()
-    return () => {
-      void supabase.removeChannel(channel)
-    }
-  }, [childId, scheduleRefresh])
 
   const showToast = (msg: string) => {
     setToast(msg)
@@ -454,8 +290,7 @@ export default function MissionTab({
   }
 
   /**
-   * 크레딧 옮기기 API 성공 직후: Supabase Realtime 은 늦게 올 수 있어, 응답 본문으로 `stats` 를 바로 맞춥니다.
-   * (이전에는 `onSuccess` 가 비어 있어 화면이 갱신되지 않거나 한참 뒤에야 바뀌는 것처럼 보였습니다.)
+   * 크레딧 옮기기 API 성공 직후: 응답 본문으로 `stats` 를 바로 맞춥니다(실시간 구독 없이도 즉시 반영).
    */
   const applyCreditTransferSuccess = useCallback((result: CreditTransferApiSuccess) => {
     setStats((prev) =>
@@ -469,96 +304,6 @@ export default function MissionTab({
     )
     setCreditSheetBucket(null)
   }, [])
-
-  /**
-   * 롤백 알림 팝업을 한 번만 띄웁니다(실시간·브로드캐스트 중복 방지).
-   */
-  const tryShowRollbackPopup = useCallback((dailyMissionId: string, missionTitle: string) => {
-    const now = Date.now()
-    const m = rollbackPopupDedupRef.current
-    for (const [id, t] of m) {
-      if (now - t > 8000) m.delete(id)
-    }
-    if (m.has(dailyMissionId)) return
-    m.set(dailyMissionId, now)
-    setRollbackPopup({ dailyMissionId, missionTitle })
-  }, [])
-
-  /**
-   * 부모 「다시하기」 직후: 슬라이더 완료 집합을 풀고, 팝업으로 롤백 사실을 알립니다.
-   */
-  useEffect(() => {
-    const supabase = createClient()
-    const channel = supabase
-      .channel(`mission_redo:${childId}`)
-      .on('broadcast', { event: 'mission_rolled_back' }, (message) => {
-        const raw = (message as { payload?: unknown }).payload
-        if (!isMissionRolledBackPayload(raw)) return
-        setDone((prev) => {
-          const next = new Set(prev)
-          next.delete(raw.dailyMissionId)
-          return next
-        })
-        tryShowRollbackPopup(raw.dailyMissionId, raw.title)
-      })
-      .subscribe()
-    return () => {
-      void supabase.removeChannel(channel)
-    }
-  }, [childId, tryShowRollbackPopup])
-
-  /**
-   * 브로드캐스트가 끊겨도 mission_logs 가 미완료로 바뀌는 순간 DB 와 슬라이더를 맞춥니다(Realtime 공개 테이블).
-   * 브로드캐스트를 못 받은 경우에만 여기서 제목을 조회해 같은 롤백 팝업을 띄웁니다.
-   */
-  useEffect(() => {
-    const supabase = createClient()
-    const channel = supabase
-      .channel(`mission_log_undo_sync:${childId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'mission_logs',
-          filter: `child_id=eq.${childId}`,
-        },
-        async (payload) => {
-          const row = payload.new as {
-            is_completed?: boolean
-            mission_id?: string
-            assigned_date?: string
-          }
-          if (row.is_completed !== false) return
-          const mid = row.mission_id
-          const ad =
-            typeof row.assigned_date === 'string'
-              ? row.assigned_date.slice(0, 10)
-              : String(row.assigned_date ?? '')
-          if (!mid || !ad) return
-          const { data: dm } = await supabase
-            .from('daily_missions')
-            .select('id, is_completed')
-            .eq('child_id', childId)
-            .eq('mission_template_id', mid)
-            .eq('date', ad)
-            .maybeSingle()
-          if (dm && dm.is_completed === false) {
-            setDone((prev) => {
-              const next = new Set(prev)
-              next.delete(dm.id)
-              return next
-            })
-            const { data: mt } = await supabase.from('missions').select('title').eq('id', mid).maybeSingle()
-            tryShowRollbackPopup(dm.id, typeof mt?.title === 'string' && mt.title.trim() ? mt.title : '미션')
-          }
-        },
-      )
-      .subscribe()
-    return () => {
-      void supabase.removeChannel(channel)
-    }
-  }, [childId, tryShowRollbackPopup])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -589,10 +334,6 @@ export default function MissionTab({
       sessionStorage.setItem(`cooanc_sp_shown_${specialPopup.dailyMissionId}_${today}`, '1')
     }
     setSpecialPopup(null)
-  }
-
-  function dismissRollbackPopup() {
-    setRollbackPopup(null)
   }
 
   function handleComplete(dm: DailyMissionWithTemplate, ev: MouseEvent<HTMLButtonElement>) {
@@ -647,10 +388,6 @@ export default function MissionTab({
           })
           showToast(typeof json.error === 'string' ? json.error : '미션 완료에 실패했어요')
           return
-        }
-        const ch = parentLogBroadcastRef.current
-        if (ch) {
-          void ch.send({ type: 'broadcast', event: 'child_completed_mission', payload: { t: Date.now() } })
         }
       } catch {
         setDone((prev) => {
@@ -1038,57 +775,6 @@ export default function MissionTab({
   ) : null
 
   /**
-   * 롤백된 미션의 카드 일러스트를 같은 규칙으로 계산합니다.
-   * - dailyMissionId 로 오늘 카드 목록에서 찾기
-   * - 못 찾으면 payload 의 missionTitle 로 안전하게 계산
-   */
-  const rollbackMissionIconFrame = rollbackPopup
-    ? (() => {
-        const matched = ordered.find((dm) => dm.id === rollbackPopup.dailyMissionId)?.missions
-        const title = matched?.title ?? rollbackPopup.missionTitle
-        const description = matched?.description ?? null
-        return missionRoutineIconFrame(title, description)
-      })()
-    : null
-
-  /** 미션 롤백 안내 — 특별 미션 팝업보다 위에 두어 부모 알림이 가려지지 않게 합니다 */
-  const rollbackPopupBlock = rollbackPopup ? (
-    <div
-      className="fixed inset-0 z-[105] flex items-center justify-center p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="rollback-pop-title"
-    >
-      <button type="button" className="absolute inset-0 bg-black/50" aria-label="닫기" onClick={dismissRollbackPopup} />
-      <div className="relative z-[1] w-full max-w-sm rounded-2xl border-2 border-orange-300 bg-white p-5 shadow-xl">
-        <p id="rollback-pop-title" className="text-center text-lg font-black text-brand-text">
-          미션 다시하기
-        </p>
-        <div className="mt-3 flex justify-center">
-          <SpriteImage
-            sheet={MISSION_ROUTINES_ATLAS}
-            frame={rollbackMissionIconFrame ?? missionRoutineIconFrame(rollbackPopup.missionTitle, null)}
-            width={92}
-            clipRotated={false}
-            className="select-none drop-shadow-[0_2px_8px_rgba(0,0,0,0.08)]"
-          />
-        </div>
-        <p className="mt-2 text-center text-sm font-bold text-orange-600">{rollbackPopup.missionTitle}</p>
-        <p className="mt-3 text-center text-xs font-medium leading-relaxed text-gray-600">
-          사유: 부모님이 이 미션을 다시 하기로 바꿨어요.
-        </p>
-        <button
-          type="button"
-          onClick={dismissRollbackPopup}
-          className="mt-5 w-full rounded-xl bg-brand-blue py-3 text-sm font-bold text-white"
-        >
-          알겠어요
-        </button>
-      </div>
-    </div>
-  ) : null
-
-  /**
    * 가로·상단 패딩 상쇄는 `(child)/mission/layout.tsx` 한 곳에서만 처리합니다.
    * 여기서는 하단 독과 겹치지 않도록 아래쪽 마진만 둡니다.
    */
@@ -1142,7 +828,6 @@ export default function MissionTab({
             </div>
           </div>
           {popupBlock}
-          {rollbackPopupBlock}
           {truthPopupBlock}
         </div>
 
@@ -1183,7 +868,6 @@ export default function MissionTab({
           totalMissions={total}
         />
         {popupBlock}
-        {rollbackPopupBlock}
         {truthPopupBlock}
         {/**
          * 토스트는 `main`(z-10) 안에 두면 상단바(z-40)·하단 독(z-50)보다 뒤 레이어라 가려집니다.

@@ -1,7 +1,12 @@
+/**
+ * 부모가 「자녀 화면으로 보기」로 들어올 때 호출하는 API입니다.
+ * `childAppDataCache` 의 React `cache` 로 family_links 조회를 묶어, 같은 요청에서 중복 DB 왕복을 줄입니다.
+ */
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { normalizeUuidParam } from '@/lib/normalizeUuid'
 import { PARENT_AS_CHILD_COOKIE, PARENT_AS_CHILD_COOKIE_MAX_AGE } from '@/lib/parentAsChildCookie'
+import { getCachedFamilyLinksForChild, getCachedFamilyLinksForParent } from '@/lib/childAppDataCache'
 
 /**
  * GET /api/parent/enter-child-ui?childId=UUID (childId 생략 가능)
@@ -51,18 +56,9 @@ export async function GET(req: NextRequest) {
   let childId = normalizeUuidParam(childIdParam)
 
   if (!childId) {
-    const { data: links, error: linksErr } = await supabase
-      .from('family_links')
-      .select('child_id')
-      .eq('parent_id', user.id)
-      .order('created_at', { ascending: true })
-      .limit(1)
-
-    if (linksErr) {
-      console.error('[enter-child-ui] family_links fallback:', linksErr.message)
-    }
-
-    const first = links?.[0]?.child_id
+    /** React `cache` — 같은 요청 안에서 자녀 레이아웃과 중복 조회를 합칩니다 */
+    const links = await getCachedFamilyLinksForParent(user.id)
+    const first = links[0]?.child_id
     childId = normalizeUuidParam(first ?? null)
   }
 
@@ -71,14 +67,10 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(new URL('/parent/home', req.nextUrl.origin))
   }
 
-  const { data: link } = await supabase
-    .from('family_links')
-    .select('id')
-    .eq('parent_id', user.id)
-    .eq('child_id', childId)
-    .maybeSingle()
-
-  if (!link) {
+  /** 자녀 기준으로 이미 캐시된 링크 행에서 부모 일치 여부만 확인 (별도 round-trip 제거) */
+  const familyRows = await getCachedFamilyLinksForChild(childId)
+  const linked = familyRows.some((row) => row.parent_id === user.id)
+  if (!linked) {
     return NextResponse.json({ error: '연결된 자녀가 아니에요' }, { status: 403 })
   }
 

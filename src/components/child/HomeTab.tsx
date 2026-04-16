@@ -3,7 +3,7 @@
 import Image from 'next/image'
 import { useCallback, useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import type { ChildItemUnlock, ChildStats, PraiseStickerGrant, PraiseStickerPlacement } from '@/types/database'
+import type { ChildStats, PraiseStickerGrant, PraiseStickerPlacement } from '@/types/database'
 import NavigationMapSheet from '@/components/child/NavigationMapSheet'
 import BearStickerSheet from '@/components/child/BearStickerSheet'
 import PraiseGiftArrivalModal from '@/components/child/PraiseGiftArrivalModal'
@@ -11,7 +11,7 @@ import ChildHomeIslandStage from '@/components/child/ChildHomeIslandStage'
 import ChildHomeSceneryBand from '@/components/child/ChildHomeSceneryBand'
 import { MapActionPill, StickerActionPill } from '@/components/child/ChildSceneryTopPills'
 import { mergePraiseStickerGrantsFromServer } from '@/lib/mergePraiseStickerGrantsFromServer'
-import { mergeChildStatsPatch, normalizeChildStatsCreditsSplit } from '@/lib/childCreditsSplit'
+import { normalizeChildStatsCreditsSplit } from '@/lib/childCreditsSplit'
 import { ASSETS, CHARACTER_DECOR_UI_FORCE_ALL_LOCKED } from '@/constants/assets'
 import ItemUnlockCelebrationPopup from '@/components/child/ItemUnlockCelebrationPopup'
 import type { TriggerKey } from '@/lib/gameLayer/triggerItemMap'
@@ -133,135 +133,11 @@ export default function HomeTab({
     setArrivalOpen(pending)
   }, [grants])
 
-  useEffect(() => {
-    const supabase = createClient()
-    const ch = supabase
-      .channel(`praise_grants:${childId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'praise_sticker_grants',
-          filter: `child_id=eq.${childId}`,
-        },
-        (payload) => {
-          setGrants((prev) => [payload.new as PraiseStickerGrant, ...prev])
-        },
-      )
-      .subscribe()
-    return () => {
-      void supabase.removeChannel(ch)
-    }
-  }, [childId])
-
   /**
-   * 20칸 완주 등으로 grants 행이 DB 에서 지워지면, INSERT 채널은 안 오므로 DELETE 구독으로 목록을 다시 맞춥니다.
+   * 예전에는 Supabase Realtime(WebSocket)으로 칭찬·통계·잠금 해제를 즉시 받았습니다.
+   * 자녀 앱 성능(홈 진입 시 긴 WS 핸드셰이크)을 줄이기 위해 구독을 제거했고,
+   * 시트를 열거나 저장할 때 호출되는 `refreshGrantsOnly` 등 일반 쿼리로만 맞춥니다.
    */
-  useEffect(() => {
-    const supabase = createClient()
-    const ch = supabase
-      .channel(`praise_grants_delete:${childId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'DELETE',
-          schema: 'public',
-          table: 'praise_sticker_grants',
-          filter: `child_id=eq.${childId}`,
-        },
-        () => {
-          void refreshGrantsOnly()
-        },
-      )
-      .subscribe()
-    return () => {
-      void supabase.removeChannel(ch)
-    }
-  }, [childId, refreshGrantsOnly])
-
-  /**
-   * 부모가 「스티커판 비우기」로 placements 를 지우면, 아이 앱이 새로고침 없이도 칸이 비어 보이게 합니다.
-   * (INSERT/UPDATE/DELETE 어떤 변화든 다시 읽어 오면 됩니다.)
-   */
-  useEffect(() => {
-    const supabase = createClient()
-    const ch = supabase
-      .channel(`praise_placements:${childId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'praise_sticker_placements',
-          filter: `child_id=eq.${childId}`,
-        },
-        () => {
-          void refreshStickerPlacementsOnly()
-        },
-      )
-      .subscribe()
-    return () => {
-      void supabase.removeChannel(ch)
-    }
-  }, [childId, refreshStickerPlacementsOnly])
-
-  useEffect(() => {
-    const supabase = createClient()
-    const channel = supabase
-      .channel(`child_stats:${childId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'child_stats',
-          filter: `child_id=eq.${childId}`,
-        },
-        (payload) => {
-          setStats((prev) =>
-            normalizeChildStatsCreditsSplit(
-              mergeChildStatsPatch(prev, payload.new as Record<string, unknown>),
-            ),
-          )
-        },
-      )
-      .subscribe()
-
-    return () => {
-      void supabase.removeChannel(channel)
-    }
-  }, [childId])
-
-  // 아이템 잠금 해제 실시간 구독 (다른 탭에서 트리거됐을 때 홈에서도 팝업)
-  useEffect(() => {
-    const supabase = createClient()
-    const ch = supabase
-      .channel(`child_item_unlocks:${childId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'child_item_unlocks',
-          filter: `child_id=eq.${childId}`,
-        },
-        (payload) => {
-          const row = payload.new as ChildItemUnlock
-          setUnlockedItemIndexes((prev) =>
-            prev.includes(row.item_index) ? prev : [...prev, row.item_index],
-          )
-          /** 전부 잠금 강제 모드에서는 축하 팝업만 막고, 상태는 나중에 플래그 해제 시 반영되게 둡니다. */
-          if (!CHARACTER_DECOR_UI_FORCE_ALL_LOCKED) {
-            setItemUnlockPopup({ index: row.item_index, triggerKey: row.trigger_key as TriggerKey })
-          }
-        },
-      )
-      .subscribe()
-    return () => {
-      void supabase.removeChannel(ch)
-    }
-  }, [childId])
 
   const dismissArrival = useCallback(async () => {
     const now = new Date().toISOString()

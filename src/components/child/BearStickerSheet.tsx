@@ -188,14 +188,6 @@ export default function BearStickerSheet({
   /** `praiseGrantsRevision` 이 오르면 merge 없이 `initialGrants` 로 grants state 를 덮어씁니다 */
   const grantsRevisionAppliedRef = useRef(0)
 
-  /**
-   * 부모 앱 `parent_sticker_board:${childId}` 채널로 브로드캐스트를 보낼 때 씁니다.
-   * 미션 탭의 `parent_mission_log_refresh` 와 같은 패턴으로, 시트가 열린 뒤 구독이 완료되면 ref 가 채워집니다.
-   */
-  const parentStickerBoardBroadcastRef = useRef<ReturnType<ReturnType<typeof createClient>['channel']> | null>(
-    null,
-  )
-
   /** 드래그 중인 grant id (포인터는 window 에서 추적) */
   const dragRef = useRef<{
     grantId: string
@@ -352,41 +344,10 @@ export default function BearStickerSheet({
   }, [boardCompleteConfetti])
 
   /**
-   * 스티커 시트가 열려 있을 때만 부모 알림용 브로드캐스트 채널을 붙입니다.
-   * 닫으면 채널을 끊어 불필요한 연결을 줄입니다.
+   * 예전에는 Supabase 브로드캐스트로 부모 화면에 「판을 채웠다」를 알렸습니다.
+   * 자녀 앱에서 WebSocket 을 끊기 위해 호출은 유지하되 내용은 비웁니다(부모는 다른 경로로 새로고침).
    */
-  useEffect(() => {
-    if (!open) return
-    const supabase = createClient()
-    const ch = supabase.channel(`parent_sticker_board:${childId}`, { config: { broadcast: { ack: false } } })
-    ch.subscribe((status) => {
-      if (status === 'SUBSCRIBED') parentStickerBoardBroadcastRef.current = ch
-    })
-    return () => {
-      parentStickerBoardBroadcastRef.current = null
-      void supabase.removeChannel(ch)
-    }
-  }, [open, childId])
-
-  /**
-   * 「엄마에게 알려주기」: 같은 이름의 채널을 구독 중인 부모 화면에 이벤트를 쏩니다.
-   * 시트를 막 연 직후라 아직 `SUBSCRIBED` 가 안 됐을 수 있어, ref 가 비면 임시 채널로 한 번 더 보냅니다.
-   */
-  const notifyParentStickerBoardComplete = useCallback(() => {
-    const payload = { type: 'broadcast' as const, event: 'sticker_board_filled', payload: { t: Date.now() } }
-    const ch = parentStickerBoardBroadcastRef.current
-    if (ch) {
-      void ch.send(payload)
-      return
-    }
-    const supabase = createClient()
-    const once = supabase.channel(`parent_sticker_board:${childId}`, { config: { broadcast: { ack: false } } })
-    once.subscribe((status) => {
-      if (status !== 'SUBSCRIBED') return
-      void once.send(payload)
-      void supabase.removeChannel(once)
-    })
-  }, [childId])
+  const notifyParentStickerBoardComplete = useCallback(() => {}, [])
 
   /**
    * 종이 위 미배치 스티커 시작 위치
