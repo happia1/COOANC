@@ -12,7 +12,11 @@ import ChildHomeSceneryBand from '@/components/child/ChildHomeSceneryBand'
 import { MapActionPill, StickerActionPill } from '@/components/child/ChildSceneryTopPills'
 import { mergePraiseStickerGrantsFromServer } from '@/lib/mergePraiseStickerGrantsFromServer'
 import { normalizeChildStatsCreditsSplit } from '@/lib/childCreditsSplit'
-import { ASSETS, CHARACTER_DECOR_UI_FORCE_ALL_LOCKED } from '@/constants/assets'
+import {
+  ASSETS,
+  CHARACTER_DECOR_UI_FORCE_ALL_LOCKED,
+  CHILD_HOME_BACKGROUND_CACHE_BUST,
+} from '@/constants/assets'
 import ItemUnlockCelebrationPopup from '@/components/child/ItemUnlockCelebrationPopup'
 import type { TriggerKey } from '@/lib/gameLayer/triggerItemMap'
 
@@ -36,7 +40,7 @@ type Props = {
  * 아이 앱 홈 탭
  * - **한 화면**: 상단 풍경·하단 꾸미기가 **6:4** 비율(`flex-[6]`/`flex-[4]`)로 나뉨
  * - 섬 무대는 `ChildHomeIslandStage` 의 `density="flex"` 로 남는 세로 공간에 맞춤
- * - 배경: 홈 전용 큰 그림(`ASSETS.layouts.childHomeBackgroundSecondScreen` — 태블릿 키즈룸 세로 PNG)을 풀 블리드 셸 **뒤 한 겹**만 깝니다. `ChildHomeSceneryBand` 는 캐릭터 무대만 담고 `showBackground={false}` 입니다. 옛 잔디·섬 합성 PNG는 `showIslandArt={false}` 로 끕니다.
+ * - 배경: 홈 전용 큰 그림(`ASSETS.layouts.childHomeBackgroundSecondScreen` — 태블릿 키즈룸 세로 PNG)을 풀 블리드 셸 **뒤 한 겹**만 깝니다. CDN·브라우저 캐시는 `CHILD_HOME_BACKGROUND_CACHE_BUST` 로 `?v=` 끊고, **`next/image` 대신 `<img>`** 로 직접 요청해 최적화 캐시에 걸리지 않게 합니다. `ChildHomeSceneryBand` 는 캐릭터 무대만 담고 `showBackground={false}` 입니다. 옛 잔디·섬 합성 PNG는 `showIslandArt={false}` 로 끕니다.
  * - 칭찬 스티커(곰)는 무대 **오른쪽 상단**(기존 날씨 자리), 성장 지도는 무대 **왼쪽** 지도 단추로 엽니다.
  * - 부모가 칭찬 스티커를 내면 팝업 후 곰돌이 판에서 붙일 수 있음
  */
@@ -234,13 +238,18 @@ export default function HomeTab({
 
   const homeTabFullBackground = (
     <div className="pointer-events-none absolute inset-0 z-0" aria-hidden>
-      <Image
-        src={ASSETS.layouts.childHomeBackgroundSecondScreen}
+      {/**
+       * `next/image` 는 `/_next/image` 최적화 캐시 + 정적 `immutable` 헤더와 겹치면 배포 후에도 옛 WebP 가 남을 수 있어,
+       * 풀블리드 배경은 원본 PNG URL + `?v=` 로 직접 불러옵니다.
+       */}
+      <img
+        src={`${ASSETS.layouts.childHomeBackgroundSecondScreen}?v=${CHILD_HOME_BACKGROUND_CACHE_BUST}`}
         alt=""
-        fill
-        className={homeBackgroundObjectPositionClass}
-        sizes="100vw"
-        priority
+        className={`absolute inset-0 h-full w-full ${homeBackgroundObjectPositionClass}`}
+        loading="eager"
+        decoding="async"
+        fetchPriority="high"
+        draggable={false}
       />
     </div>
   )
