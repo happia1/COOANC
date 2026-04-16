@@ -13,6 +13,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import ParentEnterChildUiLink from '@/components/parent/ParentEnterChildUiLink'
 import { createClient } from '@/lib/supabase/client'
 import {
   addSeoulCalendarDays,
@@ -248,6 +249,7 @@ export default function HomeTab({ childrenData }: Props) {
             부모 홈에서 선택 중인 자녀와 맞추기 위해 클릭 시 Zustand id 도 같이 저장합니다.
           */}
           <Link
+            prefetch={false}
             href={`/api/parent/enter-child-ui?childId=${encodeURIComponent(child.id)}`}
             className="block cursor-pointer rounded-xl transition-opacity active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4A90E2] focus-visible:ring-offset-2"
             aria-label={`${child.name} 자녀용 앱 화면으로 들어가기`}
@@ -269,7 +271,7 @@ export default function HomeTab({ childrenData }: Props) {
                 total: child.totalMissions,
               }}
             />
-          </Link>
+          </ParentEnterChildUiLink>
 
           <EconomicEqPanel
             stats={{

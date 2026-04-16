@@ -4,6 +4,7 @@
  */
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { getCachedParentAuth } from '@/lib/parentServerAuthCache'
 import { resolveDisplayAge } from '@/lib/ageFromBirthDate'
 import {
   profileAgeGroupShortLabel,
@@ -22,27 +23,16 @@ type TodayDailyMissionRow = {
 }
 
 export default async function RoutinePage() {
+  const auth = await getCachedParentAuth()
+  if (!auth?.user) redirect('/login')
+  if (!auth.profile || auth.profile.role !== 'parent') redirect('/home')
+
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .maybeSingle()
-
-  if (profile?.role !== 'parent') redirect('/home')
-
-  const { data: links } = await supabase
-    .from('family_links')
-    .select('id, child_id')
-    .eq('parent_id', user.id)
-
-  const childIds = (links ?? []).map((l) => l.child_id)
+  const links = auth.familyLinks
+  const childIds = links.map((l) => l.child_id)
   /** 자녀별 family_links.id — AI 일정 패널의 `/agent-b/parse` 에 넣습니다. */
   const familyLinkByChild: Record<string, string> = Object.fromEntries(
-    (links ?? []).map((l) => [String((l as { child_id: string }).child_id), String((l as { id: string }).id)]),
+    links.map((l) => [l.child_id, l.id]),
   )
 
   const todaySeoul = getSeoulDateString()

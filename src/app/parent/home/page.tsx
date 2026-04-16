@@ -9,6 +9,7 @@
  */
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { getCachedParentAuth } from '@/lib/parentServerAuthCache'
 import { resolveDisplayAge } from '@/lib/ageFromBirthDate'
 import {
   profileAgeGroupShortLabel,
@@ -25,24 +26,12 @@ import { buildWeeklyRoutineDays, type DailyMissionCompletionRow } from '@/lib/ch
 import HomeTab, { type ChildSummary } from '@/components/parent/HomeTab'
 
 export default async function ParentHomePage() {
+  const auth = await getCachedParentAuth()
+  if (!auth?.user) redirect('/login')
+  if (!auth.profile || auth.profile.role !== 'parent') redirect('/home')
+
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('name, role')
-    .eq('id', user.id)
-    .maybeSingle()
-
-  if (profile?.role !== 'parent') redirect('/home')
-
-  const { data: links } = await supabase
-    .from('family_links')
-    .select('child_id')
-    .eq('parent_id', user.id)
-
-  const childIds = (links ?? []).map((l) => l.child_id)
+  const childIds = auth.familyLinks.map((l) => l.child_id)
 
   if (childIds.length === 0) {
     return <HomeTab childrenData={[]} />

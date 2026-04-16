@@ -16,8 +16,8 @@
 
 import { useState, useEffect, useLayoutEffect, useMemo, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import ParentEnterChildUiLink from '@/components/parent/ParentEnterChildUiLink'
 import { useParentStore } from '@/store/parentStore'
 import { createClient } from '@/lib/supabase/client'
 import type { RealtimeChannel } from '@supabase/supabase-js'
@@ -746,6 +746,7 @@ export default function RoutineTab({
            * 클릭 시 선택 id 를 맞춰 두면 부모 탭을 돌아왔을 때도 같은 아이가 선택된 상태로 유지됩니다.
            */}
           <Link
+            prefetch={false}
             href={`/api/parent/enter-child-ui?childId=${encodeURIComponent(currentChild.id)}`}
             className="block cursor-pointer rounded-xl transition-opacity active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4A90E2] focus-visible:ring-offset-2"
             aria-label={`${currentChild.name} 자녀용 앱 화면으로 들어가기`}
@@ -763,7 +764,7 @@ export default function RoutineTab({
               childcareLabel={currentChild.childcareLabel}
               mission={null}
             />
-          </Link>
+          </ParentEnterChildUiLink>
           <ChildProfileNav tabs={tabs} compact />
         </div>
       )}

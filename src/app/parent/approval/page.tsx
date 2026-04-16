@@ -3,6 +3,7 @@
  */
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { getCachedParentAuth } from '@/lib/parentServerAuthCache'
 import ApprovalTab from '@/components/parent/ApprovalTab'
 import { selectChildProfilesByIds } from '@/lib/supabase/childProfileSelect'
 import { resolveDisplayAge } from '@/lib/ageFromBirthDate'
@@ -14,22 +15,15 @@ import {
 import type { StoreItem } from '@/types/database'
 
 export default async function ApprovalPage() {
+  const auth = await getCachedParentAuth()
+  if (!auth?.user) redirect('/login')
+  if (!auth.profile || auth.profile.role !== 'parent') redirect('/home')
+
   const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) redirect('/login')
-
-  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle()
-
-  if (profile?.role !== 'parent') redirect('/home')
-
-  const { data: links } = await supabase.from('family_links').select('id, child_id').eq('parent_id', user.id)
-
-  const childIds = (links ?? []).map((l) => l.child_id)
-  const linkByChild = Object.fromEntries((links ?? []).map((l) => [l.child_id, l.id]))
-  const linkIds = (links ?? []).map((l) => l.id)
+  const links = auth.familyLinks
+  const childIds = links.map((l) => l.child_id)
+  const linkByChild = Object.fromEntries(links.map((l) => [l.child_id, l.id]))
+  const linkIds = links.map((l) => l.id)
 
   const profileBundle = childIds.length > 0 ? await selectChildProfilesByIds(supabase, childIds) : { rows: [], error: null }
   if (profileBundle.error) {
