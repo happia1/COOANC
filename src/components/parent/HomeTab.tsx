@@ -13,6 +13,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import ParentEnterChildUiLink from '@/components/parent/ParentEnterChildUiLink'
 import { createClient } from '@/lib/supabase/client'
 import {
@@ -83,6 +84,7 @@ type Props = {
 }
 
 export default function HomeTab({ childrenData }: Props) {
+  const router = useRouter()
   const { selectedChildId, setSelectedChildId } = useParentStore()
   /** 부모 홈 데이터는 이벤트성 갱신보다 안정성이 우선이라 일반 조회(fetch)만 사용합니다. */
   const supabaseRef = useRef(createClient())
@@ -159,6 +161,16 @@ export default function HomeTab({ childrenData }: Props) {
 
   return (
     <div className="flex flex-col gap-4">
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={() => router.refresh()}
+          className="rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-[11px] font-bold text-gray-600"
+          aria-label="홈 데이터 수동 새로고침"
+        >
+          새로고침
+        </button>
+      </div>
 
       {/* 자녀 전환: ◀ ▶ 및 스와이프 (Zustand 로 루틴 탭과 동일한 자녀 선택) */}
       <ChildProfileNav tabs={tabs} />

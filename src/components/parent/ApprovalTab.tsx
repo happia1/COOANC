@@ -10,7 +10,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import ParentEnterChildUiLink from '@/components/parent/ParentEnterChildUiLink'
 import { useParentStore } from '@/store/parentStore'
 import ChildProfileNav, { type ChildTab } from '@/components/parent/ChildProfileNav'
@@ -118,6 +118,7 @@ export default function ApprovalTab({
   hiddenItemIdsByChild: initialHidden,
   initialCreditOverridesByChild,
 }: Props) {
+  const router = useRouter()
   /** 승인 탭은 Realtime 대신 주기적 조회(polling)로 안정성을 우선합니다. */
   const supabaseRef = useRef(createClient())
 
@@ -624,6 +625,20 @@ export default function ApprovalTab({
 
   return (
     <div className="flex flex-col gap-5">
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={() => {
+            void refreshPurchaseRequests()
+            void refreshChildMissionLogs()
+            router.refresh()
+          }}
+          className="rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-[11px] font-bold text-gray-600"
+          aria-label="승인 데이터 수동 새로고침"
+        >
+          새로고침
+        </button>
+      </div>
       {toast && (
         <div
           className={`fixed top-6 left-1/2 z-[200] -translate-x-1/2 font-bold text-sm px-5 py-2.5 rounded-full shadow-lg ${

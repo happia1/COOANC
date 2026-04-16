@@ -16,7 +16,7 @@
 
 import { useState, useEffect, useLayoutEffect, useMemo, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import ParentEnterChildUiLink from '@/components/parent/ParentEnterChildUiLink'
 import { useParentStore } from '@/store/parentStore'
 import ChildProfileNav, { type ChildTab } from '@/components/parent/ChildProfileNav'
@@ -462,6 +462,7 @@ export default function RoutineTab({
   todayDailyMissions = [],
   familyLinkByChild = {},
 }: Props) {
+  const router = useRouter()
   const pathname = usePathname()
   const { selectedChildId, setSelectedChildId } = useParentStore()
   /** multiline: 긴 안내(예: API hint) — 줄바꿈·너비·표시 시간 확대 */
@@ -663,6 +664,16 @@ export default function RoutineTab({
 
   return (
     <div className="flex flex-col gap-3">
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={() => router.refresh()}
+          className="rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-[11px] font-bold text-gray-600"
+          aria-label="루틴 데이터 수동 새로고침"
+        >
+          새로고침
+        </button>
+      </div>
       {toast && (
         <div
           className={`fixed top-6 left-1/2 -translate-x-1/2 z-[60] font-bold text-sm shadow-lg ${

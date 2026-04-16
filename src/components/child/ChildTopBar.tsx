@@ -1,7 +1,6 @@
 'use client'
 
 import Image from 'next/image'
-import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { TOPBAR_LOGO_CLASSNAME, TOPBAR_LOGO_HEIGHT, TOPBAR_LOGO_SRC, TOPBAR_LOGO_WIDTH } from '@/constants/branding'
 
@@ -70,15 +69,14 @@ export default function ChildTopBar({ isParentPreview = false }: Props) {
            * Next `Link` 기본 prefetch 가 이 URL 을 미리 GET 하면 쿠키가 지워지고 307 이 나가
            * 탭 전환 전에 세션이 깨질 수 있습니다. 반드시 끕니다.
            */}
-          <Link
+          <a
             href={exitHref}
-            prefetch={false}
             className="flex h-8 w-8 items-center justify-center shrink-0 transition-opacity hover:opacity-80"
             aria-label="나가기"
           >
             {/* 텍스트 버튼 대신 exit 아이콘 사용, 알약 배경 제거 */}
             <Image src="/assets/img/common/ui/exit.png" alt="" width={20} height={20} className="h-5 w-5 object-contain" />
-          </Link>
+          </a>
         </div>
       </div>
     </header>
