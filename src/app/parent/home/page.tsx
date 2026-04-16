@@ -24,6 +24,25 @@ import {
 } from '@/lib/koreaDate'
 import { buildWeeklyRoutineDays, type DailyMissionCompletionRow } from '@/lib/childWeeklyRoutine'
 import HomeTab, { type ChildSummary } from '@/components/parent/HomeTab'
+import { unstable_cache } from 'next/cache'
+import { createServiceRoleClient } from '@/lib/supabase/admin'
+
+/**
+ * 자녀 프로필은 빈번히 바뀌지 않으므로 5분 캐시를 둡니다.
+ * - service_role 이 있으면 RLS와 무관하게 빠르게 읽고,
+ * - 없으면 호출부에서 기존 세션 클라이언트 조회로 폴백합니다.
+ */
+const getCachedChildProfilesForParentHome = unstable_cache(
+  async (childIdsKey: string) => {
+    const childIds = childIdsKey.split(',').filter(Boolean)
+    if (childIds.length === 0) return { rows: [], error: null as { message: string } | null }
+    const svc = createServiceRoleClient()
+    if (!svc) return { rows: null, error: { message: 'no_service_role' } }
+    return selectChildProfilesByIds(svc, childIds)
+  },
+  ['parent-home-child-profiles'],
+  { revalidate: 300 },
+)
 
 export default async function ParentHomePage() {
   const auth = await getCachedParentAuth()
@@ -41,24 +60,13 @@ export default async function ParentHomePage() {
   const weekStart = getSeoulMondayOfWeekContaining(today)
   const weekEnd = addSeoulCalendarDays(weekStart, 6)
 
-  const { rows: profileRows, error: profilesFetchErr } = await selectChildProfilesByIds(supabase, childIds)
-  if (profilesFetchErr) {
-    console.error('[parent home] profiles:', profilesFetchErr.message)
-  }
-  const profiles = profileRows ?? []
-
-  const [statsRes, todayDailyRes, weekDailyRes, recentLogsRes] = await Promise.all([
+  const childIdsKey = [...childIds].sort().join(',')
+  const [cachedProfilesRes, statsRes, weekDailyRes, recentLogsRes] = await Promise.all([
+    getCachedChildProfilesForParentHome(childIdsKey),
     supabase
       .from('child_stats')
       .select('child_id, credits, hearts, current_level, exp, exp_to_next_level, streak_days, eq_delay_score, eq_routine_rate, eq_save_ratio')
       .in('child_id', childIds),
-
-    // 당일 배정된 카드 전부(자녀 앱 MissionTab 의 total 과 동일한 기준)
-    supabase
-      .from('daily_missions')
-      .select('child_id, is_completed')
-      .in('child_id', childIds)
-      .eq('date', today),
 
     // 경제 EQ 카드 — 이번 주 월~일(서울) 배정 미션
     supabase
@@ -76,19 +84,21 @@ export default async function ParentHomePage() {
       .order('completed_at', { ascending: false })
       .limit(30),
   ])
+  const profileRes =
+    cachedProfilesRes.rows !== null
+      ? cachedProfilesRes
+      : await selectChildProfilesByIds(supabase, childIds)
+  if (profileRes.error) {
+    console.error('[parent home] profiles:', profileRes.error.message)
+  }
+  const profiles = profileRes.rows ?? []
   const statsMap = Object.fromEntries(
     ((statsRes.data ?? []) as { child_id: string; [key: string]: unknown }[]).map((s) => [s.child_id, s])
   )
 
-  // 자녀별: 오늘 날짜 daily_missions 전체 개수·완료 개수(오전/오후/스페셜 등 구분 없이 한 번에 집계)
+  // 자녀별: 오늘/이번주 daily_missions 집계(쿼리 1회 결과를 재사용)
   const todayProgressMap: Record<string, { total: number; completed: number }> = {}
   for (const cid of childIds) todayProgressMap[cid] = { total: 0, completed: 0 }
-  for (const row of (todayDailyRes.data ?? []) as { child_id: string; is_completed: boolean }[]) {
-    const acc = todayProgressMap[row.child_id]
-    if (!acc) continue
-    acc.total += 1
-    if (row.is_completed) acc.completed += 1
-  }
 
   // 자녀별 이번 주 daily_missions → 월~일 막대 데이터
   const weekRowsByChild: Record<string, DailyMissionCompletionRow[]> = {}
@@ -101,6 +111,13 @@ export default async function ParentHomePage() {
     const bucket = weekRowsByChild[row.child_id]
     if (!bucket) continue
     bucket.push({ date: row.date, is_completed: row.is_completed })
+    if (row.date === today) {
+      const acc = todayProgressMap[row.child_id]
+      if (acc) {
+        acc.total += 1
+        if (row.is_completed) acc.completed += 1
+      }
+    }
   }
 
   // 최근 활동: child_id별 분류 (최대 5개)
