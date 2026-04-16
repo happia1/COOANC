@@ -554,7 +554,7 @@ export default function MissionTab({
               >
                 {/**
                  * 카드 전체 탭 = 완료. 일반 미션은 흰 카드, 특별만 앰버 테두리.
-                 * `routines_01.png` 아틀라스 — `clipRotated={false}` 로 회전 프레임 잘림 완화.
+                 * `routines_01.webp` 아틀라스 — `clipRotated={false}` 로 회전 프레임 잘림 완화.
                  */}
                 {/** 배경색 없음 — 아틀라스 일러스트만 흰 카드 위에 표시 */}
                 {/**

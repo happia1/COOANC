@@ -356,7 +356,7 @@ export const BANNERS: SpriteSheet = {
 // ─── missions ──────────────────────────────────────────────────────
 
 export const ROUTINES_01: SpriteSheet = {
-  image: 'missions/routines_01.png',
+  image: 'missions/routines_01.webp',
   atlasW: 509,
   atlasH: 1637,
   frames: {

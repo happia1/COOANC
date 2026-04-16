@@ -7,7 +7,7 @@ import { MISSION_ROUTINES_ATLAS } from '@/constants/missionRoutineAtlas'
 const DEFAULT_FRAME = 'play_inside'
 
 /**
- * 미션 제목(및 선택적 설명)을 보고 `missions/routines_01.png` 아틀라스의 프레임 이름을 고릅니다.
+ * 미션 제목(및 선택적 설명)을 보고 `missions/routines_01.webp` 아틀라스의 프레임 이름을 고릅니다.
  * - 한글·영문 키워드를 섞어 두었고, 안 맞으면 `DEFAULT_FRAME` 입니다.
  * - 부모가 만든 제목이 다양해도 비슷한 그림이 나오도록 순서가 **구체적인 규칙이 위**입니다.
  */

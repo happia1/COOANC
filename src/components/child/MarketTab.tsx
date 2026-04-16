@@ -533,7 +533,10 @@ export default function MarketTab({
       }
     }
 
-    void syncMarketFromDb()
+    /**
+     * 마운트 직시 sync 는 생략합니다 — `market/page.tsx`(RSC)가 이미 최신 행을 넘기므로
+     * 첫 폴링은 5초 후 interval 과 (탭 복귀 시) focus/visibility 에서만 돌립니다.
+     */
     const intervalId = window.setInterval(() => {
       if (document.visibilityState === 'visible') void syncMarketFromDb()
     }, 5000)

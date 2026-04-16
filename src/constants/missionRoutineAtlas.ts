@@ -5,7 +5,7 @@ import type { SpriteSheet } from '@/constants/sprites'
  * `scripts/gen-mission-routine-atlas.mjs` 로 `routines_01.json` 에서 재생성.
  */
 export const MISSION_ROUTINES_ATLAS: SpriteSheet = {
-  "image": "missions/routines_01.png",
+  "image": "missions/routines_01.webp",
   "atlasW": 509,
   "atlasH": 1637,
   "frames": {
