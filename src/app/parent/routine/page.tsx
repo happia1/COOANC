@@ -14,6 +14,7 @@ import {
 import RoutineTab from '@/components/parent/RoutineTab'
 import { selectChildProfilesByIds } from '@/lib/supabase/childProfileSelect'
 import { getSeoulDateString } from '@/lib/koreaDate'
+import { getMissionTemplatesForParentRoutinePage } from '@/lib/missionsTemplateCache'
 import type { Mission } from '@/types/database'
 
 type TodayDailyMissionRow = {
@@ -47,11 +48,8 @@ export default async function RoutinePage() {
           .in('child_id', childIds)
       : Promise.resolve({ data: [], error: null }),
 
-    supabase
-      .from('missions')
-      .select('*')
-      .order('level_required', { ascending: true })
-      .order('created_at', { ascending: false }),
+    /** 템플릿 마스터만 60초 캐시 — 부모 id 로 키를 나눠 계정 간 데이터가 섞이지 않게 함 */
+    getMissionTemplatesForParentRoutinePage(auth.user.id),
 
     childIds.length > 0
       ? supabase
@@ -67,6 +65,9 @@ export default async function RoutinePage() {
   }
   if (dailyTodayRes.error) {
     console.error('[parent routine] daily_missions today:', dailyTodayRes.error.message)
+  }
+  if (missionsRes.error) {
+    console.error('[parent routine] missions select:', missionsRes.error.message)
   }
   const profiles = profileBundle.rows ?? []
   type StatRow = {

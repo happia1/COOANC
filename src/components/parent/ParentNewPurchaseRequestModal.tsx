@@ -69,6 +69,10 @@ export default function ParentNewPurchaseRequestModal() {
         )
         .subscribe()
 
+      if (cancelled) {
+        void supabase.removeChannel(channel)
+        return
+      }
       channelRef.current = channel
     })()
 

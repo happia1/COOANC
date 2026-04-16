@@ -17,6 +17,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createServiceRoleClient } from '@/lib/supabase/admin'
 import { getCachedProfileRowById, getCachedFamilyLinksForChild } from '@/lib/childAppDataCache'
 import { getActorChildContext } from '@/lib/getActorChildContext'
+import { getMissionTemplatesForChildMissionPage } from '@/lib/missionsTemplateCache'
 import MissionTab from '@/components/child/MissionTab'
 import { getSeoulDateString } from '@/lib/koreaDate'
 import { uuidStringsEqual } from '@/lib/normalizeUuid'
@@ -109,7 +110,8 @@ export default async function MissionPage() {
    * 미션 템플릿·일일행은 service_role 로 조회하면 RLS·embed 이슈 없이 부모 루틴 탭과 동일 스냅샷에 가깝습니다.
    * 키가 없으면 자녀 세션 클라이언트로 폴백합니다.
    */
-  const missionDb = createServiceRoleClient() ?? supabase
+  const serviceRoleClient = createServiceRoleClient()
+  const missionDb = serviceRoleClient ?? supabase
 
   type CalEventRow = { start_date: string; end_date: string; routine_override: string }
 
@@ -128,9 +130,18 @@ export default async function MissionPage() {
           .limit(5)
       : Promise.resolve({ data: [] as CalEventRow[], error: null })
 
+  /**
+   * `missions` 템플릿만 `unstable_cache`(revalidate 60초) — 탭·새로고침 때 매번 전체 스냅샷을 읽지 않습니다.
+   * service_role 이 없을 때만 매 요청 `missionDb` 조회로 폴백합니다.
+   */
+  const templatesQuery =
+    serviceRoleClient != null
+      ? getMissionTemplatesForChildMissionPage()
+      : missionDb.from('missions').select('*').order('scheduled_time', { ascending: true, nullsFirst: false })
+
   const [calRes, templatesRes, existingBeforeRes] = await Promise.all([
     calendarP,
-    missionDb.from('missions').select('*').order('scheduled_time', { ascending: true, nullsFirst: false }),
+    templatesQuery,
     missionDb.from('daily_missions').select('mission_template_id').eq('child_id', childId).eq('date', today),
   ])
 

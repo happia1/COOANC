@@ -108,6 +108,11 @@ export default function ParentRoutineAlarmButton({ initialPendingApprovalCount }
         )
         .subscribe()
 
+      /** 언마운트가 먼저 끝난 뒤 채널이 붙으면 ref 만 비우고 끊지 못해 누수가 나지 않게 합니다 */
+      if (cancelled) {
+        void supabase.removeChannel(channel)
+        return
+      }
       channelRef.current = channel
       void refreshPendingPurchaseRows()
     })()
