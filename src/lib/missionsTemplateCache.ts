@@ -32,24 +32,23 @@ export async function getMissionTemplatesForChildMissionPage() {
 }
 
 /**
- * 부모 루틴 RSC — 로그인한 부모별로 RLS 가 적용된 `missions` 목록
- * - 캐시 키에 부모 user id 를 넣어 다른 계정과 섞이지 않게 합니다.
+ * 부모 루틴 RSC — 로그인한 부모의 세션(RLS)으로 `missions` 목록을 조회합니다.
+ *
+ * 비개발자 설명:
+ * - 이 조회는 "누가 로그인했는지"에 따라 결과가 달라집니다.
+ * - 그래서 Next의 장기 캐시(`unstable_cache`) 안에서 쿠키 기반 클라이언트를 만들면
+ *   런타임 환경에 따라 서버 에러가 날 수 있어, 부모 루틴은 매 요청 안전 조회로 유지합니다.
+ * - 함수 시그니처(`parentUserId`)는 호출부 호환을 위해 그대로 둡니다.
  */
-export function getMissionTemplatesForParentRoutinePage(parentUserId: string) {
-  return unstable_cache(
-    async () => {
-      const supabase = await createClient()
-      const res = await supabase
-        .from('missions')
-        .select('*')
-        .order('level_required', { ascending: true })
-        .order('created_at', { ascending: false })
-      return {
-        data: (res.data ?? null) as Mission[] | null,
-        error: res.error ? { message: res.error.message } : null,
-      }
-    },
-    ['parent-routine-missions', parentUserId],
-    { revalidate: 60 },
-  )()
+export async function getMissionTemplatesForParentRoutinePage(_parentUserId: string) {
+  const supabase = await createClient()
+  const res = await supabase
+    .from('missions')
+    .select('*')
+    .order('level_required', { ascending: true })
+    .order('created_at', { ascending: false })
+  return {
+    data: (res.data ?? null) as Mission[] | null,
+    error: res.error ? { message: res.error.message } : null,
+  }
 }
