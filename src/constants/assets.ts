@@ -117,12 +117,7 @@ export const ASSETS = {
       'second_screen_room_background.png',
     ),
     /**
-     * 자녀 앱 「오늘의 미션」탭 전용 배경입니다.
-     * - 실제 파일: `public/assets/img/layouts/backgrounds/home_background_02.png`
-     */
-    missionTabBackground: assetImg('layouts', 'backgrounds', 'home_background_02.png'),
-    /**
-     * 공용 로딩(`loading.tsx`), 루트(`/`) 리다이렉트 등 — 미션 탭은 `missionTabBackground` 를 씁니다.
+     * 공용 로딩(`loading.tsx`), 루트(`/`) 리다이렉트 등 — 미션 탭은 전면 배경 이미지를 쓰지 않습니다.
      * (현재 파일: `public/assets/img/layouts/backgrounds/background_01.png`)
      */
     sharedAppBackground: assetImg('layouts', 'backgrounds', 'background_01.png'),

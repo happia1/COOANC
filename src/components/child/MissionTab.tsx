@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef, type MouseEvent } from 'react'
 import { createPortal } from 'react-dom'
-import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import type {
   ChildStats,
@@ -24,7 +23,6 @@ import { BANNERS, ICONS } from '@/constants/sprites'
 import { MISSION_ROUTINES_ATLAS } from '@/constants/missionRoutineAtlas'
 import { missionRoutineIconFrame } from '@/lib/missionRoutineIconFrame'
 import { resolveRoutineMissionPngUrl } from '@/lib/routineMissionThumbnail'
-import { ASSETS } from '@/constants/assets'
 
 import MissionCreditToPiggyOverlay from '@/components/child/MissionCreditToPiggyOverlay'
 import MissionCreditMoveDialog, {
@@ -185,7 +183,7 @@ function trySpecialDeliveryPopupFields(
 
 /**
  * 미션 탭
- * - 배경: 탭 루트 전체(상단 크레딧+하단 오늘의 미션)에 공용 배경 한 겹(`ASSETS.layouts.sharedAppBackground` — 로딩 화면과 동일). `main` 패딩 상쇄는 `mission/layout.tsx` 의 풀 블리드 래퍼.
+ * - 탭 루트에는 전면 배경 PNG 를 두지 않음(요청에 따라 제거). 좌우·상단 풀 블리드 여백 처리는 `mission/layout.tsx` 만 참고.
  * - **오늘의 미션** 바깥·제목·카드 줄 **패딩**, 카드 **비율·간격** 모두 `missionTodayLayoutSpec.ts` 픽스. 임의 수정 금지.
  * - 미션 탭 본문은 세로 스크롤로 상단(저금통·돈바구니·지갑 무대)·하단(카드)을 이어서 볼 수 있습니다.
  * - 카드 썸네일: `resolveRoutineMissionPngUrl`(제목 우선) 또는 `routines_01` 아틀라스(`missionRoutineIconFrame`)
@@ -781,27 +779,9 @@ export default function MissionTab({
   const missionTabRootClassName =
     'relative isolate box-border -mb-[calc(60px+0.35rem)] flex min-h-0 min-w-0 flex-1 flex-col bg-transparent'
 
-  /**
-   * 미션 화면 맨 뒤 풀블리드 배경입니다.
-   * 비개발자 설명: `mission/layout.tsx` 가 좌우·위로 넓혀 주므로, 이 그림이 탭 가장자리까지 보입니다.
-   * `pointer-events-none`: 배경이 버튼·카드의 터치를 가리지 않습니다.
-   */
-  const missionAreaBackground = (
-    <div className="pointer-events-none absolute inset-0 z-0" aria-hidden>
-      <Image
-        src={ASSETS.layouts.missionTabBackground}
-        alt=""
-        fill
-        className="object-cover object-[center_88%]"
-        sizes="100vw"
-      />
-    </div>
-  )
-
   if (isFullRestDay) {
     return (
       <div className={missionTabRootClassName}>
-        {missionAreaBackground}
         <div className="relative z-[1] flex min-h-0 min-w-0 flex-1 flex-col">
           <MissionSleepMorningLayer
             childId={childId}
@@ -858,7 +838,6 @@ export default function MissionTab({
 
   return (
     <div className={missionTabRootClassName}>
-      {missionAreaBackground}
       <div className="relative z-[1] flex min-h-0 min-w-0 flex-1 flex-col">
         <MissionSleepMorningLayer
           childId={childId}
