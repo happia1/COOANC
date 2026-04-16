@@ -539,23 +539,20 @@ function CharacterDecorInventory({ unlockedIndexes }: { unlockedIndexes: number[
                     className="pointer-events-none aspect-square w-full"
                   >
                     <div className="relative size-full overflow-hidden rounded-xl border border-amber-100/90 bg-[#f7f4eb] shadow-sm">
-                      {unlocked ? (
-                        <Image
-                          src={ASSETS.characters.decorItemImages[index]}
-                          alt=""
-                          fill
-                          loading="lazy"
-                          sizes="(max-width: 448px) 18vw, 76px"
-                          className="object-contain p-0.5 transition-all duration-500"
-                          draggable={false}
-                        />
-                      ) : (
-                        /**
-                         * 잠긴 아이템은 실제 이미지를 읽지 않고 회색 플레이스홀더만 보여
-                         * 홈 진입 시 네트워크/디코딩 비용을 줄입니다.
-                         */
-                        <div className="absolute inset-0 bg-gradient-to-b from-gray-200 to-gray-300" aria-hidden />
-                      )}
+                      {/**
+                       * 잠김/해제와 관계없이 기존처럼 실제 아이템 이미지를 항상 그립니다.
+                       * 잠긴 칸은 아래 클래스에서 흑백+투명도만 적용해 "보이되 비활성" 상태를 유지합니다.
+                       */
+                      }
+                      <Image
+                        src={ASSETS.characters.decorItemImages[index]}
+                        alt=""
+                        fill
+                        loading="lazy"
+                        sizes="(max-width: 448px) 18vw, 76px"
+                        className={`object-contain p-0.5 transition-all duration-500 ${unlocked ? '' : 'grayscale opacity-[0.55]'}`}
+                        draggable={false}
+                      />
                       {!unlocked && (
                         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
                           {/** 가운데 흰 자물쇠만 — 밝은 썸네일에서도 보이도록 살짝 어두운 외곽 그림자 */}

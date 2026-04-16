@@ -136,4 +136,8 @@ export type AssetsCategory = keyof typeof ASSETS
  * - true: DB 에 잠금 해제가 있어도 칸은 잠금 UI만 보이고, 실시간으로 새로 풀려도 축하 팝업은 띄우지 않습니다.
  * - 조건(미션·저장 등)을 `triggerItemMap` 과 연동한 뒤 false 로 바꾸면 정상적으로 해제 상태가 반영됩니다.
  */
-export const CHARACTER_DECOR_UI_FORCE_ALL_LOCKED = true
+/**
+ * 운영 기본값은 false 입니다.
+ * - 비개발자용 설명: true 로 두면 "모든 아이템이 잠긴 것처럼" 보여서 회색 자물쇠만 보입니다.
+ */
+export const CHARACTER_DECOR_UI_FORCE_ALL_LOCKED = false
