@@ -533,10 +533,11 @@ export default function MarketTab({
       }
     }
 
-    // ✅ 수정: mount 후 2초 뒤부터 이벤트 수신
     let listenerReady = false
     const listenerTimer = window.setTimeout(() => { listenerReady = true }, 2000)
-
+    const intervalId = window.setInterval(() => {
+      if (document.visibilityState === 'visible') void syncMarketFromDb()
+    }, 5000)
     const onVisibleOrFocus = () => {
       if (listenerReady && document.visibilityState === 'visible') void syncMarketFromDb()
     }
