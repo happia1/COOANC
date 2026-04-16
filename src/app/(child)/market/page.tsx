@@ -13,8 +13,8 @@ import { isCategoryExcludedFromMarket } from '@/lib/parentMarketMenuSections'
 import type { StoreItem, PurchaseRequest } from '@/types/database'
 
 export default async function MarketPage() {
-  const ctx = await getActorChildContext()
-  const supabase = await createClient()
+  /** 자녀 컨텍스트와 DB 클라이언트는 순차 대기 없이 동시에 준비합니다. */
+  const [ctx, supabase] = await Promise.all([getActorChildContext(), createClient()])
   const childId = ctx.actorChildId
 
   const [statsRes, familyRows, itemsRes, hiddenRes, requestsRes, wishRes, creditOvRes] = await Promise.all([

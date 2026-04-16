@@ -15,7 +15,7 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import type { StoreItem } from '@/types/database'
 import SpriteImage from '@/components/common/SpriteImage'
-import MarketItemImage from '@/components/common/MarketItemImage'
+import StoreItemThumbnail from '@/components/common/StoreItemThumbnail'
 import { SHOP_ANIMATIONS, ICONS } from '@/constants/sprites'
 import type { MarketItemFrameKey } from '@/lib/marketItemFrame'
 
@@ -306,17 +306,14 @@ export default function MarketPurchaseConfirmDialog({
                   <div className="mt-2.5 flex flex-col items-center gap-2.5 text-center sm:mt-3 sm:flex-row sm:items-start sm:text-left">
                     {/* 모바일에서 이미지 박스를 함께 줄여 전체 카드 비율을 안정적으로 유지합니다. */}
                     <div className="flex h-[4.6rem] w-[4.6rem] shrink-0 items-end justify-center overflow-hidden rounded-xl bg-white/90 shadow-inner ring-1 ring-black/[0.06] sm:h-[5.75rem] sm:w-[5.75rem]">
-                      {item.image_url ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={item.image_url}
-                          alt=""
-                          className="max-h-[4.1rem] max-w-full object-contain object-bottom sm:max-h-[5.25rem]"
-                          draggable={false}
-                        />
-                      ) : (
-                        <MarketItemImage frame={frame} height={74} />
-                      )}
+                      <StoreItemThumbnail
+                        imageUrl={item.image_url}
+                        frame={frame}
+                        height={74}
+                        className="max-h-[4.1rem] max-w-full object-contain object-bottom sm:max-h-[5.25rem]"
+                        priority
+                        sizes="(max-width: 640px) 25vw, 92px"
+                      />
                     </div>
                     {/* 세로 스택일 때도 텍스트 블록이 자연스럽게 줄바꿈되도록 중앙 정렬을 허용합니다. */}
                     <div className="flex min-w-0 flex-1 flex-col items-center justify-center gap-1.5 sm:items-start">

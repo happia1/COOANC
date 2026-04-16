@@ -74,33 +74,16 @@ function templatePoolForToday(
   return weekly.length > 0 ? weekly : dailyOrWeekly.filter((m) => m.repeat_type === 'daily')
 }
 
+type CalEventRow = { start_date: string; end_date: string; routine_override: string }
+
 export default async function MissionPage() {
-  const ctx = await getActorChildContext()
-  const supabase = await createClient()
+  /**
+   * 컨텍스트(자녀 id)와 Supabase 클라이언트는 서로 독립 — 한 번에 기다려 TTFB 를 줄입니다.
+   */
+  const [ctx, supabase] = await Promise.all([getActorChildContext(), createClient()])
   const childId = ctx.actorChildId
 
   const today = getSeoulDateString()
-
-  const [statsRes, profileRow, familyRows, grantsRes, placementsRes] = await Promise.all([
-    supabase.from('child_stats').select('*').eq('child_id', childId).maybeSingle(),
-    getCachedProfileRowById(childId),
-    getCachedFamilyLinksForChild(childId),
-    supabase
-      .from('praise_sticker_grants')
-      .select('*')
-      .eq('child_id', childId)
-      .order('created_at', { ascending: false }),
-    supabase.from('praise_sticker_placements').select('*').eq('child_id', childId),
-  ])
-
-  const initialStats = (statsRes.data ?? null) as ChildStats | null
-  const level = initialStats?.current_level ?? 0
-
-  const childName = (profileRow?.name ?? '').trim() || '쿠앵이'
-  const initialPraiseGrants = (grantsRes.data ?? []) as PraiseStickerGrant[]
-  const initialPraisePlacements = (placementsRes.data ?? []) as PraiseStickerPlacement[]
-
-  const parentId = familyRows[0]?.parent_id ?? null
 
   /** embed 에 템플릿 보상·배율을 넣어 자녀 카드 숫자와 완료 API가 맞춰집니다. */
   const missionJoin =
@@ -113,37 +96,52 @@ export default async function MissionPage() {
   const serviceRoleClient = createServiceRoleClient()
   const missionDb = serviceRoleClient ?? supabase
 
-  type CalEventRow = { start_date: string; end_date: string; routine_override: string }
-
-  /**
-   * 달력(휴가/방학)·전체 미션 템플릿·오늘 이미 있는 daily_missions 는 서로 독립이므로 한꺼번에 요청합니다.
-   * (예전: 달력 → 템플릿 → 기존 행 순차 대기로 체감 로딩이 길어짐)
-   */
-  const calendarP =
-    parentId != null
-      ? missionDb
-          .from('calendar_events')
-          .select('start_date, end_date, routine_override')
-          .eq('parent_id', parentId)
-          .lte('start_date', today)
-          .gte('end_date', today)
-          .limit(5)
-      : Promise.resolve({ data: [] as CalEventRow[], error: null })
-
   /**
    * `missions` 템플릿만 `unstable_cache`(revalidate 60초) — 탭·새로고침 때 매번 전체 스냅샷을 읽지 않습니다.
-   * service_role 이 없을 때만 매 요청 `missionDb` 조회로 폴백합니다.
    */
   const templatesQuery =
     serviceRoleClient != null
       ? getMissionTemplatesForChildMissionPage()
       : missionDb.from('missions').select('*').order('scheduled_time', { ascending: true, nullsFirst: false })
 
-  const [calRes, templatesRes, existingBeforeRes] = await Promise.all([
-    calendarP,
-    templatesQuery,
-    missionDb.from('daily_missions').select('mission_template_id').eq('child_id', childId).eq('date', today),
-  ])
+  /**
+   * 달력을 제외한 나머지는 모두 childId 만 있으면 됩니다.
+   * `calendar_events` 는 부모 id 가 필요해 family_links 를 받은 뒤 한 번 더 요청합니다.
+   */
+  const [statsRes, profileRow, familyRows, grantsRes, placementsRes, templatesRes, existingBeforeRes] =
+    await Promise.all([
+      supabase.from('child_stats').select('*').eq('child_id', childId).maybeSingle(),
+      getCachedProfileRowById(childId),
+      getCachedFamilyLinksForChild(childId),
+      supabase
+        .from('praise_sticker_grants')
+        .select('*')
+        .eq('child_id', childId)
+        .order('created_at', { ascending: false }),
+      supabase.from('praise_sticker_placements').select('*').eq('child_id', childId),
+      templatesQuery,
+      missionDb.from('daily_missions').select('mission_template_id').eq('child_id', childId).eq('date', today),
+    ])
+
+  const initialStats = (statsRes.data ?? null) as ChildStats | null
+  const level = initialStats?.current_level ?? 0
+
+  const childName = (profileRow?.name ?? '').trim() || '쿠앵이'
+  const initialPraiseGrants = (grantsRes.data ?? []) as PraiseStickerGrant[]
+  const initialPraisePlacements = (placementsRes.data ?? []) as PraiseStickerPlacement[]
+
+  const parentId = familyRows[0]?.parent_id ?? null
+
+  const calRes =
+    parentId != null
+      ? await missionDb
+          .from('calendar_events')
+          .select('start_date, end_date, routine_override')
+          .eq('parent_id', parentId)
+          .lte('start_date', today)
+          .gte('end_date', today)
+          .limit(5)
+      : { data: [] as CalEventRow[], error: null }
 
   const calEvents = calRes.data ?? []
   const routineType: RoutineType =
@@ -155,29 +153,36 @@ export default async function MissionPage() {
 
   const pool = templatePoolForToday((templatesRes.data ?? []) as Mission[], childId, level, routineType)
 
-  const existingBefore = existingBeforeRes.data
+  const existingBefore = existingBeforeRes.data ?? []
 
-  const haveIds = new Set((existingBefore ?? []).map((r) => r.mission_template_id))
-  const missing = pool.filter((m) => !haveIds.has(m.id))
+  /**
+   * 성능 우선 규칙:
+   * - 오늘 `daily_missions` 가 1건이라도 있으면 백필을 **완전히 스킵**합니다.
+   * - 오늘 행이 아예 없을 때만 템플릿 기준 백필을 시도합니다.
+   */
+  if (existingBefore.length === 0 && routineType !== 'holiday') {
+    const haveIds = new Set(existingBefore.map((r) => r.mission_template_id))
+    const missing = pool.filter((m) => !haveIds.has(m.id))
 
-  /** 누락 분 백필은 행마다 `await` 하지 않고 동시에 넣어 왕복 시간을 줄입니다(중복은 23505 무시). */
-  if (missing.length > 0 && routineType !== 'holiday') {
-    await Promise.all(
-      missing.map(async (m) => {
-        const row = {
-          child_id: childId,
-          mission_template_id: m.id,
-          date: today,
-          scheduled_time: m.scheduled_time ?? null,
-          routine_type: routineType,
-          is_completed: false,
-        }
-        const { error } = await missionDb.from('daily_missions').insert(row)
-        if (error && error.code !== '23505') {
-          console.error('[child/mission] daily_missions insert', error)
-        }
-      }),
-    )
+    /** 누락이 없으면 즉시 다음 단계로 넘어갑니다. */
+    if (missing.length > 0) {
+      await Promise.all(
+        missing.map(async (m) => {
+          const row = {
+            child_id: childId,
+            mission_template_id: m.id,
+            date: today,
+            scheduled_time: m.scheduled_time ?? null,
+            routine_type: routineType,
+            is_completed: false,
+          }
+          const { error } = await missionDb.from('daily_missions').insert(row)
+          if (error && error.code !== '23505') {
+            console.error('[child/mission] daily_missions insert', error)
+          }
+        }),
+      )
+    }
   }
 
   const { data: existing, error: existingErr } = await missionDb

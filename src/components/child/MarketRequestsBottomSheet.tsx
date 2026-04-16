@@ -10,7 +10,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import type { PurchaseRequest, StoreItem } from '@/types/database'
-import MarketItemImage from '@/components/common/MarketItemImage'
+import StoreItemThumbnail from '@/components/common/StoreItemThumbnail'
 import { marketFrameKeyForItemId, type MarketItemFrameKey } from '@/lib/marketItemFrame'
 import {
   addSeoulCalendarDays,
@@ -72,17 +72,14 @@ function RequestRow({
     <li className="flex gap-3 rounded-2xl bg-white p-3 shadow-sm ring-1 ring-black/[0.05]">
       {/* 요청사항: 썸네일을 기존 대비 절반 수준으로 추가 축소 */}
       <div className="flex h-[2rem] w-[2rem] shrink-0 items-end justify-center overflow-hidden rounded-lg bg-amber-50/80 ring-1 ring-amber-100">
-        {linked?.image_url ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={linked.image_url}
-            alt=""
-            className="max-h-[1.75rem] max-w-full object-contain object-bottom"
-            draggable={false}
-          />
-        ) : (
-          <MarketItemImage frame={frame} height={28} />
-        )}
+        <StoreItemThumbnail
+          imageUrl={linked?.image_url}
+          frame={frame}
+          height={28}
+          className="max-h-[1.75rem] max-w-full object-contain object-bottom"
+          loading="lazy"
+          sizes="32px"
+        />
       </div>
       <div className="min-w-0 flex-1">
         {/* 요청사항: 블록 높이 축소를 위해 상품명 옆에 날짜를 같은 줄로 배치 */}

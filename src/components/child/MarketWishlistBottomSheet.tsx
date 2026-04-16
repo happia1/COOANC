@@ -10,7 +10,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import type { StoreItem } from '@/types/database'
 import SpriteImage from '@/components/common/SpriteImage'
-import MarketItemImage from '@/components/common/MarketItemImage'
+import StoreItemThumbnail from '@/components/common/StoreItemThumbnail'
 import { ICONS } from '@/constants/sprites'
 import { formatMarketCreditLabel } from '@/lib/applyStoreItemCreditOverrides'
 import { marketFrameKeyForItemId } from '@/lib/marketItemFrame'
@@ -97,17 +97,14 @@ export default function MarketWishlistBottomSheet({
                   <div className="flex min-w-0 items-center gap-2.5">
                     {/* 이전 28px(h-7) → 52px: 영수증에서 상품이 한눈에 보이도록 확대 */}
                     <div className="flex h-[3.25rem] w-[3.25rem] shrink-0 items-center justify-center overflow-hidden rounded-lg bg-amber-100/80">
-                      {item.image_url ? (
-                        // eslint-disable-next-line @next/next/no-img-element -- 외부/스토리지 이미지 URL
-                        <img
-                          src={item.image_url}
-                          alt=""
-                          className="max-h-full max-w-full object-contain"
-                          draggable={false}
-                        />
-                      ) : (
-                        <MarketItemImage frame={marketFrameKeyForItemId(item.id, item.name)} height={48} />
-                      )}
+                      <StoreItemThumbnail
+                        imageUrl={item.image_url}
+                        frame={marketFrameKeyForItemId(item.id, item.name)}
+                        height={48}
+                        className="max-h-full max-w-full object-contain"
+                        loading="lazy"
+                        sizes="52px"
+                      />
                     </div>
                     <span className="truncate text-gray-700">{item.name}</span>
                   </div>
@@ -182,8 +179,16 @@ export default function MarketWishlistBottomSheet({
             <div className="rounded-2xl bg-white p-3 text-center shadow-sm ring-1 ring-black/[0.06]">
               {/* 요청사항: 장바구니 블록 아이콘도 basket_filled.png 로 통일 */}
               <div className="flex justify-center" aria-hidden>
-                {/* eslint-disable-next-line @next/next/no-img-element -- public 정적 자산 경로 */}
-                <img src={BASKET_FILLED_SRC} alt="" className="h-8 w-8 object-contain" draggable={false} />
+                <Image
+                  src={BASKET_FILLED_SRC}
+                  alt=""
+                  width={32}
+                  height={32}
+                  loading="lazy"
+                  sizes="32px"
+                  className="h-8 w-8 object-contain"
+                  draggable={false}
+                />
               </div>
               <p className="mt-1 text-[11px] font-black text-red-500">장바구니</p>
               <p className="mt-0.5 text-base font-black tabular-nums text-red-500">

@@ -539,14 +539,23 @@ function CharacterDecorInventory({ unlockedIndexes }: { unlockedIndexes: number[
                     className="pointer-events-none aspect-square w-full"
                   >
                     <div className="relative size-full overflow-hidden rounded-xl border border-amber-100/90 bg-[#f7f4eb] shadow-sm">
-                      <Image
-                        src={ASSETS.characters.decorItemImages[index]}
-                        alt=""
-                        fill
-                        sizes="(max-width: 448px) 18vw, 76px"
-                        className={`object-contain p-0.5 transition-all duration-500 ${unlocked ? '' : 'grayscale opacity-[0.55]'}`}
-                        draggable={false}
-                      />
+                      {unlocked ? (
+                        <Image
+                          src={ASSETS.characters.decorItemImages[index]}
+                          alt=""
+                          fill
+                          loading="lazy"
+                          sizes="(max-width: 448px) 18vw, 76px"
+                          className="object-contain p-0.5 transition-all duration-500"
+                          draggable={false}
+                        />
+                      ) : (
+                        /**
+                         * 잠긴 아이템은 실제 이미지를 읽지 않고 회색 플레이스홀더만 보여
+                         * 홈 진입 시 네트워크/디코딩 비용을 줄입니다.
+                         */
+                        <div className="absolute inset-0 bg-gradient-to-b from-gray-200 to-gray-300" aria-hidden />
+                      )}
                       {!unlocked && (
                         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
                           {/** 가운데 흰 자물쇠만 — 밝은 썸네일에서도 보이도록 살짝 어두운 외곽 그림자 */}

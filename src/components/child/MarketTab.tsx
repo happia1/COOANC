@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom'
 import Image from 'next/image'
 import type { StoreItem, PurchaseRequest } from '@/types/database'
 import SpriteImage from '@/components/common/SpriteImage'
-import MarketItemImage from '@/components/common/MarketItemImage'
+import StoreItemThumbnail from '@/components/common/StoreItemThumbnail'
 import { SHOP_ANIMATIONS, ICONS } from '@/constants/sprites'
 import MarketPurchaseConfirmDialog from '@/components/child/MarketPurchaseConfirmDialog'
 import MarketPurchaseSuccessOverlay from '@/components/child/MarketPurchaseSuccessOverlay'
@@ -788,12 +788,15 @@ export default function MarketTab({
           document.body,
         )}
 
-      {/* 가게 지붕: 높이 상한을 두어 그 아래 선반 3단이 한 뷰포트에 들어오기 쉽게 함 */}
+      {/* 가게 지붕: LCP 후보 — priority + sizes 로 첫 페인트에 맞는 해상도만 받습니다 */}
       <div className="shrink-0 w-full overflow-hidden leading-none">
-        {/* eslint-disable-next-line @next/next/no-img-element -- 정적 자산, public 경로 */}
-        <img
+        <Image
           src={ROOF_SRC}
           alt=""
+          width={1200}
+          height={180}
+          priority
+          sizes="100vw"
           className="block h-auto w-full max-h-[4.5rem] select-none object-cover object-bottom sm:max-h-[5rem]"
           draggable={false}
           onError={(e) => {
@@ -811,7 +814,7 @@ export default function MarketTab({
       ) : (
         <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-1 pb-2 [scrollbar-width:thin]">
           {/* 요청사항: 이벤트 → 간식 → 장난감 3단 선반을 동시에 노출 */}
-          {marketSectionsWithShelves.map((block) => (
+          {marketSectionsWithShelves.map((block, blockIdx) => (
             <section key={block.sectionKey} className="shrink-0">
               <h3 className="mb-1.5 flex items-center gap-1.5 border-b border-amber-900/10 px-2 pb-1 text-[11px] font-black tracking-tight text-amber-950/90">
                 {block.title}
@@ -819,8 +822,10 @@ export default function MarketTab({
               </h3>
               {/* 선반 내부만 좌우 슬라이드 */}
               <div className="flex snap-x snap-mandatory gap-1.5 overflow-x-auto px-1 py-0.5 [-ms-overflow-style:none] [scrollbar-width:none]">
-                {block.items.map((item) => {
+                {block.items.map((item, itemIdx) => {
                   const frameKey = marketFrameKeyForItemId(item.id, item.name)
+                  /** 첫 구역 맨 앞 몇 칸만 우선 로드 — 나머지는 지연 로드로 대역폭 절약 */
+                  const thumbPriority = blockIdx === 0 && itemIdx < 4
                   const meetsLevel = level >= item.level_required
                   const isPending = shelfBlockedItemIds.has(item.id)
                   /**
@@ -853,18 +858,17 @@ export default function MarketTab({
 
                       <div className="relative flex w-full items-end justify-center overflow-visible" style={{ height: SHELF_IMG_AREA_PX }}>
                         <div className="flex max-h-full max-w-full items-end justify-center">
-                          {item.image_url ? (
-                            // eslint-disable-next-line @next/next/no-img-element -- 외부/스토리지 URL, 동적
-                            <img
-                              src={item.image_url}
-                              alt=""
-                              className="max-h-full max-w-full object-contain object-bottom"
-                              style={{ maxHeight: SHELF_SPRITE_H }}
-                              draggable={false}
-                            />
-                          ) : (
-                            <MarketItemImage frame={frameKey} height={SHELF_SPRITE_H} />
-                          )}
+                          <StoreItemThumbnail
+                            imageUrl={item.image_url}
+                            frame={frameKey}
+                            height={SHELF_SPRITE_H}
+                            width={SHELF_IMG_AREA_PX}
+                            className="max-h-full max-w-full object-contain object-bottom"
+                            style={{ maxHeight: SHELF_SPRITE_H }}
+                            priority={thumbPriority}
+                            loading="lazy"
+                            sizes={`${SHELF_IMG_AREA_PX}px`}
+                          />
                         </div>
                       </div>
 
@@ -939,9 +943,17 @@ export default function MarketTab({
               className="pointer-events-auto relative flex h-11 w-11 items-center justify-center rounded-full bg-white shadow-md ring-2 ring-amber-200/90 transition-transform active:scale-95"
               aria-label={`장바구니 열기, ${wishlistTotalCount}개`}
             >
-              {/* 요청사항: 플로팅 장바구니 아이콘을 basket_filled.png 로 통일 */}
-              {/* eslint-disable-next-line @next/next/no-img-element -- public 정적 자산 경로 */}
-              <img src={BASKET_FILLED_SRC} alt="" className="h-6 w-6 object-contain" draggable={false} />
+              {/* 요청사항: 플로팅 장바구니 아이콘을 basket_filled.png 로 통일 — 하단 플로팅이라 lazy */}
+              <Image
+                src={BASKET_FILLED_SRC}
+                alt=""
+                width={24}
+                height={24}
+                loading="lazy"
+                sizes="24px"
+                className="h-6 w-6 object-contain"
+                draggable={false}
+              />
               <span className="absolute -right-0.5 -top-0.5 flex min-h-[1rem] min-w-[1rem] items-center justify-center rounded-full bg-brand-blue px-0.5 text-[9px] font-black tabular-nums text-white ring-2 ring-white">
                 {wishlistTotalCount > 99 ? '99+' : wishlistTotalCount}
               </span>
@@ -1007,17 +1019,14 @@ export default function MarketTab({
             </p>
             {/* 상품 썸네일: 뒤쪽 색·테두리 없이 그림만 보이게(팝업 흰 배경 위에 이미지) */}
             <div className="mt-2.5 flex justify-center" aria-hidden>
-              {shelfActionFor.item.image_url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={shelfActionFor.item.image_url}
-                  alt=""
-                  className="max-h-[4.25rem] max-w-[min(100%,5rem)] object-contain"
-                  draggable={false}
-                />
-              ) : (
-                <MarketItemImage frame={shelfActionFor.frame} height={60} />
-              )}
+              <StoreItemThumbnail
+                imageUrl={shelfActionFor.item.image_url}
+                frame={shelfActionFor.frame}
+                height={60}
+                className="max-h-[4.25rem] max-w-[min(100%,5rem)] object-contain"
+                priority
+                sizes="80px"
+              />
             </div>
             {/* 요청사항: 레벨 표시는 제거하고, 크레딧 가독성을 높이기 위해 숫자 크기를 키웁니다. */}
             <div className="mt-2 text-center text-sm font-bold text-gray-500">
@@ -1064,10 +1073,13 @@ export default function MarketTab({
                     >
                       {/* 구매하기와 같은 블록 스타일(ring·그림자·패딩)·색만 노란 계열 */}
                       <span className="inline-flex flex-col items-center justify-center gap-1.5 leading-none">
-                        {/* eslint-disable-next-line @next/next/no-img-element -- public 정적 자산 경로 */}
-                        <img
+                        <Image
                           src={BASKET_FILLED_SRC}
                           alt=""
+                          width={36}
+                          height={36}
+                          loading="lazy"
+                          sizes="36px"
                           className="h-9 w-9 shrink-0 object-contain drop-shadow-sm"
                           draggable={false}
                         />
@@ -1116,10 +1128,13 @@ export default function MarketTab({
           <div className="relative z-[1] mx-auto w-full max-w-[18rem] rounded-3xl bg-white p-5 text-center shadow-2xl ring-1 ring-black/[0.06]">
             {/* 마켓 전역과 동일한 장바구니 일러스트 — 담긴 것을 직관적으로 보여 줌 */}
             <div className="mx-auto flex justify-center">
-              {/* eslint-disable-next-line @next/next/no-img-element -- public 정적 자산 */}
-              <img
+              <Image
                 src={BASKET_FILLED_SRC}
                 alt=""
+                width={64}
+                height={64}
+                loading="lazy"
+                sizes="64px"
                 className="h-16 w-16 object-contain drop-shadow-sm"
                 draggable={false}
               />
@@ -1235,17 +1250,14 @@ export default function MarketTab({
               🪂
             </span>
             <div className="-mt-1 flex items-end justify-center" style={{ filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.15))' }}>
-              {delivery.itemImageUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={delivery.itemImageUrl}
-                  alt=""
-                  className="max-h-[96px] max-w-[min(100vw-2rem,200px)] object-contain object-bottom"
-                  draggable={false}
-                />
-              ) : (
-                <MarketItemImage frame={delivery.frame} height={96} />
-              )}
+              <StoreItemThumbnail
+                imageUrl={delivery.itemImageUrl}
+                frame={delivery.frame}
+                height={96}
+                className="max-h-[96px] max-w-[min(100vw-2rem,200px)] object-contain object-bottom"
+                loading="lazy"
+                sizes="(max-width: 480px) 40vw, 200px"
+              />
             </div>
             <p className="mt-2 text-center text-sm font-bold text-gray-600">{delivery.request.item_name}</p>
           </div>

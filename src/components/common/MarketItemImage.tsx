@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import type { CSSProperties } from 'react'
 import type { MarketItemImageKey } from '@/constants/marketItemImages'
 import { marketItemImageUrl } from '@/constants/marketItemImages'
@@ -11,13 +12,43 @@ export interface MarketItemImageProps {
   height?: number
   className?: string
   style?: CSSProperties
+  /** 첫 선반 상단 등 — Next 가 우선 로드 */
+  priority?: boolean
+  loading?: 'lazy' | 'eager'
+  sizes?: string
 }
 
 /**
- * 마켓 기본 상품 일러스트 — 예전 스프라이트 시트 대신 `items/shop/items/*.png` 한 장씩 표시합니다.
- * 가로·세로 한쪽만 주면 비율을 유지한 채 맞춥니다(SpriteImage 와 비슷한 느낌).
+ * 마켓 기본 상품 일러스트 — `items/shop/items/*.png` 한 장씩 표시합니다.
+ * Next.js Image 로 WebP/AVIF 변환·크기 최적화를 받습니다.
  */
-export default function MarketItemImage({ frame, width, height, className, style }: MarketItemImageProps) {
+export default function MarketItemImage({
+  frame,
+  width,
+  height,
+  className,
+  style,
+  priority = false,
+  loading = 'lazy',
+  sizes,
+}: MarketItemImageProps) {
+  const src = marketItemImageUrl(frame)
+  let w: number
+  let h: number
+  if (width != null && height != null) {
+    w = width
+    h = height
+  } else if (height != null) {
+    h = height
+    w = Math.max(32, Math.round(h * 1.22))
+  } else if (width != null) {
+    w = width
+    h = Math.max(28, Math.round(w / 1.22))
+  } else {
+    h = 44
+    w = Math.max(32, Math.round(h * 1.22))
+  }
+
   const imgStyle: CSSProperties = {
     objectFit: 'contain',
     objectPosition: 'bottom',
@@ -25,25 +56,19 @@ export default function MarketItemImage({ frame, width, height, className, style
     maxHeight: '100%',
     ...style,
   }
-  if (width != null && height != null) {
-    imgStyle.width = width
-    imgStyle.height = height
-  } else if (height != null) {
-    imgStyle.height = height
-    imgStyle.width = 'auto'
-  } else if (width != null) {
-    imgStyle.width = width
-    imgStyle.height = 'auto'
-  }
 
   return (
-    // eslint-disable-next-line @next/next/no-img-element -- 로컬 정적 마켓 자산
-    <img
-      src={marketItemImageUrl(frame)}
+    <Image
+      src={src}
       alt=""
+      width={w}
+      height={h}
       className={className}
       style={imgStyle}
       draggable={false}
+      priority={priority}
+      loading={priority ? undefined : loading}
+      sizes={sizes ?? `(max-width: 640px) ${Math.min(w * 2, 128)}px, ${w}px`}
     />
   )
 }
