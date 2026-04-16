@@ -7,12 +7,10 @@ import { PARENT_AS_CHILD_COOKIE, PARENT_AS_CHILD_COOKIE_MAX_AGE } from '@/lib/pa
  * GET /api/parent/enter-child-ui?childId=UUID (childId 생략 가능)
  * - 로그인한 사용자가 부모이고, 해당 자녀와 family_links 로 연결돼 있으면
  *   HttpOnly 쿠키를 심고 /home 으로 보냅니다.
- * - 이후 자녀 앱 레이아웃이 이 쿠키를 읽어 같은 화면을 그립니다.
  *
- * 400 이 나던 경우(요약):
- * - 주소에 자녀 id 가 없거나, `undefined` 문자열처럼 잘못 붙은 경우 → normalizeUuidParam 이 실패했음.
- * - 이제는 그럴 때 DB 에서 부모에게 연결된 첫 자녀 id 를 기본값으로 씁니다.
- * - 연결된 자녀가 한 명도 없으면 JSON 에러 대신 부모 홈으로 안내 이동합니다.
+ * Next.js 가 `<Link>` 프리페치 시 같은 URL 에 `?_rsc=…` 만 붙인 요청을 추가로 보낼 수 있습니다.
+ * 이때 `childId` 쿼리가 빠진 채로 오며, 리다이렉트(302) 응답이 RSC 클라이언트와 맞지 않아 **400** 으로 보이는 경우가 있습니다.
+ * `_rsc` 가 있으면 쿠키·리다이렉트 없이 **200 JSON no-op** 으로 끝냅니다. (실제 진입은 첫 요청 `?childId=…` 로 이미 처리됨)
  */
 export async function GET(req: NextRequest) {
   const supabase = await createClient()
@@ -20,25 +18,49 @@ export async function GET(req: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
+  const { data: profile } = user
+    ? await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle()
+    : { data: null }
+
+  const childIdParam = req.nextUrl.searchParams.get('childId')
+  const rsc = req.nextUrl.searchParams.get('_rsc')
+
+  /** 개발 환경 또는 RSC 보조 요청일 때만 — user/role/쿼리 불일치 원인 추적 */
+  if (process.env.NODE_ENV === 'development' || rsc !== null) {
+    console.log('enter-child-ui debug:', {
+      userId: user?.id,
+      role: profile?.role,
+      childId: childIdParam,
+      rsc,
+    })
+  }
+
+  if (req.nextUrl.searchParams.has('_rsc')) {
+    return NextResponse.json({ ok: true, noop: true, reason: 'next-rsc-prefetch-skip' }, { status: 200 })
+  }
+
   if (!user) {
     return NextResponse.json({ error: '인증이 필요해요' }, { status: 401 })
   }
 
-  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle()
   if (profile?.role !== 'parent') {
     return NextResponse.json({ error: '부모 계정만 이용할 수 있어요' }, { status: 403 })
   }
 
   /** 주소창에서 온 childId — 없거나 깨졌으면 아래에서 첫 연결 자녀로 채움 */
-  let childId = normalizeUuidParam(req.nextUrl.searchParams.get('childId'))
+  let childId = normalizeUuidParam(childIdParam)
 
   if (!childId) {
-    const { data: links } = await supabase
+    const { data: links, error: linksErr } = await supabase
       .from('family_links')
       .select('child_id')
       .eq('parent_id', user.id)
       .order('created_at', { ascending: true })
       .limit(1)
+
+    if (linksErr) {
+      console.error('[enter-child-ui] family_links fallback:', linksErr.message)
+    }
 
     const first = links?.[0]?.child_id
     childId = normalizeUuidParam(first ?? null)

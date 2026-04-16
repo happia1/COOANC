@@ -840,9 +840,8 @@ export default function ApprovalTab({
           {/**
            * 부모 홈의 프로필 카드와 같은 동선 — 서버가 쿠키를 설정한 뒤 자녀용 `/home` 으로 이동합니다.
            */}
-          <Link
-            prefetch={false}
-            href={`/api/parent/enter-child-ui?childId=${encodeURIComponent(currentChild.id)}`}
+          <ParentEnterChildUiLink
+            childId={currentChild.id}
             className="block cursor-pointer rounded-xl transition-opacity active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4A90E2] focus-visible:ring-offset-2"
             aria-label={`${currentChild.name} 자녀용 앱 화면으로 들어가기`}
             onClick={() => setSelectedChildId(currentChild.id)}

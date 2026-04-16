@@ -1,3 +1,5 @@
+import { parentEnterChildUiHref } from '@/lib/parentEnterChildUi'
+
 type Props = {
   /** 자녀 profiles.id (UUID 문자열) */
   childId: string
@@ -10,10 +12,11 @@ type Props = {
 /**
  * 부모 홈에서 자녀 한 명을 나타내는 카드입니다.
  * - 누르면 자녀용 앱(/home)으로 들어가도록 enter-child-ui API 로 연결합니다.
- * - `<a href>` 로 두어 브라우저 기본 이동을 씁니다.
+ * - `<a href>` 로 두어 브라우저 기본 이동을 씁니다(Next prefetch 없음).
+ * - id 가 비어 있으면 주소는 쿼리 없이 API 만 가리키고 서버가 첫 자녀를 고릅니다.
  */
 export function ChildAccountCard({ childId, name, level, streakDays, credits }: Props) {
-  const href = `/api/parent/enter-child-ui?childId=${encodeURIComponent(childId)}`
+  const href = parentEnterChildUiHref(childId)
 
   return (
     <a

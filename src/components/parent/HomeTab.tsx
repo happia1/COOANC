@@ -248,9 +248,8 @@ export default function HomeTab({ childrenData }: Props) {
             자녀가 평소 쓰는 것과 같은 탭(홈·미션·마켓…)이 열리고, 상단에 「부모 보기」가 보입니다.
             부모 홈에서 선택 중인 자녀와 맞추기 위해 클릭 시 Zustand id 도 같이 저장합니다.
           */}
-          <Link
-            prefetch={false}
-            href={`/api/parent/enter-child-ui?childId=${encodeURIComponent(child.id)}`}
+          <ParentEnterChildUiLink
+            childId={child.id}
             className="block cursor-pointer rounded-xl transition-opacity active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4A90E2] focus-visible:ring-offset-2"
             aria-label={`${child.name} 자녀용 앱 화면으로 들어가기`}
             onClick={() => setSelectedChildId(child.id)}
