@@ -4,10 +4,8 @@
  * ※ `/api/parent/enter-child-ui` 는 여기서 호출하지 않습니다.
  *   부모 미리보기 세션은 `PARENT_AS_CHILD_COOKIE`(HttpOnly) + `getActorChildContext` 만 사용합니다.
  *
- * 오늘 daily_missions 를 조회한 뒤, 비어 있지 않아도
- * 「이 자녀 템플릿 중 오늘 넣어야 할 것」이 빠져 있으면 추가 삽입합니다.
- * (부모가 스페셜만 assign-today 로 한 줄 넣은 뒤에는 예전 로직이 전체 백필을 건너뛰어
- * 루틴·다른 스페셜이 안 보이던 문제를 막습니다.)
+ * 오늘 `daily_missions` 를 조인과 함께 한 번 읽고, 행이 없을 때만 템플릿 풀을 백필합니다.
+ * (이미 오늘 행이 있으면 백필을 건너뛰어 대부분의 요청에서 insert·refetch 가 없습니다.)
  *
  * 템플릿 조회·daily_missions 쓰기/읽기는 가능하면 service_role 로 통일합니다.
  * - 자녀 세션 RLS·조인(embed) 환경 차이로 목록이 비는 경우를 줄입니다.
@@ -108,20 +106,18 @@ export default async function MissionPage() {
    * 달력을 제외한 나머지는 모두 childId 만 있으면 됩니다.
    * `calendar_events` 는 부모 id 가 필요해 family_links 를 받은 뒤 한 번 더 요청합니다.
    */
-  const [statsRes, profileRow, familyRows, grantsRes, placementsRes, templatesRes, existingBeforeRes] =
-    await Promise.all([
-      supabase.from('child_stats').select('*').eq('child_id', childId).maybeSingle(),
-      getCachedProfileRowById(childId),
-      getCachedFamilyLinksForChild(childId),
-      supabase
-        .from('praise_sticker_grants')
-        .select('*')
-        .eq('child_id', childId)
-        .order('created_at', { ascending: false }),
-      supabase.from('praise_sticker_placements').select('*').eq('child_id', childId),
-      templatesQuery,
-      missionDb.from('daily_missions').select('mission_template_id').eq('child_id', childId).eq('date', today),
-    ])
+  const [statsRes, profileRow, familyRows, grantsRes, placementsRes, templatesRes] = await Promise.all([
+    supabase.from('child_stats').select('*').eq('child_id', childId).maybeSingle(),
+    getCachedProfileRowById(childId),
+    getCachedFamilyLinksForChild(childId),
+    supabase
+      .from('praise_sticker_grants')
+      .select('*')
+      .eq('child_id', childId)
+      .order('created_at', { ascending: false }),
+    supabase.from('praise_sticker_placements').select('*').eq('child_id', childId),
+    templatesQuery,
+  ])
 
   const initialStats = (statsRes.data ?? null) as ChildStats | null
   const level = initialStats?.current_level ?? 0
@@ -153,39 +149,11 @@ export default async function MissionPage() {
 
   const pool = templatePoolForToday((templatesRes.data ?? []) as Mission[], childId, level, routineType)
 
-  const existingBefore = existingBeforeRes.data ?? []
-
   /**
-   * 성능 우선 규칙:
-   * - 오늘 `daily_missions` 가 1건이라도 있으면 백필을 **완전히 스킵**합니다.
-   * - 오늘 행이 아예 없을 때만 템플릿 기준 백필을 시도합니다.
+   * 오늘 일일 미션을 한 번 읽은 뒤, 행이 없고 휴일이 아니며 넣을 템플릿이 있을 때만 백필합니다.
+   * (이전: `mission_template_id` 만 먼저 조회 → 항상 2번의 daily_missions 왕복)
    */
-  if (existingBefore.length === 0 && routineType !== 'holiday') {
-    const haveIds = new Set(existingBefore.map((r) => r.mission_template_id))
-    const missing = pool.filter((m) => !haveIds.has(m.id))
-
-    /** 누락이 없으면 즉시 다음 단계로 넘어갑니다. */
-    if (missing.length > 0) {
-      await Promise.all(
-        missing.map(async (m) => {
-          const row = {
-            child_id: childId,
-            mission_template_id: m.id,
-            date: today,
-            scheduled_time: m.scheduled_time ?? null,
-            routine_type: routineType,
-            is_completed: false,
-          }
-          const { error } = await missionDb.from('daily_missions').insert(row)
-          if (error && error.code !== '23505') {
-            console.error('[child/mission] daily_missions insert', error)
-          }
-        }),
-      )
-    }
-  }
-
-  const { data: existing, error: existingErr } = await missionDb
+  let { data: existingRows, error: existingErr } = await missionDb
     .from('daily_missions')
     .select(`*, missions(${missionJoin})`)
     .eq('child_id', childId)
@@ -196,7 +164,42 @@ export default async function MissionPage() {
     console.error('[child/mission] daily_missions select', existingErr.message)
   }
 
-  const dailyMissions = (existing ?? []) as DailyMissionWithTemplate[]
+  const existing = (existingRows ?? []) as DailyMissionWithTemplate[]
+
+  /**
+   * 백필: 오늘 행이 0개이고, 휴일이 아니며, 넣을 템플릿 풀이 비어 있지 않을 때만 실행합니다.
+   * 풀이 비어 있으면(`pool.length === 0`) insert 를 시도하지 않습니다.
+   */
+  if (existing.length === 0 && routineType !== 'holiday' && pool.length > 0) {
+    await Promise.all(
+      pool.map(async (m) => {
+        const row = {
+          child_id: childId,
+          mission_template_id: m.id,
+          date: today,
+          scheduled_time: m.scheduled_time ?? null,
+          routine_type: routineType,
+          is_completed: false,
+        }
+        const { error } = await missionDb.from('daily_missions').insert(row)
+        if (error && error.code !== '23505') {
+          console.error('[child/mission] daily_missions insert', error)
+        }
+      }),
+    )
+    const refetch = await missionDb
+      .from('daily_missions')
+      .select(`*, missions(${missionJoin})`)
+      .eq('child_id', childId)
+      .eq('date', today)
+      .order('scheduled_time', { ascending: true, nullsFirst: false })
+    if (refetch.error) {
+      console.error('[child/mission] daily_missions refetch', refetch.error.message)
+    }
+    existingRows = refetch.data
+  }
+
+  const dailyMissions = (existingRows ?? []) as DailyMissionWithTemplate[]
 
   const fullRest = routineType === 'holiday' && dailyMissions.length === 0
 

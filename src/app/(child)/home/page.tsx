@@ -17,17 +17,14 @@ export default async function ChildHomePage({
 }: {
   searchParams?: Promise<Record<string, string | string[] | undefined>>
 }) {
-  const ctx = await getActorChildContext()
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
+  /** 컨텍스트와 DB 클라이언트를 동시에 준비한 뒤, 인증 확인과 테이블 조회를 한 번에 묶어 TTFB 를 줄입니다. */
+  const [ctx, supabase] = await Promise.all([getActorChildContext(), createClient()])
   const childId = ctx.actorChildId
   const resolvedParams = searchParams ? await searchParams : {}
   const openNavMap = resolvedParams.openNavMap === '1'
 
-  const [statsRes, profileRow, grantsRes, placementsRes, itemUnlocksRes] = await Promise.all([
+  const [authRes, statsRes, profileRow, grantsRes, placementsRes, itemUnlocksRes] = await Promise.all([
+    supabase.auth.getUser(),
     supabase.from('child_stats').select('*').eq('child_id', childId).maybeSingle(),
     getCachedProfileRowById(childId),
     supabase
@@ -40,6 +37,7 @@ export default async function ChildHomePage({
 
     supabase.from('child_item_unlocks').select('item_index').eq('child_id', childId),
   ])
+  const user = authRes.data.user
 
   const initialStats = (statsRes.data ?? null) as ChildStats | null
 

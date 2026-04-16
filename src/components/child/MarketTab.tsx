@@ -492,7 +492,13 @@ export default function MarketTab({
     const syncMarketFromDb = async () => {
       const [hiddenRes, prRes, statsRes] = await Promise.all([
         supabase.from('child_market_hidden_items').select('store_item_id').eq('child_id', childId),
-        supabase.from('purchase_requests').select('*').eq('child_id', childId).order('created_at', { ascending: false }),
+        /** `purchase_requests` 는 `requested_at` 만 있음 — 존재하지 않는 `created_at` 으로 정렬하면 400 */
+        supabase
+          .from('purchase_requests')
+          .select('*')
+          .eq('child_id', childId)
+          .order('requested_at', { ascending: false })
+          .limit(12),
         supabase.from('child_stats').select('credits_wallet').eq('child_id', childId).maybeSingle(),
       ])
       if (cancelled) return
