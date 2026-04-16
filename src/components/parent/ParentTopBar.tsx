@@ -34,6 +34,7 @@ export default function ParentTopBar({ pendingApprovalCount }: TopBarProps) {
           <ParentRoutineAlarmButton initialPendingApprovalCount={pendingApprovalCount} />
           <Link
             href="/settings"
+            prefetch={false}
             className="flex h-8 w-8 items-center justify-center transition-opacity hover:opacity-80"
             aria-label="설정"
           >

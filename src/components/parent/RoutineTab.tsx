@@ -19,9 +19,6 @@ import { createPortal } from 'react-dom'
 import { usePathname } from 'next/navigation'
 import ParentEnterChildUiLink from '@/components/parent/ParentEnterChildUiLink'
 import { useParentStore } from '@/store/parentStore'
-import { createClient } from '@/lib/supabase/client'
-import type { RealtimeChannel } from '@supabase/supabase-js'
-import { getSeoulDateString } from '@/lib/koreaDate'
 import ChildProfileNav, { type ChildTab } from '@/components/parent/ChildProfileNav'
 import { CompactChildProfileCard } from '@/components/parent/CompactChildProfileCard'
 import CalendarSection from '@/components/parent/CalendarSection'
@@ -465,8 +462,6 @@ export default function RoutineTab({
   todayDailyMissions = [],
   familyLinkByChild = {},
 }: Props) {
-  /** 루틴 탭 Realtime은 같은 Supabase 클라이언트를 계속 재사용합니다. */
-  const supabaseRef = useRef(createClient())
   const pathname = usePathname()
   const { selectedChildId, setSelectedChildId } = useParentStore()
   /** multiline: 긴 안내(예: API hint) — 줄바꿈·너비·표시 시간 확대 */
@@ -527,50 +522,7 @@ export default function RoutineTab({
     setRoutineAgentUnread(0)
   }, [currentId])
 
-  /** assign-today 브로드캐스트를 SUBSCRIBED 직후 바로 쏠 수 있게 미리 붙여 둡니다(매번 subscribe 대기 제거). */
-  const assignNotifyChannelRef = useRef<RealtimeChannel | null>(null)
-  /** SUBSCRIBED 전에 보낸 요청은 대기시켜 채널 중복 생성 없이 한 번만 전송합니다. */
-  const pendingAssignPayloadRef = useRef<{ childId: string; payload: Record<string, unknown> } | null>(null)
-
-  useEffect(() => {
-    if (!currentId) {
-      assignNotifyChannelRef.current = null
-      pendingAssignPayloadRef.current = null
-      return
-    }
-    const supabase = supabaseRef.current
-    if (assignNotifyChannelRef.current) {
-      void supabase.removeChannel(assignNotifyChannelRef.current)
-      assignNotifyChannelRef.current = null
-    }
-    const ch = supabase.channel(`daily_missions_child_refresh:${currentId}`, {
-      config: { broadcast: { ack: false } },
-    })
-    ch.subscribe((status) => {
-      if (status === 'SUBSCRIBED') {
-        assignNotifyChannelRef.current = ch
-        const pending = pendingAssignPayloadRef.current
-        if (pending && pending.childId === currentId) {
-          void ch.send({ type: 'broadcast', event: 'assign_today_ok', payload: pending.payload })
-          pendingAssignPayloadRef.current = null
-        }
-      }
-    })
-    return () => {
-      assignNotifyChannelRef.current = null
-      pendingAssignPayloadRef.current = null
-      void supabase.removeChannel(ch)
-    }
-  }, [currentId])
-
-  const sendAssignTodayBroadcast = useCallback((childId: string, payload: Record<string, unknown>) => {
-    const ready = assignNotifyChannelRef.current
-    if (ready) {
-      void ready.send({ type: 'broadcast', event: 'assign_today_ok', payload })
-      return
-    }
-    pendingAssignPayloadRef.current = { childId, payload }
-  }, [])
+  /** 긴급 최적화: 루틴 탭에서는 Realtime 채널을 열지 않고 API 응답만으로 상태를 갱신합니다. */
 
   /** 온보딩과 동일: 집 보육이 아니면 학교·기관 루틴으로 봅니다 */
   const hasSchool =
@@ -682,27 +634,6 @@ export default function RoutineTab({
         return
       }
       showToast(json.alreadyAssigned ? '이미 오늘 일정에 있어요' : '오늘 자녀 화면에 넣었어요')
-      const missionRow = missions.find((m) => m.id === templateId)
-      const missionTemplate = missionRow
-        ? {
-            title: missionRow.title,
-            icon_emoji: missionRow.icon_emoji,
-            description: missionRow.description,
-            credit_reward: missionRow.credit_reward,
-            heart_reward: missionRow.heart_reward,
-            exp_reward: missionRow.exp_reward,
-            reward_multiplier: missionRow.reward_multiplier ?? null,
-            difficulty: missionRow.difficulty,
-            block: missionRow.block,
-            repeat_type: missionRow.repeat_type,
-          }
-        : null
-      sendAssignTodayBroadcast(currentId, {
-        date: typeof json.date === 'string' ? json.date : getSeoulDateString(),
-        alreadyAssigned: Boolean(json.alreadyAssigned),
-        dailyMission: json.dailyMission ?? null,
-        missionTemplate,
-      })
     } catch {
       showToast('네트워크 오류가 발생했어요', false)
     } finally {

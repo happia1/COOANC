@@ -25,62 +25,61 @@ export default function ParentNewPurchaseRequestModal() {
   const [modal, setModal] = useState<ModalState>({ open: false })
   /** DB `store_items.image_url` — 있으면 실제 상품 사진을 팝업에 씁니다 */
   const [itemImageUrl, setItemImageUrl] = useState<string | null>(null)
-  const channelRef = useRef<ReturnType<ReturnType<typeof createClient>['channel']> | null>(null)
+  /** 마지막으로 확인한 pending 요청 id — polling 시 중복 팝업 방지 */
+  const lastSeenRequestIdRef = useRef<string | null>(null)
 
   useEffect(() => {
     const supabase = createClient()
-    let cancelled = false
-
-    void (async () => {
+    const pollLatestPending = async () => {
       const {
         data: { user },
       } = await supabase.auth.getUser()
-      if (!user || cancelled) return
-
+      if (!user) return
       const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle()
-      if (profile?.role !== 'parent' || cancelled) return
-
+      if (profile?.role !== 'parent') return
       const { data: links } = await supabase.from('family_links').select('child_id').eq('parent_id', user.id)
-      const childIds = new Set((links ?? []).map((r: { child_id: string }) => r.child_id))
-      if (childIds.size === 0 || cancelled) return
-
-      const channel = supabase
-        .channel(`parent_new_purchase:${user.id}`)
-        .on(
-          'postgres_changes',
-          { event: 'INSERT', schema: 'public', table: 'purchase_requests' },
-          (payload) => {
-            // Realtime 이 넘기는 새 행: 상품 id·이름이 있으면 이미지 조회에 씁니다
-            const row = payload.new as {
-              child_id?: string
-              status?: string
-              item_id?: string | null
-              item_name?: string | null
-            }
-            if (!row.child_id || !childIds.has(row.child_id)) return
-            if (row.status !== 'pending') return
-            setModal({
-              open: true,
-              childId: row.child_id,
-              itemId: row.item_id ?? null,
-              itemName: row.item_name ?? null,
-            })
-          },
-        )
-        .subscribe()
-
-      if (cancelled) {
-        void supabase.removeChannel(channel)
+      const childIds = (links ?? []).map((r: { child_id: string }) => r.child_id).filter(Boolean)
+      if (childIds.length === 0) return
+      const { data } = await supabase
+        .from('purchase_requests')
+        .select('id, child_id, item_id, item_name, status, requested_at')
+        .in('child_id', childIds)
+        .eq('status', 'pending')
+        .order('requested_at', { ascending: false })
+        .limit(1)
+      const row = data?.[0] as
+        | { id: string; child_id: string; item_id?: string | null; item_name?: string | null }
+        | undefined
+      if (!row?.id) return
+      if (lastSeenRequestIdRef.current === null) {
+        /** 최초 1회는 기준점만 잡고 팝업은 띄우지 않습니다. */
+        lastSeenRequestIdRef.current = row.id
         return
       }
-      channelRef.current = channel
-    })()
+      if (lastSeenRequestIdRef.current === row.id) return
+      lastSeenRequestIdRef.current = row.id
+      setModal({
+        open: true,
+        childId: row.child_id,
+        itemId: row.item_id ?? null,
+        itemName: row.item_name ?? null,
+      })
+    }
+
+    void pollLatestPending()
+    const interval = window.setInterval(() => {
+      void pollLatestPending()
+    }, 30000)
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void pollLatestPending()
+    }
+    window.addEventListener('focus', onVisible)
+    document.addEventListener('visibilitychange', onVisible)
 
     return () => {
-      cancelled = true
-      const ch = channelRef.current
-      channelRef.current = null
-      if (ch) void supabase.removeChannel(ch)
+      window.clearInterval(interval)
+      window.removeEventListener('focus', onVisible)
+      document.removeEventListener('visibilitychange', onVisible)
     }
   }, [])
 

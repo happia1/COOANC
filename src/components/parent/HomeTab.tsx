@@ -84,78 +84,13 @@ type Props = {
 
 export default function HomeTab({ childrenData }: Props) {
   const { selectedChildId, setSelectedChildId } = useParentStore()
-  /** 부모 홈에서 쓰는 Supabase 브라우저 클라이언트(싱글톤 재사용) */
+  /** 부모 홈 데이터는 이벤트성 갱신보다 안정성이 우선이라 일반 조회(fetch)만 사용합니다. */
   const supabaseRef = useRef(createClient())
-  /** child_stats 실시간 채널(선택 자녀 1개만 유지) */
-  const childStatsChannelRef = useRef<ReturnType<typeof supabaseRef.current.channel> | null>(null)
-  /** weekly routine 재조회용 daily_missions 채널(선택 자녀 1개만 유지) */
-  const dailyMissionChannelRef = useRef<ReturnType<typeof supabaseRef.current.channel> | null>(null)
 
   const currentId = selectedChildId ?? childrenData[0]?.id
   const child = childrenData.find((c) => c.id === currentId) ?? childrenData[0]
 
-  /**
-   * 서버에서 받은 stats 위에, 같은 탭을 보는 동안 자녀 앱에서 발생한 child_stats 변경을 Realtime 으로 얹습니다.
-   * (지갑↔저금통 이동 시 eq_save_ratio·eq_delay_score 가 갱신되면 도넛·반원이 바로 반영됩니다.)
-   */
-  const [statsFromRealtime, setStatsFromRealtime] = useState<
-    Partial<NonNullable<ChildSummary['stats']>>
-  >({})
-  useEffect(() => {
-    setStatsFromRealtime({})
-  }, [child?.id])
-
-  const s = useMemo(() => {
-    if (!child?.stats) return null
-    return { ...child.stats, ...statsFromRealtime }
-  }, [child?.stats, statsFromRealtime])
-
-  useEffect(() => {
-    if (!child?.id) return
-    const supabase = supabaseRef.current
-    /** 자녀 변경 시 이전 채널이 남아 중복 수신하지 않도록 먼저 제거 */
-    if (childStatsChannelRef.current) {
-      void supabase.removeChannel(childStatsChannelRef.current)
-      childStatsChannelRef.current = null
-    }
-    const ch = supabase
-      .channel(`parent_home_cs:${child.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'child_stats',
-          filter: `child_id=eq.${child.id}`,
-        },
-        (payload) => {
-          const row = payload.new as Record<string, unknown>
-          const n = (key: string) => {
-            const v = row[key]
-            return typeof v === 'number' && Number.isFinite(v) ? v : undefined
-          }
-          setStatsFromRealtime((prev) => ({
-            ...prev,
-            ...(n('credits') !== undefined ? { credits: n('credits')! } : {}),
-            ...(n('hearts') !== undefined ? { hearts: n('hearts')! } : {}),
-            ...(n('current_level') !== undefined ? { current_level: n('current_level')! } : {}),
-            ...(n('exp') !== undefined ? { exp: n('exp')! } : {}),
-            ...(n('exp_to_next_level') !== undefined ? { exp_to_next_level: n('exp_to_next_level')! } : {}),
-            ...(n('streak_days') !== undefined ? { streak_days: n('streak_days')! } : {}),
-            ...(n('eq_delay_score') !== undefined ? { eq_delay_score: n('eq_delay_score')! } : {}),
-            ...(n('eq_routine_rate') !== undefined ? { eq_routine_rate: n('eq_routine_rate')! } : {}),
-            ...(n('eq_save_ratio') !== undefined ? { eq_save_ratio: n('eq_save_ratio')! } : {}),
-          }))
-        },
-      )
-      .subscribe()
-    childStatsChannelRef.current = ch
-
-    return () => {
-      if (childStatsChannelRef.current === ch) childStatsChannelRef.current = null
-      void supabase.removeChannel(ch)
-    }
-  }, [child?.id])
+  const s = child?.stats ?? null
 
   /** 선택 자녀가 바뀌면 서버에서 받은 주간 막대 데이터로 맞춘 뒤, Realtime 으로 최신화합니다. */
   const [weeklyRoutine, setWeeklyRoutine] = useState<WeeklyRoutineDay[]>(child?.weeklyRoutine ?? [])
@@ -210,36 +145,9 @@ export default function HomeTab({ childrenData }: Props) {
       }
       setWeeklyRoutine(buildWeeklyRoutineDays(today, data ?? []))
     }
-    /** 채널 연결 전에 1회 즉시 조회해 첫 렌더 체감 지연을 줄입니다 */
+    /** Realtime 대신 자녀 전환 시 1회 조회로만 최신 주간 막대를 맞춥니다. */
     void loadWeek()
-
-    /** 자녀 변경 시 이전 daily_missions 채널 정리 후 현재 자녀 채널만 유지 */
-    if (dailyMissionChannelRef.current) {
-      void supabase.removeChannel(dailyMissionChannelRef.current)
-      dailyMissionChannelRef.current = null
-    }
-
-    const dm = supabase
-      .channel(`parent_home_dm:${child.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'daily_missions',
-          filter: `child_id=eq.${child.id}`,
-        },
-        () => {
-          void loadWeek()
-        },
-      )
-      .subscribe()
-    dailyMissionChannelRef.current = dm
-
-    return () => {
-      if (dailyMissionChannelRef.current === dm) dailyMissionChannelRef.current = null
-      void supabase.removeChannel(dm)
-    }
+    return
   }, [child?.id])
 
   // 오늘 미션 달성률

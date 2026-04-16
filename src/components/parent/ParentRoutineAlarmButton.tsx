@@ -7,7 +7,7 @@
  * - purchase_requests 변경은 Realtime 으로 목록을 다시 읽습니다.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import {
@@ -35,7 +35,6 @@ export default function ParentRoutineAlarmButton({ initialPendingApprovalCount }
   const [acknowledgedIds, setAcknowledgedIds] = useState<Set<string>>(() => new Set())
   /** 첫 번째 대기 목록 fetch 가 끝났는지 — 뱃지를 서버 숫자와 맞출 때 사용 */
   const [fetchDone, setFetchDone] = useState(false)
-  const channelRef = useRef<ReturnType<ReturnType<typeof createClient>['channel']> | null>(null)
 
   /** 클라이언트에서만: 예전에 확인해 둔 id 를 불러옵니다 */
   useEffect(() => {
@@ -80,48 +79,19 @@ export default function ParentRoutineAlarmButton({ initialPendingApprovalCount }
   }, [])
 
   useEffect(() => {
-    const supabase = createClient()
-    let cancelled = false
-    let childIdSet = new Set<string>()
-
-    void (async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      if (!user || cancelled) return
-      const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle()
-      if (profile?.role !== 'parent' || cancelled) return
-      const { data: links } = await supabase.from('family_links').select('child_id').eq('parent_id', user.id)
-      childIdSet = new Set((links ?? []).map((r: { child_id: string }) => r.child_id))
-      if (childIdSet.size === 0 || cancelled) return
-
-      const channel = supabase
-        .channel(`parent_topbar_pending_requests:${user.id}`)
-        .on(
-          'postgres_changes',
-          { event: '*', schema: 'public', table: 'purchase_requests' },
-          (payload) => {
-            const row = (payload.new ?? payload.old) as { child_id?: string } | null
-            if (!row?.child_id || !childIdSet.has(row.child_id)) return
-            void refreshPendingPurchaseRows()
-          },
-        )
-        .subscribe()
-
-      /** 언마운트가 먼저 끝난 뒤 채널이 붙으면 ref 만 비우고 끊지 못해 누수가 나지 않게 합니다 */
-      if (cancelled) {
-        void supabase.removeChannel(channel)
-        return
-      }
-      channelRef.current = channel
+    void refreshPendingPurchaseRows()
+    const interval = window.setInterval(() => {
       void refreshPendingPurchaseRows()
-    })()
-
+    }, 30000)
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void refreshPendingPurchaseRows()
+    }
+    window.addEventListener('focus', onVisible)
+    document.addEventListener('visibilitychange', onVisible)
     return () => {
-      cancelled = true
-      const ch = channelRef.current
-      channelRef.current = null
-      if (ch) void supabase.removeChannel(ch)
+      window.clearInterval(interval)
+      window.removeEventListener('focus', onVisible)
+      document.removeEventListener('visibilitychange', onVisible)
     }
   }, [refreshPendingPurchaseRows])
 
