@@ -227,15 +227,14 @@ export default function MissionCreditCards({
   )
 
   /**
-   * 카드 바깥 테두리·배경
-   * (비개발자용) 맨 위 안쪽 여백을 거의 없앰(`pt-0`), 아래는 `pb-2` 유지로 카드 세로를 더 줄입니다.
+   * 카드 바깥 — 배경·테두리·블러 제거, 상호작용(탭 스케일)만 유지.
    */
   const creditCardShell =
-    'rounded-xl bg-white/78 px-1.5 pt-0 pb-2 shadow-sm ring-1 ring-white/75 backdrop-blur-[2px] transition-transform active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/90'
+    'px-0.5 pt-0 pb-2 transition-transform active:scale-[0.97] focus-visible:outline-none'
 
   return (
     <div
-      className="flex w-full flex-row items-end justify-center gap-1 overflow-visible px-3 sm:px-4"
+      className="flex w-full flex-row items-end justify-center gap-0 overflow-visible px-1 sm:px-2"
       aria-label="크레딧 현황"
     >
 
