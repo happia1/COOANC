@@ -25,6 +25,8 @@ import { useParentStore } from '@/store/parentStore'
 import ChildProfileNav, { type ChildTab } from '@/components/parent/ChildProfileNav'
 import { CompactChildProfileCard } from '@/components/parent/CompactChildProfileCard'
 import EconomicEqPanel from '@/components/parent/EconomicEqPanel'
+import SpriteImage from '@/components/common/SpriteImage'
+import { ICONS } from '@/constants/sprites'
 
 /**
  * 최근 활동 카드 헤더용: 펼침이면 화살표가 위(접기), 접힘이면 아래(펼치기) — RoutineTab 의 ChevronToggleIcon 과 동일 패턴입니다.
@@ -173,84 +175,156 @@ export default function HomeTab({ childrenData }: Props) {
         </div>
       ) : (
         <>
-          {/*
-            프로필 카드를 누르면 API 가 「부모인데 이 자녀 화면을 본다」는 쿠키를 심고 /home 으로 보냅니다.
-            자녀가 평소 쓰는 것과 같은 탭(홈·미션·마켓…)이 열리고, 상단에 「부모 보기」가 보입니다.
-            부모 홈에서 선택 중인 자녀와 맞추기 위해 클릭 시 Zustand id 도 같이 저장합니다.
-          */}
-          <ParentEnterChildUiLink
-            childId={child.id}
-            className="block cursor-pointer rounded-xl transition-opacity active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4A90E2] focus-visible:ring-offset-2"
-            aria-label={`${child.name} 자녀용 앱 화면으로 들어가기`}
-            onClick={() => setSelectedChildId(child.id)}
-          >
-            <CompactChildProfileCard
-              name={child.name}
-              age={child.age}
-              avatarUrl={child.avatarUrl}
-              level={s?.current_level ?? 0}
-              credits={s?.credits ?? 0}
-              hearts={s?.hearts ?? 0}
-              streakDays={s?.streak_days ?? 0}
-              ageGroupLabel={child.ageGroupLabel}
-              childcareLabel={child.childcareLabel}
-              mission={{
-                ratePercent: missionRate,
-                completed: child.todayCompleted,
-                total: child.totalMissions,
-              }}
-            />
-          </ParentEnterChildUiLink>
+          {/* ── 상단: 프로필(좌) + 스탯(우) ──────────────────────────────────
+              모바일: flex-col / md+: flex-row
+              프로필 카드를 누르면 자녀용 앱 화면으로 이동합니다. */}
+          <div className="flex flex-col gap-3 md:flex-row md:items-stretch md:gap-4">
+            {/* 좌: 프로필 카드 (아바타 + 이름 + Lv + 한마디) */}
+            <ParentEnterChildUiLink
+              childId={child.id}
+              className="block cursor-pointer rounded-xl transition-opacity active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4A90E2] focus-visible:ring-offset-2 md:flex-1"
+              aria-label={`${child.name} 자녀용 앱 화면으로 들어가기`}
+              onClick={() => setSelectedChildId(child.id)}
+            >
+              <CompactChildProfileCard
+                name={child.name}
+                age={child.age}
+                avatarUrl={child.avatarUrl}
+                level={s?.current_level ?? 0}
+                credits={s?.credits ?? 0}
+                hearts={s?.hearts ?? 0}
+                streakDays={s?.streak_days ?? 0}
+                ageGroupLabel={child.ageGroupLabel}
+                childcareLabel={child.childcareLabel}
+                hideStats
+              />
+            </ParentEnterChildUiLink>
 
-          <EconomicEqPanel
-            stats={{
-              eq_routine_rate: s?.eq_routine_rate ?? 0,
-              eq_delay_score: s?.eq_delay_score ?? 0,
-              eq_save_ratio: s?.eq_save_ratio ?? 0,
-              streak_days: s?.streak_days ?? 0,
-              credits: s?.credits ?? 0,
-            }}
-            weeklyRoutine={weeklyRoutine}
-            childName={child.name}
-            agentChildId={child.id}
-          />
+            {/* 우: 스탯 카드 (코인 | 하트 | 연속) */}
+            <div
+              className="flex flex-row items-center justify-around gap-4 rounded-2xl bg-white px-4 py-3 shadow-sm md:w-48 md:flex-col md:justify-center md:gap-4"
+              aria-label={`코인 ${(s?.credits ?? 0).toLocaleString()}, 하트 ${s?.hearts ?? 0}, 연속 ${s?.streak_days ?? 0}일`}
+            >
+              <div className="flex flex-col items-center gap-0.5">
+                <SpriteImage sheet={ICONS} frame="credits" width={18} clipRotated={false} className="shrink-0 select-none" />
+                <span className="text-sm font-black tabular-nums leading-tight text-[#4A90E2]">
+                  {(s?.credits ?? 0).toLocaleString()}
+                </span>
+                <span className="text-[10px] text-gray-400">코인</span>
+              </div>
+              <div className="flex flex-col items-center gap-0.5">
+                <SpriteImage sheet={ICONS} frame="heart" width={18} className="shrink-0 select-none" />
+                <span className="text-sm font-black tabular-nums leading-tight text-rose-500">
+                  {s?.hearts ?? 0}
+                </span>
+                <span className="text-[10px] text-gray-400">하트</span>
+              </div>
+              <div className="flex flex-col items-center gap-0.5">
+                <svg
+                  width={18}
+                  height={18}
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  className="shrink-0 text-orange-500"
+                  aria-hidden
+                >
+                  <path
+                    d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                <span className="text-sm font-black tabular-nums leading-tight text-amber-600">
+                  {s?.streak_days ?? 0}일
+                </span>
+                <span className="text-[10px] text-gray-400">연속</span>
+              </div>
+            </div>
+          </div>
 
-          {/* 최근 활동: 토글 헤더(기본 접힘) + 펼칠 때만 미션 완료 로그 목록 */}
-          {child.recentActivity.length > 0 && (
-            <div className="overflow-hidden rounded-2xl bg-white shadow-sm">
-              <button
-                type="button"
-                onClick={() => setRecentActivityOpen((o) => !o)}
-                aria-expanded={recentActivityOpen}
-                aria-label={recentActivityOpen ? '최근 활동 접기' : '최근 활동 펼치기'}
-                className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-gray-50 active:bg-gray-50/80"
-              >
-                <div className="flex min-w-0 flex-1 items-center gap-2">
-                  <span className="text-sm font-bold text-gray-700">최근 활동</span>
-                  <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-bold text-gray-500">
-                    {child.recentActivity.length}
+          {/* ── 본문: md에서 2컬럼 그리드, 모바일에서 단일 컬럼 ───────────── */}
+          <div className="flex flex-col gap-4 md:grid md:grid-cols-2 md:gap-4">
+
+            {/* 좌 컬럼: 성장 리포트 + 루틴 (EconomicEqPanel) */}
+            <div className="flex flex-col gap-4">
+              <EconomicEqPanel
+                stats={{
+                  eq_routine_rate: s?.eq_routine_rate ?? 0,
+                  eq_delay_score: s?.eq_delay_score ?? 0,
+                  eq_save_ratio: s?.eq_save_ratio ?? 0,
+                  streak_days: s?.streak_days ?? 0,
+                  credits: s?.credits ?? 0,
+                }}
+                weeklyRoutine={weeklyRoutine}
+                childName={child.name}
+                agentChildId={child.id}
+              />
+            </div>
+
+            {/* 우 컬럼: 오늘의 진행도 + 최근 활동 */}
+            <div className="flex flex-col gap-4">
+              {/* 오늘의 진행도 */}
+              <div className="rounded-2xl bg-white p-4 shadow-sm">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <p className="text-sm font-bold text-gray-700">오늘의 진행도</p>
+                  <span className="text-sm font-black tabular-nums text-[#4A90E2]">
+                    {missionRate}%
+                    <span className="ml-1 text-[10px] font-normal text-gray-400">
+                      ({child.todayCompleted}/{child.totalMissions})
+                    </span>
                   </span>
                 </div>
-                <RecentActivityChevron open={recentActivityOpen} className="text-gray-400" />
-              </button>
-              {recentActivityOpen ? (
-                <div className="flex flex-col gap-2 border-t border-gray-100 px-4 pb-4 pt-3">
-                  {child.recentActivity.map((act, i) => (
-                    <div key={i} className="flex items-center gap-3">
-                      <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-gray-100 text-xs font-black text-gray-600">
-                        {act.missionTitle.slice(0, 1)}
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-bold text-gray-700">{act.missionTitle}</p>
-                        <p className="text-[10px] text-gray-400">{act.completedAt.slice(0, 10)}</p>
-                      </div>
-                      <span className="flex-shrink-0 text-xs font-bold text-[#4A90E2]">+{act.creditEarned}</span>
-                    </div>
-                  ))}
+                <div className="h-2 overflow-hidden rounded-full bg-gray-100">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-[#F8E71C] to-[#7ED321] transition-all"
+                    style={{ width: `${missionRate}%` }}
+                  />
                 </div>
-              ) : null}
+                {missionRate === 100 && child.totalMissions > 0 && (
+                  <p className="mt-1 text-right text-[10px] font-bold text-[#7ED321]">오늘 미션 모두 완료!</p>
+                )}
+              </div>
+
+              {/* 최근 활동: 토글 헤더(기본 접힘) + 펼칠 때만 미션 완료 로그 목록 */}
+              {child.recentActivity.length > 0 && (
+                <div className="overflow-hidden rounded-2xl bg-white shadow-sm">
+                  <button
+                    type="button"
+                    onClick={() => setRecentActivityOpen((o) => !o)}
+                    aria-expanded={recentActivityOpen}
+                    aria-label={recentActivityOpen ? '최근 활동 접기' : '최근 활동 펼치기'}
+                    className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-gray-50 active:bg-gray-50/80"
+                  >
+                    <div className="flex min-w-0 flex-1 items-center gap-2">
+                      <span className="text-sm font-bold text-gray-700">최근 활동</span>
+                      <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-bold text-gray-500">
+                        {child.recentActivity.length}
+                      </span>
+                    </div>
+                    <RecentActivityChevron open={recentActivityOpen} className="text-gray-400" />
+                  </button>
+                  {recentActivityOpen ? (
+                    <div className="flex flex-col gap-2 border-t border-gray-100 px-4 pb-4 pt-3">
+                      {child.recentActivity.map((act, i) => (
+                        <div key={i} className="flex items-center gap-3">
+                          <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-gray-100 text-xs font-black text-gray-600">
+                            {act.missionTitle.slice(0, 1)}
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-bold text-gray-700">{act.missionTitle}</p>
+                            <p className="text-[10px] text-gray-400">{act.completedAt.slice(0, 10)}</p>
+                          </div>
+                          <span className="flex-shrink-0 text-xs font-bold text-[#4A90E2]">+{act.creditEarned}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              )}
             </div>
-          )}
+          </div>
         </>
       )}
     </div>
