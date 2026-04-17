@@ -18,8 +18,13 @@ export default function ParentNavBar() {
   const pathname = usePathname()
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-sm border-t border-gray-100 shadow-lg">
-      <div className="flex items-stretch max-w-md mx-auto h-[60px]">
+    <nav className="
+      fixed bottom-0 left-0 right-0 z-50 border-t border-gray-100 bg-white/90 shadow-lg backdrop-blur-sm
+      md:relative md:bottom-auto md:left-auto md:right-auto md:z-auto
+      md:flex md:w-20 md:flex-col md:border-r md:border-t-0 md:shadow-none md:bg-white
+    ">
+      {/* 모바일: 가로 h-[60px] / md+: 세로 전체 높이 */}
+      <div className="flex h-[60px] items-stretch md:h-full md:flex-col md:items-stretch">
         {TABS.map(({ href, label, icon }) => {
           const isActive = pathname === href || pathname.startsWith(href + '/')
           /** 선택 탭은 진한 네이비, 나머지는 연한 회색 */
@@ -29,10 +34,14 @@ export default function ParentNavBar() {
               key={href}
               href={href}
               prefetch={false}
-              className="flex-1 flex flex-col items-center justify-center gap-0.5 relative transition-colors"
+              className="relative flex flex-1 flex-col items-center justify-center gap-0.5 transition-colors md:h-16 md:flex-none"
             >
+              {/* 모바일: 상단 수평 바 / md+: 우측 수직 바 */}
               {isActive && (
-                <span className="absolute top-0 left-1/2 -translate-x-1/2 w-6 h-1 rounded-b-full bg-slate-700" />
+                <span className="
+                  absolute top-0 left-1/2 h-1 w-6 -translate-x-1/2 rounded-b-full bg-slate-700
+                  md:top-1/2 md:right-0 md:left-auto md:h-6 md:w-1 md:translate-x-0 md:-translate-y-1/2 md:rounded-l-full
+                " />
               )}
               <DockTabIcon id={icon} className={`h-6 w-6 shrink-0 ${tone}`} />
               <span className={`text-[10px] font-bold leading-none ${tone}`}>{label}</span>

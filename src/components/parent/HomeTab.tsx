@@ -160,7 +160,7 @@ export default function HomeTab({ childrenData }: Props) {
   const tabs: ChildTab[] = childrenData.map((c) => ({ id: c.id, name: c.name }))
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4 md:gap-6">
       {/* 자녀 전환: ◀ ▶ 및 스와이프 (Zustand 로 루틴 탭과 동일한 자녀 선택) */}
       <ChildProfileNav tabs={tabs} />
 
@@ -178,7 +178,7 @@ export default function HomeTab({ childrenData }: Props) {
           {/* ── 상단: 프로필(좌) + 스탯(우) ──────────────────────────────────
               모바일: flex-col / md+: flex-row
               프로필 카드를 누르면 자녀용 앱 화면으로 이동합니다. */}
-          <div className="flex flex-col gap-3 md:flex-row md:items-stretch md:gap-4">
+          <div className="flex flex-col gap-3 md:flex-row md:items-stretch md:gap-6">
             {/* 좌: 프로필 카드 (아바타 + 이름 + Lv + 한마디) */}
             <ParentEnterChildUiLink
               childId={child.id}
@@ -245,7 +245,7 @@ export default function HomeTab({ childrenData }: Props) {
           </div>
 
           {/* ── 본문: md에서 2컬럼 그리드, 모바일에서 단일 컬럼 ───────────── */}
-          <div className="flex flex-col gap-4 md:grid md:grid-cols-2 md:gap-4">
+          <div className="flex flex-col gap-4 md:grid md:grid-cols-2 md:gap-6">
 
             {/* 좌 컬럼: 성장 리포트 + 루틴 (EconomicEqPanel) */}
             <div className="flex flex-col gap-4">
