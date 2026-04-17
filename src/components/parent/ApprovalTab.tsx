@@ -205,19 +205,6 @@ export default function ApprovalTab({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- 초기 맵은 JSON 키에 전부 직렬화됨
   }, [creditOverridesInitialKey])
 
-  /** 태블릿 전용: 구매 요청 카드 선택 상태 — 선택된 카드 강조 + 하단 상세 패널 표시 */
-  const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null)
-
-  /** 자녀가 바뀌면 선택 초기화 */
-  useEffect(() => {
-    setSelectedRequestId(null)
-  }, [currentId])
-
-  const selectedRequest = useMemo(
-    () => requestsForChild.find((r) => r.id === selectedRequestId) ?? null,
-    [requestsForChild, selectedRequestId],
-  )
-
   const [rejectModal, setRejectModal] = useState<{ requestId: string; itemName: string } | null>(null)
   const [rejectNote, setRejectNote] = useState('')
   /** 「승인」클릭 시 — 바로 승인 vs 외부 쇼핑몰 안내(자녀 화면 별도 팝업) */
@@ -297,6 +284,14 @@ export default function ApprovalTab({
   const currentChild = childrenProfiles.find((c) => c.id === currentId) ?? childrenProfiles[0]
   const childLevel = currentChild?.level ?? 0
 
+  /** 태블릿 전용: 구매 요청 카드 선택 상태 — 선택된 카드 강조 + 하단 상세 패널 표시 */
+  const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null)
+
+  /** 자녀가 바뀌면 선택 초기화 */
+  useEffect(() => {
+    setSelectedRequestId(null)
+  }, [currentId])
+
   const tabs: ChildTab[] = useMemo(
     () => childrenProfiles.map((c) => ({ id: c.id, name: c.name })),
     [childrenProfiles],
@@ -305,6 +300,11 @@ export default function ApprovalTab({
   const requestsForChild = useMemo(
     () => (currentId ? requests.filter((r) => r.child_id === currentId) : []),
     [requests, currentId],
+  )
+
+  const selectedRequest = useMemo(
+    () => requestsForChild.find((r) => r.id === selectedRequestId) ?? null,
+    [requestsForChild, selectedRequestId],
   )
 
   const historyForChild = useMemo(
