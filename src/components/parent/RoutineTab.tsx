@@ -20,7 +20,6 @@ import { usePathname } from 'next/navigation'
 import ParentEnterChildUiLink from '@/components/parent/ParentEnterChildUiLink'
 import { useParentStore } from '@/store/parentStore'
 import ChildProfileNav, { type ChildTab } from '@/components/parent/ChildProfileNav'
-import { CompactChildProfileCard } from '@/components/parent/CompactChildProfileCard'
 import CalendarSection from '@/components/parent/CalendarSection'
 import RoutineKeywordBuilderSheet from '@/components/parent/RoutineKeywordBuilderSheet'
 import SpecialMissionAddSheet from '@/components/parent/SpecialMissionAddSheet'
@@ -677,30 +676,69 @@ export default function RoutineTab({
         </div>
       )}
 
-      {/* 모바일 전용 프로필 카드 — md에서는 우 컬럼 상단으로 이동(hidden md:block) */}
+      {/* 자녀 전환 네비 — 모바일·태블릿 공통 */}
+      <ChildProfileNav tabs={tabs} compact />
+
+      {/* 통합 프로필 바 — 아바타+이름 좌 / 코인·하트·연속 우 */}
       {currentChild && (
-        <div className="flex flex-col gap-2 md:hidden">
-          <ParentEnterChildUiLink
-            childId={currentChild.id}
-            className="block cursor-pointer rounded-xl transition-opacity active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4A90E2] focus-visible:ring-offset-2"
-            aria-label={`${currentChild.name} 자녀용 앱 화면으로 들어가기`}
-            onClick={() => setSelectedChildId(currentChild.id)}
-          >
-            <CompactChildProfileCard
-              name={currentChild.name}
-              age={currentChild.age}
-              avatarUrl={currentChild.avatarUrl}
-              level={childLevel}
-              credits={currentChild.credits}
-              hearts={currentChild.hearts}
-              streakDays={currentChild.streakDays}
-              ageGroupLabel={currentChild.ageGroupLabel}
-              childcareLabel={currentChild.childcareLabel}
-              mission={null}
-            />
-          </ParentEnterChildUiLink>
-          <ChildProfileNav tabs={tabs} compact />
-        </div>
+        <ParentEnterChildUiLink
+          childId={currentChild.id}
+          className="block w-full cursor-pointer rounded-2xl transition-opacity active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4A90E2] focus-visible:ring-offset-2 md:w-auto md:max-w-sm md:self-start"
+          aria-label={`${currentChild.name} 자녀용 앱 화면으로 들어가기`}
+          onClick={() => setSelectedChildId(currentChild.id)}
+        >
+          <div className="flex w-full items-center justify-between rounded-2xl bg-white px-4 py-3 shadow-sm">
+            {/* 좌: 아바타 + 이름 + 레벨 */}
+            <div className="flex items-center gap-3">
+              <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-white">
+                {currentChild.avatarUrl ? (
+                  <div className="flex h-full w-full items-center justify-center p-1.5">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={currentChild.avatarUrl} alt="" className="h-full w-full object-contain object-center" />
+                  </div>
+                ) : (
+                  <span className="flex h-full w-full items-center justify-center text-center text-[10px] font-black leading-tight text-gray-700">
+                    Lv{childLevel}
+                  </span>
+                )}
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <span className="text-sm font-black text-gray-800">{currentChild.name}</span>
+                <span className="text-[11px] text-gray-400">Lv.{childLevel}</span>
+              </div>
+            </div>
+
+            {/* 우: 코인 · 하트 · 연속 */}
+            <div
+              className="flex items-center gap-4"
+              aria-label={`코인 ${(currentChild.credits).toLocaleString()}, 하트 ${currentChild.hearts}, 연속 ${currentChild.streakDays}일`}
+            >
+              <div className="flex items-center gap-1">
+                <SpriteImage sheet={ICONS} frame="credits" width={16} clipRotated={false} className="shrink-0 select-none" />
+                <span className="text-sm font-black tabular-nums text-[#4A90E2]">
+                  {(currentChild.credits).toLocaleString()}
+                </span>
+              </div>
+              <div className="flex items-center gap-1">
+                <SpriteImage sheet={ICONS} frame="heart" width={16} className="shrink-0 select-none" />
+                <span className="text-sm font-black tabular-nums text-rose-500">
+                  {currentChild.hearts}
+                </span>
+              </div>
+              <div className="flex items-center gap-1">
+                <svg width={16} height={16} viewBox="0 0 24 24" fill="none" className="shrink-0 text-orange-500" aria-hidden>
+                  <path
+                    d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"
+                    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                  />
+                </svg>
+                <span className="text-sm font-black tabular-nums text-amber-600">
+                  {currentChild.streakDays}일
+                </span>
+              </div>
+            </div>
+          </div>
+        </ParentEnterChildUiLink>
       )}
 
       {/**
@@ -754,44 +792,13 @@ export default function RoutineTab({
       />
 
       {/* ── 2컬럼 그리드 ────────────────────────────────────────────────────────
-          모바일(grid-cols-1): order 로 미션(우) → 캘린더(좌) 순 유지
-          md+(grid-cols-2): 좌=CalendarSection(sticky), 우=프로필+미션
+          모바일(grid-cols-1): 미션 → 캘린더 순(DOM 순서 = 화면 순서)
+          md+(grid-cols-2): 좌=미션, 우=CalendarSection(sticky)
       ──────────────────────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2 md:gap-6 md:items-start">
 
-        {/* 좌 컬럼(md) / 하단(모바일): CalendarSection — sticky on md */}
-        <div className="order-last md:order-first md:sticky md:top-4">
-          <CalendarSection childId={currentId ?? null} />
-        </div>
-
-        {/* 우 컬럼(md) / 상단(모바일): 프로필(태블릿) + 미션 섹션들 */}
-        <div className="order-first md:order-last flex flex-col gap-3">
-
-          {/* 태블릿 전용 프로필 카드 — 모바일에서는 위의 md:hidden 블록이 표시됨 */}
-          {currentChild && (
-            <div className="hidden md:flex flex-col gap-2">
-              <ParentEnterChildUiLink
-                childId={currentChild.id}
-                className="block cursor-pointer rounded-xl transition-opacity active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4A90E2] focus-visible:ring-offset-2"
-                aria-label={`${currentChild.name} 자녀용 앱 화면으로 들어가기`}
-                onClick={() => setSelectedChildId(currentChild.id)}
-              >
-                <CompactChildProfileCard
-                  name={currentChild.name}
-                  age={currentChild.age}
-                  avatarUrl={currentChild.avatarUrl}
-                  level={childLevel}
-                  credits={currentChild.credits}
-                  hearts={currentChild.hearts}
-                  streakDays={currentChild.streakDays}
-                  ageGroupLabel={currentChild.ageGroupLabel}
-                  childcareLabel={currentChild.childcareLabel}
-                  mission={null}
-                />
-              </ParentEnterChildUiLink>
-              <ChildProfileNav tabs={tabs} compact />
-            </div>
-          )}
+        {/* 좌 컬럼(md) / 상단(모바일): 미션 섹션들 */}
+        <div className="flex flex-col gap-3">
 
           {/* 활성 미션 — 헤더와 연필(키워드 시트) 동일 행 */}
           <section>
@@ -969,7 +976,13 @@ export default function RoutineTab({
             )}
           </section>
 
-        </div>{/* /우 컬럼 */}
+        </div>{/* /좌 컬럼 */}
+
+        {/* 우 컬럼(md) / 하단(모바일): CalendarSection — sticky on md */}
+        <div className="md:sticky md:top-4">
+          <CalendarSection childId={currentId ?? null} />
+        </div>
+
       </div>{/* /2컬럼 그리드 */}
 
       {/* 키워드 시트: routineOnly로 주간/주말·활성 상태를 목록과 동일한 DB 스냅샷에서 복원 */}

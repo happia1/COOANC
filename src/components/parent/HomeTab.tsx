@@ -23,8 +23,8 @@ import {
 import { buildWeeklyRoutineDays, type WeeklyRoutineDay } from '@/lib/childWeeklyRoutine'
 import { useParentStore } from '@/store/parentStore'
 import ChildProfileNav, { type ChildTab } from '@/components/parent/ChildProfileNav'
-import { CompactChildProfileCard } from '@/components/parent/CompactChildProfileCard'
 import EconomicEqPanel from '@/components/parent/EconomicEqPanel'
+import ParentAgentHomeCards from '@/components/parent/ParentAgentHomeCards'
 import SpriteImage from '@/components/common/SpriteImage'
 import { ICONS } from '@/constants/sprites'
 
@@ -175,79 +175,71 @@ export default function HomeTab({ childrenData }: Props) {
         </div>
       ) : (
         <>
-          {/* ── 상단: 프로필(좌) + 스탯(우) ──────────────────────────────────
-              모바일: flex-col / md+: flex-row
-              프로필 카드를 누르면 자녀용 앱 화면으로 이동합니다. */}
-          <div className="flex w-full flex-col gap-4 md:flex-row md:items-center">
-            {/* 좌: 프로필 카드 (아바타 + 이름 + Lv + 한마디) */}
-            <ParentEnterChildUiLink
-              childId={child.id}
-              className="block cursor-pointer rounded-xl transition-opacity active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4A90E2] focus-visible:ring-offset-2 md:flex-1"
-              aria-label={`${child.name} 자녀용 앱 화면으로 들어가기`}
-              onClick={() => setSelectedChildId(child.id)}
-            >
-              <CompactChildProfileCard
-                name={child.name}
-                age={child.age}
-                avatarUrl={child.avatarUrl}
-                level={s?.current_level ?? 0}
-                credits={s?.credits ?? 0}
-                hearts={s?.hearts ?? 0}
-                streakDays={s?.streak_days ?? 0}
-                ageGroupLabel={child.ageGroupLabel}
-                childcareLabel={child.childcareLabel}
-                hideStats
-              />
-            </ParentEnterChildUiLink>
+          {/* ── 상단: 통합 프로필 바 (아바타+이름 좌 / 코인·하트·연속 우) ── */}
+          <ParentEnterChildUiLink
+            childId={child.id}
+            className="block w-full cursor-pointer rounded-2xl transition-opacity active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4A90E2] focus-visible:ring-offset-2 md:w-auto md:max-w-sm md:self-start"
+            aria-label={`${child.name} 자녀용 앱 화면으로 들어가기`}
+            onClick={() => setSelectedChildId(child.id)}
+          >
+            <div className="flex w-full items-center justify-between rounded-2xl bg-white px-4 py-3 shadow-sm">
+              {/* 좌: 아바타 + 이름 + 레벨 */}
+              <div className="flex items-center gap-3">
+                <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-white">
+                  {child.avatarUrl ? (
+                    <div className="flex h-full w-full items-center justify-center p-1.5">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={child.avatarUrl} alt="" className="h-full w-full object-contain object-center" />
+                    </div>
+                  ) : (
+                    <span className="flex h-full w-full items-center justify-center text-center text-[10px] font-black leading-tight text-gray-700">
+                      Lv{s?.current_level ?? 0}
+                    </span>
+                  )}
+                </div>
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-sm font-black text-gray-800">{child.name}</span>
+                  <span className="text-[11px] text-gray-400">Lv.{s?.current_level ?? 0}</span>
+                </div>
+              </div>
 
-            {/* 우: 스탯 카드 (코인 | 하트 | 연속) */}
-            <div
-              className="flex flex-row items-center justify-around gap-4 rounded-2xl bg-white px-4 py-3 shadow-sm md:w-56 md:flex-col md:justify-center md:gap-4"
-              aria-label={`코인 ${(s?.credits ?? 0).toLocaleString()}, 하트 ${s?.hearts ?? 0}, 연속 ${s?.streak_days ?? 0}일`}
-            >
-              <div className="flex flex-col items-center gap-0.5">
-                <SpriteImage sheet={ICONS} frame="credits" width={18} clipRotated={false} className="shrink-0 select-none" />
-                <span className="text-sm font-black tabular-nums leading-tight text-[#4A90E2]">
-                  {(s?.credits ?? 0).toLocaleString()}
-                </span>
-                <span className="text-[10px] text-gray-400">코인</span>
-              </div>
-              <div className="flex flex-col items-center gap-0.5">
-                <SpriteImage sheet={ICONS} frame="heart" width={18} className="shrink-0 select-none" />
-                <span className="text-sm font-black tabular-nums leading-tight text-rose-500">
-                  {s?.hearts ?? 0}
-                </span>
-                <span className="text-[10px] text-gray-400">하트</span>
-              </div>
-              <div className="flex flex-col items-center gap-0.5">
-                <svg
-                  width={18}
-                  height={18}
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  className="shrink-0 text-orange-500"
-                  aria-hidden
-                >
-                  <path
-                    d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-                <span className="text-sm font-black tabular-nums leading-tight text-amber-600">
-                  {s?.streak_days ?? 0}일
-                </span>
-                <span className="text-[10px] text-gray-400">연속</span>
+              {/* 우: 코인 · 하트 · 연속 */}
+              <div
+                className="flex items-center gap-4"
+                aria-label={`코인 ${(s?.credits ?? 0).toLocaleString()}, 하트 ${s?.hearts ?? 0}, 연속 ${s?.streak_days ?? 0}일`}
+              >
+                <div className="flex items-center gap-1">
+                  <SpriteImage sheet={ICONS} frame="credits" width={16} clipRotated={false} className="shrink-0 select-none" />
+                  <span className="text-sm font-black tabular-nums text-[#4A90E2]">
+                    {(s?.credits ?? 0).toLocaleString()}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <SpriteImage sheet={ICONS} frame="heart" width={16} className="shrink-0 select-none" />
+                  <span className="text-sm font-black tabular-nums text-rose-500">
+                    {s?.hearts ?? 0}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <svg width={16} height={16} viewBox="0 0 24 24" fill="none" className="shrink-0 text-orange-500" aria-hidden>
+                    <path
+                      d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"
+                      stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                    />
+                  </svg>
+                  <span className="text-sm font-black tabular-nums text-amber-600">
+                    {s?.streak_days ?? 0}일
+                  </span>
+                </div>
               </div>
             </div>
-          </div>
+          </ParentEnterChildUiLink>
 
           {/* ── 본문: md에서 2컬럼 그리드, 모바일에서 단일 컬럼 ───────────── */}
           <div className="grid w-full grid-cols-1 gap-4 md:grid-cols-2 md:gap-6">
 
-            {/* 좌 컬럼: 성장 리포트 + 루틴 (EconomicEqPanel) */}
+            {/* 좌 컬럼: 이번 주 성장 리포트(EQ 차트) + 오늘의 진행도 + 주간 루틴 달성
+                agentChildId 미전달 → EconomicEqPanel 이 AI 에이전트 카드를 렌더하지 않음 */}
             <div className="flex flex-col gap-4">
               <EconomicEqPanel
                 stats={{
@@ -259,12 +251,8 @@ export default function HomeTab({ childrenData }: Props) {
                 }}
                 weeklyRoutine={weeklyRoutine}
                 childName={child.name}
-                agentChildId={child.id}
               />
-            </div>
 
-            {/* 우 컬럼: 오늘의 진행도 + 최근 활동 */}
-            <div className="flex flex-col gap-4">
               {/* 오늘의 진행도 */}
               <div className="rounded-2xl bg-white p-4 shadow-sm">
                 <div className="mb-2 flex items-center justify-between gap-2">
@@ -286,6 +274,12 @@ export default function HomeTab({ childrenData }: Props) {
                   <p className="mt-1 text-right text-[10px] font-bold text-[#7ED321]">오늘 미션 모두 완료!</p>
                 )}
               </div>
+            </div>
+
+            {/* 우 컬럼: AI 꿀팁(ParentAgentHomeCards) + 최근 활동 + 데이터 모으는 중
+                ParentAgentHomeCards 가 데이터 있을 땐 AI 카드, 없을 땐 「데이터 모으는 중」을 모두 처리함 */}
+            <div className="flex flex-col gap-4">
+              <ParentAgentHomeCards childId={child.id} />
 
               {/* 최근 활동: 토글 헤더(기본 접힘) + 펼칠 때만 미션 완료 로그 목록 */}
               {child.recentActivity.length > 0 && (

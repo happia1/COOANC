@@ -8,7 +8,7 @@
  * - 날짜 탭: 해당 날 일정이 있으면 상세 슬라이드, 없으면 빈 상태 시트 +「일정등록하기」(헤더 +와 동일 EventSheet, 클릭한 날짜로 시작·종료일 채움)
  * - 일정 상세 시트 헤더 오른쪽 + : 헤더와 같은 EventSheet(일정 추가)를 연 뒤 상세는 닫음
  * - 「이번 달 일정」은 **항상** 같은 줄에 표시(일정 0건이어도 숨기지 않음). 펼치면 목록 또는 빈 안내.
- * - 흰 카드는 `pb-4`(작은 하단 여백)만 둠. 저작 표시 `ⓒRHYMIA.Ltd.co` 는 **카드 밖**(섹션 하단) 중앙.
+ * - 흰 카드는 `pb-4`(작은 하단 여백)만 둠.
  * - 시트 z-index는 하단 독바(z-50)보다 위로 두어 저장 버튼이 가리지 않게 함
  */
 
@@ -524,15 +524,6 @@ export default function CalendarSection({ childId }: Props) {
           </div>
         ) : null}
       </div>
-      </div>
-
-      {/*
-        저작 표시: 흰 카드 밖(섹션 하단) 중앙 — 카드와 시각적으로 분리
-      */}
-      <div className="mt-2 text-center">
-        <p className="text-[9px] font-medium tracking-tight text-gray-400" aria-label="저작권 표시">
-          ⓒRHYMIA.Ltd.co
-        </p>
       </div>
 
       {sheet && (

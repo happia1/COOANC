@@ -14,12 +14,13 @@ import { usePathname } from 'next/navigation'
 import ParentEnterChildUiLink from '@/components/parent/ParentEnterChildUiLink'
 import { useParentStore } from '@/store/parentStore'
 import ChildProfileNav, { type ChildTab } from '@/components/parent/ChildProfileNav'
-import { CompactChildProfileCard } from '@/components/parent/CompactChildProfileCard'
 import ParentMarketMenuControl from '@/components/parent/ParentMarketMenuControl'
 import PraiseStickerPanel from '@/components/parent/PraiseStickerPanel'
 import type { PurchaseRequest, StoreItem } from '@/types/database'
 import { createClient } from '@/lib/supabase/client'
 import MarketItemImage from '@/components/common/MarketItemImage'
+import SpriteImage from '@/components/common/SpriteImage'
+import { ICONS } from '@/constants/sprites'
 import { marketFrameKeyForItemId } from '@/lib/marketItemFrame'
 import {
   getMsUntilNextSeoulMidnight,
@@ -203,6 +204,19 @@ export default function ApprovalTab({
     setCreditOverridesByChild(m)
     // eslint-disable-next-line react-hooks/exhaustive-deps -- 초기 맵은 JSON 키에 전부 직렬화됨
   }, [creditOverridesInitialKey])
+
+  /** 태블릿 전용: 구매 요청 카드 선택 상태 — 선택된 카드 강조 + 하단 상세 패널 표시 */
+  const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null)
+
+  /** 자녀가 바뀌면 선택 초기화 */
+  useEffect(() => {
+    setSelectedRequestId(null)
+  }, [currentId])
+
+  const selectedRequest = useMemo(
+    () => requestsForChild.find((r) => r.id === selectedRequestId) ?? null,
+    [requestsForChild, selectedRequestId],
+  )
 
   const [rejectModal, setRejectModal] = useState<{ requestId: string; itemName: string } | null>(null)
   const [rejectNote, setRejectNote] = useState('')
@@ -750,253 +764,170 @@ export default function ApprovalTab({
         </>
       )}
 
-      {/* 루틴·홈과 동일: 프로필 카드 탭 → 자녀 앱, 아래 줄은 다자녀 ◀▶ */}
+      {/* 통합 프로필 바 — 아바타+이름 좌 / 코인·하트·연속 우 */}
       {currentChild && (
-        <div className="flex flex-col gap-2">
-          {/**
-           * 부모 홈의 프로필 카드와 같은 동선 — 서버가 쿠키를 설정한 뒤 자녀용 `/home` 으로 이동합니다.
-           */}
-          <ParentEnterChildUiLink
-            childId={currentChild.id}
-            className="block cursor-pointer rounded-xl transition-opacity active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4A90E2] focus-visible:ring-offset-2"
-            aria-label={`${currentChild.name} 자녀용 앱 화면으로 들어가기`}
-            onClick={() => setSelectedChildId(currentChild.id)}
-          >
-            <CompactChildProfileCard
-              name={currentChild.name}
-              age={currentChild.age}
-              avatarUrl={currentChild.avatarUrl}
-              level={childLevel}
-              credits={currentChild.credits}
-              hearts={currentChild.hearts}
-              streakDays={currentChild.streakDays}
-              ageGroupLabel={currentChild.ageGroupLabel}
-              childcareLabel={currentChild.childcareLabel}
-              mission={null}
-            />
-          </ParentEnterChildUiLink>
-          <ChildProfileNav tabs={tabs} compact />
-        </div>
+        <ParentEnterChildUiLink
+          childId={currentChild.id}
+          className="block w-full cursor-pointer rounded-2xl transition-opacity active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4A90E2] focus-visible:ring-offset-2 md:w-auto md:max-w-sm md:self-start"
+          aria-label={`${currentChild.name} 자녀용 앱 화면으로 들어가기`}
+          onClick={() => setSelectedChildId(currentChild.id)}
+        >
+          <div className="flex w-full items-center justify-between rounded-2xl bg-white px-4 py-3 shadow-sm">
+            {/* 좌: 아바타 + 이름 + 레벨 */}
+            <div className="flex items-center gap-3">
+              <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-white">
+                {currentChild.avatarUrl ? (
+                  <div className="flex h-full w-full items-center justify-center p-1.5">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={currentChild.avatarUrl} alt="" className="h-full w-full object-contain object-center" />
+                  </div>
+                ) : (
+                  <span className="flex h-full w-full items-center justify-center text-center text-[10px] font-black leading-tight text-gray-700">
+                    Lv{childLevel}
+                  </span>
+                )}
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <span className="text-sm font-black text-gray-800">{currentChild.name}</span>
+                <span className="text-[11px] text-gray-400">Lv.{childLevel}</span>
+              </div>
+            </div>
+
+            {/* 우: 코인 · 하트 · 연속 */}
+            <div
+              className="flex items-center gap-4"
+              aria-label={`코인 ${(currentChild.credits).toLocaleString()}, 하트 ${currentChild.hearts}, 연속 ${currentChild.streakDays}일`}
+            >
+              <div className="flex items-center gap-1">
+                <SpriteImage sheet={ICONS} frame="credits" width={16} clipRotated={false} className="shrink-0 select-none" />
+                <span className="text-sm font-black tabular-nums text-[#4A90E2]">
+                  {(currentChild.credits).toLocaleString()}
+                </span>
+              </div>
+              <div className="flex items-center gap-1">
+                <SpriteImage sheet={ICONS} frame="heart" width={16} className="shrink-0 select-none" />
+                <span className="text-sm font-black tabular-nums text-rose-500">
+                  {currentChild.hearts}
+                </span>
+              </div>
+              <div className="flex items-center gap-1">
+                <svg width={16} height={16} viewBox="0 0 24 24" fill="none" className="shrink-0 text-orange-500" aria-hidden>
+                  <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                <span className="text-sm font-black tabular-nums text-amber-600">
+                  {currentChild.streakDays}일
+                </span>
+              </div>
+            </div>
+          </div>
+        </ParentEnterChildUiLink>
       )}
 
-      <PraiseStickerPanel childId={currentId} childName={currentChild?.name ?? '자녀'} />
-
       {/* ── 2컬럼 그리드 ────────────────────────────────────────────────────────
-          모바일(grid-cols-1): 구매 요청 → 완료 미션 → 마켓 순 유지
-          md+(grid-cols-2): 좌=구매 요청(sticky), 우=완료 미션+마켓+빈 상태
+          모바일(grid-cols-1):  order-1=우 컬럼(스티커·구매요청) → order-2=좌 컬럼(완료미션·마켓)
+          md+(grid-cols-2):    좌=오늘완료미션+마켓제어,  우=스티커+구매요청+승인내역
       ──────────────────────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 gap-5 md:grid-cols-2 md:gap-6 md:items-start">
+      <div className="grid grid-cols-1 gap-6 w-full items-start md:grid-cols-2">
 
-      {/* 좌 컬럼: 구매 요청 (sticky on md) */}
-      <div className="flex flex-col gap-5 md:sticky md:top-4 md:max-h-[calc(100vh-200px)] md:overflow-y-auto">
+      {/* ── 좌 컬럼(md) / 하단(모바일): 오늘 완료 미션 + 마켓 제어 ── */}
+      <div className="order-2 md:order-1 flex flex-col gap-5">
 
-      {/* 구매 요청 — 선택 자녀만 (`#parent-purchase-requests` 로 스크롤 이동) */}
-      <section id="parent-purchase-requests">
-        <h2 className="text-sm font-bold text-brand-text mb-2">구매 요청</h2>
-
-        {requestsForChild.length === 0 ? (
-          <div className="bg-white rounded-2xl p-6 text-center shadow-sm">
-            <p className="text-sm text-gray-400">대기 중인 구매 요청이 없어요</p>
-          </div>
-        ) : (
-          <div className="flex flex-col gap-3">
-            {requestsForChild.map((req) => {
-              const linked = req.item_id ? storeItemById.get(req.item_id) : undefined
-              const rawUrl = linked?.image_url
-              const thumbUrl =
-                typeof rawUrl === 'string' && rawUrl.trim() !== '' ? rawUrl.trim() : null
-              const frame = marketFrameKeyForItemId(req.item_id, req.item_name)
-              const isParentBuying = req.status === 'parent_buying'
-              return (
-                <div
-                  key={req.id}
-                  className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100 transition-all active:scale-[0.99]"
-                >
-                  <div className="flex flex-row items-start gap-2 sm:gap-3">
-                    <div className="flex min-w-0 flex-1 gap-2 sm:gap-3">
-                      <div
-                        /** 요청사항 반영: 이전보다 이미지를 조금 키워 가독성 보완 */
-                        className={`flex h-[52px] w-[52px] shrink-0 items-end justify-center overflow-hidden rounded-xl ring-1 ${
-                          isParentBuying ? 'bg-sky-50/80 ring-sky-100' : 'bg-amber-50/80 ring-amber-100'
-                        }`}
-                      >
-                        {thumbUrl ? (
-                          // eslint-disable-next-line @next/next/no-img-element -- 스토리지·외부 URL
-                          <img
-                            src={thumbUrl}
-                            alt=""
-                            className="max-h-full max-w-full object-contain object-bottom"
-                            draggable={false}
-                          />
-                        ) : (
-                          <MarketItemImage frame={frame} height={44} />
-                        )}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        {/** 요청사항 반영: 텍스트 크기를 한 단계 더 줄여 카드 밀도 개선 */}
-                        <p className="text-xs font-black text-brand-text">{req.item_name}</p>
-                        <p className="mt-0.5 text-[10px] text-gray-400">{req.requested_at.slice(0, 10)}</p>
-                        <p className="mt-1 text-xs font-black tabular-nums text-brand-blue">
-                          {req.item_price.toLocaleString()} 크레딧
-                        </p>
-                        {isParentBuying && (
-                          <p className="mt-1.5 text-[9px] font-bold leading-snug text-sky-700">
-                            외부에서 주문한 뒤 「배달 승인」으로 자녀에게 알려 주세요.
-                          </p>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="flex w-[4.25rem] shrink-0 flex-col gap-1 self-start pt-0.5 sm:w-[4.5rem]">
-                      {isParentBuying ? (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => setRejectModal({ requestId: req.id, itemName: req.item_name })}
-                            disabled={loading === req.id}
-                            className="w-full rounded-lg border border-red-200 py-1.5 text-[9px] font-bold text-red-500 transition-all active:scale-95 disabled:opacity-50 sm:rounded-xl sm:py-2"
-                          >
-                            반려
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              window.open(PARENT_EXTERNAL_SHOP_URL, '_blank', 'noopener,noreferrer')
-                            }
-                            className="w-full rounded-lg bg-amber-500 py-1.5 text-[9px] font-bold text-white shadow-md transition-all active:scale-95 sm:rounded-xl sm:py-2"
-                          >
-                            쿠팡 열기
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => void handleApprove(req.id)}
-                            disabled={loading === req.id}
-                            className="w-full rounded-lg bg-brand-blue py-1.5 text-[9px] font-bold text-white shadow-md transition-all active:scale-95 disabled:opacity-50 sm:rounded-xl sm:py-2"
-                          >
-                            {loading === req.id ? '…' : '배달 승인'}
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => setRejectModal({ requestId: req.id, itemName: req.item_name })}
-                            disabled={loading === req.id}
-                            className="w-full rounded-lg border border-red-200 py-1.5 text-[9px] font-bold text-red-500 transition-all active:scale-95 disabled:opacity-50 sm:rounded-xl sm:py-2"
-                          >
-                            반려
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setApproveChoiceModal({ requestId: req.id, itemName: req.item_name })
-                            }
-                            disabled={loading === req.id}
-                            className="w-full rounded-lg bg-brand-blue py-1.5 text-[9px] font-bold text-white shadow-md transition-all active:scale-95 disabled:opacity-50 sm:rounded-xl sm:py-2"
-                          >
-                            승인
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        )}
-
-        {historyForChild.length > 0 && (
-          <div className={requestsForChild.length > 0 ? 'mt-5' : 'mt-0'}>
+        {/* 오늘 완료 미션
+            모바일: 버튼 탭 → 하단 시트 / 태블릿: 인라인 목록 직접 표시 */}
+        <section>
+          {/* 모바일 전용 — 버튼 + 롤백 시트 */}
+          <div className="md:hidden">
             <button
               type="button"
               onClick={() => {
-                setPurchaseHistoryShowAll(false)
-                setPurchaseHistorySheetOpen(true)
+                setRollbackSheetShowAll(false)
+                setRollbackSheetOpen(true)
               }}
               className="w-full rounded-2xl bg-white p-4 text-left shadow-sm ring-1 ring-gray-100 transition-all active:scale-[0.99]"
             >
               <div className="flex items-center gap-3">
                 <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                  <span className="text-sm font-black text-brand-text">승인 내역</span>
-                  <span className="text-[11px] text-gray-400">탭하여 목록 보기</span>
+                  <span className="text-sm font-black text-brand-text">오늘 완료 미션</span>
+                  <span className="text-[11px] text-gray-400">탭하여 다시 하기 · 롤백</span>
                 </div>
                 <span className="shrink-0 rounded-full bg-brand-blue/10 px-2.5 py-1 text-xs font-black tabular-nums text-brand-blue">
-                  {historyForChild.length}건
+                  {todayCompletedLogs.length}건
                 </span>
-                <span className="shrink-0 text-lg font-bold text-gray-300" aria-hidden>
-                  ›
-                </span>
+                <span className="shrink-0 text-lg font-bold text-gray-300" aria-hidden>›</span>
               </div>
             </button>
 
-            {purchaseHistorySheetOpen && (
+            {rollbackSheetOpen && (
               <div className="fixed inset-0 z-[100] flex flex-col justify-end">
                 <button
                   type="button"
                   className="absolute inset-0 bg-black/45"
                   aria-label="닫기"
-                  onClick={() => setPurchaseHistorySheetOpen(false)}
+                  onClick={() => setRollbackSheetOpen(false)}
                 />
                 <div
                   className="relative z-[1] flex max-h-[min(78dvh,560px)] flex-col rounded-t-3xl bg-white shadow-2xl"
                   role="dialog"
                   aria-modal="true"
-                  aria-labelledby="purchase-history-sheet-title"
+                  aria-labelledby="rollback-sheet-title"
                 >
                   <div className="flex justify-center pt-2 pb-1">
                     <span className="h-1 w-10 rounded-full bg-gray-200" />
                   </div>
                   <div className="border-b border-gray-100 px-5 pb-3 pt-1">
-                    <h3 id="purchase-history-sheet-title" className="text-base font-black text-brand-text">
-                      승인 내역
+                    <h3 id="rollback-sheet-title" className="text-base font-black text-brand-text">
+                      오늘 완료 미션
                     </h3>
                   </div>
                   <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3">
-                    <ul className="flex flex-col gap-1.5">
-                      {visiblePurchaseHistory.map((req) => {
-                        const pill = purchaseRequestStatusPill(req.status)
-                        return (
-                          <li
-                            key={req.id}
-                            className="rounded-xl bg-gray-50/90 px-3 py-2.5 ring-1 ring-gray-100"
+                    {todayCompletedLogs.length === 0 ? (
+                      <p className="py-8 text-center text-sm text-gray-400">오늘 완료한 미션이 없어요</p>
+                    ) : (
+                      <div className="flex flex-col gap-2">
+                        {visibleRollbackInSheet.map((log) => (
+                          <div
+                            key={log.id}
+                            className="flex items-center gap-3 rounded-xl bg-gray-50/90 px-3 py-2.5 ring-1 ring-gray-100"
                           >
-                            <div className="flex items-start justify-between gap-2">
-                              <p className="min-w-0 flex-1 truncate text-sm font-bold text-brand-text">{req.item_name}</p>
-                              <span
-                                className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-black ${pill.pillClass}`}
-                              >
-                                {pill.label}
-                              </span>
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-sm font-bold text-brand-text">{log.missions?.title ?? '미션'}</p>
+                              <p className="text-[10px] text-gray-400">
+                                {log.completed_at
+                                  ? getSeoulDateFromIsoTimestamp(log.completed_at) ?? log.completed_at.slice(0, 10)
+                                  : ''}
+                              </p>
                             </div>
-                            <p className="mt-1 text-[10px] tabular-nums text-gray-400">
-                              {purchaseHistoryPrimaryDate(req)} · {req.item_price.toLocaleString()}크레딧
-                            </p>
-                            {req.status === 'rejected' && req.parent_note ? (
-                              <p className="mt-1 line-clamp-2 text-[10px] text-gray-500">사유: {req.parent_note}</p>
-                            ) : null}
-                          </li>
-                        )
-                      })}
-                    </ul>
+                            <div className="shrink-0 text-right">
+                              <p className="text-[10px] font-bold tabular-nums text-brand-blue">+{log.credit_earned} 크레딧</p>
+                              <button
+                                type="button"
+                                onClick={() => void handleRequestRedoFromChild(log)}
+                                disabled={loading === log.id}
+                                className="text-[10px] font-bold text-orange-500 hover:underline disabled:opacity-50"
+                              >
+                                다시하기
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                  {purchaseHistoryHasMore ? (
+                  {todayCompletedLogs.length > ROLLBACK_SHEET_INITIAL && !rollbackSheetShowAll && (
                     <div className="border-t border-gray-100 px-4 py-2">
                       <button
                         type="button"
-                        onClick={() => setPurchaseHistoryShowAll((v) => !v)}
+                        onClick={() => setRollbackSheetShowAll(true)}
                         className="w-full rounded-xl border border-gray-200 py-2.5 text-sm font-bold text-brand-text"
                       >
-                        {purchaseHistoryShowAll
-                          ? `간단히 보기 (${PURCHASE_HISTORY_PREVIEW_COUNT}건)`
-                          : `더보기 (${historyForChild.length - PURCHASE_HISTORY_PREVIEW_COUNT}건 더)`}
+                        더보기 ({todayCompletedLogs.length - ROLLBACK_SHEET_INITIAL}개 더 있음)
                       </button>
                     </div>
-                  ) : null}
+                  )}
                   <div className="border-t border-gray-100 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
                     <button
                       type="button"
-                      onClick={() => setPurchaseHistorySheetOpen(false)}
+                      onClick={() => setRollbackSheetOpen(false)}
                       className="w-full rounded-2xl bg-gray-100 py-3 text-sm font-bold text-gray-600"
                     >
                       닫기
@@ -1005,140 +936,388 @@ export default function ApprovalTab({
                 </div>
               </div>
             )}
-          </div>
-        )}
-      </section>
+          </div>{/* /모바일 전용 */}
+
+          {/* 태블릿 전용 — 인라인 목록 */}
+          <div className="hidden md:block rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
+            <div className="mb-3 flex items-center justify-between">
+              <span className="text-sm font-black text-brand-text">오늘 완료 미션</span>
+              <span className="rounded-full bg-brand-blue/10 px-2.5 py-1 text-xs font-black tabular-nums text-brand-blue">
+                {todayCompletedLogs.length}건
+              </span>
+            </div>
+            {todayCompletedLogs.length === 0 ? (
+              <p className="py-4 text-center text-sm text-gray-400">오늘 완료한 미션이 없어요</p>
+            ) : (
+              <div className="flex flex-col gap-2 max-h-64 overflow-y-auto">
+                {todayCompletedLogs.map((log) => (
+                  <div
+                    key={log.id}
+                    className="flex items-center gap-3 rounded-xl bg-gray-50/90 px-3 py-2.5 ring-1 ring-gray-100"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-bold text-brand-text">{log.missions?.title ?? '미션'}</p>
+                      <p className="text-[10px] text-gray-400">
+                        {log.completed_at
+                          ? getSeoulDateFromIsoTimestamp(log.completed_at) ?? log.completed_at.slice(0, 10)
+                          : ''}
+                      </p>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <p className="text-[10px] font-bold tabular-nums text-brand-blue">+{log.credit_earned} 크레딧</p>
+                      <button
+                        type="button"
+                        onClick={() => void handleRequestRedoFromChild(log)}
+                        disabled={loading === log.id}
+                        className="text-[10px] font-bold text-orange-500 hover:underline disabled:opacity-50"
+                      >
+                        다시하기
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>{/* /태블릿 전용 */}
+        </section>
+
+        {/* `id`: 홈 경제 EQ 코칭 카드의 「자녀 보상 등록」링크가 이 구역으로 스크롤되게 함 */}
+        <section id="parent-approval-market-rewards" aria-label="자녀 마켓 보상 설정">
+          <ParentMarketMenuControl
+            childId={currentId}
+            storeItems={storeItems}
+            hiddenItemIds={hiddenSetForCurrent}
+            familyLinkIdForChild={currentId ? linkByChild[currentId] ?? null : null}
+            onHiddenChange={onHiddenChangeForCurrent}
+            onItemCreated={(item) => setStoreItems((prev) => [...prev, item])}
+            creditOverrides={creditOverridesForCurrent}
+            onCreditOverrideSaved={onCreditOverrideSaved}
+          />
+        </section>
 
       </div>{/* /좌 컬럼 */}
 
-      {/* 우 컬럼: 빈 상태(md 전용) + 오늘 완료 미션 + 마켓 설정 */}
-      <div className="flex flex-col gap-5">
+      {/* ── 우 컬럼(md) / 상단(모바일): 칭찬 스티커 + 자녀 전환 + 구매 요청 + 승인 내역 ── */}
+      <div className="order-1 md:order-2 flex flex-col gap-5">
 
-        {/* md에서 구매 요청이 없을 때 안내 (모바일 숨김) */}
-        {requestsForChild.length === 0 && (
-          <div className="hidden md:flex items-center justify-center h-48 rounded-2xl bg-white text-gray-400 text-sm shadow-sm">
-            구매 요청을 선택하면 상세 내용이 표시돼요
+        <PraiseStickerPanel childId={currentId} childName={currentChild?.name ?? '자녀'} />
+
+        {/* 구매 요청 */}
+        <section id="parent-purchase-requests">
+          <div className="mb-2 flex items-center justify-between">
+            <h2 className="text-sm font-bold text-brand-text">구매 요청</h2>
           </div>
-        )}
 
-      {/* 오늘 완료 미션 — 카드 탭 시 하단 시트(스크롤, 최대 10건 + 더보기) */}
-      <section>
-        <button
-          type="button"
-          onClick={() => {
-            setRollbackSheetShowAll(false)
-            setRollbackSheetOpen(true)
-          }}
-          className="w-full rounded-2xl bg-white p-4 text-left shadow-sm ring-1 ring-gray-100 transition-all active:scale-[0.99]"
-        >
-          <div className="flex items-center gap-3">
-            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-              <span className="text-sm font-black text-brand-text">오늘 완료 미션</span>
-              <span className="text-[11px] text-gray-400">탭하여 다시 하기 · 롤백</span>
-            </div>
-            <span className="shrink-0 rounded-full bg-brand-blue/10 px-2.5 py-1 text-xs font-black tabular-nums text-brand-blue">
-              {todayCompletedLogs.length}건
-            </span>
-            <span className="shrink-0 text-lg font-bold text-gray-300" aria-hidden>
-              ›
-            </span>
-          </div>
-        </button>
+          {/* 자녀 전환 네비 */}
+          <ChildProfileNav tabs={tabs} compact />
 
-        {rollbackSheetOpen && (
-          <div className="fixed inset-0 z-[100] flex flex-col justify-end">
-            <button
-              type="button"
-              className="absolute inset-0 bg-black/45"
-              aria-label="닫기"
-              onClick={() => setRollbackSheetOpen(false)}
-            />
-            <div
-              className="relative z-[1] flex max-h-[min(78dvh,560px)] flex-col rounded-t-3xl bg-white shadow-2xl"
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="rollback-sheet-title"
-            >
-              <div className="flex justify-center pt-2 pb-1">
-                <span className="h-1 w-10 rounded-full bg-gray-200" />
+          {/* 요청 목록 — 태블릿에서는 최대 높이 제한 후 스크롤 */}
+          <div className="mt-2 flex flex-col gap-3 md:max-h-72 md:overflow-y-auto">
+            {requestsForChild.length === 0 ? (
+              <div className="rounded-2xl bg-white p-6 text-center shadow-sm">
+                <p className="text-sm text-gray-400">대기 중인 구매 요청이 없어요</p>
               </div>
-              <div className="border-b border-gray-100 px-5 pb-3 pt-1">
-                <h3 id="rollback-sheet-title" className="text-base font-black text-brand-text">
-                  오늘 완료 미션
-                </h3>
-              </div>
-              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3">
-                {todayCompletedLogs.length === 0 ? (
-                  <p className="py-8 text-center text-sm text-gray-400">오늘 완료한 미션이 없어요</p>
-                ) : (
-                  <div className="flex flex-col gap-2">
-                    {visibleRollbackInSheet.map((log) => (
-                      <div
-                        key={log.id}
-                        className="flex items-center gap-3 rounded-xl bg-gray-50/90 px-3 py-2.5 ring-1 ring-gray-100"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-bold text-brand-text">{log.missions?.title ?? '미션'}</p>
-                          <p className="text-[10px] text-gray-400">
-                            {log.completed_at
-                              ? getSeoulDateFromIsoTimestamp(log.completed_at) ?? log.completed_at.slice(0, 10)
-                              : ''}
-                          </p>
+            ) : (
+              requestsForChild.map((req) => {
+                const linked = req.item_id ? storeItemById.get(req.item_id) : undefined
+                const rawUrl = linked?.image_url
+                const thumbUrl = typeof rawUrl === 'string' && rawUrl.trim() !== '' ? rawUrl.trim() : null
+                const frame = marketFrameKeyForItemId(req.item_id, req.item_name)
+                const isParentBuying = req.status === 'parent_buying'
+                const isSelected = selectedRequestId === req.id
+                return (
+                  <div
+                    key={req.id}
+                    className={`rounded-2xl bg-white p-4 shadow-sm transition-all active:scale-[0.99] cursor-pointer ${
+                      isSelected ? 'ring-2 ring-brand-blue' : 'ring-1 ring-gray-100'
+                    }`}
+                    onClick={() => setSelectedRequestId(isSelected ? null : req.id)}
+                  >
+                    <div className="flex flex-row items-start gap-2 sm:gap-3">
+                      <div className="flex min-w-0 flex-1 gap-2 sm:gap-3">
+                        <div
+                          className={`flex h-[52px] w-[52px] shrink-0 items-end justify-center overflow-hidden rounded-xl ring-1 ${
+                            isParentBuying ? 'bg-sky-50/80 ring-sky-100' : 'bg-amber-50/80 ring-amber-100'
+                          }`}
+                        >
+                          {thumbUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element -- 스토리지·외부 URL
+                            <img
+                              src={thumbUrl}
+                              alt=""
+                              className="max-h-full max-w-full object-contain object-bottom"
+                              draggable={false}
+                            />
+                          ) : (
+                            <MarketItemImage frame={frame} height={44} />
+                          )}
                         </div>
-                        <div className="shrink-0 text-right">
-                          <p className="text-[10px] font-bold tabular-nums text-brand-blue">+{log.credit_earned} 크레딧</p>
-                          <button
-                            type="button"
-                            onClick={() => void handleRequestRedoFromChild(log)}
-                            disabled={loading === log.id}
-                            className="text-[10px] font-bold text-orange-500 hover:underline disabled:opacity-50"
-                          >
-                            다시하기
-                          </button>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-black text-brand-text">{req.item_name}</p>
+                          <p className="mt-0.5 text-[10px] text-gray-400">{req.requested_at.slice(0, 10)}</p>
+                          <p className="mt-1 text-xs font-black tabular-nums text-brand-blue">
+                            {req.item_price.toLocaleString()} 크레딧
+                          </p>
+                          {isParentBuying && (
+                            <p className="mt-1.5 text-[9px] font-bold leading-snug text-sky-700">
+                              외부에서 주문한 뒤 「배달 승인」으로 자녀에게 알려 주세요.
+                            </p>
+                          )}
                         </div>
                       </div>
-                    ))}
+
+                      {/* 승인·반려 버튼: 모바일에서만 카드 안에 표시 */}
+                      <div className="md:hidden flex w-[4.25rem] shrink-0 flex-col gap-1 self-start pt-0.5 sm:w-[4.5rem]">
+                        {isParentBuying ? (
+                          <>
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); setRejectModal({ requestId: req.id, itemName: req.item_name }) }}
+                              disabled={loading === req.id}
+                              className="w-full rounded-lg border border-red-200 py-1.5 text-[9px] font-bold text-red-500 transition-all active:scale-95 disabled:opacity-50 sm:rounded-xl sm:py-2"
+                            >
+                              반려
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); window.open(PARENT_EXTERNAL_SHOP_URL, '_blank', 'noopener,noreferrer') }}
+                              className="w-full rounded-lg bg-amber-500 py-1.5 text-[9px] font-bold text-white shadow-md transition-all active:scale-95 sm:rounded-xl sm:py-2"
+                            >
+                              쿠팡 열기
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); void handleApprove(req.id) }}
+                              disabled={loading === req.id}
+                              className="w-full rounded-lg bg-brand-blue py-1.5 text-[9px] font-bold text-white shadow-md transition-all active:scale-95 disabled:opacity-50 sm:rounded-xl sm:py-2"
+                            >
+                              {loading === req.id ? '…' : '배달 승인'}
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); setRejectModal({ requestId: req.id, itemName: req.item_name }) }}
+                              disabled={loading === req.id}
+                              className="w-full rounded-lg border border-red-200 py-1.5 text-[9px] font-bold text-red-500 transition-all active:scale-95 disabled:opacity-50 sm:rounded-xl sm:py-2"
+                            >
+                              반려
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); setApproveChoiceModal({ requestId: req.id, itemName: req.item_name }) }}
+                              disabled={loading === req.id}
+                              className="w-full rounded-lg bg-brand-blue py-1.5 text-[9px] font-bold text-white shadow-md transition-all active:scale-95 disabled:opacity-50 sm:rounded-xl sm:py-2"
+                            >
+                              승인
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                )}
+                )
+              })
+            )}
+          </div>
+
+          {/* 태블릿 전용 상세 패널 — 선택된 요청의 승인·반려 버튼 */}
+          <div className="hidden md:block mt-4">
+            {selectedRequest ? (
+              <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-brand-blue/30">
+                <p className="text-sm font-black text-brand-text">{selectedRequest.item_name}</p>
+                <p className="mt-0.5 text-[10px] text-gray-400">
+                  {selectedRequest.requested_at.slice(0, 10)} · {selectedRequest.item_price.toLocaleString()} 크레딧
+                </p>
+                <div className="mt-3 flex flex-col gap-2">
+                  {selectedRequest.status === 'parent_buying' ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setRejectModal({ requestId: selectedRequest.id, itemName: selectedRequest.item_name })}
+                        disabled={loading === selectedRequest.id}
+                        className="w-full rounded-xl border border-red-200 py-2 text-xs font-bold text-red-500 transition-all active:scale-95 disabled:opacity-50"
+                      >
+                        반려
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => window.open(PARENT_EXTERNAL_SHOP_URL, '_blank', 'noopener,noreferrer')}
+                        className="w-full rounded-xl bg-amber-500 py-2 text-xs font-bold text-white shadow-md transition-all active:scale-95"
+                      >
+                        쿠팡 열기
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void handleApprove(selectedRequest.id)}
+                        disabled={loading === selectedRequest.id}
+                        className="w-full rounded-xl bg-brand-blue py-2 text-xs font-bold text-white shadow-md transition-all active:scale-95 disabled:opacity-50"
+                      >
+                        {loading === selectedRequest.id ? '처리 중…' : '배달 승인'}
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setRejectModal({ requestId: selectedRequest.id, itemName: selectedRequest.item_name })}
+                        disabled={loading === selectedRequest.id}
+                        className="w-full rounded-xl border border-red-200 py-2 text-xs font-bold text-red-500 transition-all active:scale-95 disabled:opacity-50"
+                      >
+                        반려
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setApproveChoiceModal({ requestId: selectedRequest.id, itemName: selectedRequest.item_name })}
+                        disabled={loading === selectedRequest.id}
+                        className="w-full rounded-xl bg-brand-blue py-2 text-xs font-bold text-white shadow-md transition-all active:scale-95 disabled:opacity-50"
+                      >
+                        승인
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
-              {todayCompletedLogs.length > ROLLBACK_SHEET_INITIAL && !rollbackSheetShowAll && (
-                <div className="border-t border-gray-100 px-4 py-2">
+            ) : (
+              <p className="hidden md:block text-sm text-gray-400 text-center py-6">
+                요청 카드를 탭하면 승인·반려 버튼이 나타납니다
+              </p>
+            )}
+          </div>
+
+          {/* 승인 내역 — 모바일: 버튼 → 하단 시트 */}
+          {historyForChild.length > 0 && (
+            <div className="md:hidden mt-5">
+              <button
+                type="button"
+                onClick={() => { setPurchaseHistoryShowAll(false); setPurchaseHistorySheetOpen(true) }}
+                className="w-full rounded-2xl bg-white p-4 text-left shadow-sm ring-1 ring-gray-100 transition-all active:scale-[0.99]"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                    <span className="text-sm font-black text-brand-text">승인 내역</span>
+                    <span className="text-[11px] text-gray-400">탭하여 목록 보기</span>
+                  </div>
+                  <span className="shrink-0 rounded-full bg-brand-blue/10 px-2.5 py-1 text-xs font-black tabular-nums text-brand-blue">
+                    {historyForChild.length}건
+                  </span>
+                  <span className="shrink-0 text-lg font-bold text-gray-300" aria-hidden>›</span>
+                </div>
+              </button>
+
+              {purchaseHistorySheetOpen && (
+                <div className="fixed inset-0 z-[100] flex flex-col justify-end">
                   <button
                     type="button"
-                    onClick={() => setRollbackSheetShowAll(true)}
-                    className="w-full rounded-xl border border-gray-200 py-2.5 text-sm font-bold text-brand-text"
+                    className="absolute inset-0 bg-black/45"
+                    aria-label="닫기"
+                    onClick={() => setPurchaseHistorySheetOpen(false)}
+                  />
+                  <div
+                    className="relative z-[1] flex max-h-[min(78dvh,560px)] flex-col rounded-t-3xl bg-white shadow-2xl"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="purchase-history-sheet-title"
                   >
-                    더보기 ({todayCompletedLogs.length - ROLLBACK_SHEET_INITIAL}개 더 있음)
-                  </button>
+                    <div className="flex justify-center pt-2 pb-1">
+                      <span className="h-1 w-10 rounded-full bg-gray-200" />
+                    </div>
+                    <div className="border-b border-gray-100 px-5 pb-3 pt-1">
+                      <h3 id="purchase-history-sheet-title" className="text-base font-black text-brand-text">
+                        승인 내역
+                      </h3>
+                    </div>
+                    <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3">
+                      <ul className="flex flex-col gap-1.5">
+                        {visiblePurchaseHistory.map((req) => {
+                          const pill = purchaseRequestStatusPill(req.status)
+                          return (
+                            <li key={req.id} className="rounded-xl bg-gray-50/90 px-3 py-2.5 ring-1 ring-gray-100">
+                              <div className="flex items-start justify-between gap-2">
+                                <p className="min-w-0 flex-1 truncate text-sm font-bold text-brand-text">{req.item_name}</p>
+                                <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-black ${pill.pillClass}`}>
+                                  {pill.label}
+                                </span>
+                              </div>
+                              <p className="mt-1 text-[10px] tabular-nums text-gray-400">
+                                {purchaseHistoryPrimaryDate(req)} · {req.item_price.toLocaleString()}크레딧
+                              </p>
+                              {req.status === 'rejected' && req.parent_note ? (
+                                <p className="mt-1 line-clamp-2 text-[10px] text-gray-500">사유: {req.parent_note}</p>
+                              ) : null}
+                            </li>
+                          )
+                        })}
+                      </ul>
+                    </div>
+                    {purchaseHistoryHasMore ? (
+                      <div className="border-t border-gray-100 px-4 py-2">
+                        <button
+                          type="button"
+                          onClick={() => setPurchaseHistoryShowAll((v) => !v)}
+                          className="w-full rounded-xl border border-gray-200 py-2.5 text-sm font-bold text-brand-text"
+                        >
+                          {purchaseHistoryShowAll
+                            ? `간단히 보기 (${PURCHASE_HISTORY_PREVIEW_COUNT}건)`
+                            : `더보기 (${historyForChild.length - PURCHASE_HISTORY_PREVIEW_COUNT}건 더)`}
+                        </button>
+                      </div>
+                    ) : null}
+                    <div className="border-t border-gray-100 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+                      <button
+                        type="button"
+                        onClick={() => setPurchaseHistorySheetOpen(false)}
+                        className="w-full rounded-2xl bg-gray-100 py-3 text-sm font-bold text-gray-600"
+                      >
+                        닫기
+                      </button>
+                    </div>
+                  </div>
                 </div>
               )}
-              <div className="border-t border-gray-100 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+            </div>
+          )}
+
+          {/* 승인 내역 — 태블릿: 인라인 목록 */}
+          {historyForChild.length > 0 && (
+            <div className="hidden md:block mt-5">
+              <h3 className="mb-2 text-sm font-bold text-brand-text">승인 내역</h3>
+              <ul className="flex flex-col gap-1.5">
+                {visiblePurchaseHistory.map((req) => {
+                  const pill = purchaseRequestStatusPill(req.status)
+                  return (
+                    <li key={req.id} className="rounded-xl bg-gray-50/90 px-3 py-2.5 ring-1 ring-gray-100">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="min-w-0 flex-1 truncate text-sm font-bold text-brand-text">{req.item_name}</p>
+                        <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-black ${pill.pillClass}`}>
+                          {pill.label}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-[10px] tabular-nums text-gray-400">
+                        {purchaseHistoryPrimaryDate(req)} · {req.item_price.toLocaleString()}크레딧
+                      </p>
+                      {req.status === 'rejected' && req.parent_note ? (
+                        <p className="mt-1 line-clamp-2 text-[10px] text-gray-500">사유: {req.parent_note}</p>
+                      ) : null}
+                    </li>
+                  )
+                })}
+              </ul>
+              {purchaseHistoryHasMore && (
                 <button
                   type="button"
-                  onClick={() => setRollbackSheetOpen(false)}
-                  className="w-full rounded-2xl bg-gray-100 py-3 text-sm font-bold text-gray-600"
+                  onClick={() => setPurchaseHistoryShowAll((v) => !v)}
+                  className="mt-2 w-full rounded-xl border border-gray-200 py-2.5 text-sm font-bold text-brand-text"
                 >
-                  닫기
+                  {purchaseHistoryShowAll
+                    ? `간단히 보기 (${PURCHASE_HISTORY_PREVIEW_COUNT}건)`
+                    : `더보기 (${historyForChild.length - PURCHASE_HISTORY_PREVIEW_COUNT}건 더)`}
                 </button>
-              </div>
+              )}
             </div>
-          </div>
-        )}
-      </section>
-
-      {/* `id`: 홈 경제 EQ 코칭 카드의 「자녀 보상 등록」링크가 이 구역으로 스크롤되게 함 */}
-      <section id="parent-approval-market-rewards" aria-label="자녀 마켓 보상 설정">
-        <ParentMarketMenuControl
-          childId={currentId}
-          storeItems={storeItems}
-          hiddenItemIds={hiddenSetForCurrent}
-          familyLinkIdForChild={currentId ? linkByChild[currentId] ?? null : null}
-          onHiddenChange={onHiddenChangeForCurrent}
-          onItemCreated={(item) => setStoreItems((prev) => [...prev, item])}
-          creditOverrides={creditOverridesForCurrent}
-          onCreditOverrideSaved={onCreditOverrideSaved}
-        />
-      </section>
+          )}
+        </section>
 
       </div>{/* /우 컬럼 */}
 
