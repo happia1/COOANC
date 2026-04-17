@@ -635,6 +635,7 @@ export default function ApprovalTab({
       )}
 
       {approveChoiceModal && (
+
         <div
           className="fixed inset-0 z-[210] flex items-center justify-center bg-black/45 px-5"
           role="dialog"
@@ -779,6 +780,15 @@ export default function ApprovalTab({
       )}
 
       <PraiseStickerPanel childId={currentId} childName={currentChild?.name ?? '자녀'} />
+
+      {/* ── 2컬럼 그리드 ────────────────────────────────────────────────────────
+          모바일(grid-cols-1): 구매 요청 → 완료 미션 → 마켓 순 유지
+          md+(grid-cols-2): 좌=구매 요청(sticky), 우=완료 미션+마켓+빈 상태
+      ──────────────────────────────────────────────────────────────────────── */}
+      <div className="grid grid-cols-1 gap-5 md:grid-cols-2 md:gap-6 md:items-start">
+
+      {/* 좌 컬럼: 구매 요청 (sticky on md) */}
+      <div className="flex flex-col gap-5 md:sticky md:top-4 md:max-h-[calc(100vh-200px)] md:overflow-y-auto">
 
       {/* 구매 요청 — 선택 자녀만 (`#parent-purchase-requests` 로 스크롤 이동) */}
       <section id="parent-purchase-requests">
@@ -999,6 +1009,18 @@ export default function ApprovalTab({
         )}
       </section>
 
+      </div>{/* /좌 컬럼 */}
+
+      {/* 우 컬럼: 빈 상태(md 전용) + 오늘 완료 미션 + 마켓 설정 */}
+      <div className="flex flex-col gap-5">
+
+        {/* md에서 구매 요청이 없을 때 안내 (모바일 숨김) */}
+        {requestsForChild.length === 0 && (
+          <div className="hidden md:flex items-center justify-center h-48 rounded-2xl bg-white text-gray-400 text-sm shadow-sm">
+            구매 요청을 선택하면 상세 내용이 표시돼요
+          </div>
+        )}
+
       {/* 오늘 완료 미션 — 카드 탭 시 하단 시트(스크롤, 최대 10건 + 더보기) */}
       <section>
         <button
@@ -1117,6 +1139,10 @@ export default function ApprovalTab({
           onCreditOverrideSaved={onCreditOverrideSaved}
         />
       </section>
+
+      </div>{/* /우 컬럼 */}
+
+      </div>{/* /2컬럼 그리드 */}
 
     </div>
   )

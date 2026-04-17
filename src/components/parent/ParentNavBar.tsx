@@ -19,12 +19,14 @@ export default function ParentNavBar() {
 
   return (
     <nav className="
-      fixed bottom-0 left-0 right-0 z-50 border-t border-gray-100 bg-white/90 shadow-lg backdrop-blur-sm
-      md:relative md:bottom-auto md:left-auto md:right-auto md:z-auto
-      md:flex md:w-20 md:flex-col md:border-r md:border-t-0 md:shadow-none md:bg-white
+      fixed bottom-0 left-0 right-0 z-40 flex flex-row
+      border-t border-gray-100 bg-white shadow-lg
+      md:relative md:bottom-auto md:left-auto md:right-auto
+      md:flex-col md:w-20 md:h-full
+      md:border-t-0 md:border-r md:border-gray-100 md:shadow-none
     ">
       {/* 모바일: 가로 h-[60px] / md+: 세로 전체 높이 */}
-      <div className="flex h-[60px] items-stretch md:h-full md:flex-col md:items-stretch">
+      <div className="flex h-[60px] w-full items-stretch md:h-full md:w-auto md:flex-col md:items-stretch">
         {TABS.map(({ href, label, icon }) => {
           const isActive = pathname === href || pathname.startsWith(href + '/')
           /** 선택 탭은 진한 네이비, 나머지는 연한 회색 */

@@ -40,14 +40,14 @@ export default function ParentAppChrome({ pendingApprovalCount, children }: Prop
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-gradient-to-b from-sky-50 via-white to-blue-50">
+    <div className="flex h-screen flex-col bg-gradient-to-b from-sky-50 via-white to-blue-50">
       <ParentTopBar pendingApprovalCount={pendingApprovalCount} />
       {/* 모바일: flex-col(하단 독바 fixed) / md+: flex-row(좌측 사이드 독바 + 본문) */}
-      <div className="flex flex-1 flex-col md:flex-row">
+      <div className="flex flex-1 flex-col overflow-hidden md:flex-row">
         <ParentNavBar />
         <main
           id={PARENT_TABS_MAIN_SCROLL_EL_ID}
-          className="w-full flex-1 overflow-y-auto px-4 pb-24 pt-4 md:px-8 md:pb-6"
+          className="w-full flex-1 overflow-y-auto px-4 pb-16 pt-4 md:pb-0 md:px-8"
         >
           {children}
         </main>

@@ -178,7 +178,7 @@ export default function HomeTab({ childrenData }: Props) {
           {/* ── 상단: 프로필(좌) + 스탯(우) ──────────────────────────────────
               모바일: flex-col / md+: flex-row
               프로필 카드를 누르면 자녀용 앱 화면으로 이동합니다. */}
-          <div className="flex flex-col gap-3 md:flex-row md:items-stretch md:gap-6">
+          <div className="flex w-full flex-col gap-4 md:flex-row md:items-center">
             {/* 좌: 프로필 카드 (아바타 + 이름 + Lv + 한마디) */}
             <ParentEnterChildUiLink
               childId={child.id}
@@ -202,7 +202,7 @@ export default function HomeTab({ childrenData }: Props) {
 
             {/* 우: 스탯 카드 (코인 | 하트 | 연속) */}
             <div
-              className="flex flex-row items-center justify-around gap-4 rounded-2xl bg-white px-4 py-3 shadow-sm md:w-48 md:flex-col md:justify-center md:gap-4"
+              className="flex flex-row items-center justify-around gap-4 rounded-2xl bg-white px-4 py-3 shadow-sm md:w-56 md:flex-col md:justify-center md:gap-4"
               aria-label={`코인 ${(s?.credits ?? 0).toLocaleString()}, 하트 ${s?.hearts ?? 0}, 연속 ${s?.streak_days ?? 0}일`}
             >
               <div className="flex flex-col items-center gap-0.5">
@@ -245,7 +245,7 @@ export default function HomeTab({ childrenData }: Props) {
           </div>
 
           {/* ── 본문: md에서 2컬럼 그리드, 모바일에서 단일 컬럼 ───────────── */}
-          <div className="flex flex-col gap-4 md:grid md:grid-cols-2 md:gap-6">
+          <div className="grid w-full grid-cols-1 gap-4 md:grid-cols-2 md:gap-6">
 
             {/* 좌 컬럼: 성장 리포트 + 루틴 (EconomicEqPanel) */}
             <div className="flex flex-col gap-4">
