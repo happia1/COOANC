@@ -59,7 +59,7 @@ export default async function ChildLayout({ children }: { children: ReactNode })
          * 모바일: 독바 높이(64px) + 여유만큼 bottom padding.
          * 태블릿 landscape: 독바가 left sidebar이므로 bottom padding 불필요, pt/px도 제거하여 HomeTab이 꽉 채우게.
          */}
-        <main className="relative z-10 mx-auto flex min-h-0 w-full max-w-md flex-1 flex-col overflow-visible px-4 pb-[calc(64px+0.35rem)] pt-4 md:landscape:max-w-none md:landscape:px-0 md:landscape:pt-0 md:landscape:pb-0 md:landscape:overflow-hidden">
+        <main className="relative z-10 flex min-h-0 w-full flex-1 flex-col overflow-visible px-4 pb-[calc(64px+0.35rem)] pt-4 md:landscape:px-0 md:landscape:pt-0 md:landscape:pb-0 md:landscape:overflow-hidden">
           {children}
         </main>
       </div>
