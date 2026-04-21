@@ -10,9 +10,11 @@
 import Link from 'next/link'
 import { useCallback, useEffect, useState } from 'react'
 import {
+  getAgentBaseUrl,
   type AgentEqScores,
   type AgentLatestReportRow,
 } from '@/lib/agentApi'
+import { createClient } from '@/lib/supabase/client'
 import ParentAgentBottomSheet from '@/components/parent/ParentAgentBottomSheet'
 
 /** 한 줄 미리보기: 공백 제거 후 앞쪽만 잘라 표시합니다(이모지·한글 모두 대략 30자 분량). */
@@ -55,6 +57,14 @@ function EqScoreBars({ eq }: { eq: AgentEqScores | null | undefined }) {
 
 type SheetKind = 'report' | 'coaching' | null
 
+/** 에이전트 실행 결과 상태 */
+type RunState =
+  | 'idle'       // 아직 실행 안 함
+  | 'generating' // 실행 중
+  | 'success'    // 성공
+  | 'insufficient' // 데이터 부족 (7일 미만)
+  | 'error'      // 네트워크·서버 오류
+
 type Props = {
   childId: string
 }
@@ -62,38 +72,94 @@ type Props = {
 export default function ParentAgentHomeCards({ childId }: Props) {
   const [row, setRow] = useState<AgentLatestReportRow | null | undefined>(undefined)
   const [loading, setLoading] = useState(true)
+  const [runState, setRunState] = useState<RunState>('idle')
+  const [distinctDays, setDistinctDays] = useState(0)
   const [sheet, setSheet] = useState<SheetKind>(null)
-  /** 서버 렌더 중 호출을 막기 위해 공개 환경변수 URL만 클라이언트에서 읽습니다. */
-  const agentBaseUrl = process.env.NEXT_PUBLIC_AGENT_URL?.trim()?.replace(/\/$/, '') ?? ''
 
   const load = useCallback(async () => {
-    if (!childId || !agentBaseUrl) {
-      /** URL 미설정이면 네트워크를 치지 않고 즉시 폴백 카드로 렌더링합니다. */
+    if (!childId) {
       setRow(null)
       setLoading(false)
       return
     }
     setLoading(true)
+    setRunState('idle')
+    const agentBaseUrl = getAgentBaseUrl()
     try {
-      /** 서버 fetch 없이 클라이언트에서만 비동기로 가져옵니다. */
-            // ✅ 수정 (5초 timeout)
-      const controller = new AbortController()
-      const timeoutId = window.setTimeout(() => controller.abort(), 5000)
-      const data = await fetch(
+      // 1) 기존 리포트 조회 — Render cold-start 고려해 15초 타임아웃
+      const getCtrl = new AbortController()
+      const getTimeout = window.setTimeout(() => getCtrl.abort(), 15_000)
+      const existing = await fetch(
         `${agentBaseUrl}/agent-a/latest?child_id=${encodeURIComponent(childId)}`,
-        { signal: controller.signal }
+        { signal: getCtrl.signal },
       )
-        .then((res) => (res.ok ? res.json() : null))
+        .then((res) => (res.ok ? (res.json() as Promise<AgentLatestReportRow>) : null))
         .catch(() => null)
-        .finally(() => window.clearTimeout(timeoutId))
-      setRow((data as AgentLatestReportRow | null) ?? null)
+        .finally(() => window.clearTimeout(getTimeout))
+
+      if (existing) {
+        setRow(existing)
+        setLoading(false)
+        return
+      }
+
+      // 2) 저장된 리포트 없음 → 에이전트 실행으로 생성 시도
+      setLoading(false)
+      setRunState('generating')
+      const { data: { session } } = await createClient().auth.getSession()
+      const parentId = session?.user?.id ?? ''
+
+      const runCtrl = new AbortController()
+      const runTimeout = window.setTimeout(() => runCtrl.abort(), 120_000)
+      const runResult = await fetch(`${agentBaseUrl}/agent-a/run`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ child_id: childId, parent_id: parentId }),
+        signal: runCtrl.signal,
+      })
+        .then((res) => (res.ok ? (res.json() as Promise<{ status: string; distinct_days?: number }>) : null))
+        .catch(() => null)
+        .finally(() => window.clearTimeout(runTimeout))
+
+      if (!runResult) {
+        setRunState('error')
+        setRow(null)
+        return
+      }
+
+      if (runResult.status === 'insufficient_data') {
+        setDistinctDays(runResult.distinct_days ?? 0)
+        setRunState('insufficient')
+        setRow(null)
+        return
+      }
+
+      if (runResult.status === 'success') {
+        // 생성 완료 후 최신 리포트 재조회
+        const newGet = new AbortController()
+        const newTimeout = window.setTimeout(() => newGet.abort(), 10_000)
+        const fresh = await fetch(
+          `${agentBaseUrl}/agent-a/latest?child_id=${encodeURIComponent(childId)}`,
+          { signal: newGet.signal },
+        )
+          .then((res) => (res.ok ? (res.json() as Promise<AgentLatestReportRow>) : null))
+          .catch(() => null)
+          .finally(() => window.clearTimeout(newTimeout))
+        setRow(fresh ?? null)
+        setRunState(fresh ? 'success' : 'error')
+        return
+      }
+
+      // 그 외 상태(500 등)
+      setRunState('error')
+      setRow(null)
     } catch {
-      /** 에이전트가 느리거나 404여도 홈 전체는 계속 그려야 하므로 폴백 카드로 유지합니다. */
+      setRunState('error')
       setRow(null)
     } finally {
       setLoading(false)
     }
-  }, [agentBaseUrl, childId])
+  }, [childId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     void load()
@@ -104,24 +170,56 @@ export default function ParentAgentHomeCards({ childId }: Props) {
       (String(row.report_text ?? '').trim().length > 0 || String(row.coaching_text ?? '').trim().length > 0),
   )
 
-  const showCollecting = !loading && (!row || !hasContent)
-
   const reportFull = String(row?.report_text ?? '').trim()
   const coachingFull = String(row?.coaching_text ?? '').trim()
 
   return (
     <div className="space-y-3">
+      {/* 기존 리포트 조회 중 */}
       {loading ? (
         <div className="flex items-center justify-center gap-2 rounded-2xl border border-sky-100 bg-white/80 py-6 shadow-sm">
-          <span
-            className="h-5 w-5 animate-spin rounded-full border-2 border-sky-200 border-t-sky-500"
-            aria-hidden
-          />
+          <span className="h-5 w-5 animate-spin rounded-full border-2 border-sky-200 border-t-sky-500" aria-hidden />
           <span className="text-xs font-bold text-sky-800">AI 요약 불러오는 중…</span>
         </div>
       ) : null}
 
-      {showCollecting && !loading ? (
+      {/* 에이전트 실행 중 */}
+      {!loading && runState === 'generating' ? (
+        <div className="flex items-center justify-center gap-2 rounded-2xl border border-violet-100 bg-violet-50/80 py-6 shadow-sm">
+          <span className="h-5 w-5 animate-spin rounded-full border-2 border-violet-200 border-t-violet-500" aria-hidden />
+          <span className="text-xs font-bold text-violet-800">AI 리포트 생성 중… (최대 2분)</span>
+        </div>
+      ) : null}
+
+      {/* 데이터 부족 */}
+      {!loading && runState === 'insufficient' ? (
+        <div className="rounded-2xl bg-gradient-to-br from-emerald-50 via-sky-50 to-violet-50 p-4 shadow-sm ring-1 ring-white/80">
+          <p className="text-center text-sm font-black text-gray-800">🌱 데이터 모으는 중</p>
+          <p className="mt-2 text-center text-[11px] font-semibold leading-relaxed text-gray-600">
+            현재 {distinctDays}일치 데이터가 있어요.{'\n'}미션을 7일 이상 진행하면 AI 분석이 시작돼요!
+          </p>
+        </div>
+      ) : null}
+
+      {/* 네트워크/서버 오류 또는 첫 로드 후 리포트 없음 */}
+      {!loading && runState === 'error' ? (
+        <div className="rounded-2xl bg-red-50 p-4 shadow-sm ring-1 ring-red-100">
+          <p className="text-center text-sm font-black text-red-700">⚠️ AI 분석 연결 실패</p>
+          <p className="mt-1 text-center text-[11px] font-semibold text-red-500">
+            에이전트 서버에 연결할 수 없어요.
+          </p>
+          <button
+            type="button"
+            onClick={() => void load()}
+            className="mx-auto mt-3 flex items-center gap-1 rounded-lg bg-red-100 px-3 py-1.5 text-[11px] font-bold text-red-700 active:bg-red-200"
+          >
+            다시 시도
+          </button>
+        </div>
+      ) : null}
+
+      {/* 최초 로드 완료 후 idle 상태 & 리포트 없음 (= run 시도 전에 row가 없는 경우는 없음) */}
+      {!loading && runState === 'idle' && !hasContent ? (
         <div className="rounded-2xl bg-gradient-to-br from-emerald-50 via-sky-50 to-violet-50 p-4 shadow-sm ring-1 ring-white/80">
           <p className="text-center text-sm font-black text-gray-800">🌱 데이터 모으는 중</p>
           <p className="mt-2 text-center text-[11px] font-semibold leading-relaxed text-gray-600">
