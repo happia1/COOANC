@@ -215,7 +215,7 @@ export default function EconomicEqPanel({
   const spendPct = 100 - savePct
 
   return (
-    <section className="bg-white rounded-2xl p-4 shadow-sm space-y-4">
+    <section className="w-full bg-white rounded-2xl p-4 shadow-sm space-y-4">
       {agentChildId ? <ParentAgentHomeCards childId={agentChildId} /> : null}
 
       <p className="text-sm font-bold text-gray-700">우리아이 경제 EQ 지수</p>

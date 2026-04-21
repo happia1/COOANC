@@ -68,7 +68,7 @@ export default function PraiseStickerPanel({ childId, childName }: Props) {
   }
 
   return (
-    <section className="rounded-2xl border border-brand-blue/20 bg-sky-50/80 p-4 shadow-sm">
+    <section className="w-full rounded-2xl border border-brand-blue/20 bg-sky-50/80 p-4 shadow-sm">
       <div className="mb-2 flex items-start gap-2">
         <div className="min-w-0 flex-1">
           <h2 className="text-sm font-bold text-brand-text">칭찬 스티커 보상</h2>

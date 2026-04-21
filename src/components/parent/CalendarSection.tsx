@@ -326,7 +326,7 @@ export default function CalendarSection({ childId }: Props) {
   }
 
   return (
-    <section>
+    <section className="w-full">
       {/* 스페셜 미션과 동일: 섹션 제목은 카드 밖, 액션(+ )는 같은 줄 오른쪽 끝 */}
       <div className="mb-1.5 flex items-center justify-between gap-2">
         <h2 className="text-sm font-bold text-gray-800">캘린더</h2>
@@ -341,7 +341,7 @@ export default function CalendarSection({ childId }: Props) {
       </div>
 
       {/* pb-4: 이번 달 일정 아래·카드 하단 여백을 최소로(요청에 따라 pb-10 → 더 축소). FAB과 겹치면 pb-6 등으로만 살짝 늘리면 됨 */}
-      <div className="rounded-2xl bg-white px-4 pt-4 pb-4 shadow-sm">
+      <div className="w-full rounded-2xl bg-white px-4 pt-4 pb-4 shadow-sm">
       {/* 범례: 한 줄 가로 스크롤 — 스크롤바 UI는 숨김(웹킷·파이어폭스·구형 Edge) */}
       <div
         className="mb-3 flex snap-x snap-proximity touch-pan-x gap-2 overflow-x-auto overscroll-x-contain pb-0.5 [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"

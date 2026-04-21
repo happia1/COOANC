@@ -47,7 +47,7 @@ export default function ParentAppChrome({ pendingApprovalCount, children }: Prop
         <ParentNavBar />
         <main
           id={PARENT_TABS_MAIN_SCROLL_EL_ID}
-          className="w-full flex-1 overflow-y-auto px-4 pb-16 pt-4 md:pb-0 md:px-8"
+          className="w-full flex-1 overflow-y-auto pb-16 md:pb-0"
         >
           {children}
         </main>

@@ -621,7 +621,7 @@ export default function ApprovalTab({
   }
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="w-full px-4 md:px-6 lg:px-8 py-4 flex flex-col gap-5">
       {toast && (
         <div
           className={`fixed top-6 left-1/2 z-[200] -translate-x-1/2 font-bold text-sm px-5 py-2.5 rounded-full shadow-lg ${

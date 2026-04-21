@@ -174,10 +174,10 @@ export default function ParentAgentHomeCards({ childId }: Props) {
   const coachingFull = String(row?.coaching_text ?? '').trim()
 
   return (
-    <div className="space-y-3">
+    <div className="w-full space-y-3">
       {/* 기존 리포트 조회 중 */}
       {loading ? (
-        <div className="flex items-center justify-center gap-2 rounded-2xl border border-sky-100 bg-white/80 py-6 shadow-sm">
+        <div className="w-full flex items-center justify-center gap-2 rounded-2xl border border-sky-100 bg-white/80 py-6 shadow-sm">
           <span className="h-5 w-5 animate-spin rounded-full border-2 border-sky-200 border-t-sky-500" aria-hidden />
           <span className="text-xs font-bold text-sky-800">AI 요약 불러오는 중…</span>
         </div>
@@ -185,7 +185,7 @@ export default function ParentAgentHomeCards({ childId }: Props) {
 
       {/* 에이전트 실행 중 */}
       {!loading && runState === 'generating' ? (
-        <div className="flex items-center justify-center gap-2 rounded-2xl border border-violet-100 bg-violet-50/80 py-6 shadow-sm">
+        <div className="w-full flex items-center justify-center gap-2 rounded-2xl border border-violet-100 bg-violet-50/80 py-6 shadow-sm">
           <span className="h-5 w-5 animate-spin rounded-full border-2 border-violet-200 border-t-violet-500" aria-hidden />
           <span className="text-xs font-bold text-violet-800">AI 리포트 생성 중… (최대 2분)</span>
         </div>
@@ -193,7 +193,7 @@ export default function ParentAgentHomeCards({ childId }: Props) {
 
       {/* 데이터 부족 */}
       {!loading && runState === 'insufficient' ? (
-        <div className="rounded-2xl bg-gradient-to-br from-emerald-50 via-sky-50 to-violet-50 p-4 shadow-sm ring-1 ring-white/80">
+        <div className="w-full rounded-2xl bg-gradient-to-br from-emerald-50 via-sky-50 to-violet-50 p-4 shadow-sm ring-1 ring-white/80">
           <p className="text-center text-sm font-black text-gray-800">🌱 데이터 모으는 중</p>
           <p className="mt-2 text-center text-[11px] font-semibold leading-relaxed text-gray-600">
             현재 {distinctDays}일치 데이터가 있어요.{'\n'}미션을 7일 이상 진행하면 AI 분석이 시작돼요!
@@ -203,7 +203,7 @@ export default function ParentAgentHomeCards({ childId }: Props) {
 
       {/* 네트워크/서버 오류 또는 첫 로드 후 리포트 없음 */}
       {!loading && runState === 'error' ? (
-        <div className="rounded-2xl bg-red-50 p-4 shadow-sm ring-1 ring-red-100">
+        <div className="w-full rounded-2xl bg-red-50 p-4 shadow-sm ring-1 ring-red-100">
           <p className="text-center text-sm font-black text-red-700">⚠️ AI 분석 연결 실패</p>
           <p className="mt-1 text-center text-[11px] font-semibold text-red-500">
             에이전트 서버에 연결할 수 없어요.
@@ -220,7 +220,7 @@ export default function ParentAgentHomeCards({ childId }: Props) {
 
       {/* 최초 로드 완료 후 idle 상태 & 리포트 없음 (= run 시도 전에 row가 없는 경우는 없음) */}
       {!loading && runState === 'idle' && !hasContent ? (
-        <div className="rounded-2xl bg-gradient-to-br from-emerald-50 via-sky-50 to-violet-50 p-4 shadow-sm ring-1 ring-white/80">
+        <div className="w-full rounded-2xl bg-gradient-to-br from-emerald-50 via-sky-50 to-violet-50 p-4 shadow-sm ring-1 ring-white/80">
           <p className="text-center text-sm font-black text-gray-800">🌱 데이터 모으는 중</p>
           <p className="mt-2 text-center text-[11px] font-semibold leading-relaxed text-gray-600">
             미션을 7일 이상 진행하면 AI 분석이 시작돼요!
@@ -233,7 +233,7 @@ export default function ParentAgentHomeCards({ childId }: Props) {
           <button
             type="button"
             onClick={() => setSheet('report')}
-            className="group flex flex-col rounded-2xl bg-gradient-to-br from-amber-100/90 via-orange-50 to-rose-50 p-4 text-left shadow-md ring-1 ring-amber-100/80 transition active:scale-[0.99]"
+            className="group w-full flex flex-col rounded-2xl bg-gradient-to-br from-amber-100/90 via-orange-50 to-rose-50 p-4 text-left shadow-md ring-1 ring-amber-100/80 transition active:scale-[0.99]"
           >
             <span className="text-xs font-black text-amber-950">📊 AI 인사이트 리포트</span>
             <p className="mt-2 line-clamp-2 text-[11px] font-semibold leading-snug text-amber-900/90">
@@ -245,7 +245,7 @@ export default function ParentAgentHomeCards({ childId }: Props) {
           <button
             type="button"
             onClick={() => setSheet('coaching')}
-            className="group flex flex-col rounded-2xl bg-gradient-to-br from-sky-100/90 via-indigo-50 to-violet-50 p-4 text-left shadow-md ring-1 ring-sky-100/80 transition active:scale-[0.99]"
+            className="group w-full flex flex-col rounded-2xl bg-gradient-to-br from-sky-100/90 via-indigo-50 to-violet-50 p-4 text-left shadow-md ring-1 ring-sky-100/80 transition active:scale-[0.99]"
           >
             <span className="text-xs font-black text-sky-950">💡 경제 습관 코칭 가이드</span>
             <p className="mt-2 line-clamp-2 text-[11px] font-semibold leading-snug text-sky-900/90">

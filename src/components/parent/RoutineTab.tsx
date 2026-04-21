@@ -661,7 +661,7 @@ export default function RoutineTab({
   }
 
   return (
-    <div className="flex flex-col gap-3 md:gap-6">
+    <div className="w-full px-4 md:px-6 lg:px-8 py-4 flex flex-col gap-3 md:gap-6">
       {toast && (
         <div
           className={`fixed top-6 left-1/2 -translate-x-1/2 z-[60] font-bold text-sm shadow-lg ${

@@ -160,7 +160,7 @@ export default function HomeTab({ childrenData }: Props) {
   const tabs: ChildTab[] = childrenData.map((c) => ({ id: c.id, name: c.name }))
 
   return (
-    <div className="flex flex-col gap-4 md:gap-6">
+    <div className="w-full px-4 md:px-6 lg:px-8 py-4 flex flex-col gap-4 md:gap-6">
       {/* 자녀 전환: ◀ ▶ 및 스와이프 (Zustand 로 루틴 탭과 동일한 자녀 선택) */}
       <ChildProfileNav tabs={tabs} />
 
