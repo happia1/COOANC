@@ -32,6 +32,8 @@ import type {
  * 빌드 시 정적 사전 렌더링(prerender)을 하지 않고 요청 시점에 렌더링합니다.
  */
 export const dynamic = 'force-dynamic'
+/** 요청마다 최신 데이터를 다시 계산해 자정 직후 stale 페이지를 피합니다. */
+export const revalidate = 0
 export const preferredRegion = 'hnd1'
 
 type RoutineType = 'weekday' | 'weekend' | 'holiday' | 'vacation'
@@ -78,6 +80,7 @@ type CalEventRow = { start_date: string; end_date: string; routine_override: str
 export default async function MissionPage() {
   /**
    * 컨텍스트(자녀 id)와 Supabase 클라이언트는 서로 독립 — 한 번에 기다려 TTFB 를 줄입니다.
+   * 서버 컴포넌트 단계에는 팝업/모달 상태가 없어 백필을 막는 UI 블로킹 경로가 없습니다.
    */
   const [ctx, supabase] = await Promise.all([getActorChildContext(), createClient()])
   const childId = ctx.actorChildId
@@ -170,12 +173,13 @@ export default async function MissionPage() {
   }
 
   const existing = (existingRows ?? []) as DailyMissionWithTemplate[]
+  console.log('[mission] today=', today, 'existing=', existing.length, 'pool=', pool.length)
 
   /**
    * 백필: 오늘 행이 0개이고, 휴일이 아니며, 넣을 템플릿 풀이 비어 있지 않을 때만 실행합니다.
    * 풀이 비어 있으면(`pool.length === 0`) insert 를 시도하지 않습니다.
    */
-  if (existing.length === 0 && routineType !== 'holiday' && pool.length > 0) {
+  if (existing.length === 0 && pool.length > 0) {
     await Promise.all(
       pool.map(async (m) => {
         const row = {

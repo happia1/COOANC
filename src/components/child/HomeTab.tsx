@@ -245,7 +245,7 @@ export default function HomeTab({
       <img
         src={`${ASSETS.layouts.childHomeBackgroundSecondScreen}?v=${CHILD_HOME_BACKGROUND_CACHE_BUST}`}
         alt=""
-        className={`absolute inset-0 h-full w-full ${homeBackgroundObjectPositionClass}`}
+        className={`absolute inset-0 h-full w-full ${homeBackgroundObjectPositionClass} brightness-[1.2]`}
         loading="eager"
         decoding="async"
         fetchPriority="high"

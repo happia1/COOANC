@@ -139,6 +139,20 @@ function getSeoulNowParts(): { hour: number; minute: number } {
   return { hour, minute }
 }
 
+/** 현재 서울 날짜를 YYYY-MM-DD 문자열로 반환합니다(클라이언트 기준). */
+function getSeoulTodayStringClient(): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Seoul',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date())
+  const year = parts.find((p) => p.type === 'year')?.value ?? '0000'
+  const month = parts.find((p) => p.type === 'month')?.value ?? '01'
+  const day = parts.find((p) => p.type === 'day')?.value ?? '01'
+  return `${year}-${month}-${day}`
+}
+
 /** 현재가 오전인지(00:00~11:59) */
 function isMorningInSeoulNow(): boolean {
   return getSeoulNowParts().hour < 12
@@ -249,6 +263,20 @@ export default function MissionTab({
   useEffect(() => {
     setMissionList(dailyMissions)
   }, [dailyMissions])
+
+  /**
+   * 자정 직후(또는 날짜가 바뀐 시점) 빈 목록이 내려오면 한 번 더 새로고침해
+   * 서버 백필 완료 데이터를 즉시 다시 받아옵니다.
+   */
+  useEffect(() => {
+    if (dailyMissions.length > 0) return
+    const { hour } = getSeoulNowParts()
+    const nowSeoulDate = getSeoulTodayStringClient()
+    const changedDate = nowSeoulDate !== today
+    const justAfterMidnight = hour === 0
+    if (!changedDate && !justAfterMidnight) return
+    router.refresh()
+  }, [dailyMissions.length, router, today])
 
   /** 미션 완료 시 돼지 저금통 위 크레딧 낙하 연출(토큰 증가 = 다시 재생) */
   const [creditFxNonce, setCreditFxNonce] = useState(0)
@@ -929,16 +957,8 @@ export default function MissionTab({
                 >
                   닫기
                 </button>
-                <button
-                  onClick={() => {
-                    setHeartsFullPopup(false)
-                    router.push('/home?openNavMap=1')
-                  }}
-                  className="rounded-xl bg-gradient-to-r from-pink-400 to-rose-500 px-4 py-2 text-sm font-bold text-white shadow active:scale-95"
-                >
-                  지도 보기
-                </button>
               </div>
+              {/* TODO: Phase 2 — island map feature */}
             </div>
           </div>,
           document.body,

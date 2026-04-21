@@ -795,7 +795,7 @@ export default function ApprovalTab({
 
             {/* 우: 코인 · 하트 · 연속 */}
             <div
-              className="flex items-center gap-4"
+              className="flex flex-col gap-1 md:flex-row md:gap-4"
               aria-label={`코인 ${(currentChild.credits).toLocaleString()}, 하트 ${currentChild.hearts}, 연속 ${currentChild.streakDays}일`}
             >
               <div className="flex items-center gap-1">

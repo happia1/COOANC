@@ -205,7 +205,7 @@ export default function HomeTab({ childrenData }: Props) {
 
               {/* 우: 코인 · 하트 · 연속 */}
               <div
-                className="flex items-center gap-4"
+                className="flex flex-col gap-1 md:flex-row md:gap-4"
                 aria-label={`코인 ${(s?.credits ?? 0).toLocaleString()}, 하트 ${s?.hearts ?? 0}, 연속 ${s?.streak_days ?? 0}일`}
               >
                 <div className="flex items-center gap-1">

@@ -11,7 +11,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getSeoulDateString, getSeoulTimeHHMM, getSeoulWeekdayShort } from '@/lib/koreaDate'
-import { readRoutineAlarmPrefs } from '@/lib/routineAlarmLocalPrefs'
+import { readRoutineAlarmPrefs, readRoutineHasSchoolFromStorage } from '@/lib/routineAlarmLocalPrefs'
 
 /** TexturePacker `mode.json` 과 맞춘 아틀라스 크기·프레임 (이미지 파일: `public/assets/img/common/ui/mode.png`) */
 const MODE_ATLAS = {
@@ -46,6 +46,13 @@ const CELEBRATION_CONFETTI_SOLO_MS = 2000
 const CELEBRATION_THUMB_VISIBLE_MS = 3400
 
 type CelebrationStep = 'idle' | 'confetti' | 'thumb'
+type RoutineAlarmKind = 'wake' | 'return' | 'sleep'
+
+type ActiveRoutineAlarmPopup = {
+  kind: RoutineAlarmKind
+  label: string
+  time: string
+}
 
 type Props = {
   childId: string
@@ -124,7 +131,7 @@ export default function MissionSleepMorningLayer({
 }: Props) {
   const [celebrationStep, setCelebrationStep] = useState<CelebrationStep>('idle')
   const [sleepModalOpen, setSleepModalOpen] = useState(false)
-  const [morningOpen, setMorningOpen] = useState(false)
+  const [activeAlarmPopup, setActiveAlarmPopup] = useState<ActiveRoutineAlarmPopup | null>(null)
   /** 컨페티 조각의 무작위 배치를 연출마다 새로 뽑기 위한 카운터 */
   const [confettiKey, setConfettiKey] = useState(0)
 
@@ -169,38 +176,71 @@ export default function MissionSleepMorningLayer({
     return clearCelebrationTimers
   }, [completedCount, totalMissions, isFullRestDay, clearCelebrationTimers])
 
+  /** 오늘이 주말인지(토/일) */
+  const isWeekendToday = useMemo(() => ['토', '일'].includes(getSeoulWeekdayShort(today)), [today])
+
   /**
-   * 아침: 서울 날짜가 페이지의 today 와 같고, 기상 시각을 지났으며, 알람이 켜져 있을 때 하루 1회
-   * (휴식일에도 기상 알람은 울릴 수 있어 `isFullRestDay` 는 여기서 막지 않습니다)
+   * 기상/하원·귀가/취침 알람을 현재 시각 기준으로 검사해,
+   * 아직 표시하지 않은 "가장 최근 시각" 알람 팝업을 하나 엽니다.
    */
   useEffect(() => {
     if (typeof window === 'undefined') return
-    if (getSeoulDateString() !== today) return
+    const checkAndOpenAlarmPopup = () => {
+      if (getSeoulDateString() !== today) return
+      if (activeAlarmPopup) return
 
-    const key = `cooanc_morning_alarm_popup_${childId}_${today}`
-    if (localStorage.getItem(key)) return
+      const prefs = readRoutineAlarmPrefs()
+      const nowHm = getSeoulTimeHHMM()
+      const hasSchool = readRoutineHasSchoolFromStorage()
 
-    const prefs = readRoutineAlarmPrefs()
-    if (!prefs.notifyWake || !prefs.soundWake.trim()) return
+      const candidates: Array<{
+        kind: RoutineAlarmKind
+        label: string
+        time: string
+        sound: string
+      }> = []
 
-    const weekend = ['토', '일'].includes(getSeoulWeekdayShort(today))
-    if (weekend && !prefs.wakeOnWeekend) return
+      if (prefs.notifyWake && prefs.soundWake.trim() && nowHm >= prefs.wakeTime) {
+        if (!(isWeekendToday && !prefs.wakeOnWeekend)) {
+          candidates.push({ kind: 'wake', label: '기상', time: prefs.wakeTime, sound: prefs.soundWake })
+        }
+      }
+      if (hasSchool && prefs.notifyReturn && prefs.soundReturn.trim() && nowHm >= prefs.returnHomeTime) {
+        if (!(isWeekendToday && !prefs.returnOnWeekend)) {
+          candidates.push({ kind: 'return', label: '하원·귀가', time: prefs.returnHomeTime, sound: prefs.soundReturn })
+        }
+      }
+      if (prefs.notifySleep && prefs.soundSleep.trim() && nowHm >= prefs.sleepTime) {
+        if (!(isWeekendToday && !prefs.sleepOnWeekend)) {
+          candidates.push({ kind: 'sleep', label: '취침', time: prefs.sleepTime, sound: prefs.soundSleep })
+        }
+      }
+      if (candidates.length === 0) return
 
-    const nowHm = getSeoulTimeHHMM()
-    if (nowHm < prefs.wakeTime) return
+      const notShownYet = candidates.filter((c) => {
+        const shownKey = `cooanc_routine_alarm_popup_${c.kind}_${childId}_${today}`
+        return !localStorage.getItem(shownKey)
+      })
+      if (notShownYet.length === 0) return
 
-    /** 같은 날 두 번 뜨지 않도록 — 팝업을 연 직후 저장(탭 이동으로 effect가 여러 번 돌아도 1회) */
-    localStorage.setItem(key, '1')
+      /** 이미 지난 알람들 중 "가장 최근 시각" 하나만 팝업으로 띄웁니다. */
+      const picked = notShownYet.sort((a, b) => b.time.localeCompare(a.time))[0]
+      localStorage.setItem(`cooanc_routine_alarm_popup_${picked.kind}_${childId}_${today}`, '1')
 
-    const url = `/assets/audio/alarm/${encodeURIComponent(prefs.soundWake)}`
-    const a = new Audio(url)
-    a.loop = true
-    audioRef.current = a
-    void a.play().catch(() => {
-      /* 자동 재생 차단 등 — 팝업만 표시 */
-    })
-    setMorningOpen(true)
-  }, [childId, today])
+      const url = `/assets/audio/alarm/${encodeURIComponent(picked.sound)}`
+      const a = new Audio(url)
+      a.loop = true
+      audioRef.current = a
+      void a.play().catch(() => {
+        /* 자동 재생 차단 등 — 팝업만 표시 */
+      })
+      setActiveAlarmPopup({ kind: picked.kind, label: picked.label, time: picked.time })
+    }
+
+    checkAndOpenAlarmPopup()
+    const timer = window.setInterval(checkAndOpenAlarmPopup, 30_000)
+    return () => window.clearInterval(timer)
+  }, [activeAlarmPopup, childId, isWeekendToday, today])
 
   /** 탭을 나가도 알람 소리가 남지 않게 정리 */
   useEffect(() => {
@@ -213,14 +253,14 @@ export default function MissionSleepMorningLayer({
     }
   }, [])
 
-  const stopMorningAlarm = useCallback(() => {
+  const stopRoutineAlarm = useCallback(() => {
     const a = audioRef.current
     if (a) {
       a.pause()
       a.currentTime = 0
       audioRef.current = null
     }
-    setMorningOpen(false)
+    setActiveAlarmPopup(null)
   }, [])
 
   const confettiPieces = useMemo(() => {
@@ -308,44 +348,54 @@ export default function MissionSleepMorningLayer({
         </div>
       )}
 
-      {/* 아침 알람: 하단 시트가 아니라 화면 중앙에 두어 하단 독(탭바)에 가리지 않게 함 */}
-      {morningOpen && (
+      {/* 루틴 알람 팝업: 유형별(기상/하원·귀가/취침)로 이미지 노출을 다르게 처리 */}
+      {activeAlarmPopup && (
         <div
           className="fixed inset-0 z-[107] flex items-center justify-center px-4 pt-4 pb-[max(1rem,calc(env(safe-area-inset-bottom)+5.5rem))] sm:px-6"
           role="dialog"
           aria-modal="true"
-          aria-labelledby="morning-modal-title"
+          aria-labelledby="routine-alarm-modal-title"
         >
-          <button type="button" className="absolute inset-0 bg-black/45" aria-label="배경" onClick={stopMorningAlarm} />
+          <button type="button" className="absolute inset-0 bg-black/45" aria-label="배경" onClick={stopRoutineAlarm} />
           <div
             className="relative z-[1] w-full max-w-md max-h-[min(90dvh,640px)] overflow-y-auto overflow-x-hidden rounded-3xl border-2 border-amber-200 bg-gradient-to-b from-amber-50 via-white to-white shadow-2xl"
             style={{ animation: 'mission-sheet-slide-up 0.5s ease-out forwards' }}
           >
-            <div
-              className="flex justify-center pt-6"
-              style={{ animation: 'mission-sun-slide-up 0.55s ease-out forwards' }}
-            >
-              {/*
-                아침 해 일러스트 크기: `scale` 은 아틀라스(큰 이미지에서 잘라 쓰는 조각)를 몇 배로 키울지입니다.
-                예전 1.1 배에서 절반으로 줄여 팝업이 덜 커 보이게 함 (1.1 × 0.5 = 0.55).
-              */}
-              <ModeAtlasSprite frame="morning" scale={0.55} alt="아침 해" className="shrink-0" />
-            </div>
+            {activeAlarmPopup.kind !== 'return' ? (
+              <div
+                className="flex justify-center pt-6"
+                style={{ animation: 'mission-sun-slide-up 0.55s ease-out forwards' }}
+              >
+                {/**
+                 * 요청사항 반영:
+                 * - 하원·귀가(return): 이미지 제거
+                 * - 취침(sleep): 수면모드 이미지 사용
+                 * - 기상(wake): 기존 아침 해 이미지 유지
+                 */}
+                <ModeAtlasSprite
+                  frame={activeAlarmPopup.kind === 'sleep' ? 'sleep' : 'morning'}
+                  scale={activeAlarmPopup.kind === 'sleep' ? 0.9 : 0.55}
+                  alt={activeAlarmPopup.kind === 'sleep' ? '수면 모드' : '아침 해'}
+                  className="shrink-0"
+                />
+              </div>
+            ) : null}
             <div className="px-6 pb-6 pt-2">
-              <p id="morning-modal-title" className="text-center text-xl font-black text-amber-950">
-                좋은 아침이에요!
+              <p id="routine-alarm-modal-title" className="text-center text-xl font-black text-amber-950">
+                {activeAlarmPopup.kind === 'sleep' ? '취침 알람이에요!' : activeAlarmPopup.kind === 'return' ? '하원·귀가 알람이에요!' : '좋은 아침이에요!'}
               </p>
 
-              {/* 노란 블록: 기상 시각(HH:MM)만 크게 — 라벨·소리·안내 문구는 제거 */}
+              {/* 노란 블록: 해당 알람 시각(HH:MM)만 크게 표시 */}
               <div className="mt-4 flex min-h-[5.5rem] items-center justify-center rounded-2xl border border-amber-100 bg-amber-50/80 px-4 py-6">
                 <p className="text-center text-4xl font-black tabular-nums tracking-tight text-amber-800 sm:text-5xl">
-                  {readRoutineAlarmPrefs().wakeTime}
+                  {activeAlarmPopup.time}
                 </p>
               </div>
+              <p className="mt-2 text-center text-sm font-bold text-amber-700">{activeAlarmPopup.label}</p>
 
               <button
                 type="button"
-                onClick={stopMorningAlarm}
+                onClick={stopRoutineAlarm}
                 className="mt-5 w-full rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 py-3.5 text-sm font-black text-white shadow-lg active:scale-[0.99]"
               >
                 알람 끄기
