@@ -4,11 +4,12 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { DockTabIcon, type DockTabIconId } from '@/components/navigation/DockTabIcons'
+import { useChildAppProfile } from '@/context/ProfileContext'
 
 /**
  * 아이 앱 내비게이션 바
- * - 모바일: 하단 고정(fixed bottom-0), 가로 배열
- * - 태블릿 landscape (md + landscape): 좌측 사이드바(relative flex-col), 레이아웃 흐름에 참여
+ * - 모바일: 하단 고정(fixed bottom-0), 가로 배열, 마지막 탭에 나가기 버튼 포함
+ * - 태블릿 landscape (md + landscape): 좌측 사이드바(relative flex-col), 나가기 버튼은 하단에 mt-auto
  *
  * pendingHref: 탭을 누르면 라우터 완료를 기다리지 않고 즉시 활성 표시를 바꿉니다.
  */
@@ -22,9 +23,21 @@ type Props = {
   isParentPreview?: boolean
 }
 
+const tabItemCls = [
+  'relative flex flex-1 flex-col items-center justify-center gap-1 min-h-[56px] transition-transform active:scale-95',
+  'md:landscape:w-full md:landscape:flex-none md:landscape:flex-row md:landscape:justify-center md:landscape:min-h-0 md:landscape:py-4',
+].join(' ')
+
+const exitItemCls = [
+  'relative flex flex-1 flex-col items-center justify-center gap-1 min-h-[56px] transition-transform active:scale-95 no-underline text-inherit',
+  'md:landscape:w-full md:landscape:flex-none md:landscape:flex-col md:landscape:justify-center md:landscape:min-h-0 md:landscape:py-3 md:landscape:mt-auto',
+].join(' ')
+
 export default function ChildNavBar({ isParentPreview = false }: Props) {
   const pathname = usePathname()
   const [pendingHref, setPendingHref] = useState<string | null>(null)
+  const profile = useChildAppProfile()
+  const exitHref = profile?.exitHref ?? '/parent/home'
 
   useEffect(() => {
     setPendingHref(null)
@@ -41,13 +54,13 @@ export default function ChildNavBar({ isParentPreview = false }: Props) {
         // 태블릿 landscape: relative 좌측 사이드바
         'md:landscape:relative md:landscape:bottom-auto md:landscape:left-auto md:landscape:right-auto',
         'md:landscape:z-auto md:landscape:flex-col',
-        'md:landscape:h-full md:landscape:w-14 md:landscape:shrink-0',
+        'md:landscape:h-full md:landscape:w-20 md:landscape:shrink-0',
         'md:landscape:border-t-0 md:landscape:border-r md:landscape:shadow-none',
         'md:landscape:bg-white md:landscape:backdrop-blur-none',
       ].join(' ')}
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
-      <div className="mx-auto flex h-16 max-w-md items-stretch md:landscape:h-full md:landscape:w-full md:landscape:max-w-none md:landscape:flex-col md:landscape:items-center md:landscape:py-2">
+      <div className="mx-auto flex h-16 w-full items-stretch md:landscape:h-full md:landscape:w-full md:landscape:max-w-none md:landscape:flex-col md:landscape:items-center md:landscape:py-2">
         {TABS.map(({ href, label, icon }) => {
           const isActive = effectivePath === href || effectivePath.startsWith(href + '/')
           const tone = isActive ? 'text-slate-700' : 'text-slate-400'
@@ -62,15 +75,10 @@ export default function ChildNavBar({ isParentPreview = false }: Props) {
               {isActive && (
                 <span className="absolute left-0 top-1/2 hidden h-8 w-1 -translate-y-1/2 rounded-r-full bg-slate-700 md:landscape:block" />
               )}
-              <DockTabIcon id={icon} className={`h-7 w-7 shrink-0 ${tone}`} />
+              <DockTabIcon id={icon} className={`h-8 w-8 shrink-0 ${tone}`} />
               <span className={`text-xs font-bold leading-none md:landscape:hidden ${tone}`}>{label}</span>
             </>
           )
-
-          const sharedCls = [
-            'relative flex flex-1 flex-col items-center justify-center gap-1 min-h-[56px] transition-transform active:scale-95',
-            'md:landscape:w-full md:landscape:flex-none md:landscape:flex-row md:landscape:justify-center md:landscape:min-h-0 md:landscape:py-4',
-          ].join(' ')
 
           if (isParentPreview) {
             return (
@@ -78,7 +86,7 @@ export default function ChildNavBar({ isParentPreview = false }: Props) {
                 key={href}
                 href={href}
                 onClick={() => setPendingHref(href)}
-                className={`${sharedCls} no-underline text-inherit`}
+                className={`${tabItemCls} no-underline text-inherit`}
               >
                 {inner}
               </a>
@@ -90,12 +98,25 @@ export default function ChildNavBar({ isParentPreview = false }: Props) {
               href={href}
               prefetch={false}
               onClick={() => setPendingHref(href)}
-              className={sharedCls}
+              className={tabItemCls}
             >
               {inner}
             </Link>
           )
         })}
+
+        {/* 나가기 버튼: 모바일 독 마지막 탭 + 태블릿 사이드바 하단(mt-auto) */}
+        <a href={exitHref} className={exitItemCls} aria-label="나가기">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/assets/img/common/ui/exit.png"
+            alt=""
+            width={32}
+            height={32}
+            className="h-8 w-8 shrink-0 object-contain opacity-60"
+          />
+          <span className="text-xs font-bold leading-none text-slate-400">나가기</span>
+        </a>
       </div>
     </nav>
   )

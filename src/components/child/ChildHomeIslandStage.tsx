@@ -396,22 +396,13 @@ export default function ChildHomeIslandStage({
 
       {scene === 'bunny' ? (
         <div
-          className={
-            /** `bottom` 을 줄이고 `translateY` 를 키우면 무대 기준으로 캐릭터 전체가 아래로 내려갑니다(종 동일). */
-            'pointer-events-none absolute inset-x-0 bottom-0 z-[2] flex justify-center'
-          }
+          className="pointer-events-none absolute left-1/2 -translate-x-1/2 bottom-[30%] z-[2] flex justify-center"
         >
           {density === 'flex' ? (
-            /**
-             * flex(홈 반응형) 캐릭터 위치 고정:
-             * - 기존 `translateY(2.45rem)` 고정값은 화면 높이 변화에서 러그 기준이 흔들릴 수 있어요.
-             * - `cqh`(컨테이너 높이 비율) + `clamp` 로 바꿔, 작아져도/커져도 같은 자리(러그 위)를 더 안정적으로 유지합니다.
-             * - 비개발자용: 화면이 바뀌어도 "캐릭터 발 위치"가 배경 기준으로 덜 떠다니게 고정하는 장치입니다.
-             */
             <div
               role="img"
               aria-label="나의 쿠앵이 캐릭터"
-              className="origin-bottom [transform:translateY(clamp(1.9rem,9.2cqh,3.6rem))_scale(0.9)]"
+              className="origin-bottom [transform:scale(0.9)]"
             >
               <HomeIslandHeroSprite sprite={homeStageSprite} />
             </div>

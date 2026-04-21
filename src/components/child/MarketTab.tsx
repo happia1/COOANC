@@ -65,9 +65,9 @@ const ROOF_SRC = `/assets/img/layouts/backgrounds/market_roof.png?v=${MARKET_ROO
 /** 요청사항: 물건이 담긴 장바구니 아이콘(공용 정적 이미지) */
 const BASKET_FILLED_SRC = '/assets/img/common/ui/basket_filled.png'
 
-/** 선반 3단을 한 화면에 넣기 위한 카드·썸네일 크기(가로 스크롤 행 안에서 사용) */
-const SHELF_IMG_AREA_PX = 52
-const SHELF_SPRITE_H = 44
+/** 선반 카드 썸네일 크기 */
+const SHELF_IMG_AREA_PX = 64
+const SHELF_SPRITE_H = 56
 
 /**
  * 배달 풀스크린 연출(「배달 시작」→「상품이 도착했어요」→「받았어요」)을 켜거나 끕니다.
@@ -730,8 +730,8 @@ export default function MarketTab({
           document.body,
         )}
 
-      {/* 가게 지붕: LCP 후보 — priority + sizes 로 첫 페인트에 맞는 해상도만 받습니다 */}
-      <div className="shrink-0 w-full overflow-hidden leading-none">
+      {/* 가게 지붕: 모바일 전용 — 태블릿 landscape에서는 숨김 */}
+      <div className="shrink-0 w-full overflow-hidden leading-none md:landscape:hidden">
         <Image
           src={ROOF_SRC}
           alt=""
@@ -763,7 +763,7 @@ export default function MarketTab({
                 <span className="ml-auto tabular-nums text-[9px] font-bold text-amber-900/40">{block.items.length}개</span>
               </h3>
               {/* 선반 내부만 좌우 슬라이드 */}
-              <div className="flex snap-x snap-mandatory gap-1.5 overflow-x-auto px-1 py-0.5 [-ms-overflow-style:none] [scrollbar-width:none]">
+              <div className="flex snap-x snap-mandatory gap-2 md:landscape:gap-3 overflow-x-auto px-1 py-0.5 [-ms-overflow-style:none] [scrollbar-width:none]">
                 {block.items.map((item, itemIdx) => {
                   const frameKey = marketFrameKeyForItemId(item.id, item.name)
                   /** 첫 구역 맨 앞 몇 칸만 우선 로드 — 나머지는 지연 로드로 대역폭 절약 */
@@ -783,7 +783,7 @@ export default function MarketTab({
                       key={item.id}
                       type="button"
                       onClick={() => handleItemClick(item, frameKey)}
-                      className={`relative flex w-[4.7rem] shrink-0 snap-start flex-col rounded-xl bg-white/95 p-1 pt-1.5 shadow-md ring-1 ring-black/[0.06] transition-transform active:scale-[0.98] ${
+                      className={`relative flex w-24 md:landscape:w-28 shrink-0 snap-start flex-col rounded-xl bg-white/95 p-1 pt-1.5 shadow-md ring-1 ring-black/[0.06] transition-transform active:scale-[0.98] ${
                         isDimmed ? 'grayscale brightness-[0.72]' : ''
                       }`}
                     >
@@ -820,7 +820,7 @@ export default function MarketTab({
                           style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.06)' }}
                         >
                           <SpriteImage sheet={ICONS} frame="credit" width={11} clipRotated={false} />
-                          <span className="truncate text-[8px] font-black tabular-nums text-brand-blue sm:text-[9px]">
+                          <span className="truncate text-[10px] font-black tabular-nums text-brand-blue">
                             {formatMarketCreditLabel(item.credit_price)}
                           </span>
                         </div>
@@ -857,7 +857,7 @@ export default function MarketTab({
           <div className="flex min-w-0 flex-1 items-baseline gap-1.5 text-gray-700">
             {/* 요청사항: '지갑(마켓)' 텍스트 대신 크레딧 아이콘으로 의미를 표시 */}
             <SpriteImage sheet={ICONS} frame="credit" width={16} clipRotated={false} />
-            <span className="truncate text-lg font-black tabular-nums text-brand-blue sm:text-xl">
+            <span className="truncate text-lg font-black tabular-nums text-brand-blue md:text-2xl">
               {currentWallet.toLocaleString()}
             </span>
           </div>
@@ -875,7 +875,7 @@ export default function MarketTab({
         <div
           className="pointer-events-none fixed right-4 z-[55] flex flex-col gap-3 items-end sm:right-5"
           style={{
-            bottom: 'max(1rem, calc(60px + 0.85rem + env(safe-area-inset-bottom, 0px)))',
+            bottom: 'max(1rem, calc(64px + 0.85rem + env(safe-area-inset-bottom, 0px)))',
           }}
         >
           {wishlistItemIds.length > 0 && (

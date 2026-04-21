@@ -602,8 +602,7 @@ export default function MissionTab({
                       <img
                         src={routineImagePath}
                         alt=""
-                        className="max-w-full select-none object-contain drop-shadow-[0_2px_8px_rgba(0,0,0,0.08)]"
-                        style={{ width: MISSION_CARD_ROUTINE_SPRITE_WIDTH_PX, height: MISSION_CARD_ROUTINE_SPRITE_WIDTH_PX, maxWidth: '100%' }}
+                        className="h-20 w-20 md:h-28 md:w-28 lg:h-32 lg:w-32 max-w-full select-none object-contain drop-shadow-[0_2px_8px_rgba(0,0,0,0.08)]"
                         draggable={false}
                       />
                     ) : (

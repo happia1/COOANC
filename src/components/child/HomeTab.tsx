@@ -201,21 +201,6 @@ export default function HomeTab({
    */
   const tabletOverlayIcons = (
     <>
-      {/* top-left: home + exit */}
-      <div className="pointer-events-none absolute left-4 top-4 z-20 hidden gap-2 md:landscape:flex">
-        <OverlayIconButton href="/home" ariaLabel="홈으로">
-          <svg className="h-5 w-5 text-slate-700" viewBox="0 0 24 24" fill="none" aria-hidden>
-            <path d="M3 12L12 3l9 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            <path d="M9 21V12h6v9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            <path d="M3 12v9h18V12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </OverlayIconButton>
-        <OverlayIconButton href={exitHref} ariaLabel="나가기">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/assets/img/common/ui/exit.png" alt="" width={20} height={20} className="h-5 w-5 object-contain" />
-        </OverlayIconButton>
-      </div>
-
       {/* top-center: "나의 꾸미기 방" title */}
       <div className="pointer-events-none absolute left-1/2 top-4 z-20 hidden -translate-x-1/2 md:landscape:block">
         <span className="text-sm font-black text-white [text-shadow:0_1px_6px_rgba(0,0,0,0.45)]">나의 꾸미기 방</span>
@@ -442,14 +427,14 @@ function TabletDecorPanel({
         {filteredItems.length === 0 ? (
           <p className="pt-8 text-center text-sm text-gray-400">아이템이 없어요</p>
         ) : (
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-4 gap-1.5">
             {filteredItems.map(({ src, index }) => {
               const owned = unlockedIndexes.includes(index)
               return (
                 <div
                   key={index}
                   className={[
-                    'relative flex flex-col overflow-hidden rounded-xl border bg-white',
+                    'relative flex flex-col overflow-hidden rounded-lg border bg-white',
                     owned ? 'border-brand-blue ring-2 ring-brand-blue/30' : 'border-gray-100',
                   ].join(' ')}
                 >
@@ -459,14 +444,14 @@ function TabletDecorPanel({
                       alt=""
                       fill
                       loading="lazy"
-                      sizes="(max-width: 1024px) 18vw, 14vw"
-                      className={`object-contain p-1.5 ${owned ? '' : 'grayscale opacity-60'}`}
+                      sizes="(max-width: 1024px) 14vw, 10vw"
+                      className={`object-contain p-1 ${owned ? '' : 'grayscale opacity-60'}`}
                       draggable={false}
                     />
                     {/* Lock overlay */}
                     {!owned && (
-                      <div className="absolute inset-0 flex items-center justify-center bg-black/20 rounded-t-xl">
-                        <svg className="h-5 w-5 text-white drop-shadow" viewBox="0 0 24 24" fill="none" aria-hidden>
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/20 rounded-t-lg">
+                        <svg className="h-4 w-4 text-white drop-shadow" viewBox="0 0 24 24" fill="none" aria-hidden>
                           <path d="M7 11V8a5 5 0 0110 0v3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                           <rect x="4" y="11" width="16" height="11" rx="2" stroke="currentColor" strokeWidth="2" />
                           <circle cx="12" cy="16" r="1.25" fill="currentColor" />
@@ -475,14 +460,14 @@ function TabletDecorPanel({
                     )}
                   </div>
                   {/* Price / owned badge */}
-                  <div className="flex items-center justify-center px-1 py-1.5">
+                  <div className="flex items-center justify-center px-0.5 py-1">
                     {owned ? (
-                      <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-[10px] font-bold text-gray-500">
-                        보유 중
+                      <span className="rounded-full bg-gray-100 px-1.5 py-0.5 text-[9px] font-bold text-gray-500">
+                        보유
                       </span>
                     ) : (
-                      <span className="flex items-center gap-0.5 rounded-full bg-slate-700 px-2 py-0.5 text-[10px] font-bold text-amber-200">
-                        🪙 {DECOR_ITEM_PRICE} 코인
+                      <span className="flex items-center gap-0.5 rounded-full bg-slate-700 px-1.5 py-0.5 text-[9px] font-bold text-amber-200">
+                        🪙 {DECOR_ITEM_PRICE}
                       </span>
                     )}
                   </div>
