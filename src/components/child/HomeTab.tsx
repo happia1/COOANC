@@ -19,31 +19,20 @@ import {
 } from '@/constants/assets'
 import ItemUnlockCelebrationPopup from '@/components/child/ItemUnlockCelebrationPopup'
 import type { TriggerKey } from '@/lib/gameLayer/triggerItemMap'
+import { useChildAppProfile } from '@/context/ProfileContext'
 
 type Props = {
   childId: string
   initialStats: ChildStats | null
   childName: string
-  /** 프로필에 고른 캐릭터 — 홈 섬 정면 스프라이트와 맞춥니다(없으면 토끼) */
   childAvatarUrl?: string | null
-  /** @deprecated Phase 3에서 NavigationMapSheet로 교체됨. home/page.tsx에서 제거 예정. */
   growthMapData?: Record<string, unknown>
   initialPraiseGrants: PraiseStickerGrant[]
   initialPraisePlacements: PraiseStickerPlacement[]
-  /** 이미 잠금 해제된 아이템 인덱스 목록 (서버에서 쿼리) */
   initialUnlockedItemIndexes?: number[]
-  /** URL 파라미터 openNavMap=1 로 지도 자동 열기 */
   initialMapOpen?: boolean
 }
 
-/**
- * 아이 앱 홈 탭
- * - **한 화면**: 상단 풍경·하단 꾸미기가 **6:4** 비율(`flex-[6]`/`flex-[4]`)로 나뉨
- * - 섬 무대는 `ChildHomeIslandStage` 의 `density="flex"` 로 남는 세로 공간에 맞춤
- * - 배경: 홈 전용 큰 그림(`ASSETS.layouts.childHomeBackgroundSecondScreen` — 태블릿 키즈룸 세로 PNG)을 풀 블리드 셸 **뒤 한 겹**만 깝니다. CDN·브라우저 캐시는 `CHILD_HOME_BACKGROUND_CACHE_BUST` 로 `?v=` 끊고, **`next/image` 대신 `<img>`** 로 직접 요청해 최적화 캐시에 걸리지 않게 합니다. `ChildHomeSceneryBand` 는 캐릭터 무대만 담고 `showBackground={false}` 입니다. 옛 잔디·섬 합성 PNG는 `showIslandArt={false}` 로 끕니다.
- * - 칭찬 스티커(곰)는 무대 **오른쪽 상단**(기존 날씨 자리), 성장 지도는 무대 **왼쪽** 지도 단추로 엽니다.
- * - 부모가 칭찬 스티커를 내면 팝업 후 곰돌이 판에서 붙일 수 있음
- */
 export default function HomeTab({
   childId,
   initialStats,
@@ -55,33 +44,25 @@ export default function HomeTab({
   initialUnlockedItemIndexes = [],
   initialMapOpen = false,
 }: Props) {
+  const profile = useChildAppProfile()
+  const exitHref = profile?.exitHref ?? '/parent/home'
+
   const [stats, setStats] = useState<ChildStats | null>(() =>
     initialStats ? normalizeChildStatsCreditsSplit(initialStats) : null,
   )
   const [mapOpen, setMapOpen] = useState(initialMapOpen)
   const [unlockedItemIndexes, setUnlockedItemIndexes] = useState<number[]>(initialUnlockedItemIndexes)
   const [itemUnlockPopup, setItemUnlockPopup] = useState<{ index: number; triggerKey: TriggerKey } | null>(null)
-  /**
-   * 꾸미기 칸에 실제로 넘길「잠금 해제된 인덱스」입니다.
-   * `CHARACTER_DECOR_UI_FORCE_ALL_LOCKED` 가 true 이면 DB 값과 관계없이 빈 배열이라 전부 잠금 UI가 됩니다.
-   */
   const effectiveDecorUnlocked = CHARACTER_DECOR_UI_FORCE_ALL_LOCKED ? [] : unlockedItemIndexes
   const [bearOpen, setBearOpen] = useState(false)
   const [grants, setGrants] = useState(initialPraiseGrants)
   const [placements, setPlacements] = useState(initialPraisePlacements)
-  /**
-   * 20칸 완주 후 grants 가 통째로 사라질 때 BearStickerSheet 가 merge 로 옛 목록을 살리지 않게 합니다.
-   * 숫자만 올리면 시트 안쪽 `initialGrants` 를 그대로 덮어씁니다.
-   */
   const [praiseGrantsRevision, setPraiseGrantsRevision] = useState(0)
   const [arrivalOpen, setArrivalOpen] = useState(false)
   const [stickerFabImgOk, setStickerFabImgOk] = useState(true)
-  /** 클라이언트 마운트 후에만 커스텀 FAB 이미지 사용 → SSR HTML 과 첫 페인트를 맞춤 */
   const [clientReady, setClientReady] = useState(false)
 
-  useEffect(() => {
-    setClientReady(true)
-  }, [])
+  useEffect(() => { setClientReady(true) }, [])
 
   useEffect(() => {
     setStats(initialStats ? normalizeChildStatsCreditsSplit(initialStats) : null)
@@ -95,14 +76,12 @@ export default function HomeTab({
     setPlacements(initialPraisePlacements)
   }, [initialPraisePlacements])
 
-  /** 곰돌이 판에서 스티커만 붙였을 때: placements 만 다시 가져와서 도착 팝업용 grants 낙관적 상태를 덮어쓰지 않음 */
   const refreshStickerPlacementsOnly = useCallback(async () => {
     const supabase = createClient()
     const { data } = await supabase.from('praise_sticker_placements').select('*').eq('child_id', childId)
     if (data) setPlacements(data as PraiseStickerPlacement[])
   }, [childId])
 
-  /** DB 의 발행 목록을 다시 읽습니다(다른 기기·서버에서 grants 가 통째로 삭제됐을 때 등) */
   const refreshGrantsOnly = useCallback(async () => {
     const supabase = createClient()
     const { data } = await supabase
@@ -116,11 +95,6 @@ export default function HomeTab({
     }
   }, [childId])
 
-  /**
-   * 서버 reset-board 직후: placements 비움 + 가능하면 stats 에 판 비움 시각을 넣어
-   * BearStickerSheet 가 닫혔다 열려도 서버와 같은 필터를 유지합니다.
-   * 20칸 완주로 리셋된 경우(grantsDeleted) 발행 기록도 비우고 시트 merge 를 끊습니다.
-   */
   const clearPraiseStickerBoard = useCallback((clearedAt?: string, meta?: { grantsDeleted?: boolean }) => {
     setPlacements([])
     if (meta?.grantsDeleted) {
@@ -137,17 +111,9 @@ export default function HomeTab({
     setArrivalOpen(pending)
   }, [grants])
 
-  /**
-   * 예전에는 Supabase Realtime(WebSocket)으로 칭찬·통계·잠금 해제를 즉시 받았습니다.
-   * 자녀 앱 성능(홈 진입 시 긴 WS 핸드셰이크)을 줄이기 위해 구독을 제거했고,
-   * 시트를 열거나 저장할 때 호출되는 `refreshGrantsOnly` 등 일반 쿼리로만 맞춥니다.
-   */
-
   const dismissArrival = useCallback(async () => {
     const now = new Date().toISOString()
-    setGrants((prev) =>
-      prev.map((g) => (g.popup_dismissed_at ? g : { ...g, popup_dismissed_at: now })),
-    )
+    setGrants((prev) => prev.map((g) => (g.popup_dismissed_at ? g : { ...g, popup_dismissed_at: now })))
     setArrivalOpen(false)
     const supabase = createClient()
     await supabase
@@ -157,10 +123,7 @@ export default function HomeTab({
       .is('popup_dismissed_at', null)
   }, [childId])
 
-  const openBearFromFab = useCallback(() => {
-    setBearOpen(true)
-  }, [])
-
+  const openBearFromFab = useCallback(() => { setBearOpen(true) }, [])
   const openBearFromGift = useCallback(() => {
     setBearOpen(true)
     void dismissArrival()
@@ -168,19 +131,13 @@ export default function HomeTab({
 
   const sheets = (
     <>
-      <NavigationMapSheet
-        open={mapOpen}
-        onClose={() => setMapOpen(false)}
-        childName={childName}
-        stats={stats}
-      />
+      <NavigationMapSheet open={mapOpen} onClose={() => setMapOpen(false)} childName={childName} stats={stats} />
       <BearStickerSheet
         open={bearOpen}
         onClose={() => setBearOpen(false)}
         childId={childId}
         initialGrants={grants}
         initialPlacements={placements}
-        /** DB에 저장된 「마지막 판 비움」시각 — 새 탭에서도 예전 스티커가 종이에 안 쌓이게 함 */
         serverPraiseBoardClearedAt={stats?.praise_board_cleared_at ?? null}
         onInventoryChange={() => void refreshStickerPlacementsOnly()}
         onBoardCleared={clearPraiseStickerBoard}
@@ -189,18 +146,16 @@ export default function HomeTab({
     </>
   )
 
-  const arrivalModal = (
-    <PraiseGiftArrivalModal open={arrivalOpen} onGoStickers={openBearFromGift} />
-  )
+  const arrivalModal = <PraiseGiftArrivalModal open={arrivalOpen} onGoStickers={openBearFromGift} />
 
   /**
-   * 곰 스티커 단추를 무대 **오른쪽 상단**(기존 날씨 자리)으로 옮깁니다.
-   * - 원형 배경 래퍼를 제거해 아이콘 자체만 보이게 합니다.
-   * - 바깥은 `pointer-events-none`, 버튼만 `pointer-events-auto` 로 눌리게 유지합니다.
-   * - `pt-5`/`sm:pt-6`: 아이콘을 한 단계 더 아래로(상단 여유).
+   * 곰 스티커 단추 — 모바일: fixed top-right / 태블릿 landscape: 숨김(HomeTab 왼쪽 패널 overlay 사용).
    */
   const stickerTopRightButton = (
-    <div className="pointer-events-none absolute right-0 top-0 z-20 pr-0.5 pt-5 sm:pr-1 sm:pt-6">
+    <div
+      className="pointer-events-none fixed right-3 z-50 md:landscape:hidden"
+      style={{ top: 'max(12px, env(safe-area-inset-top))' }}
+    >
       <div className="pointer-events-auto shrink-0">
         <StickerActionPill
           useCustomImage={clientReady && stickerFabImgOk}
@@ -211,41 +166,27 @@ export default function HomeTab({
     </div>
   )
 
-  /**
-   * 하단 꾸미기 영역: 위 풍경과 **6:4**(`flex-[6]` / `flex-[4]`).
-   * `mt-5` / `sm:mt-6`: 섬·풍경과 간격을 넉넉히 두어 아이템 그리드 상단이 잘리거나 겹쳐 보이지 않게 합니다.
-   * `pt-2`: 패널 안에서 제목·그리드가 위 경계에 붙지 않게 여유를 둡니다.
-   */
   const homeBottomPanelClass =
-    'relative z-10 mt-5 flex min-h-0 flex-[4] basis-0 flex-col gap-1 overflow-hidden px-3 pb-2 pt-0.5 sm:mt-6'
+    'relative z-10 mt-5 flex min-h-0 flex-[4] basis-0 flex-col gap-1 overflow-hidden px-3 pb-2 pt-0.5 sm:mt-6 md:landscape:hidden'
 
   /**
-   * 홈 탭 전체(캐릭터 무대 + 「내 캐릭터 꾸미기」)를 `main` 패딩 밖까지 넓혀, 배경 PNG 가 좌우·상단에 닿게 합니다.
-   * (미션 탭 `mission/layout.tsx` 와 같은 `calc(100%+2rem)` 원리 — 비개발자용: 화면 가장자리까지 그림이 이어집니다.)
+   * 홈 탭 루트:
+   * - 모바일: full-bleed (-mx-4 -mt-4 w-[calc(100%+2rem)]) flex-col
+   * - 태블릿 landscape: flex-row, 패딩 취소(md:landscape:mx-0 mt-0 w-full)
    */
   const homeFullBleedShellClass =
-    'relative isolate -mx-4 -mt-4 box-border flex min-h-0 min-w-0 w-[calc(100%+2rem)] max-w-none flex-1 shrink-0 flex-col self-stretch overflow-visible'
+    'relative isolate -mx-4 -mt-4 box-border flex min-h-0 min-w-0 w-[calc(100%+2rem)] max-w-none flex-1 shrink-0 flex-col self-stretch overflow-visible' +
+    ' md:landscape:mx-0 md:landscape:mt-0 md:landscape:w-full md:landscape:flex-row md:landscape:overflow-hidden'
 
   /**
-   * 홈 전체 뒤쪽 배경입니다.
-   * (비개발자용) 아이가 보는 방 배경 그림이고, 버튼·캐릭터는 이 위 `z-[1]` 레이어에 있습니다.
+   * 배경 이미지 (모바일: 전체 / 태블릿: 왼쪽 패널만)
    */
-  /**
-   * 배경 그림이 화면에서 살짝 위로 올라가 보이도록 기준점을 아래쪽(세로 58%)으로 둡니다.
-   * - 비개발자용: 숫자를 50보다 크게 하면 그림이 위로, 작게 하면 아래로 움직인 것처럼 보입니다.
-   */
-  const homeBackgroundObjectPositionClass = 'object-cover object-[center_90%]'
-
   const homeTabFullBackground = (
     <div className="pointer-events-none absolute inset-0 z-0" aria-hidden>
-      {/**
-       * `next/image` 는 `/_next/image` 최적화 캐시 + 정적 `immutable` 헤더와 겹치면 배포 후에도 옛 WebP 가 남을 수 있어,
-       * 풀블리드 배경은 원본 PNG URL + `?v=` 로 직접 불러옵니다.
-       */}
       <img
         src={`${ASSETS.layouts.childHomeBackgroundSecondScreen}?v=${CHILD_HOME_BACKGROUND_CACHE_BUST}`}
         alt=""
-        className={`absolute inset-0 h-full w-full ${homeBackgroundObjectPositionClass} brightness-[1.2]`}
+        className={`absolute inset-0 h-full w-full object-cover object-[center_90%] brightness-[1.2]`}
         loading="eager"
         decoding="async"
         fetchPriority="high"
@@ -254,91 +195,106 @@ export default function HomeTab({
     </div>
   )
 
-  if (!stats) {
-    return (
-      <>
-        <div className={homeFullBleedShellClass}>
+  /**
+   * 태블릿 landscape 전용: 왼쪽 패널 상단 overlay 아이콘
+   * 모바일에서는 숨깁니다(hidden md:landscape:flex).
+   */
+  const tabletOverlayIcons = (
+    <>
+      {/* top-left: home + exit */}
+      <div className="pointer-events-none absolute left-4 top-4 z-20 hidden gap-2 md:landscape:flex">
+        <OverlayIconButton href="/home" ariaLabel="홈으로">
+          <svg className="h-5 w-5 text-slate-700" viewBox="0 0 24 24" fill="none" aria-hidden>
+            <path d="M3 12L12 3l9 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M9 21V12h6v9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M3 12v9h18V12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </OverlayIconButton>
+        <OverlayIconButton href={exitHref} ariaLabel="나가기">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/assets/img/common/ui/exit.png" alt="" width={20} height={20} className="h-5 w-5 object-contain" />
+        </OverlayIconButton>
+      </div>
+
+      {/* top-center: "나의 꾸미기 방" title */}
+      <div className="pointer-events-none absolute left-1/2 top-4 z-20 hidden -translate-x-1/2 md:landscape:block">
+        <span className="text-sm font-black text-white [text-shadow:0_1px_6px_rgba(0,0,0,0.45)]">나의 꾸미기 방</span>
+      </div>
+
+      {/* top-right: map + sticker */}
+      <div className="pointer-events-none absolute right-4 top-4 z-20 hidden gap-2 md:landscape:flex">
+        <OverlayIconButton onClick={() => setMapOpen(true)} ariaLabel="항해지도 열기">
+          <Image src="/assets/img/common/ui/map.png" alt="" width={20} height={20} className="h-5 w-5 object-contain" />
+        </OverlayIconButton>
+        <OverlayIconButton onClick={openBearFromFab} ariaLabel="스티커 보관함 열기">
+          <Image src="/assets/img/common/ui/sticker_icon.png" alt="" width={20} height={20} className="h-5 w-5 object-contain" />
+        </OverlayIconButton>
+      </div>
+    </>
+  )
+
+  /**
+   * 섬·캐릭터 무대 (stats 유무에 따라 내부 내용 분기)
+   */
+  const islandSection = (
+    <div className="flex min-h-0 flex-1 flex-col justify-end gap-1.5">
+      <div className="relative mx-auto flex min-h-0 w-full max-w-sm flex-1 flex-col items-center justify-end -mt-2 sm:-mt-4">
+        {/* 지도 단추: 모바일용 (태블릿에서는 overlay 사용) */}
+        <div className="pointer-events-none absolute left-0 top-0 z-20 flex items-start pl-0.5 pt-5 sm:pl-1 sm:pt-6 md:landscape:hidden">
+          <div className="pointer-events-auto shrink-0">
+            <MapActionPill onClick={() => setMapOpen(true)} />
+          </div>
+        </div>
+        {stickerTopRightButton}
+        <ChildHomeIslandStage density="flex" homeAvatarUrl={childAvatarUrl} showIslandArt={false} />
+      </div>
+    </div>
+  )
+
+  return (
+    <>
+      <div className={homeFullBleedShellClass}>
+        {/**
+         * 왼쪽 패널 (모바일: 전체 화면 / 태블릿 landscape: 50%)
+         * - background가 이 div 안에 있어 태블릿에서 왼쪽 절반만 덮음
+         */}
+        <div className="relative flex flex-1 flex-col min-h-0 md:landscape:w-1/2 md:landscape:flex-none md:landscape:overflow-hidden">
           {homeTabFullBackground}
-          {/** 통계가 없을 때도 홈 전용 배경은 동일하게 깔고, 콘텐츠만 이 래퍼 위에 올립니다. */}
+          {tabletOverlayIcons}
+
+          {/* 캐릭터 영역 */}
           <div className="relative z-[1] flex min-h-0 min-w-0 flex-1 flex-col">
-            <ChildHomeSceneryBand edgeBleed={false} flexFill showBackground={false} ariaLabel="홈 상단">
+            {!stats && (
               <div className="shrink-0 space-y-2 py-1 text-center">
                 <p className="text-sm text-gray-500">부모님이 미션을 만들어주실 거야.</p>
               </div>
-              {/** `flex-1 min-h-0`: 풍경 밴드 안에서 섬이 남는 높이를 쓰고, 작은 화면에서도 잘리지 않게 줄어듦 */}
-              <div className="flex min-h-0 flex-1 flex-col justify-end">
-                {/**
-                 * 성장 지도 단추만 무대 **왼쪽** 세로 가운데 — 곰 스티커는 화면 오른쪽 아래 플로팅으로 옮겼습니다.
-                 * `pointer-events-none` 으로 빈 곳 탭은 통과하고 지도 단추만 눌리게 합니다.
-                 */}
-                {/**
-                 * 섬·잔디·캐릭터 묶음: `-mt` 를 더 줄여 한 칸 더 아래로 보이게(곰 단추와 맞춤).
-                 */}
-                <div className="relative mx-auto flex min-h-0 w-full max-w-sm flex-1 flex-col items-center justify-end -mt-2 sm:-mt-4">
-                  {/**
-                   * 성장 지도(지도 아이콘) 단추 위치
-                   * - 요청사항: "왼쪽 상단" 배치
-                   * - `pointer-events-none` 으로 빈 영역 탭은 통과시키고, 버튼만 `pointer-events-auto` 로 눌리게 합니다.
-                   * - `pt-5`/`sm:pt-6`: 곰 스티커 단추와 같은 높이감으로 맞춤
-                   */}
-                  <div className="pointer-events-none absolute left-0 top-0 z-20 flex items-start pl-0.5 pt-5 sm:pl-1 sm:pt-6">
-                    <div className="pointer-events-auto shrink-0">
-                      <MapActionPill onClick={() => setMapOpen(true)} />
-                    </div>
-                  </div>
-                  {/** 기존 날씨 위치에 곰 스티커 단추를 배치합니다. */}
-                  {stickerTopRightButton}
-                  <ChildHomeIslandStage density="flex" homeAvatarUrl={childAvatarUrl} showIslandArt={false} />
-                </div>
-              </div>
+            )}
+            <ChildHomeSceneryBand
+              edgeBleed={false}
+              flexFill
+              flexFillWeight={stats ? 5.5 : undefined}
+              showBackground={false}
+              ariaLabel="홈 상단"
+            >
+              {islandSection}
             </ChildHomeSceneryBand>
+
+            {/* 모바일 전용 꾸미기 인벤토리 */}
             <section className={homeBottomPanelClass} aria-label="내 캐릭터 꾸미기">
               <CharacterDecorInventory unlockedIndexes={effectiveDecorUnlocked} />
             </section>
           </div>
         </div>
-        {sheets}
-        {arrivalModal}
-        {itemUnlockPopup && (
-          <ItemUnlockCelebrationPopup
-            itemIndex={itemUnlockPopup.index}
-            triggerKey={itemUnlockPopup.triggerKey}
-            onClose={() => setItemUnlockPopup(null)}
+
+        {/**
+         * 오른쪽 패널 — 태블릿 landscape 전용 꾸미기 상점
+         */}
+        <div className="hidden md:landscape:flex md:landscape:w-1/2 flex-col bg-white overflow-hidden border-l border-gray-100">
+          <TabletDecorPanel
+            unlockedIndexes={effectiveDecorUnlocked}
+            stats={stats}
           />
-        )}
-      </>
-    )
-  }
-
-  return (
-    <div className={homeFullBleedShellClass}>
-      {homeTabFullBackground}
-      <div className="relative z-[1] flex min-h-0 min-w-0 flex-1 flex-col">
-        <ChildHomeSceneryBand edgeBleed={false} flexFill flexFillWeight={5.5} showBackground={false} ariaLabel="홈 상단">
-          {/** 캐릭터 무대: `-mt` 로 하단 꾸미기와 살짝만 겹칩니다. 배경은 셸의 `homeTabFullBackground` 가 담당합니다. */}
-          <div className="flex min-h-0 flex-1 flex-col justify-end gap-1.5">
-            <div className="relative mx-auto flex min-h-0 w-full max-w-sm flex-1 flex-col items-center justify-end -mt-2 sm:-mt-4">
-              {/**
-               * 성장 지도(지도 아이콘) 단추 위치
-               * - 요청사항: "왼쪽 상단" 배치
-               * - 로딩/정상 화면에서 동일한 좌표를 사용해 UX 를 일관되게 합니다.
-               * - `pt-5`/`sm:pt-6`: 우측 곰 스티커 단추와 세로 위치를 맞춤
-               */}
-              <div className="pointer-events-none absolute left-0 top-0 z-20 flex items-start pl-0.5 pt-5 sm:pl-1 sm:pt-6">
-                <div className="pointer-events-auto shrink-0">
-                  <MapActionPill onClick={() => setMapOpen(true)} />
-                </div>
-              </div>
-              {/** 기존 날씨 위치(우상단)에 곰 스티커 단추를 동일하게 배치합니다. */}
-              {stickerTopRightButton}
-              <ChildHomeIslandStage density="flex" homeAvatarUrl={childAvatarUrl} showIslandArt={false} />
-            </div>
-          </div>
-        </ChildHomeSceneryBand>
-
-        <section className={homeBottomPanelClass} aria-label="내 캐릭터 꾸미기">
-          <CharacterDecorInventory unlockedIndexes={effectiveDecorUnlocked} />
-        </section>
+        </div>
       </div>
 
       {sheets}
@@ -350,47 +306,223 @@ export default function HomeTab({
           onClose={() => setItemUnlockPopup(null)}
         />
       )}
-    </div>
+    </>
   )
 }
 
-/** 꾸미기 썸네일 개수·열 개수 — `ASSETS.characters.decorItemImages` 와 길이가 같아야 합니다. */
-const DECOR_ITEM_COUNT = ASSETS.characters.decorItemImages.length
+// ─── Sub-components ────────────────────────────────────────────────
 
-/** 위·아래 두 줄이면 열 개수는 아이템 수의 절반입니다. */
+/** 태블릿 왼쪽 패널 overlay 아이콘 버튼 */
+function OverlayIconButton({
+  children,
+  onClick,
+  href,
+  ariaLabel,
+}: {
+  children: React.ReactNode
+  onClick?: () => void
+  href?: string
+  ariaLabel: string
+}) {
+  const cls = 'pointer-events-auto flex h-10 w-10 items-center justify-center rounded-xl bg-white/80 shadow-sm transition active:scale-95 focus-visible:outline-none'
+  if (href) {
+    return <a href={href} className={cls} aria-label={ariaLabel}>{children}</a>
+  }
+  return (
+    <button type="button" onClick={onClick} className={cls} aria-label={ariaLabel}>
+      {children}
+    </button>
+  )
+}
+
+// ─── Decor categories ──────────────────────────────────────────────
+
+const DECOR_CATEGORIES = [
+  { id: 'outfit' as const, label: '옷' },
+  { id: 'accessory' as const, label: '악세서리' },
+  { id: 'hair' as const, label: '헤어' },
+  { id: 'background' as const, label: '배경' },
+] as const
+
+type DecorCategoryId = (typeof DECOR_CATEGORIES)[number]['id']
+
+const DECOR_ITEM_PRICE = 300
+
+const TOTAL_ITEMS = ASSETS.characters.decorItemImages.length
+
+/** 아이템 인덱스 → 카테고리 매핑 (placeholder split — 실제 카테고리 확정 후 갱신 필요) */
+function getCategoryForIndex(index: number): DecorCategoryId {
+  if (index < Math.ceil(TOTAL_ITEMS * 0.34)) return 'outfit'
+  if (index < Math.ceil(TOTAL_ITEMS * 0.6)) return 'accessory'
+  if (index < Math.ceil(TOTAL_ITEMS * 0.83)) return 'hair'
+  return 'background'
+}
+
+// ─── Category icon SVGs ────────────────────────────────────────────
+
+function CategoryIcon({ id, className }: { id: DecorCategoryId; className?: string }) {
+  const cls = className ?? 'h-5 w-5'
+  switch (id) {
+    case 'outfit':
+      return (
+        <svg className={cls} viewBox="0 0 24 24" fill="none" aria-hidden>
+          <path d="M20 7l-4-3H8L4 7l3 2v9h10V9l3-2z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+          <path d="M8 4c0 1.1.9 2 2 2h4a2 2 0 000-4H10a2 2 0 00-2 2z" stroke="currentColor" strokeWidth="1.6" />
+        </svg>
+      )
+    case 'accessory':
+      return (
+        <svg className={cls} viewBox="0 0 24 24" fill="none" aria-hidden>
+          <path d="M4 12h16M4 12c0-2 2-4 4-4s2 2 4 2 2-2 4-2 4 2 4 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+          <path d="M4 12c0 2 2 4 4 4s2-2 4-2 2 2 4 2 4-2 4-4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+        </svg>
+      )
+    case 'hair':
+      return (
+        <svg className={cls} viewBox="0 0 24 24" fill="none" aria-hidden>
+          <circle cx="12" cy="9" r="4" stroke="currentColor" strokeWidth="1.6" />
+          <path d="M5 20c0-3.3 3.1-6 7-6s7 2.7 7 6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+        </svg>
+      )
+    case 'background':
+      return (
+        <svg className={cls} viewBox="0 0 24 24" fill="none" aria-hidden>
+          <rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" strokeWidth="1.6" />
+          <path d="M3 15l5-5 4 4 3-3 4 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+          <circle cx="8.5" cy="9.5" r="1.5" fill="currentColor" />
+        </svg>
+      )
+  }
+}
+
+// ─── Tablet right panel ────────────────────────────────────────────
+
+function TabletDecorPanel({
+  unlockedIndexes,
+  stats,
+}: {
+  unlockedIndexes: number[]
+  stats: ChildStats | null
+}) {
+  const [activeCategory, setActiveCategory] = useState<DecorCategoryId>('outfit')
+
+  const filteredItems = ASSETS.characters.decorItemImages
+    .map((src, index) => ({ src, index }))
+    .filter(({ index }) => getCategoryForIndex(index) === activeCategory)
+
+  const walletCredits = stats?.credits_wallet ?? stats?.credits ?? 0
+
+  return (
+    <>
+      {/* Category tab bar */}
+      <div className="flex shrink-0 flex-row justify-around border-b border-gray-100 bg-white py-2">
+        {DECOR_CATEGORIES.map(({ id, label }) => {
+          const isActive = activeCategory === id
+          return (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setActiveCategory(id)}
+              className={[
+                'flex flex-col items-center gap-1 px-2 pb-1 pt-0.5 text-xs font-bold transition-colors',
+                isActive
+                  ? 'border-b-2 border-brand-blue text-brand-blue'
+                  : 'border-b-2 border-transparent text-slate-400',
+              ].join(' ')}
+            >
+              <CategoryIcon id={id} className="h-5 w-5" />
+              <span>{label}</span>
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Item grid */}
+      <div className="flex-1 overflow-y-auto p-4 [scrollbar-width:thin]">
+        {filteredItems.length === 0 ? (
+          <p className="pt-8 text-center text-sm text-gray-400">아이템이 없어요</p>
+        ) : (
+          <div className="grid grid-cols-3 gap-3">
+            {filteredItems.map(({ src, index }) => {
+              const owned = unlockedIndexes.includes(index)
+              return (
+                <div
+                  key={index}
+                  className={[
+                    'relative flex flex-col overflow-hidden rounded-xl border bg-white',
+                    owned ? 'border-brand-blue ring-2 ring-brand-blue/30' : 'border-gray-100',
+                  ].join(' ')}
+                >
+                  <div className="relative aspect-square">
+                    <Image
+                      src={src}
+                      alt=""
+                      fill
+                      loading="lazy"
+                      sizes="(max-width: 1024px) 18vw, 14vw"
+                      className={`object-contain p-1.5 ${owned ? '' : 'grayscale opacity-60'}`}
+                      draggable={false}
+                    />
+                    {/* Lock overlay */}
+                    {!owned && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/20 rounded-t-xl">
+                        <svg className="h-5 w-5 text-white drop-shadow" viewBox="0 0 24 24" fill="none" aria-hidden>
+                          <path d="M7 11V8a5 5 0 0110 0v3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                          <rect x="4" y="11" width="16" height="11" rx="2" stroke="currentColor" strokeWidth="2" />
+                          <circle cx="12" cy="16" r="1.25" fill="currentColor" />
+                        </svg>
+                      </div>
+                    )}
+                  </div>
+                  {/* Price / owned badge */}
+                  <div className="flex items-center justify-center px-1 py-1.5">
+                    {owned ? (
+                      <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-[10px] font-bold text-gray-500">
+                        보유 중
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-0.5 rounded-full bg-slate-700 px-2 py-0.5 text-[10px] font-bold text-amber-200">
+                        🪙 {DECOR_ITEM_PRICE} 코인
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Credit bar */}
+      <div className="flex shrink-0 items-center justify-center gap-6 border-t border-gray-100 bg-white py-3">
+        <span className="text-sm font-bold text-brand-text">
+          보유 골드: <span className="text-amber-500">🪙 {walletCredits.toLocaleString('ko-KR')}</span>
+        </span>
+        {(stats?.credits_piggy ?? 0) > 0 && (
+          <span className="text-sm font-bold text-brand-text">
+            저금통: <span className="text-sky-600">🐷 {(stats?.credits_piggy ?? 0).toLocaleString('ko-KR')}</span>
+          </span>
+        )}
+      </div>
+    </>
+  )
+}
+
+// ─── Mobile decor inventory ────────────────────────────────────────
+
+const DECOR_ITEM_COUNT = ASSETS.characters.decorItemImages.length
 const DECOR_GRID_COLS = DECOR_ITEM_COUNT / 2
 
-/**
- * 잠금된 칸 가운데에만 겹쳐 보일 자물쇠 SVG 입니다(별도 아이콘 패키지 없이 가볍게 그립니다).
- * 선 색은 `currentColor` 이므로 부모에서 `text-white` 등으로 **흰 자물쇠**를 줄 수 있습니다.
- * `aria-hidden`: 스크린 리더는 바깥 `aria-label` 로만 설명하고 이 그림은 장식으로 취급합니다.
- */
 function DecorLockIcon({ className }: { className?: string }) {
   return (
-    <svg
-      className={className}
-      viewBox="0 0 24 24"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      aria-hidden
-    >
-      <path
-        d="M7 11V8a5 5 0 0110 0v3"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
+    <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+      <path d="M7 11V8a5 5 0 0110 0v3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
       <rect x="4" y="11" width="16" height="11" rx="2" stroke="currentColor" strokeWidth="2" />
       <circle cx="12" cy="16" r="1.25" fill="currentColor" />
     </svg>
   )
 }
 
-/**
- * 꾸미기 인벤토리 — 아이템을 **위·아래 2줄**로 두고, **한 번의 가로 스크롤**로 두 줄이 같이 밀립니다.
- * 잠금 해제된 아이템은 컬러로, 그 외는 흑백 썸네일 위에 **흰색 자물쇠**만 가운데 겹칩니다(별도 막·「잠금」글자 없음).
- */
 function CharacterDecorInventory({ unlockedIndexes }: { unlockedIndexes: number[] }) {
   return (
     <div className="flex min-h-0 w-full flex-1 flex-col" aria-labelledby="child-decor-heading">
@@ -424,11 +556,6 @@ function CharacterDecorInventory({ unlockedIndexes }: { unlockedIndexes: number[
                     className="pointer-events-none aspect-square w-full"
                   >
                     <div className="relative size-full overflow-hidden rounded-xl border border-amber-100/90 bg-[#f7f4eb] shadow-sm">
-                      {/**
-                       * 잠김/해제와 관계없이 기존처럼 실제 아이템 이미지를 항상 그립니다.
-                       * 잠긴 칸은 아래 클래스에서 흑백+투명도만 적용해 "보이되 비활성" 상태를 유지합니다.
-                       */
-                      }
                       <Image
                         src={ASSETS.characters.decorItemImages[index]}
                         alt=""
@@ -440,7 +567,6 @@ function CharacterDecorInventory({ unlockedIndexes }: { unlockedIndexes: number[
                       />
                       {!unlocked && (
                         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                          {/** 가운데 흰 자물쇠만 — 밝은 썸네일에서도 보이도록 살짝 어두운 외곽 그림자 */}
                           <DecorLockIcon className="size-[28%] min-h-[22px] min-w-[22px] max-h-9 max-w-9 text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.45)]" />
                         </div>
                       )}
@@ -455,4 +581,3 @@ function CharacterDecorInventory({ unlockedIndexes }: { unlockedIndexes: number[
     </div>
   )
 }
-

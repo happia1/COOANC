@@ -17,6 +17,8 @@ export type ChildAppProfileValue = {
   childName: string
   childAvatarUrl: string | null
   familyLinks: ChildAppFamilyLink[]
+  /** 나가기 버튼 URL — 부모 미리보기면 `/api/parent/exit-child-ui`, 자녀 본인이면 `/parent/home` */
+  exitHref: string
 }
 
 const ProfileContext = createContext<ChildAppProfileValue | null>(null)
