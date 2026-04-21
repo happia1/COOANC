@@ -138,8 +138,6 @@ export default function ApprovalTab({
 
   const [requests, setRequests] = useState<PurchaseRequest[]>(pendingRequests)
   const [historyRequests, setHistoryRequests] = useState<PurchaseRequest[]>(requestHistory)
-  /** 승인 내역 하단 시트 열림 — 미션 롤백 시트와 같은 패턴 */
-  const [purchaseHistorySheetOpen, setPurchaseHistorySheetOpen] = useState(false)
   /** 3건 초과분은 「더보기」로만 펼침 */
   const [purchaseHistoryShowAll, setPurchaseHistoryShowAll] = useState(false)
   const [logs, setLogs] = useState<MissionLog[]>(recentLogs)
@@ -216,7 +214,6 @@ export default function ApprovalTab({
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null)
   const [rollbackSheetOpen, setRollbackSheetOpen] = useState(false)
   const [rollbackSheetShowAll, setRollbackSheetShowAll] = useState(false)
-  const [rollbackInlineOpen, setRollbackInlineOpen] = useState(false)
 
   /**
    * 서울 기준 「오늘」 문자열 — 자정이 지나면 바뀌어야 `오늘 완료 미션` 목록이 비워집니다.
@@ -308,11 +305,6 @@ export default function ApprovalTab({
     setPurchaseHistoryShowAll(false)
     setHistoryInlineOpen(false)
   }, [currentId])
-
-  /** 시트를 닫으면 다음에 열 때 다시 3건만 보이게 */
-  useEffect(() => {
-    if (!purchaseHistorySheetOpen) setPurchaseHistoryShowAll(false)
-  }, [purchaseHistorySheetOpen])
 
   const visiblePurchaseHistory = useMemo(() => {
     if (purchaseHistoryShowAll) return historyForChild
@@ -756,257 +748,70 @@ export default function ApprovalTab({
         </>
       )}
 
-      {/* 통합 프로필 바 — 전체 너비로 그리드 위에 배치 → 모바일 최상단, 태블릿은 두 컬럼이 같은 y에서 시작 */}
-      {currentChild && (
-        <ParentEnterChildUiLink
-          childId={currentChild.id}
-          className="block w-full cursor-pointer rounded-2xl transition-opacity active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4A90E2] focus-visible:ring-offset-2"
-          aria-label={`${currentChild.name} 자녀용 앱 화면으로 들어가기`}
-          onClick={() => setSelectedChildId(currentChild.id)}
-        >
-          <div className="flex w-full items-center justify-between rounded-2xl bg-white px-4 py-3 shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-white">
-                {currentChild.avatarUrl ? (
-                  <div className="flex h-full w-full items-center justify-center p-1.5">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={currentChild.avatarUrl} alt="" className="h-full w-full object-contain object-center" />
-                  </div>
-                ) : (
-                  <span className="flex h-full w-full items-center justify-center text-center text-[10px] font-black leading-tight text-gray-700">
-                    Lv{childLevel}
-                  </span>
-                )}
-              </div>
-              <div className="flex flex-col gap-0.5">
-                <span className="text-sm font-black text-gray-800">{currentChild.name}</span>
-                <span className="text-[11px] text-gray-400">Lv.{childLevel}</span>
-              </div>
-            </div>
-            <div
-              className="flex flex-col items-start gap-1 sm:flex-row sm:items-center sm:gap-4"
-              aria-label={`코인 ${(currentChild.credits).toLocaleString()}, 하트 ${currentChild.hearts}, 연속 ${currentChild.streakDays}일`}
-            >
-              <div className="flex items-center gap-1">
-                <SpriteImage sheet={ICONS} frame="credits" width={16} clipRotated={false} className="shrink-0 select-none" />
-                <span className="text-sm font-black tabular-nums text-[#4A90E2]">
-                  {(currentChild.credits).toLocaleString()}
-                </span>
-              </div>
-              <div className="flex items-center gap-1">
-                <SpriteImage sheet={ICONS} frame="heart" width={16} className="shrink-0 select-none" />
-                <span className="text-sm font-black tabular-nums text-rose-500">
-                  {currentChild.hearts}
-                </span>
-              </div>
-              <div className="flex items-center gap-1">
-                <svg width={16} height={16} viewBox="0 0 24 24" fill="none" className="shrink-0 text-orange-500" aria-hidden>
-                  <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-                <span className="text-sm font-black tabular-nums text-amber-600">
-                  {currentChild.streakDays}일
-                </span>
-              </div>
-            </div>
-          </div>
-        </ParentEnterChildUiLink>
-      )}
-
       {/* ── 2컬럼 그리드 ────────────────────────────────────────────────────────
-          모바일(grid-cols-1):  order-1=우 컬럼(스티커·구매요청) → order-2=좌 컬럼(완료미션·마켓)
-          md+(grid-cols-2):    좌=오늘완료미션+마켓제어,  우=스티커+구매요청+승인내역
+          모바일(grid-cols-1): 좌 컬럼 → 우 컬럼 순 스택
+          md+(grid-cols-2):   좌=프로필+구매요청+승인내역+완료미션, 우=스티커+마켓제어
       ──────────────────────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 gap-6 w-full items-start md:grid-cols-2">
 
-      {/* ── 좌 컬럼(md) / 하단(모바일): 오늘 완료 미션 + 마켓 제어 ── */}
-      <div className="order-2 md:order-1 flex flex-col gap-5">
+      {/* ── 좌 컬럼: 프로필 + 구매 요청 + 승인 내역 + 오늘 완료 미션 ── */}
+      <div className="flex flex-col gap-5">
 
-        {/* 오늘 완료 미션
-            모바일: 버튼 탭 → 하단 시트 / 태블릿: 인라인 목록 직접 표시 */}
-        <section>
-          {/* 모바일 전용 — 버튼 + 롤백 시트 */}
-          <div className="md:hidden">
-            <button
-              type="button"
-              onClick={() => {
-                setRollbackSheetShowAll(false)
-                setRollbackSheetOpen(true)
-              }}
-              className="w-full rounded-2xl bg-white p-4 text-left shadow-sm ring-1 ring-gray-100 transition-all active:scale-[0.99]"
-            >
+        {/* 통합 프로필 바 — RoutineTab과 동일 */}
+        {currentChild && (
+          <ParentEnterChildUiLink
+            childId={currentChild.id}
+            className="block w-full cursor-pointer rounded-2xl transition-opacity active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4A90E2] focus-visible:ring-offset-2"
+            aria-label={`${currentChild.name} 자녀용 앱 화면으로 들어가기`}
+            onClick={() => setSelectedChildId(currentChild.id)}
+          >
+            <div className="flex w-full items-center justify-between rounded-2xl bg-white px-4 py-3 shadow-sm">
               <div className="flex items-center gap-3">
-                <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                  <span className="text-sm font-black text-brand-text">오늘 완료 미션</span>
-                  <span className="text-[11px] text-gray-400">탭하여 다시 하기 · 롤백</span>
-                </div>
-                <span className="shrink-0 rounded-full bg-brand-blue/10 px-2.5 py-1 text-xs font-black tabular-nums text-brand-blue">
-                  {todayCompletedLogs.length}건
-                </span>
-                <span className="shrink-0 text-lg font-bold text-gray-300" aria-hidden>›</span>
-              </div>
-            </button>
-
-            {rollbackSheetOpen && (
-              <div className="fixed inset-0 z-[100] flex flex-col justify-end">
-                <button
-                  type="button"
-                  className="absolute inset-0 bg-black/45"
-                  aria-label="닫기"
-                  onClick={() => setRollbackSheetOpen(false)}
-                />
-                <div
-                  className="relative z-[1] flex max-h-[min(78dvh,560px)] flex-col rounded-t-3xl bg-white shadow-2xl"
-                  role="dialog"
-                  aria-modal="true"
-                  aria-labelledby="rollback-sheet-title"
-                >
-                  <div className="flex justify-center pt-2 pb-1">
-                    <span className="h-1 w-10 rounded-full bg-gray-200" />
-                  </div>
-                  <div className="border-b border-gray-100 px-5 pb-3 pt-1">
-                    <h3 id="rollback-sheet-title" className="text-base font-black text-brand-text">
-                      오늘 완료 미션
-                    </h3>
-                  </div>
-                  <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3">
-                    {todayCompletedLogs.length === 0 ? (
-                      <p className="py-8 text-center text-sm text-gray-400">오늘 완료한 미션이 없어요</p>
-                    ) : (
-                      <div className="flex flex-col gap-2">
-                        {visibleRollbackInSheet.map((log) => (
-                          <div
-                            key={log.id}
-                            className="flex items-center gap-3 rounded-xl bg-gray-50/90 px-3 py-2.5 ring-1 ring-gray-100"
-                          >
-                            <div className="min-w-0 flex-1">
-                              <p className="truncate text-sm font-bold text-brand-text">{log.missions?.title ?? '미션'}</p>
-                              <p className="text-[10px] text-gray-400">
-                                {log.completed_at
-                                  ? getSeoulDateFromIsoTimestamp(log.completed_at) ?? log.completed_at.slice(0, 10)
-                                  : ''}
-                              </p>
-                            </div>
-                            <div className="shrink-0 text-right">
-                              <p className="text-[10px] font-bold tabular-nums text-brand-blue">+{log.credit_earned} 크레딧</p>
-                              <button
-                                type="button"
-                                onClick={() => void handleRequestRedoFromChild(log)}
-                                disabled={loading === log.id}
-                                className="text-[10px] font-bold text-orange-500 hover:underline disabled:opacity-50"
-                              >
-                                다시하기
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  {todayCompletedLogs.length > ROLLBACK_SHEET_INITIAL && !rollbackSheetShowAll && (
-                    <div className="border-t border-gray-100 px-4 py-2">
-                      <button
-                        type="button"
-                        onClick={() => setRollbackSheetShowAll(true)}
-                        className="w-full rounded-xl border border-gray-200 py-2.5 text-sm font-bold text-brand-text"
-                      >
-                        더보기 ({todayCompletedLogs.length - ROLLBACK_SHEET_INITIAL}개 더 있음)
-                      </button>
+                <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-white">
+                  {currentChild.avatarUrl ? (
+                    <div className="flex h-full w-full items-center justify-center p-1.5">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={currentChild.avatarUrl} alt="" className="h-full w-full object-contain object-center" />
                     </div>
+                  ) : (
+                    <span className="flex h-full w-full items-center justify-center text-center text-[10px] font-black leading-tight text-gray-700">
+                      Lv{childLevel}
+                    </span>
                   )}
-                  <div className="border-t border-gray-100 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-                    <button
-                      type="button"
-                      onClick={() => setRollbackSheetOpen(false)}
-                      className="w-full rounded-2xl bg-gray-100 py-3 text-sm font-bold text-gray-600"
-                    >
-                      닫기
-                    </button>
-                  </div>
+                </div>
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-sm font-black text-gray-800">{currentChild.name}</span>
+                  <span className="text-[11px] text-gray-400">Lv.{childLevel}</span>
                 </div>
               </div>
-            )}
-          </div>{/* /모바일 전용 */}
-
-          {/* 태블릿 전용 — 접기/펼치기 인라인 목록 */}
-          <div className="hidden md:block rounded-2xl bg-white shadow-sm ring-1 ring-gray-100">
-            <button
-              type="button"
-              onClick={() => setRollbackInlineOpen((v) => !v)}
-              aria-expanded={rollbackInlineOpen}
-              className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-gray-50 active:bg-gray-50/80 rounded-2xl"
-            >
-              <span className="text-sm font-black text-brand-text">오늘 완료 미션</span>
-              <div className="flex items-center gap-2">
-                <span className="rounded-full bg-brand-blue/10 px-2.5 py-1 text-xs font-black tabular-nums text-brand-blue">
-                  {todayCompletedLogs.length}건
-                </span>
-                <svg
-                  className={`h-4 w-4 shrink-0 text-gray-400 transition-transform duration-200 ${rollbackInlineOpen ? 'rotate-180' : ''}`}
-                  viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden
-                >
-                  <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
+              <div
+                className="flex flex-col gap-1 md:flex-row md:gap-4"
+                aria-label={`코인 ${(currentChild.credits).toLocaleString()}, 하트 ${currentChild.hearts}, 연속 ${currentChild.streakDays}일`}
+              >
+                <div className="flex items-center gap-1">
+                  <SpriteImage sheet={ICONS} frame="credits" width={16} clipRotated={false} className="shrink-0 select-none" />
+                  <span className="text-sm font-black tabular-nums text-[#4A90E2]">
+                    {(currentChild.credits).toLocaleString()}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <SpriteImage sheet={ICONS} frame="heart" width={16} className="shrink-0 select-none" />
+                  <span className="text-sm font-black tabular-nums text-rose-500">
+                    {currentChild.hearts}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <svg width={16} height={16} viewBox="0 0 24 24" fill="none" className="shrink-0 text-orange-500" aria-hidden>
+                    <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  <span className="text-sm font-black tabular-nums text-amber-600">
+                    {currentChild.streakDays}일
+                  </span>
+                </div>
               </div>
-            </button>
-            {rollbackInlineOpen && (
-              <div className="border-t border-gray-100 px-4 pb-4 pt-3">
-                {todayCompletedLogs.length === 0 ? (
-                  <p className="py-4 text-center text-sm text-gray-400">오늘 완료한 미션이 없어요</p>
-                ) : (
-                  <div className="flex flex-col gap-2 max-h-64 overflow-y-auto">
-                    {todayCompletedLogs.map((log) => (
-                      <div
-                        key={log.id}
-                        className="flex items-center gap-3 rounded-xl bg-gray-50/90 px-3 py-2.5 ring-1 ring-gray-100"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-bold text-brand-text">{log.missions?.title ?? '미션'}</p>
-                          <p className="text-[10px] text-gray-400">
-                            {log.completed_at
-                              ? getSeoulDateFromIsoTimestamp(log.completed_at) ?? log.completed_at.slice(0, 10)
-                              : ''}
-                          </p>
-                        </div>
-                        <div className="shrink-0 text-right">
-                          <p className="text-[10px] font-bold tabular-nums text-brand-blue">+{log.credit_earned} 크레딧</p>
-                          <button
-                            type="button"
-                            onClick={() => void handleRequestRedoFromChild(log)}
-                            disabled={loading === log.id}
-                            className="text-[10px] font-bold text-orange-500 hover:underline disabled:opacity-50"
-                          >
-                            다시하기
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>{/* /태블릿 전용 */}
-        </section>
-
-        {/* `id`: 홈 경제 EQ 코칭 카드의 「자녀 보상 등록」링크가 이 구역으로 스크롤되게 함 */}
-        <section id="parent-approval-market-rewards" aria-label="자녀 마켓 보상 설정">
-          <ParentMarketMenuControl
-            childId={currentId}
-            storeItems={storeItems}
-            hiddenItemIds={hiddenSetForCurrent}
-            familyLinkIdForChild={currentId ? linkByChild[currentId] ?? null : null}
-            onHiddenChange={onHiddenChangeForCurrent}
-            onItemCreated={(item) => setStoreItems((prev) => [...prev, item])}
-            creditOverrides={creditOverridesForCurrent}
-            onCreditOverrideSaved={onCreditOverrideSaved}
-          />
-        </section>
-
-      </div>{/* /좌 컬럼 */}
-
-      {/* ── 우 컬럼(md) / 상단(모바일): 칭찬 스티커 + 자녀 전환 + 구매 요청 + 승인 내역 ── */}
-      <div className="order-1 md:order-2 flex flex-col gap-5">
-
-        <PraiseStickerPanel childId={currentId} childName={currentChild?.name ?? '자녀'} />
+            </div>
+          </ParentEnterChildUiLink>
+        )}
 
         {/* 구매 요청 */}
         <section id="parent-purchase-requests">
@@ -1014,11 +819,9 @@ export default function ApprovalTab({
             <h2 className="text-sm font-bold text-brand-text">구매 요청</h2>
           </div>
 
-          {/* 자녀 전환 네비 */}
           <ChildProfileNav tabs={tabs} compact />
 
-          {/* 요청 목록 — 태블릿에서는 최대 높이 제한 후 스크롤 */}
-          <div className="mt-2 flex flex-col gap-3 md:max-h-72 md:overflow-y-auto">
+          <div className="mt-2 flex flex-col gap-3">
             {requestsForChild.length === 0 ? (
               <div className="rounded-2xl bg-white p-6 text-center shadow-sm">
                 <p className="text-sm text-gray-400">대기 중인 구매 요청이 없어요</p>
@@ -1033,12 +836,12 @@ export default function ApprovalTab({
                 return (
                   <div
                     key={req.id}
-                    className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100"
+                    className="rounded-2xl bg-white px-3 py-2.5 shadow-sm ring-1 ring-gray-100"
                   >
                     <div className="flex flex-row items-start gap-2 sm:gap-3">
                       <div className="flex min-w-0 flex-1 gap-2 sm:gap-3">
                         <div
-                          className={`flex h-[52px] w-[52px] shrink-0 items-end justify-center overflow-hidden rounded-xl ring-1 ${
+                          className={`flex h-[44px] w-[44px] shrink-0 items-end justify-center overflow-hidden rounded-xl ring-1 ${
                             isParentBuying ? 'bg-sky-50/80 ring-sky-100' : 'bg-amber-50/80 ring-amber-100'
                           }`}
                         >
@@ -1051,7 +854,7 @@ export default function ApprovalTab({
                               draggable={false}
                             />
                           ) : (
-                            <MarketItemImage frame={frame} height={44} />
+                            <MarketItemImage frame={frame} height={36} />
                           )}
                         </div>
                         <div className="min-w-0 flex-1">
@@ -1068,22 +871,22 @@ export default function ApprovalTab({
                         </div>
                       </div>
 
-                      {/* 승인·반려 버튼: 항상 카드 안에 표시 */}
-                      <div className="flex w-[4.25rem] shrink-0 flex-col gap-1 self-start pt-0.5 sm:w-[4.5rem]">
+                      {/* 승인·반려 버튼 */}
+                      <div className="flex w-[3.5rem] shrink-0 flex-col gap-1 self-center">
                         {isParentBuying ? (
                           <>
                             <button
                               type="button"
                               onClick={(e) => { e.stopPropagation(); setRejectModal({ requestId: req.id, itemName: req.item_name }) }}
                               disabled={loading === req.id}
-                              className="w-full rounded-lg border border-red-200 py-1.5 text-[9px] font-bold text-red-500 transition-all active:scale-95 disabled:opacity-50 sm:rounded-xl sm:py-2"
+                              className="w-full rounded-lg border border-red-200 py-1 text-[9px] font-bold text-red-500 transition-all active:scale-95 disabled:opacity-50"
                             >
                               반려
                             </button>
                             <button
                               type="button"
                               onClick={(e) => { e.stopPropagation(); window.open(PARENT_EXTERNAL_SHOP_URL, '_blank', 'noopener,noreferrer') }}
-                              className="w-full rounded-lg bg-amber-500 py-1.5 text-[9px] font-bold text-white shadow-md transition-all active:scale-95 sm:rounded-xl sm:py-2"
+                              className="w-full rounded-lg bg-amber-500 py-1 text-[9px] font-bold text-white shadow-sm transition-all active:scale-95"
                             >
                               쿠팡 열기
                             </button>
@@ -1091,7 +894,7 @@ export default function ApprovalTab({
                               type="button"
                               onClick={(e) => { e.stopPropagation(); void handleApprove(req.id) }}
                               disabled={loading === req.id}
-                              className="w-full rounded-lg bg-brand-blue py-1.5 text-[9px] font-bold text-white shadow-md transition-all active:scale-95 disabled:opacity-50 sm:rounded-xl sm:py-2"
+                              className="w-full rounded-lg bg-brand-blue py-1 text-[9px] font-bold text-white shadow-sm transition-all active:scale-95 disabled:opacity-50"
                             >
                               {loading === req.id ? '…' : '배달 승인'}
                             </button>
@@ -1102,7 +905,7 @@ export default function ApprovalTab({
                               type="button"
                               onClick={(e) => { e.stopPropagation(); setRejectModal({ requestId: req.id, itemName: req.item_name }) }}
                               disabled={loading === req.id}
-                              className="w-full rounded-lg border border-red-200 py-1.5 text-[9px] font-bold text-red-500 transition-all active:scale-95 disabled:opacity-50 sm:rounded-xl sm:py-2"
+                              className="w-full rounded-lg border border-red-200 py-1 text-[9px] font-bold text-red-500 transition-all active:scale-95 disabled:opacity-50"
                             >
                               반려
                             </button>
@@ -1110,7 +913,7 @@ export default function ApprovalTab({
                               type="button"
                               onClick={(e) => { e.stopPropagation(); setApproveChoiceModal({ requestId: req.id, itemName: req.item_name }) }}
                               disabled={loading === req.id}
-                              className="w-full rounded-lg bg-brand-blue py-1.5 text-[9px] font-bold text-white shadow-md transition-all active:scale-95 disabled:opacity-50 sm:rounded-xl sm:py-2"
+                              className="w-full rounded-lg bg-brand-blue py-1 text-[9px] font-bold text-white shadow-sm transition-all active:scale-95 disabled:opacity-50"
                             >
                               승인
                             </button>
@@ -1123,157 +926,185 @@ export default function ApprovalTab({
               })
             )}
           </div>
+        </section>
 
-          {/* 승인 내역 — 모바일: 버튼 → 하단 시트 */}
-          {historyForChild.length > 0 && (
-            <div className="md:hidden mt-5">
-              <button
-                type="button"
-                onClick={() => { setPurchaseHistoryShowAll(false); setPurchaseHistorySheetOpen(true) }}
-                className="w-full rounded-2xl bg-white p-4 text-left shadow-sm ring-1 ring-gray-100 transition-all active:scale-[0.99]"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                    <span className="text-sm font-black text-brand-text">승인 내역</span>
-                    <span className="text-[11px] text-gray-400">탭하여 목록 보기</span>
-                  </div>
-                  <span className="shrink-0 rounded-full bg-brand-blue/10 px-2.5 py-1 text-xs font-black tabular-nums text-brand-blue">
-                    {historyForChild.length}건
-                  </span>
-                  <span className="shrink-0 text-lg font-bold text-gray-300" aria-hidden>›</span>
+        {/* 승인 내역 — 접기/펼치기 (모바일·태블릿 공통) */}
+        {historyForChild.length > 0 && (
+          <section>
+            <button
+              type="button"
+              onClick={() => { setPurchaseHistoryShowAll(false); setHistoryInlineOpen((v) => !v) }}
+              className="w-full rounded-2xl bg-white px-4 py-2.5 text-left shadow-sm ring-1 ring-gray-100 transition-all active:scale-[0.99]"
+            >
+              <div className="flex items-center gap-3">
+                <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <span className="text-sm font-black text-brand-text">승인 내역</span>
+                  <span className="text-[11px] text-gray-400">탭하여 목록 {historyInlineOpen ? '접기' : '펼치기'}</span>
                 </div>
-              </button>
-
-              {purchaseHistorySheetOpen && (
-                <div className="fixed inset-0 z-[100] flex flex-col justify-end">
+                <span className="shrink-0 rounded-full bg-brand-blue/10 px-2.5 py-1 text-xs font-black tabular-nums text-brand-blue">
+                  {historyForChild.length}건
+                </span>
+                <span className={`shrink-0 text-lg font-bold text-gray-300 transition-transform ${historyInlineOpen ? 'rotate-90' : ''}`} aria-hidden>›</span>
+              </div>
+            </button>
+            {historyInlineOpen && (
+              <div className="mt-2">
+                <ul className="flex flex-col gap-1.5">
+                  {visiblePurchaseHistory.map((req) => {
+                    const pill = purchaseRequestStatusPill(req.status)
+                    return (
+                      <li key={req.id} className="rounded-xl bg-gray-50/90 px-3 py-2 ring-1 ring-gray-100">
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="min-w-0 flex-1 truncate text-sm font-bold text-brand-text">{req.item_name}</p>
+                          <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-black ${pill.pillClass}`}>
+                            {pill.label}
+                          </span>
+                        </div>
+                        <p className="mt-1 text-[10px] tabular-nums text-gray-400">
+                          {purchaseHistoryPrimaryDate(req)} · {req.item_price.toLocaleString()}크레딧
+                        </p>
+                        {req.status === 'rejected' && req.parent_note ? (
+                          <p className="mt-1 line-clamp-2 text-[10px] text-gray-500">사유: {req.parent_note}</p>
+                        ) : null}
+                      </li>
+                    )
+                  })}
+                </ul>
+                {purchaseHistoryHasMore && (
                   <button
                     type="button"
-                    className="absolute inset-0 bg-black/45"
-                    aria-label="닫기"
-                    onClick={() => setPurchaseHistorySheetOpen(false)}
-                  />
-                  <div
-                    className="relative z-[1] flex max-h-[min(78dvh,560px)] flex-col rounded-t-3xl bg-white shadow-2xl"
-                    role="dialog"
-                    aria-modal="true"
-                    aria-labelledby="purchase-history-sheet-title"
+                    onClick={() => setPurchaseHistoryShowAll((v) => !v)}
+                    className="mt-2 w-full rounded-xl border border-gray-200 py-2.5 text-sm font-bold text-brand-text"
                   >
-                    <div className="flex justify-center pt-2 pb-1">
-                      <span className="h-1 w-10 rounded-full bg-gray-200" />
-                    </div>
-                    <div className="border-b border-gray-100 px-5 pb-3 pt-1">
-                      <h3 id="purchase-history-sheet-title" className="text-base font-black text-brand-text">
-                        승인 내역
-                      </h3>
-                    </div>
-                    <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3">
-                      <ul className="flex flex-col gap-1.5">
-                        {visiblePurchaseHistory.map((req) => {
-                          const pill = purchaseRequestStatusPill(req.status)
-                          return (
-                            <li key={req.id} className="rounded-xl bg-gray-50/90 px-3 py-2.5 ring-1 ring-gray-100">
-                              <div className="flex items-start justify-between gap-2">
-                                <p className="min-w-0 flex-1 truncate text-sm font-bold text-brand-text">{req.item_name}</p>
-                                <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-black ${pill.pillClass}`}>
-                                  {pill.label}
-                                </span>
-                              </div>
-                              <p className="mt-1 text-[10px] tabular-nums text-gray-400">
-                                {purchaseHistoryPrimaryDate(req)} · {req.item_price.toLocaleString()}크레딧
-                              </p>
-                              {req.status === 'rejected' && req.parent_note ? (
-                                <p className="mt-1 line-clamp-2 text-[10px] text-gray-500">사유: {req.parent_note}</p>
-                              ) : null}
-                            </li>
-                          )
-                        })}
-                      </ul>
-                    </div>
-                    {purchaseHistoryHasMore ? (
-                      <div className="border-t border-gray-100 px-4 py-2">
-                        <button
-                          type="button"
-                          onClick={() => setPurchaseHistoryShowAll((v) => !v)}
-                          className="w-full rounded-xl border border-gray-200 py-2.5 text-sm font-bold text-brand-text"
-                        >
-                          {purchaseHistoryShowAll
-                            ? `간단히 보기 (${PURCHASE_HISTORY_PREVIEW_COUNT}건)`
-                            : `더보기 (${historyForChild.length - PURCHASE_HISTORY_PREVIEW_COUNT}건 더)`}
-                        </button>
-                      </div>
-                    ) : null}
-                    <div className="border-t border-gray-100 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-                      <button
-                        type="button"
-                        onClick={() => setPurchaseHistorySheetOpen(false)}
-                        className="w-full rounded-2xl bg-gray-100 py-3 text-sm font-bold text-gray-600"
-                      >
-                        닫기
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
+                    {purchaseHistoryShowAll
+                      ? `간단히 보기 (${PURCHASE_HISTORY_PREVIEW_COUNT}건)`
+                      : `더보기 (${historyForChild.length - PURCHASE_HISTORY_PREVIEW_COUNT}건 더)`}
+                  </button>
+                )}
+              </div>
+            )}
+          </section>
+        )}
 
-          {/* 승인 내역 — 태블릿: 접기/펼치기 인라인 */}
-          {historyForChild.length > 0 && (
-            <div className="hidden md:block mt-5">
+        {/* 오늘 완료 미션 — 버튼 → 하단 시트 (모바일·태블릿 공통) */}
+        <section>
+          <button
+            type="button"
+            onClick={() => { setRollbackSheetShowAll(false); setRollbackSheetOpen(true) }}
+            className="w-full rounded-2xl bg-white px-4 py-2.5 text-left shadow-sm ring-1 ring-gray-100 transition-all active:scale-[0.99]"
+          >
+            <div className="flex items-center gap-3">
+              <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <span className="text-sm font-black text-brand-text">오늘 완료 미션</span>
+                <span className="text-[11px] text-gray-400">탭하여 다시 하기 · 롤백</span>
+              </div>
+              <span className="shrink-0 rounded-full bg-brand-blue/10 px-2.5 py-1 text-xs font-black tabular-nums text-brand-blue">
+                {todayCompletedLogs.length}건
+              </span>
+              <span className="shrink-0 text-lg font-bold text-gray-300" aria-hidden>›</span>
+            </div>
+          </button>
+
+          {rollbackSheetOpen && (
+            <div className="fixed inset-0 z-[100] flex flex-col justify-end">
               <button
                 type="button"
-                onClick={() => { setPurchaseHistoryShowAll(false); setHistoryInlineOpen((v) => !v) }}
-                className="w-full rounded-2xl bg-white p-4 text-left shadow-sm ring-1 ring-gray-100 transition-all active:scale-[0.99]"
+                className="absolute inset-0 bg-black/45"
+                aria-label="닫기"
+                onClick={() => setRollbackSheetOpen(false)}
+              />
+              <div
+                className="relative z-[1] flex max-h-[min(78dvh,560px)] flex-col rounded-t-3xl bg-white shadow-2xl"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="rollback-sheet-title"
               >
-                <div className="flex items-center gap-3">
-                  <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                    <span className="text-sm font-black text-brand-text">승인 내역</span>
-                    <span className="text-[11px] text-gray-400">탭하여 목록 {historyInlineOpen ? '접기' : '펼치기'}</span>
-                  </div>
-                  <span className="shrink-0 rounded-full bg-brand-blue/10 px-2.5 py-1 text-xs font-black tabular-nums text-brand-blue">
-                    {historyForChild.length}건
-                  </span>
-                  <span className={`shrink-0 text-lg font-bold text-gray-300 transition-transform ${historyInlineOpen ? 'rotate-90' : ''}`} aria-hidden>›</span>
+                <div className="flex justify-center pt-2 pb-1">
+                  <span className="h-1 w-10 rounded-full bg-gray-200" />
                 </div>
-              </button>
-              {historyInlineOpen && (
-                <div className="mt-2">
-                  <ul className="flex flex-col gap-1.5">
-                    {visiblePurchaseHistory.map((req) => {
-                      const pill = purchaseRequestStatusPill(req.status)
-                      return (
-                        <li key={req.id} className="rounded-xl bg-gray-50/90 px-3 py-2.5 ring-1 ring-gray-100">
-                          <div className="flex items-start justify-between gap-2">
-                            <p className="min-w-0 flex-1 truncate text-sm font-bold text-brand-text">{req.item_name}</p>
-                            <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-black ${pill.pillClass}`}>
-                              {pill.label}
-                            </span>
+                <div className="border-b border-gray-100 px-5 pb-3 pt-1">
+                  <h3 id="rollback-sheet-title" className="text-base font-black text-brand-text">
+                    오늘 완료 미션
+                  </h3>
+                </div>
+                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3">
+                  {todayCompletedLogs.length === 0 ? (
+                    <p className="py-8 text-center text-sm text-gray-400">오늘 완료한 미션이 없어요</p>
+                  ) : (
+                    <div className="flex flex-col gap-2">
+                      {visibleRollbackInSheet.map((log) => (
+                        <div
+                          key={log.id}
+                          className="flex items-center gap-3 rounded-xl bg-gray-50/90 px-3 py-2.5 ring-1 ring-gray-100"
+                        >
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-bold text-brand-text">{log.missions?.title ?? '미션'}</p>
+                            <p className="text-[10px] text-gray-400">
+                              {log.completed_at
+                                ? getSeoulDateFromIsoTimestamp(log.completed_at) ?? log.completed_at.slice(0, 10)
+                                : ''}
+                            </p>
                           </div>
-                          <p className="mt-1 text-[10px] tabular-nums text-gray-400">
-                            {purchaseHistoryPrimaryDate(req)} · {req.item_price.toLocaleString()}크레딧
-                          </p>
-                          {req.status === 'rejected' && req.parent_note ? (
-                            <p className="mt-1 line-clamp-2 text-[10px] text-gray-500">사유: {req.parent_note}</p>
-                          ) : null}
-                        </li>
-                      )
-                    })}
-                  </ul>
-                  {purchaseHistoryHasMore && (
-                    <button
-                      type="button"
-                      onClick={() => setPurchaseHistoryShowAll((v) => !v)}
-                      className="mt-2 w-full rounded-xl border border-gray-200 py-2.5 text-sm font-bold text-brand-text"
-                    >
-                      {purchaseHistoryShowAll
-                        ? `간단히 보기 (${PURCHASE_HISTORY_PREVIEW_COUNT}건)`
-                        : `더보기 (${historyForChild.length - PURCHASE_HISTORY_PREVIEW_COUNT}건 더)`}
-                    </button>
+                          <div className="shrink-0 text-right">
+                            <p className="text-[10px] font-bold tabular-nums text-brand-blue">+{log.credit_earned} 크레딧</p>
+                            <button
+                              type="button"
+                              onClick={() => void handleRequestRedoFromChild(log)}
+                              disabled={loading === log.id}
+                              className="text-[10px] font-bold text-orange-500 hover:underline disabled:opacity-50"
+                            >
+                              다시하기
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   )}
                 </div>
-              )}
+                {todayCompletedLogs.length > ROLLBACK_SHEET_INITIAL && !rollbackSheetShowAll && (
+                  <div className="border-t border-gray-100 px-4 py-2">
+                    <button
+                      type="button"
+                      onClick={() => setRollbackSheetShowAll(true)}
+                      className="w-full rounded-xl border border-gray-200 py-2.5 text-sm font-bold text-brand-text"
+                    >
+                      더보기 ({todayCompletedLogs.length - ROLLBACK_SHEET_INITIAL}개 더 있음)
+                    </button>
+                  </div>
+                )}
+                <div className="border-t border-gray-100 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+                  <button
+                    type="button"
+                    onClick={() => setRollbackSheetOpen(false)}
+                    className="w-full rounded-2xl bg-gray-100 py-3 text-sm font-bold text-gray-600"
+                  >
+                    닫기
+                  </button>
+                </div>
+              </div>
             </div>
           )}
+        </section>
+
+      </div>{/* /좌 컬럼 */}
+
+      {/* ── 우 컬럼: 칭찬 스티커 + 마켓 제어 ── */}
+      <div className="flex flex-col gap-5">
+
+        <PraiseStickerPanel childId={currentId} childName={currentChild?.name ?? '자녀'} />
+
+        {/* `id`: 홈 경제 EQ 코칭 카드의 「자녀 보상 등록」링크가 이 구역으로 스크롤되게 함 */}
+        <section id="parent-approval-market-rewards" aria-label="자녀 마켓 보상 설정">
+          <ParentMarketMenuControl
+            childId={currentId}
+            storeItems={storeItems}
+            hiddenItemIds={hiddenSetForCurrent}
+            familyLinkIdForChild={currentId ? linkByChild[currentId] ?? null : null}
+            onHiddenChange={onHiddenChangeForCurrent}
+            onItemCreated={(item) => setStoreItems((prev) => [...prev, item])}
+            creditOverrides={creditOverridesForCurrent}
+            onCreditOverrideSaved={onCreditOverrideSaved}
+          />
         </section>
 
       </div>{/* /우 컬럼 */}

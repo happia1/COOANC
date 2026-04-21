@@ -252,6 +252,11 @@ export default function HomeTab({ childrenData }: Props) {
                 childName={child.name}
               />
 
+            </div>
+
+            {/* 우 컬럼: 오늘의 진행도 + AI 꿀팁(ParentAgentHomeCards) + 최근 활동 + 데이터 모으는 중
+                ParentAgentHomeCards 가 데이터 있을 땐 AI 카드, 없을 땐 「데이터 모으는 중」을 모두 처리함 */}
+            <div className="flex flex-col gap-4">
               {/* 오늘의 진행도 */}
               <div className="rounded-2xl bg-white p-4 shadow-sm">
                 <div className="mb-2 flex items-center justify-between gap-2">
@@ -273,11 +278,7 @@ export default function HomeTab({ childrenData }: Props) {
                   <p className="mt-1 text-right text-[10px] font-bold text-[#7ED321]">오늘 미션 모두 완료!</p>
                 )}
               </div>
-            </div>
 
-            {/* 우 컬럼: AI 꿀팁(ParentAgentHomeCards) + 최근 활동 + 데이터 모으는 중
-                ParentAgentHomeCards 가 데이터 있을 땐 AI 카드, 없을 땐 「데이터 모으는 중」을 모두 처리함 */}
-            <div className="flex flex-col gap-4">
               <ParentAgentHomeCards childId={child.id} />
 
               {/* 최근 활동: 토글 헤더(기본 접힘) + 펼칠 때만 미션 완료 로그 목록 */}
