@@ -72,7 +72,10 @@ export function useParentAgentReport(childId: string | undefined): UseParentAgen
       const runTimeout = window.setTimeout(() => runCtrl.abort(), 120_000)
       const runResult = await fetch(`${agentBaseUrl}/agent-a/run`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session?.access_token ?? ''}`,
+        },
         body: JSON.stringify({ child_id: childId, parent_id: parentId }),
         signal: runCtrl.signal,
       })
