@@ -21,19 +21,15 @@ import {
 /** 차트·피드백에 필요한 `child_stats` 일부 + 레벨 뱃지 표시용 레벨 */
 export type EconomicEqStatsSlice = Pick<
   ChildStats,
-  'eq_routine_rate' | 'eq_delay_score' | 'eq_save_ratio' | 'streak_days' | 'credits' | 'current_level'
+  | 'eq_routine_rate'
+  | 'eq_delay_score'
+  | 'eq_save_ratio'
+  | 'streak_days'
+  | 'credits'
+  | 'credits_wallet'
+  | 'credits_piggy'
+  | 'current_level'
 >
-
-/** `eq_delay_score`(총액 대비 저금통 %) 해설 — 설명 모달 본문에 씁니다. */
-function delayScoreReview(score: number, childName: string): string {
-  if (score >= 60) {
-    return `${childName}의 지표를 보면, 보유 크레딧 중 많은 부분이 저금통에 있어요.\n당장 쓰지 않고 모으는 습관이 잘 보입니다.`
-  }
-  if (score >= 35) {
-    return `저금통 비율이 중간쯤이에요.\n가용(돈바구니)이나 지갑에만 두지 않고 저금통으로 옮기면 같은 총액에서도 이 습관 지표가 함께 올라갑니다.`
-  }
-  return `아직 가용·지갑 쪽 비중이 크면 수치가 낮게 보일 수 있어요.\n작은 목표부터 저금통으로 옮기는 연습을 보면 좋아요.`
-}
 
 /** 루틴 추세 코드 → 화살표 문자(비개발자도 한눈에 추세를 볼 수 있게) */
 function routineTrendArrow(trend: string | undefined): string {
@@ -60,11 +56,11 @@ type Props = {
 function EqDelayExplainModal({
   onClose,
   childName,
-  delayScore,
+  savingsRate,
 }: {
   onClose: () => void
   childName: string
-  delayScore: number
+  savingsRate: number
 }) {
   const [mounted, setMounted] = useState(false)
   useEffect(() => setMounted(true), [])
@@ -92,34 +88,34 @@ function EqDelayExplainModal({
           <h2 id="eq-delay-modal-title" className="text-center text-sm font-bold text-gray-900">
             저축 습관
           </h2>
-          <p className="mt-0.5 text-center text-[10px] text-gray-500">자세한 설명 · 계산 · 해석</p>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
-          <div className="space-y-3 text-xs text-gray-700 leading-relaxed">
-            <div>
-              <p className="font-bold text-gray-900 mb-1">이 그래프는?</p>
-              <p>
-                전체 보유 크레딧(가용 돈바구니 + 지갑 + 저금통) 중 <strong>저금통에 묶인 비율</strong>을 한눈에 보여
-                줍니다. 당장 쓰지 않고 나중을 위해 모아 두는 습관을 뜻해요.
+          <div className="text-xs text-gray-700 leading-relaxed">
+            <div className="bg-blue-50 rounded-xl p-4 mb-4">
+              <p className="text-xs text-blue-500 font-medium mb-1">지금 {childName}이는</p>
+              <p className="text-base font-bold text-blue-900">
+                {savingsRate < 20
+                  ? '대부분의 크레딧을 지갑에서 쓰고 있어요'
+                  : savingsRate < 50
+                    ? '저금통보다 지갑 사용이 조금 더 많아요'
+                    : savingsRate < 80
+                      ? '저금통에 잘 모으고 있어요'
+                      : '대부분의 크레딧을 저금통에 모으고 있어요'}
+              </p>
+              <p className="text-sm text-blue-700 mt-1">
+                전체 크레딧 중 저금통에 {savingsRate}%가 있어요
               </p>
             </div>
-            <div>
-              <p className="font-bold text-gray-900 mb-1">지금 상태</p>
-              <p className="whitespace-pre-line">{delayScoreReview(delayScore, childName)}</p>
-            </div>
-            <div>
-              <p className="font-bold text-gray-900 mb-1">계산 방식</p>
-              <p>
-                저축 습관 지표 = 반올림((저금통 크레딧 ÷ 총 크레딧) × 100), 최대 100%. 서버 함수{' '}
-                <code className="rounded bg-gray-100 px-1 text-[10px]">recalculate_eq</code>가 지갑·저금통이 바뀔 때마다
-                같은 식으로 다시 계산해요.
-              </p>
-            </div>
-            <div>
-              <p className="font-bold text-gray-900 mb-1">높으면 좋을까요?</p>
-              <p>
-                일반적으로 <strong>높을수록</strong> 나중을 위해 모으는 습관이 잘 잡혀 있다고 볼 수 있어요. 다만 미션
-                보상이 가용(돈바구니)에만 쌓이고 저금통으로 옮기지 않으면 총액은 많은데 막대가 짧게 보일 수 있어요.
+
+            <p className="text-sm text-gray-600">
+              전체 크레딧 중 저금통에 보관된 비율이에요. 당장 쓰지 않고 나중을 위해 모아두는 습관을 보여줘요.
+            </p>
+
+            <div className="mt-4 pt-4 border-t border-gray-100">
+              <p className="text-xs text-gray-400 font-medium mb-1">참고</p>
+              <p className="text-sm text-gray-500">
+                높을수록 저축 습관이 잘 잡혀있다는 신호예요. 미션 보상을 받은 뒤 저금통으로 옮기는 연습을 함께
+                해보세요.
               </p>
             </div>
           </div>
@@ -178,6 +174,9 @@ export default function EconomicEqPanel({
   }
 
   const showAgentBlock = Boolean(agentChildId)
+  // 현재 잔액 기준 저축 습관 비율: 저금통 / (돈바구니 + 지갑 + 저금통)
+  const totalCredits = (stats.credits ?? 0) + (stats.credits_wallet ?? 0) + (stats.credits_piggy ?? 0)
+  const savingsRate = totalCredits > 0 ? Math.round(((stats.credits_piggy ?? 0) / totalCredits) * 100) : 0
 
   return (
     <section className="w-full bg-white rounded-2xl p-4 shadow-sm space-y-4">
@@ -353,7 +352,7 @@ export default function EconomicEqPanel({
         <EqDelayExplainModal
           onClose={() => setDelayExplainOpen(false)}
           childName={childName}
-          delayScore={stats.eq_delay_score}
+          savingsRate={savingsRate}
         />
       ) : null}
     </section>

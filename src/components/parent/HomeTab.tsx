@@ -46,6 +46,8 @@ export type ChildSummary = {
   avatarUrl: string | null
   stats: {
     credits: number
+    credits_wallet: number
+    credits_piggy: number
     hearts: number
     current_level: number
     exp: number
@@ -77,9 +79,11 @@ type Props = {
     event_type?: string | null
     title?: string | null
   }[]
+  /** 지난 14일 중 미션 완료 기록이 있는 날짜 수(서버 계산값). */
+  daysWithData: number
 }
 
-export default function HomeTab({ childrenData, upcomingEvents }: Props) {
+export default function HomeTab({ childrenData, upcomingEvents, daysWithData }: Props) {
   const { selectedChildId, setSelectedChildId } = useParentStore()
   /** 부모 홈 데이터는 이벤트성 갱신보다 안정성이 우선이라 일반 조회(fetch)만 사용합니다. */
   const supabaseRef = useRef(createClient())
@@ -358,6 +362,7 @@ export default function HomeTab({ childrenData, upcomingEvents }: Props) {
                */}
               <ParentAgentHomeCards
                 agent={agentReport}
+                daysWithData={daysWithData}
                 calendarNoticeText={calendarNoticeText}
                 calendarUpcomingEvents={effectiveUpcomingEvents.map((ev) => ({
                   id: ev.id ?? `${ev.start_date}-${ev.title ?? 'event'}`,
@@ -405,6 +410,8 @@ export default function HomeTab({ childrenData, upcomingEvents }: Props) {
                   eq_save_ratio: s?.eq_save_ratio ?? 0,
                   streak_days: s?.streak_days ?? 0,
                   credits: s?.credits ?? 0,
+                  credits_wallet: s?.credits_wallet ?? 0,
+                  credits_piggy: s?.credits_piggy ?? 0,
                   current_level: s?.current_level ?? 0,
                 }}
                 weeklyRoutine={weeklyRoutine}

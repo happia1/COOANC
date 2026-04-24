@@ -81,6 +81,8 @@ function hasDisplayableAgentContent(row: AgentLatestReportRow | null | undefined
 type Props = {
   /** `useParentAgentReport` 한 번만 호출한 결과를 넘깁니다. */
   agent: UseParentAgentReportResult
+  /** 지난 14일 중 미션 완료 기록이 있는 날짜 수(홈 서버 계산값) */
+  daysWithData: number
   /** 홈 서버 조회(calendar_events) 기반 일정 브리핑 문구 */
   calendarNoticeText?: string
   /** 홈 브리핑 UI(일정 있음 상태) 목록 데이터 */
@@ -108,7 +110,7 @@ function AgentOnboardingProgressCard({ daysWithData }: { daysWithData: number })
       {/* Progress bar — days collected / 7 */}
       <div className="mb-3">
         <div className="mb-1 flex justify-between text-xs text-gray-600">
-          <span>미션 수행 기록</span>
+          <span>분석 데이터 누적</span>
           <span>{clampedDays}일 / 7일</span>
         </div>
         <div className="h-2 overflow-hidden rounded-full bg-gray-200">
@@ -122,7 +124,7 @@ function AgentOnboardingProgressCard({ daysWithData }: { daysWithData: number })
       {/* Preview of what's coming */}
       <p className="mb-3 text-xs text-gray-500">
         {clampedDays === 0
-          ? '첫 미션을 완료하면 기록이 쌓이기 시작해요.'
+          ? '미션을 완료할수록 더 정확한 분석이 가능해요.'
           : remain > 0
             ? `${remain}일 더 진행하면 리포트가 완성돼요!`
             : '리포트를 만들 준비가 끝났어요. 잠시만 기다려 주세요!'}
@@ -151,12 +153,15 @@ function AgentOnboardingProgressCard({ daysWithData }: { daysWithData: number })
 
 export default function ParentAgentHomeCards({
   agent,
+  daysWithData,
   calendarNoticeText,
   calendarUpcomingEvents = [],
   onOpenCalendarEventSheet,
 }: Props) {
   const { row, loading, runState, distinctDays, reload } = agent
   const [sheet, setSheet] = useState<SheetKind>(null)
+  // 서버 집계(daysWithData)를 우선 사용하고, 없으면 기존 훅 값(distinctDays)을 보조로 사용합니다.
+  const onboardingDays = Math.max(0, Number(daysWithData || distinctDays || 0))
 
   const hasContent = hasDisplayableAgentContent(row)
   const coachingFull = String(row?.coaching_text ?? '').trim()
@@ -225,7 +230,7 @@ export default function ParentAgentHomeCards({
         ) : null}
 
         {!loading && runState === 'insufficient' ? (
-          <AgentOnboardingProgressCard daysWithData={distinctDays} />
+          <AgentOnboardingProgressCard daysWithData={onboardingDays} />
         ) : null}
 
         {!loading && runState === 'error' ? (
@@ -243,7 +248,7 @@ export default function ParentAgentHomeCards({
         ) : null}
 
         {!loading && runState === 'idle' && !hasContent ? (
-          <AgentOnboardingProgressCard daysWithData={distinctDays} />
+          <AgentOnboardingProgressCard daysWithData={onboardingDays} />
         ) : null}
 
         {!loading && hasContent && coachingFull ? (

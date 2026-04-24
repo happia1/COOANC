@@ -32,6 +32,11 @@ import HomeTab, { type ChildSummary } from '@/components/parent/HomeTab'
 import { unstable_cache } from 'next/cache'
 import { createServiceRoleClient } from '@/lib/supabase/admin'
 
+/** ISO 시각으로부터 경과 일수를 계산해 에이전트 재실행 주기를 판단합니다. */
+function daysSince(isoString: string): number {
+  return Math.floor((Date.now() - new Date(isoString).getTime()) / 86400000)
+}
+
 /**
  * 자녀 프로필은 빈번히 바뀌지 않으므로 5분 캐시를 둡니다.
  * - service_role 이 있으면 RLS와 무관하게 빠르게 읽고,
@@ -66,7 +71,7 @@ export default async function ParentHomePage() {
   const familyLinkIds = auth.familyLinks.map((l) => l.id)
 
   if (childIds.length === 0) {
-    return <HomeTab childrenData={[]} upcomingEvents={[]} />
+    return <HomeTab childrenData={[]} upcomingEvents={[]} daysWithData={0} />
   }
 
   const today = getSeoulDateString()
@@ -75,11 +80,21 @@ export default async function ParentHomePage() {
   const weekEnd = addSeoulCalendarDays(weekStart, 6)
 
   const childIdsKey = [...childIds].sort().join(',')
-  const [cachedProfilesRes, statsRes, weekDailyRes, recentLogsRes, calendarEventsRes] = await Promise.all([
+  const primaryChildId = childIds[0]
+  const fourteenDaysAgo = addSeoulCalendarDays(today, -14)
+  const [
+    cachedProfilesRes,
+    statsRes,
+    weekDailyRes,
+    recentLogsRes,
+    calendarEventsRes,
+    missionLogsRes,
+    agentReportsRes,
+  ] = await Promise.all([
     getCachedChildProfilesForParentHome(childIdsKey),
     supabase
       .from('child_stats')
-      .select('child_id, credits, hearts, current_level, exp, exp_to_next_level, streak_days, eq_delay_score, eq_routine_rate, eq_save_ratio')
+      .select('child_id, credits, credits_wallet, credits_piggy, hearts, current_level, exp, exp_to_next_level, streak_days, eq_delay_score, eq_routine_rate, eq_save_ratio')
       .in('child_id', childIds),
 
     // 경제 EQ 카드 — 이번 주 월~일(서울) 배정 미션
@@ -107,6 +122,21 @@ export default async function ParentHomePage() {
       .lte('start_date', sevenDaysLater)
       .order('start_date', { ascending: true })
       .limit(5),
+
+    // AI 리포트 준비 진행도: 최근 14일 중 기록이 있는 날짜 수 계산용
+    supabase
+      .from('mission_logs')
+      .select('assigned_date')
+      .eq('child_id', primaryChildId)
+      .gte('assigned_date', fourteenDaysAgo),
+
+    // 최신 리포트 1건 조회: 자동 실행 필요 여부 판단용
+    supabase
+      .from('agent_reports')
+      .select('created_at')
+      .eq('child_id', primaryChildId)
+      .order('created_at', { ascending: false })
+      .limit(1),
   ])
   const profileRes =
     cachedProfilesRes.rows !== null
@@ -198,5 +228,24 @@ export default async function ParentHomePage() {
     error: calendarEventsRes.error?.message,
   })
 
-  return <HomeTab childrenData={childrenData} upcomingEvents={upcomingEvents} />
+  const daysWithData = new Set(
+    ((missionLogsRes.data ?? []) as { assigned_date: string | null }[]).map((row) =>
+      typeof row.assigned_date === 'string' ? row.assigned_date.slice(0, 10) : row.assigned_date,
+    ),
+  ).size
+
+  const lastReport = (agentReportsRes.data ?? [])[0]
+  const shouldRunAgent = !lastReport || (lastReport.created_at ? daysSince(lastReport.created_at) >= 7 : true)
+  const agentBaseUrl = process.env.AGENT_BASE_URL
+
+  // 홈 진입 시 최신 리포트가 없고 데이터가 최소 3일 이상이면 Agent A를 백그라운드로 깨웁니다.
+  if (agentBaseUrl && shouldRunAgent && daysWithData >= 3) {
+    void fetch(`${agentBaseUrl}/agent-a/run`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ child_id: primaryChildId }),
+    }).catch((e) => console.warn('[agent-a] trigger failed', e))
+  }
+
+  return <HomeTab childrenData={childrenData} upcomingEvents={upcomingEvents} daysWithData={daysWithData} />
 }
