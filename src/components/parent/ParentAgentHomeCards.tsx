@@ -83,6 +83,68 @@ type Props = {
   agent: UseParentAgentReportResult
 }
 
+/**
+ * 리포트 준비 중 온보딩 카드:
+ * - `distinctDays`(최근 14일 중 미션이 있던 서로 다른 날짜 수)를 진행률로 사용합니다.
+ * - 기존 "0일/7일" 문구 대신, 부모가 다음 단계를 직관적으로 이해하도록 구성합니다.
+ */
+function AgentOnboardingProgressCard({ daysWithData }: { daysWithData: number }) {
+  const clampedDays = Math.max(0, Math.min(7, Number(daysWithData || 0)))
+  const remain = Math.max(0, 7 - clampedDays)
+  const progressPercent = Math.min(100, (clampedDays / 7) * 100)
+  return (
+    <div className="rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 p-5">
+      {/* Header */}
+      <div className="mb-3 flex items-center gap-2">
+        <span aria-hidden>🌱</span>
+        <p className="text-sm font-bold text-blue-900">AI 리포트 준비 중이에요</p>
+      </div>
+
+      {/* Progress bar — days collected / 7 */}
+      <div className="mb-3">
+        <div className="mb-1 flex justify-between text-xs text-blue-700">
+          <span>미션 수행 기록</span>
+          <span>{clampedDays}일 / 7일</span>
+        </div>
+        <div className="h-2 overflow-hidden rounded-full bg-blue-100">
+          <div
+            className="h-full rounded-full bg-blue-400 transition-all duration-500"
+            style={{ width: `${progressPercent}%` }}
+          />
+        </div>
+      </div>
+
+      {/* Preview of what's coming */}
+      <p className="mb-3 text-xs text-blue-600">
+        {clampedDays === 0
+          ? '첫 미션을 완료하면 기록이 쌓이기 시작해요.'
+          : remain > 0
+            ? `${remain}일 더 진행하면 리포트가 완성돼요!`
+            : '리포트를 만들 준비가 끝났어요. 잠시만 기다려 주세요!'}
+      </p>
+
+      {/* Teaser cards — what will be shown */}
+      <div className="grid grid-cols-2 gap-2">
+        {[
+          { icon: '📈', label: '루틴 성실도' },
+          { icon: '💰', label: '저축 습관' },
+          { icon: '🎯', label: '레벨 분석' },
+          { icon: '💬', label: 'AI 코멘트' },
+        ].map((item) => (
+          <div
+            key={item.label}
+            className="flex items-center gap-2 rounded-xl border border-blue-100 bg-white/70 p-3 opacity-50"
+          >
+            <span className="text-base" aria-hidden>{item.icon}</span>
+            <span className="text-xs font-medium text-blue-800">{item.label}</span>
+            <span className="ml-auto text-[10px] text-blue-400">준비 중</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export default function ParentAgentHomeCards({ agent }: Props) {
   const { row, loading, runState, distinctDays, reload } = agent
   const [sheet, setSheet] = useState<SheetKind>(null)
@@ -90,9 +152,19 @@ export default function ParentAgentHomeCards({ agent }: Props) {
   const hasContent = hasDisplayableAgentContent(row)
   const coachingFull = String(row?.coaching_text ?? '').trim()
   const coachingPreview = previewLine(row?.coaching_text)
+  const parsed = parseAgentReportPayload(row?.report_text ?? null)
+  const rawCalendarNotice = parsed.kind === 'json' ? String(parsed.data.calendar_notice ?? '').trim() : ''
+  const calendarNotice = rawCalendarNotice || '이번 주는 특별 일정이 없어요. 루틴에 집중하기 좋은 한 주예요.'
+  // 한 문장 카드라도 읽기 쉽게 2줄로 보이도록 마침표 뒤 공백을 줄바꿈으로 바꿉니다.
+  const calendarNoticeMultiline = calendarNotice.replace(/\. +/g, '.\n')
 
   return (
     <div className="w-full space-y-3">
+      {/* 일정 코멘트는 경제 EQ 패널이 아닌, AI 리포트 블록 상단에서 항상 보여 줍니다. */}
+      <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-amber-900">
+        <p className="whitespace-pre-line text-center text-xs leading-relaxed">{calendarNoticeMultiline}</p>
+      </div>
+
       {loading ? (
         <div className="w-full flex items-center justify-center gap-2 rounded-2xl border border-sky-100 bg-white/80 py-6 shadow-sm">
           <span className="h-5 w-5 animate-spin rounded-full border-2 border-sky-200 border-t-sky-500" aria-hidden />
@@ -108,12 +180,7 @@ export default function ParentAgentHomeCards({ agent }: Props) {
       ) : null}
 
       {!loading && runState === 'insufficient' ? (
-        <div className="w-full rounded-2xl bg-gradient-to-br from-emerald-50 via-sky-50 to-violet-50 p-4 shadow-sm ring-1 ring-white/80">
-          <p className="text-center text-sm font-black text-gray-800">🌱 데이터 모으는 중</p>
-          <p className="mt-2 text-center text-[11px] font-semibold leading-relaxed text-gray-600">
-            현재 {distinctDays}일치 데이터가 있어요.{'\n'}미션을 7일 이상 진행하면 AI 분석이 시작돼요!
-          </p>
-        </div>
+        <AgentOnboardingProgressCard daysWithData={distinctDays} />
       ) : null}
 
       {!loading && runState === 'error' ? (
@@ -131,12 +198,7 @@ export default function ParentAgentHomeCards({ agent }: Props) {
       ) : null}
 
       {!loading && runState === 'idle' && !hasContent ? (
-        <div className="w-full rounded-2xl bg-gradient-to-br from-emerald-50 via-sky-50 to-violet-50 p-4 shadow-sm ring-1 ring-white/80">
-          <p className="text-center text-sm font-black text-gray-800">🌱 데이터 모으는 중</p>
-          <p className="mt-2 text-center text-[11px] font-semibold leading-relaxed text-gray-600">
-            미션을 7일 이상 진행하면 AI 분석이 시작돼요!
-          </p>
-        </div>
+        <AgentOnboardingProgressCard daysWithData={distinctDays} />
       ) : null}
 
       {!loading && hasContent && coachingFull ? (

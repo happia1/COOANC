@@ -195,10 +195,6 @@ export default function EconomicEqPanel({
 
           {parsed.kind === 'json' && jsonReport ? (
             <>
-              {jsonReport.calendar_notice?.trim() ? (
-                <div className="bg-blue-50 rounded-xl p-3 text-sm text-blue-800">{jsonReport.calendar_notice}</div>
-              ) : null}
-
               <ReportCard>
                 <div className="mb-2 flex items-center gap-2">
                   <span className="rounded-full bg-violet-100 px-2.5 py-0.5 text-[11px] font-black text-violet-900">
@@ -287,11 +283,15 @@ export default function EconomicEqPanel({
           aria-haspopup="dialog"
           aria-label="저축 습관 설명 보기"
         >
-          <p className="text-[10px] font-bold text-gray-600 mb-1 text-center">저축 습관</p>
+          {/* 현재는 child_stats 현재 잔액 기준으로 즉시 계산된 값을 보여 줍니다. */}
+          <p className="text-[10px] font-bold text-gray-600 mb-1 text-center">저축 습관 (현재 잔액 기준)</p>
           <div className="pointer-events-none">
             <DelayHalfGauge value={stats.eq_delay_score} gradientId={`delay-${gradId}`} compact />
           </div>
         </button>
+        <p className="mt-2 text-center text-[10px] font-semibold text-gray-500">
+          7일 후 실제 행동 패턴 기반으로 업데이트돼요
+        </p>
       </div>
 
       {/**

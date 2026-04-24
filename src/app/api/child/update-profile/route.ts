@@ -180,7 +180,9 @@ export async function POST(req: NextRequest) {
    * 부모 홈은 자녀 프로필을 서버 캐시로 읽기 때문에,
    * 저장 직후 해당 태그를 무효화해서 즉시 최신 이름/아바타를 보이게 합니다.
    */
-  revalidateTag('parent-home-child-profiles')
+  // Next.js 최신 타입 시그니처: revalidateTag(tag, profile)
+  // 즉시 재검증 의도를 명확히 하기 위해 "max" 프로필을 사용합니다.
+  revalidateTag('parent-home-child-profiles', 'max')
 
   return NextResponse.json({ ok: true, profile: { avatar_url: freshAvatar } })
 }
