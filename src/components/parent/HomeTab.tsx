@@ -68,9 +68,15 @@ export type ChildSummary = {
 
 type Props = {
   childrenData: ChildSummary[]
+  upcomingEvents: {
+    start_date: string
+    end_date: string
+    routine_override: string
+    title?: string | null
+  }[]
 }
 
-export default function HomeTab({ childrenData }: Props) {
+export default function HomeTab({ childrenData, upcomingEvents }: Props) {
   const { selectedChildId, setSelectedChildId } = useParentStore()
   /** 부모 홈 데이터는 이벤트성 갱신보다 안정성이 우선이라 일반 조회(fetch)만 사용합니다. */
   const supabaseRef = useRef(createClient())
@@ -139,6 +145,21 @@ export default function HomeTab({ childrenData }: Props) {
   const missionRate = child?.totalMissions > 0
     ? Math.round((child.todayCompleted / child.totalMissions) * 100)
     : 0
+
+  const calendarNoticeText = useMemo(() => {
+    if (!upcomingEvents || upcomingEvents.length === 0) {
+      return '이번 주는 특별 일정이 없어요. 루틴에 집중하기 좋은 한 주예요.'
+    }
+    const next = upcomingEvents[0]
+    const label =
+      next.title?.trim() ||
+      (next.routine_override === 'none' ? '공휴일' : '방학·특별일정')
+    const dateStr = next.start_date.slice(5).replace('-', '/')
+    if (upcomingEvents.length === 1) {
+      return `이번 주 ${dateStr}에 ${label}이 있어요. 루틴 조정이 필요할 수 있어요.`
+    }
+    return `이번 주 ${dateStr} 외 ${upcomingEvents.length - 1}개 일정이 있어요.`
+  }, [upcomingEvents])
 
   const tabs: ChildTab[] = childrenData.map((c) => ({ id: c.id, name: c.name }))
 
@@ -217,6 +238,7 @@ export default function HomeTab({ childrenData }: Props) {
                */}
               <ParentAgentHomeCards
                 agent={agentReport}
+                calendarNoticeText={calendarNoticeText}
                 onOpenCalendarEventSheet={() => setCalendarEventSheetOpen(true)}
               />
 

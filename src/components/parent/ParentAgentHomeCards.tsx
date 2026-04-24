@@ -81,6 +81,8 @@ function hasDisplayableAgentContent(row: AgentLatestReportRow | null | undefined
 type Props = {
   /** `useParentAgentReport` 한 번만 호출한 결과를 넘깁니다. */
   agent: UseParentAgentReportResult
+  /** 홈 서버 조회(calendar_events) 기반 일정 브리핑 문구 */
+  calendarNoticeText?: string
   /** 홈탭에서 공용 일정 등록 시트를 열 때 사용합니다. */
   onOpenCalendarEventSheet?: () => void
 }
@@ -145,7 +147,11 @@ function AgentOnboardingProgressCard({ daysWithData }: { daysWithData: number })
   )
 }
 
-export default function ParentAgentHomeCards({ agent, onOpenCalendarEventSheet }: Props) {
+export default function ParentAgentHomeCards({
+  agent,
+  calendarNoticeText,
+  onOpenCalendarEventSheet,
+}: Props) {
   const { row, loading, runState, distinctDays, reload } = agent
   const [sheet, setSheet] = useState<SheetKind>(null)
 
@@ -154,14 +160,17 @@ export default function ParentAgentHomeCards({ agent, onOpenCalendarEventSheet }
   const coachingPreview = previewLine(row?.coaching_text)
   const parsed = parseAgentReportPayload(row?.report_text ?? null)
   const rawCalendarNotice = parsed.kind === 'json' ? String(parsed.data.calendar_notice ?? '').trim() : ''
-  const calendarNoticeText = rawCalendarNotice || '이번 주는 특별 일정이 없어요. 루틴에 집중하기 좋은 한 주예요.'
+  const noticeText =
+    calendarNoticeText?.trim() ||
+    rawCalendarNotice ||
+    '이번 주는 특별 일정이 없어요. 루틴에 집중하기 좋은 한 주예요.'
 
   return (
     <div className="w-full space-y-3">
       {/* 일정 코멘트는 경제 EQ 패널이 아닌, AI 리포트 블록 상단에서 항상 보여 줍니다. */}
       <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-amber-900">
         <div className="flex items-center justify-between gap-2">
-          <p className="whitespace-pre-line text-center text-xs leading-relaxed">{calendarNoticeText}</p>
+          <p className="flex-1 whitespace-pre-line text-xs leading-relaxed text-amber-800">{noticeText}</p>
           <button
             type="button"
             onClick={onOpenCalendarEventSheet}

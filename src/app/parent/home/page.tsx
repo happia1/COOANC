@@ -65,15 +65,16 @@ export default async function ParentHomePage() {
   const childIds = auth.familyLinks.map((l) => l.child_id)
 
   if (childIds.length === 0) {
-    return <HomeTab childrenData={[]} />
+    return <HomeTab childrenData={[]} upcomingEvents={[]} />
   }
 
   const today = getSeoulDateString()
+  const sevenDaysLater = addSeoulCalendarDays(today, 7)
   const weekStart = getSeoulMondayOfWeekContaining(today)
   const weekEnd = addSeoulCalendarDays(weekStart, 6)
 
   const childIdsKey = [...childIds].sort().join(',')
-  const [cachedProfilesRes, statsRes, weekDailyRes, recentLogsRes] = await Promise.all([
+  const [cachedProfilesRes, statsRes, weekDailyRes, recentLogsRes, calendarEventsRes] = await Promise.all([
     getCachedChildProfilesForParentHome(childIdsKey),
     supabase
       .from('child_stats')
@@ -95,6 +96,16 @@ export default async function ParentHomePage() {
       .eq('is_completed', true)
       .order('completed_at', { ascending: false })
       .limit(30),
+
+    // 홈 상단 일정 브리핑(향후 7일): 부모 기준 캘린더 일정
+    supabase
+      .from('calendar_events')
+      .select('start_date, end_date, routine_override, title')
+      .eq('parent_id', auth.user.id)
+      .gte('end_date', today)
+      .lte('start_date', sevenDaysLater)
+      .order('start_date', { ascending: true })
+      .limit(5),
   ])
   const profileRes =
     cachedProfilesRes.rows !== null
@@ -168,5 +179,12 @@ export default async function ParentHomePage() {
     }
   })
 
-  return <HomeTab childrenData={childrenData} />
+  const upcomingEvents = (calendarEventsRes.data ?? []) as {
+    start_date: string
+    end_date: string
+    routine_override: string
+    title?: string | null
+  }[]
+
+  return <HomeTab childrenData={childrenData} upcomingEvents={upcomingEvents} />
 }
