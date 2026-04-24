@@ -11,7 +11,6 @@ import { createPortal } from 'react-dom'
 import { useEffect, useId, useState } from 'react'
 import type { ChildStats } from '@/types/database'
 import type { WeeklyRoutineDay } from '@/lib/childWeeklyRoutine'
-import ParentAgentBottomSheet from '@/components/parent/ParentAgentBottomSheet'
 import {
   parseAgentReportPayload,
   type AgentEqScores,
@@ -180,7 +179,6 @@ export default function EconomicEqPanel({
 }: Props) {
   const gradId = useId().replace(/:/g, '')
   const [delayExplainOpen, setDelayExplainOpen] = useState(false)
-  const [creditDrillOpen, setCreditDrillOpen] = useState(false)
 
   const parsed = parseAgentReportPayload(agentRow?.report_text ?? null)
   const jsonReport: AgentReportJsonV1 | null = parsed.kind === 'json' ? parsed.data : null
@@ -209,20 +207,6 @@ export default function EconomicEqPanel({
 
           {parsed.kind === 'json' && jsonReport ? (
             <>
-              <ReportCard>
-                <p className="mb-2 text-xs font-bold text-gray-600">크레딧·저축 이야기</p>
-                <p className="whitespace-pre-wrap text-[12px] font-normal leading-relaxed text-gray-700">
-                  {jsonReport.credit_comment?.trim() || '크레딧 코멘트를 준비 중이에요.'}
-                </p>
-                <button
-                  type="button"
-                  onClick={() => setCreditDrillOpen(true)}
-                  className="mt-3 text-xs font-black text-[#4A90E2] underline-offset-2 hover:underline"
-                >
-                  그래프 보기 →
-                </button>
-              </ReportCard>
-
               {Array.isArray(jsonReport.wishlist_items) && jsonReport.wishlist_items.length > 0 ? (
                 <ReportCard>
                   <p className="text-[10px] font-bold text-gray-500 mb-2">위시리스트</p>
@@ -276,21 +260,9 @@ export default function EconomicEqPanel({
         <WeekdayRoutineBars days={weeklyRoutine} />
       </div>
 
-      {/* 크레딧 숫자·주간 상세 수치는 시트에서 확인 */}
-      <ParentAgentBottomSheet
-        open={creditDrillOpen}
-        title="크레딧·저축 상세"
-        onClose={() => setCreditDrillOpen(false)}
-        footer={
-          <button
-            type="button"
-            onClick={() => setCreditDrillOpen(false)}
-            className="w-full rounded-xl bg-[#4A90E2] py-3 text-xs font-black text-white active:scale-[0.99]"
-          >
-            닫기
-          </button>
-        }
-      >
+      {/* 요청 반영: 팝업 정보를 주간 루틴 완료율 하단에 고정 배치합니다. */}
+      <div className="rounded-xl bg-white p-3 shadow-sm ring-1 ring-gray-100">
+        <p className="mb-2 text-xs font-bold text-gray-600">크레딧·저축 상세</p>
         <ul className="space-y-3 text-xs text-gray-800">
           <li className="flex justify-between gap-3 border-b border-gray-100 pb-2">
             <span className="font-bold text-gray-600">14일간 획득 크레딧</span>
@@ -318,7 +290,7 @@ export default function EconomicEqPanel({
         <div className="mt-4 rounded-xl bg-sky-50/60 p-3 ring-1 ring-sky-100">
           <EqScoreBars eq={agentRow?.eq_scores as AgentEqScores | null} />
         </div>
-      </ParentAgentBottomSheet>
+      </div>
 
       {delayExplainOpen ? (
         <EqDelayExplainModal
