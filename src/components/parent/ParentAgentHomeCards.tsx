@@ -104,23 +104,23 @@ function AgentOnboardingProgressCard({ daysWithData }: { daysWithData: number })
   const remain = Math.max(0, 7 - clampedDays)
   const progressPercent = Math.min(100, (clampedDays / 7) * 100)
   return (
-    <div className="rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 p-5">
+    <div className="rounded-xl bg-gray-50/80 px-3 py-3">
       {/* Progress bar — days collected / 7 */}
       <div className="mb-3">
-        <div className="mb-1 flex justify-between text-xs text-blue-700">
+        <div className="mb-1 flex justify-between text-xs text-gray-600">
           <span>미션 수행 기록</span>
           <span>{clampedDays}일 / 7일</span>
         </div>
-        <div className="h-2 overflow-hidden rounded-full bg-blue-100">
+        <div className="h-2 overflow-hidden rounded-full bg-gray-200">
           <div
-            className="h-full rounded-full bg-blue-400 transition-all duration-500"
+            className="h-full rounded-full bg-[#4A90E2] transition-all duration-500"
             style={{ width: `${progressPercent}%` }}
           />
         </div>
       </div>
 
       {/* Preview of what's coming */}
-      <p className="mb-3 text-xs text-blue-600">
+      <p className="mb-3 text-xs text-gray-500">
         {clampedDays === 0
           ? '첫 미션을 완료하면 기록이 쌓이기 시작해요.'
           : remain > 0
@@ -138,10 +138,10 @@ function AgentOnboardingProgressCard({ daysWithData }: { daysWithData: number })
         ].map((item) => (
           <div
             key={item.label}
-            className="flex items-center gap-2 rounded-xl border border-blue-100 bg-white/70 p-3 opacity-50"
+            className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white p-3 opacity-70"
           >
-            <span className="text-xs font-medium text-blue-800">{item.label}</span>
-            <span className="ml-auto text-[10px] text-blue-400">준비 중</span>
+            <span className="text-xs font-medium text-gray-700">{item.label}</span>
+            <span className="ml-auto text-[10px] text-gray-400">준비 중</span>
           </div>
         ))}
       </div>
