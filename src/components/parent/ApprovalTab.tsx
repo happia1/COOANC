@@ -12,6 +12,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import ParentEnterChildUiLink from '@/components/parent/ParentEnterChildUiLink'
+import { CompactChildProfileCard } from '@/components/parent/CompactChildProfileCard'
 import { useParentStore } from '@/store/parentStore'
 import ChildProfileNav, { type ChildTab } from '@/components/parent/ChildProfileNav'
 import ParentMarketMenuControl from '@/components/parent/ParentMarketMenuControl'
@@ -19,8 +20,6 @@ import PraiseStickerPanel from '@/components/parent/PraiseStickerPanel'
 import type { PurchaseRequest, StoreItem } from '@/types/database'
 import { createClient } from '@/lib/supabase/client'
 import MarketItemImage from '@/components/common/MarketItemImage'
-import SpriteImage from '@/components/common/SpriteImage'
-import { ICONS } from '@/constants/sprites'
 import { marketFrameKeyForItemId } from '@/lib/marketItemFrame'
 import {
   getMsUntilNextSeoulMidnight,
@@ -765,51 +764,18 @@ export default function ApprovalTab({
             aria-label={`${currentChild.name} 자녀용 앱 화면으로 들어가기`}
             onClick={() => setSelectedChildId(currentChild.id)}
           >
-            <div className="flex w-full items-center justify-between rounded-2xl bg-white px-4 py-3 shadow-sm">
-              <div className="flex items-center gap-3">
-                <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-white">
-                  {currentChild.avatarUrl ? (
-                    <div className="flex h-full w-full items-center justify-center p-1.5">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={currentChild.avatarUrl} alt="" className="h-full w-full object-contain object-center" />
-                    </div>
-                  ) : (
-                    <span className="flex h-full w-full items-center justify-center text-center text-[10px] font-black leading-tight text-gray-700">
-                      Lv{childLevel}
-                    </span>
-                  )}
-                </div>
-                <div className="flex flex-col gap-0.5">
-                  <span className="text-sm font-black text-gray-800">{currentChild.name}</span>
-                  <span className="text-[11px] text-gray-400">Lv.{childLevel}</span>
-                </div>
-              </div>
-              <div
-                className="flex flex-col gap-1 md:flex-row md:gap-4"
-                aria-label={`코인 ${(currentChild.credits).toLocaleString()}, 하트 ${currentChild.hearts}, 연속 ${currentChild.streakDays}일`}
-              >
-                <div className="flex items-center gap-1">
-                  <SpriteImage sheet={ICONS} frame="credits" width={16} clipRotated={false} className="shrink-0 select-none" />
-                  <span className="text-sm font-black tabular-nums text-[#4A90E2]">
-                    {(currentChild.credits).toLocaleString()}
-                  </span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <SpriteImage sheet={ICONS} frame="heart" width={16} className="shrink-0 select-none" />
-                  <span className="text-sm font-black tabular-nums text-rose-500">
-                    {currentChild.hearts}
-                  </span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <svg width={16} height={16} viewBox="0 0 24 24" fill="none" className="shrink-0 text-orange-500" aria-hidden>
-                    <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                  <span className="text-sm font-black tabular-nums text-amber-600">
-                    {currentChild.streakDays}일
-                  </span>
-                </div>
-              </div>
-            </div>
+            {/** 설정 탭과 동일한 프로필 본문(이름+Lv, 메타 라인)으로 맞추고 우측 통계는 유지 */}
+            <CompactChildProfileCard
+              name={currentChild.name}
+              age={currentChild.age}
+              avatarUrl={currentChild.avatarUrl}
+              level={childLevel}
+              credits={currentChild.credits}
+              hearts={currentChild.hearts}
+              streakDays={currentChild.streakDays}
+              ageGroupLabel={currentChild.ageGroupLabel}
+              childcareLabel={currentChild.childcareLabel}
+            />
           </ParentEnterChildUiLink>
         )}
 

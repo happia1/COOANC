@@ -250,26 +250,30 @@ export default function SettingsPage() {
           </button>
         </div>
 
-        {/** 부모·자녀 계정 이름만 — 프로필 사진은 두지 않고, 자녀 프로필처럼 흰 박스 없음 */}
+        {/** 부모 프로필도 자녀 프로필처럼 카드 블록으로 보여줍니다. */}
         <div className="flex flex-col gap-3">
           <p className="text-xs font-bold uppercase tracking-wider text-gray-400">
             {userRole === 'parent' ? '부모 프로필' : '프로필'}
           </p>
           {!profileLoaded ? (
-            <div className="space-y-2 animate-pulse" aria-hidden>
-              <div className="h-4 w-36 rounded bg-gray-200" />
-              <div className="h-3 w-24 rounded bg-gray-200" />
+            <div className="rounded-2xl bg-white p-5 shadow-sm" aria-hidden>
+              <div className="space-y-2 animate-pulse">
+                <div className="h-4 w-36 rounded bg-gray-200" />
+                <div className="h-3 w-24 rounded bg-gray-200" />
+              </div>
             </div>
           ) : (
-            <div className="min-w-0">
+            <div className="min-w-0 rounded-2xl bg-white p-5 shadow-sm">
               {editingName ? (
                 <div className="flex flex-col gap-2">
+                  {/** 부모 닉네임 입력란 */}
                   <input
                     value={profileName}
                     onChange={(e) => setProfileName(e.target.value)}
-                    className="w-full max-w-[200px] rounded-xl border border-gray-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/40"
+                    className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/40"
                     autoFocus
                   />
+                  {/** 저장/취소 버튼 */}
                   <div className="flex flex-wrap gap-2">
                     <button
                       type="button"
@@ -294,8 +298,8 @@ export default function SettingsPage() {
               ) : (
                 <div className="flex items-center justify-between gap-2">
                   <div className="min-w-0">
-                    <p className="font-bold text-gray-800">{userName || '(이름 없음)'}</p>
-                    <p className="text-[11px] text-gray-400">
+                    <p className="text-base font-bold text-gray-800">{userName || '(이름 없음)'}</p>
+                    <p className="mt-0.5 text-[11px] text-gray-400">
                       {userRole === 'parent' ? '부모' : '자녀'} 계정
                     </p>
                   </div>

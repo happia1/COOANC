@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { revalidateTag } from 'next/cache'
 import { createClient as createServerClient } from '@/lib/supabase/server'
 import { createServiceRoleClient, serviceRoleEnvMissingMessage } from '@/lib/supabase/admin'
 import { getAgeFromBirthDateIso } from '@/lib/ageFromBirthDate'
@@ -174,6 +175,12 @@ export async function POST(req: NextRequest) {
   if (metaErr) {
     console.warn('[child/update-profile] auth metadata:', metaErr.message)
   }
+
+  /**
+   * 부모 홈은 자녀 프로필을 서버 캐시로 읽기 때문에,
+   * 저장 직후 해당 태그를 무효화해서 즉시 최신 이름/아바타를 보이게 합니다.
+   */
+  revalidateTag('parent-home-child-profiles')
 
   return NextResponse.json({ ok: true, profile: { avatar_url: freshAvatar } })
 }

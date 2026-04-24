@@ -25,27 +25,10 @@ import { useParentStore } from '@/store/parentStore'
 import ChildProfileNav, { type ChildTab } from '@/components/parent/ChildProfileNav'
 import EconomicEqPanel from '@/components/parent/EconomicEqPanel'
 import ParentAgentHomeCards from '@/components/parent/ParentAgentHomeCards'
+import { CompactChildProfileCard } from '@/components/parent/CompactChildProfileCard'
 import { useParentAgentReport } from '@/hooks/useParentAgentReport'
 import SpriteImage from '@/components/common/SpriteImage'
 import { ICONS } from '@/constants/sprites'
-
-/**
- * 최근 활동 카드 헤더용: 펼침이면 화살표가 위(접기), 접힘이면 아래(펼치기) — RoutineTab 의 ChevronToggleIcon 과 동일 패턴입니다.
- */
-function RecentActivityChevron({ open, className }: { open: boolean; className?: string }) {
-  return (
-    <svg
-      className={`${className ?? ''} h-4 w-4 shrink-0 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      aria-hidden
-    >
-      <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
-}
 
 export type ChildSummary = {
   id: string
@@ -101,9 +84,6 @@ export default function HomeTab({ childrenData }: Props) {
   /** 선택 자녀가 바뀌면 서버에서 받은 주간 막대 데이터로 맞춘 뒤, Realtime 으로 최신화합니다. */
   const [weeklyRoutine, setWeeklyRoutine] = useState<WeeklyRoutineDay[]>(child?.weeklyRoutine ?? [])
 
-  /** 하단 「최근 활동」 목록 — 기본 접힘, 헤더 클릭으로만 펼침 */
-  const [recentActivityOpen, setRecentActivityOpen] = useState(false)
-
   // 자녀 목록이 바뀌면(삭제 등) 선택 id 가 없거나 목록에 없으면 첫 자녀로 맞춤
   useEffect(() => {
     if (childrenData.length === 0) {
@@ -123,11 +103,6 @@ export default function HomeTab({ childrenData }: Props) {
     }
     setWeeklyRoutine(child.weeklyRoutine)
   }, [child?.id, child?.weeklyRoutine])
-
-  // 다른 자녀로 바꾸면 최근 활동도 다시 접어 두어 화면이 덜 복잡해 보이게 함
-  useEffect(() => {
-    setRecentActivityOpen(false)
-  }, [child?.id])
 
   useEffect(() => {
     if (!child) return
@@ -182,7 +157,7 @@ export default function HomeTab({ childrenData }: Props) {
           {/* ── 본문: md에서 2컬럼 그리드, 모바일에서 단일 컬럼 ───────────── */}
           <div className="grid w-full grid-cols-1 gap-4 md:grid-cols-2 md:gap-6">
 
-            {/* 좌 컬럼: 프로필 바 + 이번 주 성장 리포트(EQ 차트) + 오늘의 진행도 + 주간 루틴 달성 */}
+            {/* 좌 컬럼: 프로필 바 + 모바일 진행도 + AI 상태/코칭 카드 */}
             <div className="flex flex-col gap-4">
               {/* ── 상단: 통합 프로필 바 (아바타+이름 좌 / 코인·하트·연속 우) ── */}
               <ParentEnterChildUiLink
@@ -191,57 +166,23 @@ export default function HomeTab({ childrenData }: Props) {
                 aria-label={`${child.name} 자녀용 앱 화면으로 들어가기`}
                 onClick={() => setSelectedChildId(child.id)}
               >
-                <div className="flex w-full items-center justify-between rounded-2xl bg-white px-4 py-3 shadow-sm">
-                  {/* 좌: 아바타 + 이름 + 레벨 */}
-                  <div className="flex items-center gap-3">
-                    <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-white">
-                      {child.avatarUrl ? (
-                        <div className="flex h-full w-full items-center justify-center p-1.5">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={child.avatarUrl} alt="" className="h-full w-full object-contain object-center" />
-                        </div>
-                      ) : (
-                        <span className="flex h-full w-full items-center justify-center text-center text-[10px] font-black leading-tight text-gray-700">
-                          Lv{s?.current_level ?? 0}
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex flex-col gap-0.5">
-                      <span className="text-sm font-black text-gray-800">{child.name}</span>
-                      <span className="text-[11px] text-gray-400">Lv.{s?.current_level ?? 0}</span>
-                    </div>
-                  </div>
-
-                  {/* 우: 코인 · 하트 · 연속 */}
-                  <div
-                    className="flex flex-col items-start gap-1 sm:flex-row sm:items-center sm:gap-4"
-                    aria-label={`코인 ${(s?.credits ?? 0).toLocaleString()}, 하트 ${s?.hearts ?? 0}, 연속 ${s?.streak_days ?? 0}일`}
-                  >
-                    <div className="flex items-center gap-1">
-                      <SpriteImage sheet={ICONS} frame="credits" width={16} clipRotated={false} className="shrink-0 select-none" />
-                      <span className="text-sm font-black tabular-nums text-[#4A90E2]">
-                        {(s?.credits ?? 0).toLocaleString()}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <SpriteImage sheet={ICONS} frame="heart" width={16} className="shrink-0 select-none" />
-                      <span className="text-sm font-black tabular-nums text-rose-500">
-                        {s?.hearts ?? 0}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <svg width={16} height={16} viewBox="0 0 24 24" fill="none" className="shrink-0 text-orange-500" aria-hidden>
-                        <path
-                          d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"
-                          stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-                        />
-                      </svg>
-                      <span className="text-sm font-black tabular-nums text-amber-600">
-                        {s?.streak_days ?? 0}일
-                      </span>
-                    </div>
-                  </div>
-                </div>
+                {/**
+                 * 설정 탭과 동일한 자녀 프로필 카드 레이아웃을 재사용합니다.
+                 * - 이름 오른쪽: Lv.숫자
+                 * - 아래 줄: 미취학·유치원·3세 같은 메타 정보
+                 * - 오른쪽 끝: 크레딧·하트·연속일수 통계는 그대로 유지
+                 */}
+                <CompactChildProfileCard
+                  name={child.name}
+                  age={child.age}
+                  avatarUrl={child.avatarUrl}
+                  level={s?.current_level ?? 0}
+                  credits={s?.credits ?? 0}
+                  hearts={s?.hearts ?? 0}
+                  streakDays={s?.streak_days ?? 0}
+                  ageGroupLabel={child.ageGroupLabel}
+                  childcareLabel={child.childcareLabel}
+                />
               </ParentEnterChildUiLink>
 
               {/* 모바일 전용: 자녀 프로필 바로 아래에 오늘의 진행도를 배치합니다. */}
@@ -266,25 +207,15 @@ export default function HomeTab({ childrenData }: Props) {
                 )}
               </div>
 
-              <EconomicEqPanel
-                stats={{
-                  eq_routine_rate: s?.eq_routine_rate ?? 0,
-                  eq_delay_score: s?.eq_delay_score ?? 0,
-                  eq_save_ratio: s?.eq_save_ratio ?? 0,
-                  streak_days: s?.streak_days ?? 0,
-                  credits: s?.credits ?? 0,
-                  current_level: s?.current_level ?? 0,
-                }}
-                weeklyRoutine={weeklyRoutine}
-                childName={child.name}
-                agentChildId={child.id}
-                agentRow={agentReport.row}
-                agentLoading={agentReport.loading}
-              />
+              {/**
+               * 요청 반영: "데이터 모으는 중" 카드가 포함된 AI 블록을 좌측으로 이동합니다.
+               * (`ParentAgentHomeCards`는 로딩/insufficient/코칭 상태를 공통으로 담당)
+               */}
+              <ParentAgentHomeCards agent={agentReport} />
 
             </div>
 
-            {/* 우 컬럼: 오늘의 진행도 + 코칭 카드(ParentAgentHomeCards) + 최근 활동 — 리포트 본문은 좌측 EQ 패널 */}
+            {/* 우 컬럼: 오늘의 진행도 + 우리아이 경제 EQ 지수 */}
             <div className="flex flex-col gap-4">
               {/* md 이상: 기존 위치(우 컬럼 상단)에 오늘의 진행도를 유지합니다. */}
               <div className="hidden rounded-2xl bg-white p-4 shadow-sm md:block">
@@ -308,44 +239,24 @@ export default function HomeTab({ childrenData }: Props) {
                 )}
               </div>
 
-              <ParentAgentHomeCards agent={agentReport} />
-
-              {/* 최근 활동: 토글 헤더(기본 접힘) + 펼칠 때만 미션 완료 로그 목록 */}
-              {child.recentActivity.length > 0 && (
-                <div className="overflow-hidden rounded-2xl bg-white shadow-sm">
-                  <button
-                    type="button"
-                    onClick={() => setRecentActivityOpen((o) => !o)}
-                    aria-expanded={recentActivityOpen}
-                    aria-label={recentActivityOpen ? '최근 활동 접기' : '최근 활동 펼치기'}
-                    className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-gray-50 active:bg-gray-50/80"
-                  >
-                    <div className="flex min-w-0 flex-1 items-center gap-2">
-                      <span className="text-sm font-bold text-gray-700">최근 활동</span>
-                      <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-bold text-gray-500">
-                        {child.recentActivity.length}
-                      </span>
-                    </div>
-                    <RecentActivityChevron open={recentActivityOpen} className="text-gray-400" />
-                  </button>
-                  {recentActivityOpen ? (
-                    <div className="flex flex-col gap-2 border-t border-gray-100 px-4 pb-4 pt-3">
-                      {child.recentActivity.map((act, i) => (
-                        <div key={i} className="flex items-center gap-3">
-                          <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-gray-100 text-xs font-black text-gray-600">
-                            {act.missionTitle.slice(0, 1)}
-                          </span>
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-bold text-gray-700">{act.missionTitle}</p>
-                            <p className="text-[10px] text-gray-400">{act.completedAt.slice(0, 10)}</p>
-                          </div>
-                          <span className="flex-shrink-0 text-xs font-bold text-[#4A90E2]">+{act.creditEarned}</span>
-                        </div>
-                      ))}
-                    </div>
-                  ) : null}
-                </div>
-              )}
+              {/**
+               * 요청 반영: "우리아이 경제 EQ 지수" 패널을 우측 컬럼으로 이동합니다.
+               */}
+              <EconomicEqPanel
+                stats={{
+                  eq_routine_rate: s?.eq_routine_rate ?? 0,
+                  eq_delay_score: s?.eq_delay_score ?? 0,
+                  eq_save_ratio: s?.eq_save_ratio ?? 0,
+                  streak_days: s?.streak_days ?? 0,
+                  credits: s?.credits ?? 0,
+                  current_level: s?.current_level ?? 0,
+                }}
+                weeklyRoutine={weeklyRoutine}
+                childName={child.name}
+                agentChildId={child.id}
+                agentRow={agentReport.row}
+                agentLoading={agentReport.loading}
+              />
             </div>
           </div>
         </>
@@ -353,3 +264,4 @@ export default function HomeTab({ childrenData }: Props) {
     </div>
   )
 }
+

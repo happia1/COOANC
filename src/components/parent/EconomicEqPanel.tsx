@@ -3,7 +3,7 @@
 /**
  * 부모 홈 「우리아이 경제 EQ 지수」 패널입니다.
  * - 상단: AI 리포트 카드(JSON `report_text` 파싱) — 캘린더 안내, 레벨, 루틴, 크레딧(글만), 위시, 응원, 부모 가이드
- * - 메인에는 **퍼센트 숫자를 숨기고**, 「그래프 보기」 시트에서만 숫자·주간 막대 차트를 보여 줍니다.
+ * - 메인에는 퍼센트 숫자를 크게 강조하지 않고, 주간 루틴 완료율 막대는 카드 본문에서도 바로 보여 줍니다.
  * - `eq_delay_score` 반원 게이지는 「저축 습관」이라는 이름으로 남기고, 탭하면 계산 설명 모달이 열립니다.
  */
 
@@ -294,7 +294,17 @@ export default function EconomicEqPanel({
         </button>
       </div>
 
-      {/* 크레딧 숫자·주간 막대는 시트 안에서만 노출 */}
+      {/**
+       * 주간 루틴 완료율(이번 주) 블록:
+       * - 이전 홈 화면 구성처럼 EQ 카드 본문에서도 요일별 완주 막대를 바로 확인할 수 있게 복구합니다.
+       * - 막대를 누르면 상호작용은 없고, 상세 숫자 설명은 아래 "그래프 보기" 시트에서 이어서 볼 수 있습니다.
+       */}
+      <div className="rounded-xl bg-gray-50/80 px-2 py-3">
+        <p className="text-[11px] font-bold text-gray-600 mb-2 text-center">주간 루틴 완료율 (이번 주)</p>
+        <WeekdayRoutineBars days={weeklyRoutine} />
+      </div>
+
+      {/* 크레딧 숫자·주간 상세 수치는 시트에서 확인 */}
       <ParentAgentBottomSheet
         open={creditDrillOpen}
         title="크레딧·저축 상세"
@@ -354,6 +364,14 @@ export default function EconomicEqPanel({
  * 요일별 막대: 회색 트랙은 100% 높이, 파란 막대는 **아래에서 위로** 차오릅니다.
  */
 function WeekdayRoutineBars({ days }: { days: WeeklyRoutineDay[] }) {
+  if (!Array.isArray(days) || days.length === 0) {
+    return (
+      <div className="rounded-lg bg-white/70 px-3 py-4 text-center text-[11px] font-bold text-gray-400">
+        이번 주 루틴 데이터가 아직 없어요.
+      </div>
+    )
+  }
+
   return (
     <div className="flex items-end justify-between gap-1.5 min-h-[7.5rem] px-1">
       {days.map((d) => {

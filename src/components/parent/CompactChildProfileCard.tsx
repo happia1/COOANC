@@ -9,15 +9,8 @@
  */
 
 import type { ReactNode } from 'react'
-import SpriteImage from '@/components/common/SpriteImage'
-import { ICONS } from '@/constants/sprites'
 
 const LEVEL_NAMES = ['씨앗', '새싹', '교환사', '저축왕', '나눔이', '투자가']
-
-/** 통계 숫자가 `text-[11px]` 일 때 옆 아이콘 높이를 글자 크기에 맞춤 */
-const STAT_ICON_PX_MOBILE = 11
-/** `sm:text-sm`(14px) 구간에서 동일하게 맞춤 */
-const STAT_ICON_PX_SM = 14
 
 /** 홈 탭에서만 넘기면 카드 안에 오늘 미션 달성률 바가 붙습니다 */
 export type ProfileMissionSummary = {
@@ -68,160 +61,70 @@ export function CompactChildProfileCard({
   const secondaryParts = [...metaParts, ...(age != null ? [`${age}세`] : [])]
   const secondaryLine = secondaryParts.length > 0 ? secondaryParts.join('·') : null
 
-  /** 카드 바깥: 얇은 링·그림자(테두리처럼 보이던 것) 없이 흰 배경만 — 홈·루틴·설정 동일 */
+  /**
+   * 공통 카드 레이아웃(요청 반영):
+   * 1) 이름
+   * 2) 레벨 정보
+   * 3) 메타 정보(연령대·기관·나이)
+   * 4) 크레딧/하트/연속일수
+   *
+   * 화면 중앙 정렬로 통일해, 부모 앱의 자녀 프로필 카드가 어디서 보든 같은 인상을 주게 합니다.
+   */
   return (
     <div className={`rounded-xl bg-white px-2.5 py-2 ${className}`.trim()}>
-      {/** 한 행 전체를 세로 가운데 정렬 — 자녀 정보 텍스트 블록이 프로필 사진의 중앙과 맞도록 합니다 */}
-      <div className="flex items-center gap-2.5">
-        <div className="flex min-w-0 min-h-0 flex-1 items-center gap-3">
-          {/** 사각 썸네일 뒤는 흰색만 — 동그라미 링 없음 */}
-          <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-white">
-            {avatarUrl ? (
-              /**
-               * 프로필 PNG 는 귀·턱이 길어 `object-cover` 만 쓰면 잘려 보입니다.
-               * 안쪽 여백(`p-2`) + `object-contain` 으로 그림 전체가 사각 안에 들어가게 합니다.
-               */
-              <div className="flex h-full w-full items-center justify-center p-2">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={avatarUrl} alt="" className="h-full w-full object-contain object-center" />
-              </div>
-            ) : (
-              <span className="flex h-full w-full items-center justify-center px-1 text-center text-[11px] font-black leading-tight text-gray-700">
-                {stageName}
-              </span>
-            )}
-          </div>
-
-          <div className="flex min-w-0 flex-1 flex-col justify-center gap-1 py-0.5">
-            {/**
-             * 첫 줄: 이름은 진한 제목, Lv 는 보조 정보처럼 얇은 글씨·회색(단계 별칭은 title 만).
-             */}
-            <div className="flex min-w-0 flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
-              <p className="min-w-0 truncate text-base font-black leading-tight text-gray-900">{name}</p>
-              <span
-                className="shrink-0 text-xs font-light tabular-nums leading-none text-gray-500"
-                title={`레벨 ${lv} · ${stageName}`}
-              >
-                Lv.{lv}
-              </span>
+      <div className="flex flex-col items-center text-center">
+        {/** 상단 프로필 썸네일: 배경을 흰색으로 유지해 캐릭터가 또렷하게 보이도록 합니다. */}
+        <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-full border border-gray-200 bg-white">
+          {avatarUrl ? (
+            /**
+             * PNG 캐릭터가 더 크게 보이도록 내부 여백을 줄입니다.
+             * (contain 유지로 잘림 없이 전체 형태는 그대로 보장)
+             */
+            <div className="flex h-full w-full items-center justify-center p-0.5">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={avatarUrl} alt="" className="h-full w-full object-contain object-center" />
             </div>
-
-            {/**
-             * 둘째 줄: 미취학·유치원·나이 순으로 있으면 모두 `·`로 연결합니다.
-             */}
-            {secondaryLine && (
-              <p
-                className="text-[11px] font-bold leading-tight text-gray-500 truncate"
-                title={secondaryLine}
-              >
-                {secondaryLine}
-              </p>
-            )}
-          </div>
+          ) : (
+            <span className="flex h-full w-full items-center justify-center px-1 text-center text-[11px] font-black leading-tight text-gray-700">
+              {stageName}
+            </span>
+          )}
         </div>
 
+        {/** 1) 이름 + 작은 레벨(요청사항: 이름 옆 작은 폰트) */}
+        <div className="mt-2 flex max-w-full items-baseline justify-center gap-1.5">
+          <p className="max-w-[70%] truncate text-base font-black leading-tight text-gray-900">{name}</p>
+          <p className="shrink-0 text-[11px] font-bold text-gray-600" title={`레벨 ${lv} · ${stageName}`}>
+            Lv.{lv}
+          </p>
+        </div>
+
+        {/** 3) 메타 정보 */}
+        {secondaryLine && (
+          <p className="mt-0.5 max-w-full truncate text-[11px] font-bold leading-tight text-gray-500" title={secondaryLine}>
+            {secondaryLine}
+          </p>
+        )}
+
         {hideStats ? (
-          <div className="flex shrink-0 flex-col items-end justify-center gap-1">
-            {/* 설정 탭: 크레딧 칸 대신 수정·삭제(또는 삭제 확인) */}
+          <div className="mt-2 flex w-full flex-col items-center justify-center gap-1">
+            {/* 설정 화면의 수정/삭제 버튼도 가운데 정렬로 통일 */}
             {actions}
           </div>
         ) : (
-        <div
-          className="grid shrink-0 grid-cols-[14px_auto] items-center gap-x-1.5 gap-y-1 text-[11px] font-bold tabular-nums leading-none sm:grid-cols-[18px_auto] sm:text-sm"
-          aria-label={`크레딧 ${credits.toLocaleString()}, 하트 ${hearts}, 연속 미션 ${streakDays}일`}
-        >
-          {/**
-           * 아이콘 높이를 숫자 글자 크기(11px / sm:14px)에 맞춤 — `sm:hidden`·`hidden sm:flex` 로
-           * 서버 컴포넌트에서도 미디어쿼리만으로 두 크기를 전환합니다.
-           */}
-          <span
-            className="flex h-[11px] w-full shrink-0 items-center justify-center justify-self-center sm:h-3.5"
-            aria-hidden
+          /**
+           * 4) 크레딧 / 하트 / 연속일수:
+           * - 이미지 예시처럼 숫자를 먼저 보여주고, 아래 라벨을 붙입니다.
+           * - 세 항목은 가운데 정렬 + 세로 구분선으로 한 눈에 구분되게 배치합니다.
+           */
+          <div
+            className="mt-2 grid w-full grid-cols-3 overflow-hidden rounded-lg border border-gray-100 bg-white"
+            aria-label={`크레딧 ${credits.toLocaleString()}, 하트 ${hearts}, 연속 미션 ${streakDays}일`}
           >
-            <span className="flex sm:hidden">
-              <SpriteImage
-                sheet={ICONS}
-                frame="credits"
-                width={STAT_ICON_PX_MOBILE}
-                clipRotated={false}
-                className="select-none"
-              />
-            </span>
-            <span className="hidden sm:flex">
-              <SpriteImage
-                sheet={ICONS}
-                frame="credits"
-                width={STAT_ICON_PX_SM}
-                clipRotated={false}
-                className="select-none"
-              />
-            </span>
-          </span>
-          <span className="text-right text-[#4A90E2]" title="크레딧">
-            {credits.toLocaleString()}
-          </span>
-
-          <span
-            className="flex h-[11px] w-full shrink-0 items-center justify-center justify-self-center sm:h-3.5"
-            aria-hidden
-          >
-            <span className="flex sm:hidden">
-              <SpriteImage sheet={ICONS} frame="heart" width={STAT_ICON_PX_MOBILE} className="select-none" />
-            </span>
-            <span className="hidden sm:flex">
-              <SpriteImage sheet={ICONS} frame="heart" width={STAT_ICON_PX_SM} className="select-none" />
-            </span>
-          </span>
-          <span className="text-right text-rose-500" title="하트(경험치·EXP)">
-            {hearts}
-          </span>
-
-          {/** 불꽃: 연속 일수 — 글자 크기에 맞춘 두 벌 SVG */}
-          <span
-            className="flex h-[11px] w-full shrink-0 items-center justify-center justify-self-center sm:h-3.5"
-            aria-hidden
-          >
-            <span className="flex sm:hidden">
-              <svg
-                width={STAT_ICON_PX_MOBILE}
-                height={STAT_ICON_PX_MOBILE}
-                viewBox="0 0 24 24"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-                className="shrink-0 text-orange-500"
-              >
-                <path
-                  d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"
-                  stroke="currentColor"
-                  strokeWidth="1.75"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </span>
-            <span className="hidden sm:flex">
-              <svg
-                width={STAT_ICON_PX_SM}
-                height={STAT_ICON_PX_SM}
-                viewBox="0 0 24 24"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-                className="shrink-0 text-orange-500"
-              >
-                <path
-                  d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </span>
-          </span>
-          <span className="text-right text-amber-600" title="연속 미션 일수">
-            {streakDays}일
-          </span>
-        </div>
+            <StatCell value={credits.toLocaleString()} label="크레딧" valueClassName="text-gray-800" />
+            <StatCell value={hearts.toLocaleString()} label="하트" valueClassName="text-gray-800" withDivider />
+            <StatCell value={`${streakDays}일`} label="연속" valueClassName="text-gray-800" withDivider />
+          </div>
         )}
       </div>
 
@@ -247,6 +150,29 @@ export function CompactChildProfileCard({
           )}
         </div>
       )}
+    </div>
+  )
+}
+
+/**
+ * 통계 한 칸(숫자 + 라벨)
+ * - 중앙 정렬 카드에서 재사용할 수 있도록 작은 단위 컴포넌트로 분리합니다.
+ */
+function StatCell({
+  value,
+  label,
+  valueClassName,
+  withDivider = false,
+}: {
+  value: string
+  label: string
+  valueClassName?: string
+  withDivider?: boolean
+}) {
+  return (
+    <div className={['flex flex-col items-center justify-center px-2 py-2 text-center', withDivider ? 'border-l border-gray-200' : ''].join(' ')}>
+      <span className={['text-base font-black leading-none tabular-nums', valueClassName ?? 'text-gray-900'].join(' ')}>{value}</span>
+      <span className="mt-1 text-[10px] font-bold leading-none text-gray-500">{label}</span>
     </div>
   )
 }

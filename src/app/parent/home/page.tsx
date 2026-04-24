@@ -46,7 +46,14 @@ const getCachedChildProfilesForParentHome = unstable_cache(
     return selectChildProfilesByIds(svc, childIds)
   },
   ['parent-home-child-profiles'],
-  { revalidate: 300 },
+  {
+    revalidate: 300,
+    /**
+     * 자녀 프로필 저장 API(/api/child/update-profile)에서 `revalidateTag`로 즉시 무효화합니다.
+     * 덕분에 "자녀 앱 -> 부모 앱"으로 돌아왔을 때 오래된 프로필 카드가 남지 않습니다.
+     */
+    tags: ['parent-home-child-profiles'],
+  },
 )
 
 export default async function ParentHomePage() {

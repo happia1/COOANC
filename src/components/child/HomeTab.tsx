@@ -243,7 +243,8 @@ export default function HomeTab({
    */
   const islandSection = (
     <div className="flex min-h-0 flex-1 flex-col justify-end gap-1.5">
-      <div className="relative mx-auto flex min-h-0 w-full max-w-sm flex-1 flex-col items-center justify-end mt-2 sm:-mt-1">
+      {/** 태블릿 세로 화면에서는 캐릭터 무대 시작점을 더 아래로 내려 캐릭터가 하단에 더 가깝게 보이게 합니다. */}
+      <div className="relative mx-auto mt-2 flex min-h-0 w-full max-w-sm flex-1 flex-col items-center justify-end sm:-mt-1 md:portrait:mt-12">
         {stickerTopRightButton}
         <ChildHomeIslandStage density="flex" homeAvatarUrl={childAvatarUrl} showIslandArt={false} />
       </div>
