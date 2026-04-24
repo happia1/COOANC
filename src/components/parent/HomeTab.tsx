@@ -70,9 +70,11 @@ export type ChildSummary = {
 type Props = {
   childrenData: ChildSummary[]
   upcomingEvents: {
+    id: string
     start_date: string
     end_date: string
-    routine_override: string
+    routine_override?: string | null
+    event_type?: string | null
     title?: string | null
   }[]
 }
@@ -102,9 +104,11 @@ export default function HomeTab({ childrenData, upcomingEvents }: Props) {
    */
   const [localUpcomingEvents, setLocalUpcomingEvents] = useState<
     {
+      id?: string
       start_date: string
       end_date: string
-      routine_override: string
+      routine_override?: string | null
+      event_type?: string | null
       title?: string | null
     }[]
   >([])
@@ -120,17 +124,21 @@ export default function HomeTab({ childrenData, upcomingEvents }: Props) {
         const filtered = rows
           .map((row) => {
             const r = row as {
+              id?: string
               childId?: string | null
               startDate?: string
               endDate?: string
               routineOverride?: string
+              eventType?: string
               title?: string
             }
             return {
+              id: r.id,
               childId: r.childId ?? null,
               startDate: String(r.startDate ?? ''),
               endDate: String(r.endDate ?? ''),
               routineOverride: String(r.routineOverride ?? ''),
+              eventType: r.eventType ?? null,
               title: r.title ?? null,
             }
           })
@@ -141,9 +149,11 @@ export default function HomeTab({ childrenData, upcomingEvents }: Props) {
           .sort((a, b) => a.startDate.localeCompare(b.startDate))
           .slice(0, 5)
           .map((r) => ({
+            id: r.id,
             start_date: r.startDate,
             end_date: r.endDate,
             routine_override: r.routineOverride,
+            event_type: r.eventType ?? null,
             title: r.title,
           }))
         setLocalUpcomingEvents(filtered)
@@ -219,6 +229,43 @@ export default function HomeTab({ childrenData, upcomingEvents }: Props) {
     return upcomingEvents ?? []
   }, [localUpcomingEvents, upcomingEvents])
 
+  function formatEventDate(dateStr: string): string {
+    const parts = dateStr.split('-')
+    if (parts.length < 3) return dateStr
+    const mm = parts[1]
+    const dd = parts[2]
+    const date = new Date(dateStr)
+    const days = ['일', '월', '화', '수', '목', '금', '토']
+    return `${mm}/${dd} (${days[date.getDay()]})`
+  }
+
+  function getCategoryLabel(event: {
+    routine_override?: string | null
+    event_type?: string | null
+  }): string {
+    const routineMap: Record<string, string> = {
+      none: '공휴일',
+      weekend: '방학·특별일정',
+    }
+    const eventMap: Record<string, string> = {
+      holiday: '공휴일',
+      vacation: '방학',
+      travel: '여행',
+      event: '행사',
+      special: '기념일',
+      birthday: '기념일',
+      etc: '특별 일정',
+      other: '특별 일정',
+    }
+    if (event.routine_override && routineMap[event.routine_override]) {
+      return routineMap[event.routine_override]
+    }
+    if (event.event_type && eventMap[event.event_type]) {
+      return eventMap[event.event_type]
+    }
+    return '특별 일정'
+  }
+
   const calendarNoticeText = useMemo(() => {
     if (!effectiveUpcomingEvents || effectiveUpcomingEvents.length === 0) {
       return '이번 주는 특별 일정이 없어요. 루틴에 집중하기 좋은 한 주예요.'
@@ -226,7 +273,7 @@ export default function HomeTab({ childrenData, upcomingEvents }: Props) {
     const next = effectiveUpcomingEvents[0]
     const label =
       next.title?.trim() ||
-      (next.routine_override === 'none' ? '공휴일' : '방학·특별일정')
+      getCategoryLabel(next)
     const dateStr = next.start_date.slice(5).replace('-', '/')
     if (effectiveUpcomingEvents.length === 1) {
       return `이번 주 ${dateStr}에 ${label}이 있어요. 루틴 조정이 필요할 수 있어요.`
@@ -312,6 +359,13 @@ export default function HomeTab({ childrenData, upcomingEvents }: Props) {
               <ParentAgentHomeCards
                 agent={agentReport}
                 calendarNoticeText={calendarNoticeText}
+                calendarUpcomingEvents={effectiveUpcomingEvents.map((ev) => ({
+                  id: ev.id ?? `${ev.start_date}-${ev.title ?? 'event'}`,
+                  dateLabel: formatEventDate(ev.start_date),
+                  title: ev.title?.trim() || getCategoryLabel(ev),
+                  impactLabel:
+                    ev.routine_override === 'none' ? '루틴 없음' : '루틴 조정 필요',
+                }))}
                 onOpenCalendarEventSheet={() => setCalendarEventSheetOpen(true)}
               />
 

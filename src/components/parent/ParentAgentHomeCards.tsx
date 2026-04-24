@@ -83,6 +83,13 @@ type Props = {
   agent: UseParentAgentReportResult
   /** 홈 서버 조회(calendar_events) 기반 일정 브리핑 문구 */
   calendarNoticeText?: string
+  /** 홈 브리핑 UI(일정 있음 상태) 목록 데이터 */
+  calendarUpcomingEvents?: {
+    id: string
+    dateLabel: string
+    title: string
+    impactLabel: string
+  }[]
   /** 홈탭에서 공용 일정 등록 시트를 열 때 사용합니다. */
   onOpenCalendarEventSheet?: () => void
 }
@@ -150,6 +157,7 @@ function AgentOnboardingProgressCard({ daysWithData }: { daysWithData: number })
 export default function ParentAgentHomeCards({
   agent,
   calendarNoticeText,
+  calendarUpcomingEvents = [],
   onOpenCalendarEventSheet,
 }: Props) {
   const { row, loading, runState, distinctDays, reload } = agent
@@ -168,18 +176,53 @@ export default function ParentAgentHomeCards({
   return (
     <div className="w-full space-y-3">
       {/* 일정 코멘트는 경제 EQ 패널이 아닌, AI 리포트 블록 상단에서 항상 보여 줍니다. */}
-      <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-amber-900">
-        <div className="flex items-center justify-between gap-2">
-          <p className="flex-1 whitespace-pre-line text-xs leading-relaxed text-amber-800">{noticeText}</p>
-          <button
-            type="button"
-            onClick={onOpenCalendarEventSheet}
-            className="ml-3 shrink-0 rounded-lg border border-blue-200 px-3 py-1.5 text-xs font-medium text-blue-600 transition-colors hover:bg-blue-50"
-          >
-            일정 등록하기
-          </button>
+      {calendarUpcomingEvents.length === 0 ? (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-amber-900">
+          <div className="flex items-center justify-between gap-3">
+            <p className="flex-1 whitespace-pre-line text-sm text-amber-800">
+              {noticeText}
+            </p>
+            <button
+              type="button"
+              onClick={onOpenCalendarEventSheet}
+              className="ml-3 shrink-0 whitespace-nowrap rounded-lg border border-blue-200 px-3 py-1.5 text-xs font-medium text-blue-600 transition-colors hover:bg-blue-50"
+            >
+              일정 등록하기
+            </button>
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="rounded-xl border border-blue-200 border-l-4 border-l-blue-400 bg-blue-50 p-4">
+          {calendarUpcomingEvents.map((event) => (
+            <div key={event.id} className="mb-2 flex items-center gap-2 last:mb-0">
+              <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
+                {event.dateLabel}
+              </span>
+              <span className="text-sm font-medium text-blue-900">
+                {event.title}
+              </span>
+              <span className="ml-auto text-xs text-blue-500">
+                {event.impactLabel}
+              </span>
+            </div>
+          ))}
+          <div className="mt-3 flex gap-2 border-t border-blue-100 pt-3">
+            <Link
+              href="/parent/routine"
+              className="text-xs font-medium text-blue-600"
+            >
+              캘린더에서 보기 →
+            </Link>
+            <button
+              type="button"
+              onClick={onOpenCalendarEventSheet}
+              className="ml-auto rounded-lg bg-blue-500 px-3 py-1.5 text-xs font-medium text-white"
+            >
+              일정 등록하기
+            </button>
+          </div>
+        </div>
+      )}
 
       {loading ? (
         <div className="w-full flex items-center justify-center gap-2 rounded-2xl border border-sky-100 bg-white/80 py-6 shadow-sm">

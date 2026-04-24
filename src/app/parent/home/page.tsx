@@ -63,6 +63,7 @@ export default async function ParentHomePage() {
 
   const supabase = await createClient()
   const childIds = auth.familyLinks.map((l) => l.child_id)
+  const familyLinkIds = auth.familyLinks.map((l) => l.id)
 
   if (childIds.length === 0) {
     return <HomeTab childrenData={[]} upcomingEvents={[]} />
@@ -97,12 +98,12 @@ export default async function ParentHomePage() {
       .order('completed_at', { ascending: false })
       .limit(30),
 
-    // 홈 상단 일정 브리핑(향후 7일): 부모 기준 캘린더 일정
+    // 홈 상단 일정 브리핑(향후 7일): family_link_id 기준 캘린더 일정
     supabase
       .from('calendar_events')
-      .select('start_date, end_date, routine_override, title')
-      .eq('parent_id', auth.user.id)
-      .gte('end_date', today)
+      .select('id, start_date, end_date, routine_override, title, event_type')
+      .in('family_link_id', familyLinkIds)
+      .or(`end_date.gte.${today},end_date.is.null`)
       .lte('start_date', sevenDaysLater)
       .order('start_date', { ascending: true })
       .limit(5),
@@ -180,11 +181,22 @@ export default async function ParentHomePage() {
   })
 
   const upcomingEvents = (calendarEventsRes.data ?? []) as {
+    id: string
     start_date: string
     end_date: string
-    routine_override: string
+    routine_override?: string | null
+    event_type?: string | null
     title?: string | null
   }[]
+
+  console.log('[home] calendar query', {
+    today,
+    sevenDaysLater,
+    parentId: auth.user.id,
+    familyLinkIds,
+    result: upcomingEvents,
+    error: calendarEventsRes.error?.message,
+  })
 
   return <HomeTab childrenData={childrenData} upcomingEvents={upcomingEvents} />
 }
