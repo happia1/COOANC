@@ -799,7 +799,7 @@ export default function RoutineTab({
             ) : (
               <div className="flex flex-col gap-3">
                 <div className="space-y-1.5">
-                  <p className="px-0.5 text-[11px] font-black text-gray-500">주간</p>
+                  <p className="px-0.5 text-[11px] font-normal text-gray-400">주간</p>
                   {weekdayActive.length === 0 ? (
                     <p className={`rounded-xl border border-gray-100 bg-white py-3 text-center shadow-sm ${ROUTINE_DESC_TEXT_CLASS}`}>
                       주간 미션이 없어요
@@ -822,7 +822,7 @@ export default function RoutineTab({
                 </div>
 
                 <div className="space-y-1.5">
-                  <p className="px-0.5 text-[11px] font-black text-gray-500">주말, 휴일</p>
+                  <p className="px-0.5 text-[11px] font-normal text-gray-400">주말, 휴일</p>
                   {weekendActive.length === 0 ? (
                     <p className={`rounded-xl border border-gray-100 bg-white py-3 text-center shadow-sm ${ROUTINE_DESC_TEXT_CLASS}`}>
                       주말, 휴일 미션이 없어요
@@ -852,7 +852,7 @@ export default function RoutineTab({
               <h2 className="mb-1.5 text-sm font-bold text-gray-400">비활성 미션 (일상)</h2>
               <div className="flex flex-col gap-3 opacity-90">
                 <div className="space-y-1.5">
-                  <p className="px-0.5 text-[11px] font-black text-gray-400">주간</p>
+                  <p className="px-0.5 text-[11px] font-normal text-gray-300">주간</p>
                   <AmPmRoutineBlock
                     am={weekdayInactiveParts.am}
                     pm={weekdayInactiveParts.pm}
@@ -868,7 +868,7 @@ export default function RoutineTab({
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <p className="px-0.5 text-[11px] font-black text-gray-400">주말, 휴일</p>
+                  <p className="px-0.5 text-[11px] font-normal text-gray-300">주말, 휴일</p>
                   <AmPmRoutineBlock
                     am={weekendInactiveParts.am}
                     pm={weekendInactiveParts.pm}
