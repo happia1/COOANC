@@ -160,8 +160,12 @@ export default function ParentAgentHomeCards({
 }: Props) {
   const { row, loading, runState, distinctDays, reload } = agent
   const [sheet, setSheet] = useState<SheetKind>(null)
-  // 서버 집계(daysWithData)를 우선 사용하고, 없으면 기존 훅 값(distinctDays)을 보조로 사용합니다.
-  const onboardingDays = Math.max(0, Number(daysWithData || distinctDays || 0))
+  // 핵심: insufficient 응답일 때는 에이전트가 실제 계산한 distinctDays를 우선 표시해야
+  // "7일 누적" 오해가 생기지 않습니다.
+  const onboardingDays =
+    runState === 'insufficient'
+      ? Math.max(0, Number(distinctDays || 0))
+      : Math.max(0, Number(daysWithData || 0))
 
   const hasContent = hasDisplayableAgentContent(row)
   const coachingFull = String(row?.coaching_text ?? '').trim()

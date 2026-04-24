@@ -71,16 +71,16 @@ export default async function ParentHomePage() {
   const familyLinkIds = auth.familyLinks.map((l) => l.id)
 
   if (childIds.length === 0) {
-    return <HomeTab childrenData={[]} upcomingEvents={[]} daysWithData={0} />
+    return <HomeTab childrenData={[]} upcomingEvents={[]} daysWithDataByChild={{}} />
   }
 
   const today = getSeoulDateString()
   const sevenDaysLater = addSeoulCalendarDays(today, 7)
   const weekStart = getSeoulMondayOfWeekContaining(today)
   const weekEnd = addSeoulCalendarDays(weekStart, 6)
+  const primaryChildId = childIds[0]
 
   const childIdsKey = [...childIds].sort().join(',')
-  const primaryChildId = childIds[0]
   const fourteenDaysAgo = addSeoulCalendarDays(today, -14)
   const [
     cachedProfilesRes,
@@ -123,11 +123,11 @@ export default async function ParentHomePage() {
       .order('start_date', { ascending: true })
       .limit(5),
 
-    // AI 리포트 준비 진행도: 최근 14일 중 기록이 있는 날짜 수 계산용
+    // AI 리포트 준비 진행도: 최근 14일 중 기록이 있는 날짜 수(자녀별) 계산용
     supabase
       .from('mission_logs')
-      .select('assigned_date')
-      .eq('child_id', primaryChildId)
+      .select('child_id, assigned_date')
+      .in('child_id', childIds)
       .gte('assigned_date', fourteenDaysAgo),
 
     // 최신 리포트 1건 조회: 자동 실행 필요 여부 판단용
@@ -228,11 +228,26 @@ export default async function ParentHomePage() {
     error: calendarEventsRes.error?.message,
   })
 
-  const daysWithData = new Set(
-    ((missionLogsRes.data ?? []) as { assigned_date: string | null }[]).map((row) =>
-      typeof row.assigned_date === 'string' ? row.assigned_date.slice(0, 10) : row.assigned_date,
-    ),
-  ).size
+  const daysWithDataByChild: Record<string, number> = {}
+  for (const cid of childIds) daysWithDataByChild[cid] = 0
+  const daysSetByChild: Record<string, Set<string>> = {}
+  for (const cid of childIds) daysSetByChild[cid] = new Set<string>()
+  for (const row of (missionLogsRes.data ?? []) as { child_id: string; assigned_date: string | null }[]) {
+    if (!row.child_id) continue
+    const day =
+      typeof row.assigned_date === 'string'
+        ? row.assigned_date.slice(0, 10)
+        : row.assigned_date
+          ? String(row.assigned_date)
+          : ''
+    if (!day) continue
+    if (!daysSetByChild[row.child_id]) daysSetByChild[row.child_id] = new Set<string>()
+    daysSetByChild[row.child_id].add(day)
+  }
+  for (const cid of childIds) {
+    daysWithDataByChild[cid] = daysSetByChild[cid]?.size ?? 0
+  }
+  const daysWithData = daysWithDataByChild[primaryChildId] ?? 0
 
   const lastReport = (agentReportsRes.data ?? [])[0]
   const shouldRunAgent = !lastReport || (lastReport.created_at ? daysSince(lastReport.created_at) >= 7 : true)
@@ -248,5 +263,5 @@ export default async function ParentHomePage() {
     }).catch((e) => console.warn('[agent-a] trigger failed', e))
   }
 
-  return <HomeTab childrenData={childrenData} upcomingEvents={upcomingEvents} daysWithData={daysWithData} />
+  return <HomeTab childrenData={childrenData} upcomingEvents={upcomingEvents} daysWithDataByChild={daysWithDataByChild} />
 }

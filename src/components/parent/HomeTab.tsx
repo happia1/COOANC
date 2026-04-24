@@ -79,11 +79,11 @@ type Props = {
     event_type?: string | null
     title?: string | null
   }[]
-  /** 지난 14일 중 미션 완료 기록이 있는 날짜 수(서버 계산값). */
-  daysWithData: number
+  /** 지난 14일 중 미션 완료 기록이 있는 날짜 수(자녀별 서버 계산값). */
+  daysWithDataByChild: Record<string, number>
 }
 
-export default function HomeTab({ childrenData, upcomingEvents, daysWithData }: Props) {
+export default function HomeTab({ childrenData, upcomingEvents, daysWithDataByChild }: Props) {
   const { selectedChildId, setSelectedChildId } = useParentStore()
   /** 부모 홈 데이터는 이벤트성 갱신보다 안정성이 우선이라 일반 조회(fetch)만 사용합니다. */
   const supabaseRef = useRef(createClient())
@@ -362,7 +362,7 @@ export default function HomeTab({ childrenData, upcomingEvents, daysWithData }: 
                */}
               <ParentAgentHomeCards
                 agent={agentReport}
-                daysWithData={daysWithData}
+                daysWithData={child ? (daysWithDataByChild[child.id] ?? 0) : 0}
                 calendarNoticeText={calendarNoticeText}
                 calendarUpcomingEvents={effectiveUpcomingEvents.map((ev) => ({
                   id: ev.id ?? `${ev.start_date}-${ev.title ?? 'event'}`,
