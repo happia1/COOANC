@@ -88,7 +88,7 @@ export default async function ParentHomePage() {
     weekDailyRes,
     recentLogsRes,
     calendarEventsRes,
-    missionLogsRes,
+    completedMissionDaysRes,
     agentReportsRes,
   ] = await Promise.all([
     getCachedChildProfilesForParentHome(childIdsKey),
@@ -123,12 +123,15 @@ export default async function ParentHomePage() {
       .order('start_date', { ascending: true })
       .limit(5),
 
-    // AI 리포트 준비 진행도: 최근 14일 중 기록이 있는 날짜 수(자녀별) 계산용
+    // AI 리포트 준비 진행도:
+    // mission_logs.assigned_date 누락 케이스를 피하기 위해
+    // daily_missions 완료(date) 기준으로 "최근 14일 완료 일수"를 계산합니다.
     supabase
-      .from('mission_logs')
-      .select('child_id, assigned_date')
+      .from('daily_missions')
+      .select('child_id, date')
       .in('child_id', childIds)
-      .gte('assigned_date', fourteenDaysAgo),
+      .eq('is_completed', true)
+      .gte('date', fourteenDaysAgo),
 
     // 최신 리포트 1건 조회: 자동 실행 필요 여부 판단용
     supabase
@@ -232,13 +235,13 @@ export default async function ParentHomePage() {
   for (const cid of childIds) daysWithDataByChild[cid] = 0
   const daysSetByChild: Record<string, Set<string>> = {}
   for (const cid of childIds) daysSetByChild[cid] = new Set<string>()
-  for (const row of (missionLogsRes.data ?? []) as { child_id: string; assigned_date: string | null }[]) {
+  for (const row of (completedMissionDaysRes.data ?? []) as { child_id: string; date: string | null }[]) {
     if (!row.child_id) continue
     const day =
-      typeof row.assigned_date === 'string'
-        ? row.assigned_date.slice(0, 10)
-        : row.assigned_date
-          ? String(row.assigned_date)
+      typeof row.date === 'string'
+        ? row.date.slice(0, 10)
+        : row.date
+          ? String(row.date)
           : ''
     if (!day) continue
     if (!daysSetByChild[row.child_id]) daysSetByChild[row.child_id] = new Set<string>()

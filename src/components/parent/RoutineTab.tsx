@@ -16,7 +16,7 @@
 
 import { useState, useEffect, useLayoutEffect, useMemo, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { usePathname } from 'next/navigation'
+import { usePathname, useSearchParams } from 'next/navigation'
 import ParentEnterChildUiLink from '@/components/parent/ParentEnterChildUiLink'
 import { CompactChildProfileCard } from '@/components/parent/CompactChildProfileCard'
 import { useParentStore } from '@/store/parentStore'
@@ -463,6 +463,7 @@ export default function RoutineTab({
   familyLinkByChild = {},
 }: Props) {
   const pathname = usePathname()
+  const searchParams = useSearchParams()
   const { selectedChildId, setSelectedChildId } = useParentStore()
   /** multiline: 긴 안내(예: API hint) — 줄바꿈·너비·표시 시간 확대 */
   const [toast, setToast] = useState<{
@@ -508,6 +509,8 @@ export default function RoutineTab({
   }, [children, selectedChildId, setSelectedChildId])
 
   const currentId = selectedChildId ?? children[0]?.id ?? null
+  /** 홈 일정 브리핑에서 넘어온 `calendarDate(YYYY-MM-DD)`를 캘린더 섹션으로 전달합니다. */
+  const calendarDateFromQuery = searchParams.get('calendarDate')
   const currentChild = children.find((c) => c.id === currentId) ?? children[0]
   const childLevel = currentChild?.level ?? 0
   const familyLinkId = currentId ? familyLinkByChild[currentId] ?? null : null
@@ -949,7 +952,7 @@ export default function RoutineTab({
 
         {/* 우 컬럼(md) / 하단(모바일): CalendarSection — sticky on md */}
         <div className="md:sticky md:top-4">
-          <CalendarSection childId={currentId ?? null} />
+          <CalendarSection childId={currentId ?? null} focusDate={calendarDateFromQuery} />
         </div>
 
       </div>{/* /2컬럼 그리드 */}

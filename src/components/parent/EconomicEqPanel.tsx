@@ -14,6 +14,7 @@ import type { WeeklyRoutineDay } from '@/lib/childWeeklyRoutine'
 import ParentAgentBottomSheet from '@/components/parent/ParentAgentBottomSheet'
 import {
   parseAgentReportPayload,
+  type AgentEqScores,
   type AgentLatestReportRow,
   type AgentReportJsonV1,
 } from '@/lib/agentApi'
@@ -30,14 +31,6 @@ export type EconomicEqStatsSlice = Pick<
   | 'credits_piggy'
   | 'current_level'
 >
-
-/** 루틴 추세 코드 → 화살표 문자(비개발자도 한눈에 추세를 볼 수 있게) */
-function routineTrendArrow(trend: string | undefined): string {
-  const t = (trend ?? 'flat').toLowerCase()
-  if (t === 'up') return '↑'
-  if (t === 'down') return '↓'
-  return '→'
-}
 
 type Props = {
   stats: EconomicEqStatsSlice
@@ -147,6 +140,36 @@ function ReportCard({ children, className }: { children: React.ReactNode; classN
   )
 }
 
+/** EQ 지수(에이전트 분석) 막대 — 상세 팝업 하단에서 보여 줍니다. */
+function EqScoreBars({ eq }: { eq: AgentEqScores | null | undefined }) {
+  const delay = Math.min(100, Math.max(0, Number(eq?.delay_satisfaction ?? 0)))
+  const save = Math.min(100, Math.max(0, Number(eq?.save_ratio ?? 0)))
+  const routine = Math.min(100, Math.max(0, Number(eq?.routine_completion ?? 0)))
+  const rows = [
+    { label: '저축 습관', value: delay, color: 'from-amber-200 to-orange-300' },
+    { label: '저축 비율', value: save, color: 'from-lime-200 to-emerald-300' },
+    { label: '루틴 완주율', value: routine, color: 'from-sky-200 to-blue-400' },
+  ]
+  return (
+    <div className="space-y-3">
+      <p className="text-[11px] font-bold text-gray-600">EQ 지수 (에이전트 분석)</p>
+      {rows.map((r) => (
+        <div key={r.label}>
+          <div className="mb-1 flex justify-between text-[10px] font-bold text-gray-500">
+            <span>{r.label}</span>
+          </div>
+          <div className="h-2.5 w-full overflow-hidden rounded-full bg-gray-100">
+            <div
+              className={`h-full rounded-full bg-gradient-to-r ${r.color} transition-all duration-500`}
+              style={{ width: `${r.value}%` }}
+            />
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export default function EconomicEqPanel({
   stats,
   weeklyRoutine,
@@ -158,23 +181,12 @@ export default function EconomicEqPanel({
   const gradId = useId().replace(/:/g, '')
   const [delayExplainOpen, setDelayExplainOpen] = useState(false)
   const [creditDrillOpen, setCreditDrillOpen] = useState(false)
-  const [cheerCopied, setCheerCopied] = useState(false)
 
   const parsed = parseAgentReportPayload(agentRow?.report_text ?? null)
   const jsonReport: AgentReportJsonV1 | null = parsed.kind === 'json' ? parsed.data : null
   const legacyText = parsed.kind === 'legacy' ? parsed.text : ''
 
   const drill = jsonReport?.drill_down
-
-  const copyCheer = async (text: string) => {
-    try {
-      await navigator.clipboard.writeText(text)
-      setCheerCopied(true)
-      window.setTimeout(() => setCheerCopied(false), 2000)
-    } catch {
-      window.alert('복사에 실패했어요. 문장을 길게 눌러 직접 복사해 주세요.')
-    }
-  }
 
   const showAgentBlock = Boolean(agentChildId)
   // 현재 잔액 기준 저축 습관 비율: 저금통 / (돈바구니 + 지갑 + 저금통)
@@ -198,32 +210,8 @@ export default function EconomicEqPanel({
           {parsed.kind === 'json' && jsonReport ? (
             <>
               <ReportCard>
-                <div className="mb-2 flex items-center gap-2">
-                  <span className="rounded-full bg-violet-100 px-2.5 py-0.5 text-[11px] font-black text-violet-900">
-                    Lv.{stats.current_level ?? 0}
-                  </span>
-                  <span className="text-[10px] font-bold text-gray-500">성장 코멘트</span>
-                </div>
-                <p className="text-[13px] leading-relaxed whitespace-pre-wrap">
-                  {jsonReport.level_comment?.trim() || '레벨 코멘트를 준비 중이에요.'}
-                </p>
-              </ReportCard>
-
-              <ReportCard>
-                <div className="mb-2 flex items-center gap-2 text-gray-700">
-                  <span className="text-lg font-black tabular-nums" aria-hidden>
-                    {routineTrendArrow(jsonReport.routine_trend)}
-                  </span>
-                  <span className="text-[10px] font-bold text-gray-500">루틴·미션 습관</span>
-                </div>
-                <p className="text-[13px] leading-relaxed whitespace-pre-wrap">
-                  {jsonReport.routine_comment?.trim() || '루틴 코멘트를 준비 중이에요.'}
-                </p>
-              </ReportCard>
-
-              <ReportCard>
-                <p className="text-[10px] font-bold text-gray-500 mb-2">크레딧·저축 이야기</p>
-                <p className="text-[13px] leading-relaxed whitespace-pre-wrap">
+                <p className="mb-2 text-xs font-bold text-gray-600">크레딧·저축 이야기</p>
+                <p className="whitespace-pre-wrap text-[12px] font-normal leading-relaxed text-gray-700">
                   {jsonReport.credit_comment?.trim() || '크레딧 코멘트를 준비 중이에요.'}
                 </p>
                 <button
@@ -244,26 +232,6 @@ export default function EconomicEqPanel({
                 </ReportCard>
               ) : null}
 
-              {jsonReport.cheer_message?.trim() ? (
-                <ReportCard>
-                  <p className="text-[10px] font-bold text-gray-500 mb-2">아이에게 한 마디</p>
-                  <p className="text-[13px] leading-relaxed whitespace-pre-wrap">{jsonReport.cheer_message}</p>
-                  <button
-                    type="button"
-                    onClick={() => void copyCheer(jsonReport.cheer_message ?? '')}
-                    className="mt-3 w-full rounded-xl bg-[#4A90E2] py-2 text-xs font-black text-white active:scale-[0.99]"
-                  >
-                    {cheerCopied ? '복사했어요!' : '아이에게 전달하기'}
-                  </button>
-                </ReportCard>
-              ) : null}
-
-              {jsonReport.parent_guide?.trim() ? (
-                <div className="rounded-xl bg-amber-50 p-3 text-sm text-amber-950 ring-1 ring-amber-100/80">
-                  <p className="text-[10px] font-bold text-amber-800/90 mb-1">부모 가이드</p>
-                  <p className="leading-relaxed whitespace-pre-wrap">{jsonReport.parent_guide}</p>
-                </div>
-              ) : null}
             </>
           ) : legacyText.trim() ? (
             <ReportCard>
@@ -347,9 +315,8 @@ export default function EconomicEqPanel({
             <span className="tabular-nums font-black text-emerald-700">{drill?.save_ratio_pct ?? 0}%</span>
           </li>
         </ul>
-        <div className="mt-4 rounded-xl bg-gray-50/80 px-2 py-3">
-          <p className="text-[11px] font-bold text-gray-600 mb-2 text-center">주간 완주율 (이번 주)</p>
-          <WeekdayRoutineBars days={weeklyRoutine} />
+        <div className="mt-4 rounded-xl bg-sky-50/60 p-3 ring-1 ring-sky-100">
+          <EqScoreBars eq={agentRow?.eq_scores as AgentEqScores | null} />
         </div>
       </ParentAgentBottomSheet>
 

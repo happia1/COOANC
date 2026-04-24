@@ -30,6 +30,9 @@ import ParentAgentHomeCards from '@/components/parent/ParentAgentHomeCards'
 import { CalendarEventSheet } from '@/components/parent/CalendarSection'
 import { CompactChildProfileCard } from '@/components/parent/CompactChildProfileCard'
 import { useParentAgentReport } from '@/hooks/useParentAgentReport'
+import { buildPlaceholderCoachingGuide, buildPlaceholderEqDataFeedback } from '@/lib/childEqAiPlaceholders'
+import { CHILD_GROWTH_LEVELS } from '@/constants/childGrowthLevels'
+import type { AgentLatestReportRow } from '@/lib/agentApi'
 import SpriteImage from '@/components/common/SpriteImage'
 import { ICONS } from '@/constants/sprites'
 
@@ -90,14 +93,92 @@ export default function HomeTab({ childrenData, upcomingEvents, daysWithDataByCh
 
   const currentId = selectedChildId ?? childrenData[0]?.id
   const child = childrenData.find((c) => c.id === currentId) ?? childrenData[0]
+  const selectedDaysWithData = child ? (daysWithDataByChild[child.id] ?? 0) : 0
 
   const s = child?.stats ?? null
 
-  /** Agent A 최신 행 — 홈 좌측 EQ 패널과 우측 코칭 카드가 같이 씁니다. */
-  const agentReport = useParentAgentReport(child?.id)
+  /**
+   * Agent A 최신 행 — 홈 좌측 EQ 패널과 우측 코칭 카드가 같이 씁니다.
+   * selectedDaysWithData를 함께 전달해, 서버 distinctDays 지연 시에도 보정 재시도를 가능하게 합니다.
+   */
+  const agentReport = useParentAgentReport(child?.id, selectedDaysWithData)
 
   /** 선택 자녀가 바뀌면 서버에서 받은 주간 막대 데이터로 맞춘 뒤, Realtime 으로 최신화합니다. */
   const [weeklyRoutine, setWeeklyRoutine] = useState<WeeklyRoutineDay[]>(child?.weeklyRoutine ?? [])
+  const growthStageName =
+    CHILD_GROWTH_LEVELS.find((it) => it.level === (s?.current_level ?? 0))?.name ?? '씨앗'
+  const shouldUseLocalFallbackReport =
+    agentReport.runState === 'insufficient' &&
+    selectedDaysWithData >= 7 &&
+    !!child &&
+    !!s
+  /**
+   * 런타임 근거:
+   * - 로그에서 에이전트 서버가 `insufficient_data(distinctDays=0)`를 반복 반환함이 확인되었습니다.
+   * - 하지만 홈 서버 계산 누적일수가 7일 이상이면, 사용자가 "준비 완료인데 카드가 비어 있음"을 겪습니다.
+   * => 이 경우에만 로컬 계산 리포트를 합성해 카드 4종을 즉시 노출합니다.
+   */
+  const localFallbackAgentRow: AgentLatestReportRow | null =
+    shouldUseLocalFallbackReport && child && s
+      ? {
+          id: `fallback-${child.id}`,
+          child_id: child.id,
+          week_start: getSeoulMondayOfWeekContaining(getSeoulDateString()),
+          report_text: JSON.stringify({
+            version: 1,
+            level_comment: `${child.name}의 현재 성장 단계는 ${growthStageName}이에요.\n${buildPlaceholderEqDataFeedback({
+              stats: {
+                eq_routine_rate: s.eq_routine_rate ?? 0,
+                eq_delay_score: s.eq_delay_score ?? 0,
+                eq_save_ratio: s.eq_save_ratio ?? 0,
+                streak_days: s.streak_days ?? 0,
+                credits: s.credits ?? 0,
+              },
+              growthStageName,
+              childName: child.name,
+              weeklyRoutine,
+            })}`,
+            routine_comment: `루틴 성실도 ${s.eq_routine_rate ?? 0}%를 기준으로 이번 주 패턴을 요약했어요.`,
+            credit_comment: `저축 습관 ${s.eq_delay_score ?? 0}%, 저축 비율 ${s.eq_save_ratio ?? 0}%로 분석했어요.`,
+            cheer_message: `${child.name}의 꾸준한 시도를 크게 칭찬해 주세요. 작은 성공이 경제 습관을 만듭니다.`,
+            parent_guide: buildPlaceholderCoachingGuide({
+              stats: {
+                eq_routine_rate: s.eq_routine_rate ?? 0,
+                eq_delay_score: s.eq_delay_score ?? 0,
+                eq_save_ratio: s.eq_save_ratio ?? 0,
+                streak_days: s.streak_days ?? 0,
+                credits: s.credits ?? 0,
+              },
+              growthStageName,
+              childName: child.name,
+              weeklyRoutine,
+            }),
+            report_body_text: '로컬 폴백 리포트',
+          }),
+          coaching_text: buildPlaceholderCoachingGuide({
+            stats: {
+              eq_routine_rate: s.eq_routine_rate ?? 0,
+              eq_delay_score: s.eq_delay_score ?? 0,
+              eq_save_ratio: s.eq_save_ratio ?? 0,
+              streak_days: s.streak_days ?? 0,
+              credits: s.credits ?? 0,
+            },
+            growthStageName,
+            childName: child.name,
+            weeklyRoutine,
+          }),
+          eq_scores: {
+            routine_completion: s.eq_routine_rate ?? 0,
+            delay_satisfaction: s.eq_delay_score ?? 0,
+            save_ratio: s.eq_save_ratio ?? 0,
+          },
+          created_at: new Date().toISOString(),
+        }
+      : null
+  const effectiveAgentReport =
+    localFallbackAgentRow && !agentReport.row
+      ? { ...agentReport, row: localFallbackAgentRow, runState: 'success' as const }
+      : agentReport
   /** 홈에서도 루틴 탭과 같은 일정 등록 시트를 그대로 재사용합니다. */
   const [calendarEventSheetOpen, setCalendarEventSheetOpen] = useState(false)
   /**
@@ -361,11 +442,13 @@ export default function HomeTab({ childrenData, upcomingEvents, daysWithDataByCh
                * (`ParentAgentHomeCards`는 로딩/insufficient/코칭 상태를 공통으로 담당)
                */}
               <ParentAgentHomeCards
-                agent={agentReport}
-                daysWithData={child ? (daysWithDataByChild[child.id] ?? 0) : 0}
+                agent={effectiveAgentReport}
+                daysWithData={selectedDaysWithData}
                 calendarNoticeText={calendarNoticeText}
                 calendarUpcomingEvents={effectiveUpcomingEvents.map((ev) => ({
                   id: ev.id ?? `${ev.start_date}-${ev.title ?? 'event'}`,
+                  // 홈 브리핑 항목 클릭 시 루틴 캘린더에서 이 날짜를 바로 열기 위한 원본 값입니다.
+                  date: ev.start_date,
                   dateLabel: formatEventDate(ev.start_date),
                   title: ev.title?.trim() || getCategoryLabel(ev),
                   impactLabel:
@@ -417,8 +500,8 @@ export default function HomeTab({ childrenData, upcomingEvents, daysWithDataByCh
                 weeklyRoutine={weeklyRoutine}
                 childName={child.name}
                 agentChildId={child.id}
-                agentRow={agentReport.row}
-                agentLoading={agentReport.loading}
+                agentRow={effectiveAgentReport.row}
+                agentLoading={effectiveAgentReport.loading}
               />
             </div>
           </div>

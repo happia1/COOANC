@@ -67,6 +67,8 @@ type OverrideType = LocalCalendarEvent['routineOverride']
 
 interface Props {
   childId: string | null
+  /** 홈 브리핑 링크로 들어왔을 때 자동으로 선택해 열 날짜(YYYY-MM-DD) */
+  focusDate?: string | null
 }
 
 function dateKey(y: number, m: number, d: number): string {
@@ -112,7 +114,7 @@ type SheetState = {
   presetType?: LocalCalendarEvent['eventType']
 }
 
-export default function CalendarSection({ childId }: Props) {
+export default function CalendarSection({ childId, focusDate = null }: Props) {
   const [year, setYear] = useState(() => {
     const s = getSeoulDateString()
     return Number(s.slice(0, 4))
@@ -133,6 +135,11 @@ export default function CalendarSection({ childId }: Props) {
   const [legendFilter, setLegendFilter] = useState<LocalCalendarEvent['eventType'] | null>(null)
   /** `public_holidays` 에서 읽은 법정 공휴일 이름 — 날짜 키(YYYY-MM-DD) → 표시명 */
   const [holidayNamesByDate, setHolidayNamesByDate] = useState<Record<string, string>>({})
+  /**
+   * 외부 링크로 전달받은 날짜를 "월 이동 후 자동 클릭"하기 위한 대기값입니다.
+   * 비개발자 설명: 링크로 열렸을 때 달력 월이 다르면 먼저 월을 맞춘 뒤, 그 날짜를 자동으로 눌러 줍니다.
+   */
+  const [pendingFocusDate, setPendingFocusDate] = useState<string | null>(null)
 
   useEffect(() => {
     try {
@@ -142,6 +149,20 @@ export default function CalendarSection({ childId }: Props) {
       /* ignore */
     }
   }, [])
+
+  useEffect(() => {
+    // 잘못된 쿼리 값은 무시해 앱 동작을 안전하게 유지합니다.
+    if (!focusDate || !/^\d{4}-\d{2}-\d{2}$/.test(focusDate)) {
+      setPendingFocusDate(null)
+      return
+    }
+    const [y, m] = focusDate.split('-').map(Number)
+    if (!y || !m) return
+    setPendingFocusDate(focusDate)
+    // 대상 월/년으로 먼저 이동해야 해당 날짜를 달력에서 바로 열 수 있습니다.
+    setYear(y)
+    setMonth(m - 1)
+  }, [focusDate])
 
   /** 루틴 도우미 등이 `localStorage` 를 갱신하면 같은 탭에서도 목록을 다시 읽습니다 */
   useEffect(() => {
@@ -297,6 +318,16 @@ export default function CalendarSection({ childId }: Props) {
       setEmptyDayKey(dk)
     }
   }
+
+  useEffect(() => {
+    if (!pendingFocusDate) return
+    const [y, m] = pendingFocusDate.split('-').map(Number)
+    // 월 이동이 끝나면 날짜 상세(또는 빈 상태 시트)를 자동으로 열어 줍니다.
+    if (y === year && m - 1 === month) {
+      handleDayClick(pendingFocusDate)
+      setPendingFocusDate(null)
+    }
+  }, [pendingFocusDate, year, month])
 
   /** 헤더 + 버튼: 오늘 날짜로 일정 추가 시트(날짜는 시트 안에서 바꿀 수 있음) */
   function openAddSheet() {

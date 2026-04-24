@@ -6,52 +6,45 @@
  * - 이 컴포넌트는 `/agent-a/run` 이 돌아가는 동안의 안내와, 코칭 텍스트 바텀시트만 보여 줍니다.
  */
 
+import { type AgentLatestReportRow, parseAgentReportPayload } from '@/lib/agentApi'
+import type { ParentAgentErrorReason, UseParentAgentReportResult } from '@/hooks/useParentAgentReport'
 import Link from 'next/link'
-import { useState } from 'react'
-import { type AgentEqScores, type AgentLatestReportRow, parseAgentReportPayload } from '@/lib/agentApi'
-import type { UseParentAgentReportResult } from '@/hooks/useParentAgentReport'
-import ParentAgentBottomSheet from '@/components/parent/ParentAgentBottomSheet'
 
-/** 한 줄 미리보기: 공백을 정리한 뒤 앞부분만 잘라 카드에 넣습니다. */
-function previewLine(text: string | null | undefined, max = 30): string {
-  const t = (text ?? '').replace(/\s+/g, ' ').trim()
-  if (!t) return '내용이 아직 없어요'
-  return t.length <= max ? t : `${t.slice(0, max)}…`
+/** 에러 원인별로 사용자 문구를 분리해 보여 줍니다. */
+function getAgentErrorCopy(reason: ParentAgentErrorReason): { title: string; detail: string } {
+  switch (reason) {
+    case 'unauthorized':
+      return {
+        title: '로그인 정보 확인이 필요해요',
+        detail: '로그인이 만료되었을 수 있어요. 다시 로그인한 뒤 시도해 주세요.',
+      }
+    case 'timeout':
+      return {
+        title: 'AI 응답이 지연되고 있어요',
+        detail: '서버가 바쁜 상태예요. 잠시 후 다시 시도해 주세요.',
+      }
+    case 'service_unavailable':
+      return {
+        title: 'AI 서버가 잠시 쉬고 있어요',
+        detail: '잠깐 후 다시 시도하면 정상 동작할 가능성이 높아요.',
+      }
+    case 'server_error':
+      return {
+        title: 'AI 서버 처리 중 오류가 발생했어요',
+        detail: '일시적인 서버 오류예요. 다시 시도해 주세요.',
+      }
+    case 'network':
+      return {
+        title: '네트워크 연결을 확인해 주세요',
+        detail: '인터넷 연결이 불안정하거나 차단되어 요청이 실패했어요.',
+      }
+    default:
+      return {
+        title: 'AI 분석 연결 실패',
+        detail: '에이전트 서버에 연결할 수 없어요.',
+      }
+  }
 }
-
-/**
- * EQ 막대: 값의 **크기만** 막대 길이로 보여 주고, 퍼센트 숫자는 메인 대시보드에서 숨깁니다.
- */
-function EqScoreBars({ eq }: { eq: AgentEqScores | null | undefined }) {
-  const delay = Math.min(100, Math.max(0, Number(eq?.delay_satisfaction ?? 0)))
-  const save = Math.min(100, Math.max(0, Number(eq?.save_ratio ?? 0)))
-  const routine = Math.min(100, Math.max(0, Number(eq?.routine_completion ?? 0)))
-  const rows = [
-    { label: '저축 습관', value: delay, color: 'from-amber-200 to-orange-300' },
-    { label: '저축 비율', value: save, color: 'from-lime-200 to-emerald-300' },
-    { label: '루틴 완주율', value: routine, color: 'from-sky-200 to-blue-400' },
-  ]
-  return (
-    <div className="space-y-3">
-      <p className="text-[11px] font-bold text-gray-600">EQ 지수 (에이전트 분석)</p>
-      {rows.map((r) => (
-        <div key={r.label}>
-          <div className="mb-1 flex justify-between text-[10px] font-bold text-gray-500">
-            <span>{r.label}</span>
-          </div>
-          <div className="h-2.5 w-full overflow-hidden rounded-full bg-gray-100">
-            <div
-              className={`h-full rounded-full bg-gradient-to-r ${r.color} transition-all duration-500`}
-              style={{ width: `${r.value}%` }}
-            />
-          </div>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-type SheetKind = 'coaching' | null
 
 /** 리포트 JSON 또는 코칭 텍스트 중 하나라도 있으면 true */
 function hasDisplayableAgentContent(row: AgentLatestReportRow | null | undefined): boolean {
@@ -71,7 +64,6 @@ function hasDisplayableAgentContent(row: AgentLatestReportRow | null | undefined
         (d.routine_comment && d.routine_comment.trim()) ||
         (d.credit_comment && d.credit_comment.trim()) ||
         (d.wishlist_comment && d.wishlist_comment.trim()) ||
-        (d.cheer_message && d.cheer_message.trim()) ||
         (d.parent_guide && d.parent_guide.trim()) ||
         (d.report_body_text && d.report_body_text.trim()),
     )
@@ -88,6 +80,8 @@ type Props = {
   /** 홈 브리핑 UI(일정 있음 상태) 목록 데이터 */
   calendarUpcomingEvents?: {
     id: string
+    /** 브리핑 클릭 시 루틴 캘린더의 해당 날짜로 이동할 때 사용합니다. */
+    date: string
     dateLabel: string
     title: string
     impactLabel: string
@@ -158,18 +152,19 @@ export default function ParentAgentHomeCards({
   calendarUpcomingEvents = [],
   onOpenCalendarEventSheet,
 }: Props) {
-  const { row, loading, runState, distinctDays, reload } = agent
-  const [sheet, setSheet] = useState<SheetKind>(null)
+  const { row, loading, runState, errorReason, distinctDays, reload } = agent
   // 핵심: insufficient 응답일 때는 에이전트가 실제 계산한 distinctDays를 우선 표시해야
   // "7일 누적" 오해가 생기지 않습니다.
   const onboardingDays =
     runState === 'insufficient'
-      ? Math.max(0, Number(distinctDays || 0))
+      // 에이전트가 계산한 distinctDays가 일시적으로 0이어도,
+      // 홈 서버가 계산한 daysWithData를 함께 반영해 "0일 고정" 오판을 줄입니다.
+      ? Math.max(0, Number(distinctDays || 0), Number(daysWithData || 0))
       : Math.max(0, Number(daysWithData || 0))
+
 
   const hasContent = hasDisplayableAgentContent(row)
   const coachingFull = String(row?.coaching_text ?? '').trim()
-  const coachingPreview = previewLine(row?.coaching_text)
   const parsed = parseAgentReportPayload(row?.report_text ?? null)
   const rawCalendarNotice = parsed.kind === 'json' ? String(parsed.data.calendar_notice ?? '').trim() : ''
   const noticeText =
@@ -177,6 +172,7 @@ export default function ParentAgentHomeCards({
     rawCalendarNotice ||
     '이번 주는 특별 일정이 없어요. 루틴에 집중하기 좋은 한 주예요.'
   const blockCardClass = 'w-full rounded-2xl bg-white p-4 shadow-sm'
+  const errorCopy = getAgentErrorCopy(errorReason)
 
   return (
     <div className="w-full space-y-3">
@@ -201,17 +197,22 @@ export default function ParentAgentHomeCards({
         ) : (
         <div className="rounded-xl bg-gray-50/80 px-3 py-3">
             {calendarUpcomingEvents.map((event) => (
-              <div key={event.id} className="mb-2 flex items-center gap-2 last:mb-0">
-              <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-bold text-gray-500 ring-1 ring-gray-200">
+              <Link
+                key={event.id}
+                href={`/parent/routine?calendarDate=${encodeURIComponent(event.date)}`}
+                className="mb-2 flex items-center gap-2 rounded-lg px-1 py-1 transition-colors hover:bg-white/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4A90E2] last:mb-0"
+                aria-label={`${event.dateLabel} ${event.title} 일정 보러가기`}
+              >
+                <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-bold text-gray-500 ring-1 ring-gray-200">
                   {event.dateLabel}
                 </span>
-              <span className="text-[11px] font-bold text-gray-700">
+                <span className="text-[11px] font-bold text-gray-700">
                   {event.title}
                 </span>
-              <span className="ml-auto text-[10px] font-semibold text-gray-500">
+                <span className="ml-auto text-[10px] font-semibold text-gray-500">
                   {event.impactLabel}
                 </span>
-              </div>
+              </Link>
             ))}
           </div>
         )}
@@ -239,8 +240,8 @@ export default function ParentAgentHomeCards({
 
         {!loading && runState === 'error' ? (
           <div className="w-full rounded-xl bg-gray-50/80 p-4">
-            <p className="text-center text-sm font-black text-gray-700">AI 분석 연결 실패</p>
-            <p className="mt-1 text-center text-[11px] font-semibold text-gray-500">에이전트 서버에 연결할 수 없어요.</p>
+            <p className="text-center text-sm font-black text-gray-700">{errorCopy.title}</p>
+            <p className="mt-1 text-center text-[11px] font-semibold text-gray-500">{errorCopy.detail}</p>
             <button
               type="button"
               onClick={() => void reload()}
@@ -256,39 +257,42 @@ export default function ParentAgentHomeCards({
         ) : null}
 
         {!loading && hasContent && coachingFull ? (
-          <button
-            type="button"
-            onClick={() => setSheet('coaching')}
-            className="group w-full rounded-xl bg-gray-50/80 px-3 py-3 text-left transition active:scale-[0.99]"
-          >
-            <span className="text-[11px] font-bold text-gray-600">경제 습관 코칭 가이드</span>
-            <p className="mt-2 line-clamp-2 text-[11px] font-semibold leading-snug text-gray-700">{coachingPreview}</p>
-            <span className="mt-3 text-[10px] font-bold text-gray-500">탭해서 전체 보기 →</span>
-          </button>
+          <div className="w-full rounded-xl border border-gray-100 bg-white p-3 text-sm text-gray-800 shadow-sm">
+            <p className="text-xs font-bold text-gray-600">경제 습관 코칭 가이드</p>
+            <p className="mt-2 whitespace-pre-wrap text-[12px] font-normal leading-relaxed text-gray-700">
+              {coachingFull}
+            </p>
+          </div>
+        ) : null}
+
+        {/* 요청 반영: 성장 코멘트를 코칭 가이드 바로 아래에 배치합니다. */}
+        {!loading && parsed.kind === 'json' && parsed.data.level_comment?.trim() ? (
+          <div className="w-full rounded-xl border border-gray-100 bg-white p-3 text-sm text-gray-800 shadow-sm">
+            <div className="mb-2 flex items-center gap-2">
+              <span className="rounded-full bg-violet-100 px-2.5 py-0.5 text-xs font-bold text-violet-900">
+                성장 분석
+              </span>
+              <span className="text-xs font-bold text-gray-600">레벨 코멘트</span>
+            </div>
+            <p className="whitespace-pre-wrap text-[12px] font-normal leading-relaxed text-gray-700">
+              {parsed.data.level_comment}
+            </p>
+          </div>
         ) : null}
       </section>
 
-      <ParentAgentBottomSheet
-        open={sheet === 'coaching'}
-        title="경제 습관 코칭 가이드"
-        onClose={() => setSheet(null)}
-        footer={
-          <Link
-            href="/parent/approval#parent-approval-market-rewards"
-            className="flex w-full items-center justify-center rounded-xl bg-gradient-to-r from-sky-400 to-indigo-500 py-3 text-center text-xs font-black text-white shadow-md ring-1 ring-sky-300/50 active:scale-[0.99]"
-            onClick={() => setSheet(null)}
-          >
-            특별 보상 설정하기
-          </Link>
-        }
-      >
-        <p className="whitespace-pre-wrap text-xs leading-relaxed text-gray-800">
-          {coachingFull || '내용이 없습니다.'}
-        </p>
-        <div className="mt-4 rounded-xl bg-sky-50/60 p-3 ring-1 ring-sky-100">
-          <EqScoreBars eq={row?.eq_scores as AgentEqScores | null} />
-        </div>
-      </ParentAgentBottomSheet>
+      {/* 태블릿 가로(md)에서는 아래 3개 블록을 왼쪽 컬럼에 배치합니다. */}
+      {!loading && parsed.kind === 'json' ? (
+        <section className="hidden space-y-3 md:block lg:hidden">
+          {parsed.data.parent_guide?.trim() ? (
+            <div className="rounded-xl bg-amber-50 p-3 text-sm text-amber-950 ring-1 ring-amber-100/80">
+              <p className="text-[10px] font-bold text-amber-800/90 mb-1">부모 가이드</p>
+              <p className="leading-relaxed whitespace-pre-wrap">{parsed.data.parent_guide}</p>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
+
     </div>
   )
 }

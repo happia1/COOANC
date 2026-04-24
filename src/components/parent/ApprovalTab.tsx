@@ -852,11 +852,11 @@ export default function ApprovalTab({
                           <>
                             <button
                               type="button"
-                              onClick={(e) => { e.stopPropagation(); setRejectModal({ requestId: req.id, itemName: req.item_name }) }}
+                              onClick={(e) => { e.stopPropagation(); void handleApprove(req.id) }}
                               disabled={loading === req.id}
-                              className="w-full rounded-lg border border-red-200 py-1 text-[9px] font-bold text-red-500 transition-all active:scale-95 disabled:opacity-50"
+                              className="w-full rounded-lg bg-brand-blue py-1 text-[9px] font-bold text-white shadow-sm transition-all active:scale-95 disabled:opacity-50"
                             >
-                              반려
+                              {loading === req.id ? '…' : '배달 승인'}
                             </button>
                             <button
                               type="button"
@@ -867,23 +867,15 @@ export default function ApprovalTab({
                             </button>
                             <button
                               type="button"
-                              onClick={(e) => { e.stopPropagation(); void handleApprove(req.id) }}
-                              disabled={loading === req.id}
-                              className="w-full rounded-lg bg-brand-blue py-1 text-[9px] font-bold text-white shadow-sm transition-all active:scale-95 disabled:opacity-50"
-                            >
-                              {loading === req.id ? '…' : '배달 승인'}
-                            </button>
-                          </>
-                        ) : (
-                          <>
-                            <button
-                              type="button"
                               onClick={(e) => { e.stopPropagation(); setRejectModal({ requestId: req.id, itemName: req.item_name }) }}
                               disabled={loading === req.id}
                               className="w-full rounded-lg border border-red-200 py-1 text-[9px] font-bold text-red-500 transition-all active:scale-95 disabled:opacity-50"
                             >
                               반려
                             </button>
+                          </>
+                        ) : (
+                          <>
                             <button
                               type="button"
                               onClick={(e) => { e.stopPropagation(); setApproveChoiceModal({ requestId: req.id, itemName: req.item_name }) }}
@@ -891,6 +883,14 @@ export default function ApprovalTab({
                               className="w-full rounded-lg bg-brand-blue py-1 text-[9px] font-bold text-white shadow-sm transition-all active:scale-95 disabled:opacity-50"
                             >
                               승인
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); setRejectModal({ requestId: req.id, itemName: req.item_name }) }}
+                              disabled={loading === req.id}
+                              className="w-full rounded-lg border border-red-200 py-1 text-[9px] font-bold text-red-500 transition-all active:scale-95 disabled:opacity-50"
+                            >
+                              반려
                             </button>
                           </>
                         )}
