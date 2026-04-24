@@ -284,13 +284,16 @@ export default function EconomicEqPanel({
           aria-label="저축 습관 설명 보기"
         >
           {/* 현재는 child_stats 현재 잔액 기준으로 즉시 계산된 값을 보여 줍니다. */}
-          <p className="text-[10px] font-bold text-gray-600 mb-1 text-center">저축 습관 (현재 잔액 기준)</p>
-          <div className="relative flex items-center justify-center pointer-events-none">
-            <DelayHalfGauge value={savingsRate} gradientId={`delay-${gradId}`} compact />
-            {/* 반원 게이지 중앙에 현재 저금통 비율을 겹쳐서 바로 읽히게 표시합니다. */}
-            <div className="absolute bottom-[20%] flex flex-col items-center">
-              <span className="text-2xl font-bold text-blue-600">{savingsRate}%</span>
-              <span className="mt-0.5 text-xs text-gray-400">저금통 비율</span>
+          <p className="text-sm font-medium text-gray-600 text-center">저축 습관</p>
+          <p className="text-xs text-gray-400 text-center">현재 잔액 기준</p>
+          <div className="pointer-events-none flex flex-col items-center">
+            {/* 반원 게이지 자체에는 텍스트를 겹치지 않고, 아래 플로우로 분리해 겹침을 방지합니다. */}
+            <div className="relative">
+              <DelayHalfGauge value={savingsRate} gradientId={`delay-${gradId}`} compact />
+            </div>
+            <div className="-mt-2 flex flex-col items-center">
+              <span className="text-2xl font-bold leading-none text-blue-600">{savingsRate}%</span>
+              <span className="mt-1 text-xs text-gray-400">저금통 비율</span>
             </div>
           </div>
         </button>
