@@ -243,7 +243,8 @@ export default async function ParentHomePage() {
     void fetch(`${agentBaseUrl}/agent-a/run`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ child_id: primaryChildId }),
+      // agent-a/run 스키마에 맞춰 parent_id를 함께 전달해야 422 없이 실행됩니다.
+      body: JSON.stringify({ child_id: primaryChildId, parent_id: auth.user.id }),
     }).catch((e) => console.warn('[agent-a] trigger failed', e))
   }
 

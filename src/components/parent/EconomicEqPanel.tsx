@@ -117,6 +117,9 @@ function EqDelayExplainModal({
                 높을수록 저축 습관이 잘 잡혀있다는 신호예요. 미션 보상을 받은 뒤 저금통으로 옮기는 연습을 함께
                 해보세요.
               </p>
+              <p className="text-xs text-gray-400 mt-2">
+                7일 이상 미션을 수행하면 실제 행동 패턴 기반으로 업데이트돼요.
+              </p>
             </div>
           </div>
         </div>
@@ -267,8 +270,6 @@ export default function EconomicEqPanel({
               <p className="text-[10px] font-bold text-gray-500 mb-2">AI 인사이트 (이전 형식)</p>
               <p className="text-[13px] leading-relaxed whitespace-pre-wrap">{legacyText}</p>
             </ReportCard>
-          ) : !agentLoading ? (
-            <p className="text-center text-[11px] font-semibold text-gray-400">아직 저장된 AI 리포트가 없어요.</p>
           ) : null}
         </div>
       ) : null}
@@ -284,13 +285,15 @@ export default function EconomicEqPanel({
         >
           {/* 현재는 child_stats 현재 잔액 기준으로 즉시 계산된 값을 보여 줍니다. */}
           <p className="text-[10px] font-bold text-gray-600 mb-1 text-center">저축 습관 (현재 잔액 기준)</p>
-          <div className="pointer-events-none">
-            <DelayHalfGauge value={stats.eq_delay_score} gradientId={`delay-${gradId}`} compact />
+          <div className="relative flex items-center justify-center pointer-events-none">
+            <DelayHalfGauge value={savingsRate} gradientId={`delay-${gradId}`} compact />
+            {/* 반원 게이지 중앙에 현재 저금통 비율을 겹쳐서 바로 읽히게 표시합니다. */}
+            <div className="absolute bottom-[20%] flex flex-col items-center">
+              <span className="text-2xl font-bold text-blue-600">{savingsRate}%</span>
+              <span className="mt-0.5 text-xs text-gray-400">저금통 비율</span>
+            </div>
           </div>
         </button>
-        <p className="mt-2 text-center text-[10px] font-semibold text-gray-500">
-          7일 후 실제 행동 패턴 기반으로 업데이트돼요
-        </p>
       </div>
 
       {/**
