@@ -44,7 +44,6 @@ const AM_CHIPS: ChipDef[] = [
  */
 const PM_CHIPS: ChipDef[] = [
   { id: 'pm-hands', title: '손씻기', emoji: '', type: 'recommended', apiBlock: 'afternoon' },
-  { id: 'pm-snack', title: '간식먹기', emoji: '', type: 'recommended', apiBlock: 'afternoon' },
   { id: 'pm-water', title: '물마시기', emoji: '', type: 'recommended', apiBlock: 'afternoon' },
   { id: 'pm-out', title: '야외놀이', emoji: '', type: 'optional', apiBlock: 'afternoon' },
   { id: 'pm-in', title: '실내놀이', emoji: '', type: 'optional', apiBlock: 'afternoon' },

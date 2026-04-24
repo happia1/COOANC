@@ -155,6 +155,20 @@ const PIGGY_CREDIT_CARD_NUDGE_DOWN_CLASS = 'translate-y-1.5'
 /** 내 지갑 일러스트만 살짝 위로 올립니다(카드 박스·숫자 줄 위치는 `CREDIT_CARD_INNER_LIFT` 와 동일). */
 const WALLET_CREDIT_CARD_NUDGE_UP_CLASS = '-translate-y-1'
 
+/**
+ * 상단 숫자 슬롯 공통 크기 클래스입니다.
+ * - 모바일에서도 기존보다 한 단계 크게 보이게 하고
+ * - 태블릿(landscape)에서는 한 단계 더 키워 가독성을 높입니다.
+ */
+const TOP_CREDIT_SLOT_SIZE_CLASS = 'text-base sm:text-[1.05rem] md:landscape:text-lg'
+
+/**
+ * 상단 3개 카드 라벨(저금통/돈바구니/내 지갑) 공통 크기 클래스입니다.
+ * - 기존보다 한 단계 크게 키워 모바일에서도 더 잘 보이게 하고
+ * - 태블릿 가로에서는 추가 확대해 시인성을 높입니다.
+ */
+const TOP_CREDIT_LABEL_SIZE_CLASS = 'text-xs sm:text-sm md:landscape:text-[0.95rem]'
+
 /* ─────────────── Props ─────────────── */
 
 export interface MissionCreditCardsProps {
@@ -234,7 +248,12 @@ export default function MissionCreditCards({
 
   return (
     <div
-      className="flex w-full flex-row items-end justify-center gap-0 overflow-visible px-1 sm:px-2"
+      /**
+       * 요청사항 반영:
+       * - 모바일/태블릿 모두 상단 3카드(저금통·돈바구니·내지갑)를 더 크게 보이게 합니다.
+       * - `origin-top` 기준으로 확대해 아래 콘텐츠와의 기준점을 안정적으로 유지합니다.
+       */
+      className="flex w-full flex-row items-end justify-center gap-0 overflow-visible px-1 sm:px-2 origin-top scale-[1.08] sm:scale-[1.12] md:landscape:gap-2 md:landscape:scale-[1.24]"
       aria-label="크레딧 현황"
     >
 
@@ -264,8 +283,8 @@ export default function MissionCreditCards({
               />
             </div>
           </div>
-          <p className="text-[10px] font-bold text-rose-800">저금통</p>
-          <SlotNumber value={piggy} toneClass="text-rose-700" sizeClass="text-sm" />
+          <p className={`${TOP_CREDIT_LABEL_SIZE_CLASS} font-bold text-rose-800`}>저금통</p>
+          <SlotNumber value={piggy} toneClass="text-rose-700" sizeClass={TOP_CREDIT_SLOT_SIZE_CLASS} />
           <p className="text-center text-[10px] font-medium leading-tight text-rose-800">저축을 해요</p>
         </div>
       </button>
@@ -304,8 +323,8 @@ export default function MissionCreditCards({
               />
             </div>
           </div>
-          <p className="text-[10px] font-bold text-amber-800">돈바구니</p>
-          <SlotNumber value={floating} toneClass="text-amber-700" sizeClass="text-sm" />
+          <p className={`${TOP_CREDIT_LABEL_SIZE_CLASS} font-bold text-amber-800`}>돈바구니</p>
+          <SlotNumber value={floating} toneClass="text-amber-700" sizeClass={TOP_CREDIT_SLOT_SIZE_CLASS} />
           <p className="text-center text-[10px] font-medium leading-tight text-amber-900">보상을 받아요</p>
         </div>
       </button>
@@ -335,8 +354,8 @@ export default function MissionCreditCards({
               />
             </div>
           </div>
-          <p className="text-[10px] font-bold text-teal-800">내 지갑</p>
-          <SlotNumber value={wallet} toneClass="text-teal-700" sizeClass="text-sm" />
+          <p className={`${TOP_CREDIT_LABEL_SIZE_CLASS} font-bold text-teal-800`}>내 지갑</p>
+          <SlotNumber value={wallet} toneClass="text-teal-700" sizeClass={TOP_CREDIT_SLOT_SIZE_CLASS} />
           <p className="text-center text-[10px] font-medium leading-tight text-teal-900">쓸 수 있어요</p>
         </div>
       </button>

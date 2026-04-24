@@ -16,6 +16,7 @@ import { isRetiredSpecialMissionTitle, isSpecialSectionMission } from '@/lib/spe
 import { compareRoutineFlowSortable, type RoutineFlowSortable } from '@/lib/routineChips'
 import { parseAlarmFromMissionDescription } from '@/lib/missionAlarmDescription'
 import { scaledMissionRewards, type RewardMultiplier } from '@/lib/missionRewardMultiplier'
+import { isRetiredRoutineMissionTitle } from '@/lib/routineChips'
 import MissionSleepMorningLayer from '@/components/child/MissionSleepMorningLayer'
 import SpriteImage from '@/components/common/SpriteImage'
 import { BANNERS, ICONS } from '@/constants/sprites'
@@ -297,6 +298,13 @@ export default function MissionTab({
       missionList.filter((dm) => {
         const m = dm.missions
         if (!m) return true
+        /**
+         * 폐지된 제목(예: 신발신기 등)은 스페셜/루틴 구분 없이 카드에서 숨깁니다.
+         * 과거 daily_missions 행이 남아 있어도 자녀 화면에 계속 노출되지 않게 막습니다.
+         */
+        if (isRetiredSpecialMissionTitle(m.title)) return false
+        // 폐지된 일상 키워드(예: 간식먹기)는 기존 DB 행이 남아도 자녀 카드에서 숨깁니다.
+        if (isRetiredRoutineMissionTitle(m.title)) return false
         if (!isSpecialSectionMission(m)) return true
         return !isRetiredSpecialMissionTitle(m.title)
       }),
@@ -503,7 +511,11 @@ export default function MissionTab({
     <div className="relative -mt-3 flex min-h-0 w-full shrink-0 flex-col self-stretch pb-2">
       {/** `z-0`: 제목·하트(`z-[30]`)가 위로 겹칠 때 저금통 줄보다 뒤에 두어 글이 가려지지 않게 함 */}
       <div className="relative z-0 flex w-full shrink-0 justify-center px-3 sm:px-4">
-        <div className="w-full max-w-[18rem] sm:max-w-[18.5rem]">
+        {/**
+         * 가로 태블릿에서 상단 저금통/돈바구니/지갑 영역을 더 크게 쓸 수 있도록
+         * 컨테이너 최대 너비를 확장합니다(모바일도 한 단계 확대).
+         */}
+        <div className="w-full max-w-[19.5rem] sm:max-w-[20.5rem] md:landscape:max-w-[26rem]">
           <MissionCreditCards
             piggy={piggyCredits}
             floating={floatingCredits}
@@ -602,7 +614,11 @@ export default function MissionTab({
                       <img
                         src={routineImagePath}
                         alt=""
-                        className="h-20 w-20 md:h-28 md:w-28 lg:h-32 lg:w-32 max-w-full select-none object-contain drop-shadow-[0_2px_8px_rgba(0,0,0,0.08)]"
+                        /**
+                         * 카드 확대에 맞춰 PNG 썸네일도 같은 비율로 키웁니다.
+                         * (모바일/태블릿 가로 모두 카드 크기 증가폭을 따라가도록 반응형 높이를 상향)
+                         */
+                        className="h-36 w-36 md:h-36 md:w-36 md:landscape:h-40 md:landscape:w-40 lg:h-40 lg:w-40 max-w-full select-none object-contain drop-shadow-[0_2px_8px_rgba(0,0,0,0.08)]"
                         draggable={false}
                       />
                     ) : (
@@ -820,7 +836,11 @@ export default function MissionTab({
             completedCount={completedCount}
             totalMissions={total}
           />
-          <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-hidden pt-16">
+          {/**
+           * 상단/하단 미션 영역을 함께 조금 아래로 내리기 위해
+           * 공통 래퍼의 상단 패딩을 한 단계 키웁니다.
+           */}
+          <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-hidden pt-24">
             {heroBand}
             <div className="flex min-h-0 min-w-0 flex-1 flex-col items-center justify-center gap-2 overflow-x-hidden overflow-y-hidden overscroll-contain px-4 py-2 text-center sm:gap-3 sm:px-6 sm:py-4">
               <span className="text-sm font-black text-gray-400">휴식</span>
@@ -900,10 +920,18 @@ export default function MissionTab({
          * `overflow-y-hidden`: flex `min-h-0` 축소가 깨지지 않게 해 한 화면에 맞춤(`overflow-y-visible` 이면 세로 스크롤바 유발).
          * 카드만 필요 시 스크롤 — `bottomPanel` 안 래퍼에 `overflow-y-auto` + 스크롤바 숨김.
          */}
-        <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-hidden pt-16">
+        {/**
+         * 일반 미션 화면도 동일하게 상단 여백을 늘려
+         * 상단 크레딧 + 하단 카드 영역이 전체적으로 아래로 내려오게 맞춥니다.
+         */}
+        <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-hidden pt-24">
           {heroBand}
-          {/** `z-20` + 세로 visible: 제목이 위로 나와도 잘리지 않고, 상단 크레딧(z-0)보다 앞에 그려짐 */}
-          <div className="relative z-20 flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-hidden overscroll-contain mt-2">
+          {/**
+           * 오늘의 미션 영역을 모바일·가로 태블릿 모두 같은 비율(동일 단계)로 더 아래로 내립니다.
+           * - 모바일: mt-2 → mt-3
+           * - 가로 태블릿: mt-4 → mt-5
+           */}
+          <div className="relative z-20 flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-hidden overscroll-contain mt-3 md:landscape:mt-5">
             {bottomPanel}
           </div>
         </div>

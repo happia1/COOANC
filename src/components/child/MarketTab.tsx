@@ -771,6 +771,16 @@ export default function MarketTab({
               <div className="flex snap-x snap-mandatory gap-2 md:landscape:gap-3 overflow-x-auto px-1 py-0.5 [-ms-overflow-style:none] [scrollbar-width:none]">
                 {block.items.map((item, itemIdx) => {
                   const frameKey = marketFrameKeyForItemId(item.id, item.name)
+                  /**
+                   * 요청사항:
+                   * - 이벤트/장난감/간식 카드의 가로·세로 크기를 동일하게 통일
+                   * - 이미지와 크레딧 알약 간격/정렬도 같은 규칙으로 맞춤
+                   * (태블릿 가로에서만 적용, 모바일은 기존 유지)
+                   */
+                  const isUnifiedLargeSection =
+                    block.sectionKey === 'event' || block.sectionKey === 'toy' || block.sectionKey === 'snack'
+                  /** 요청사항: 이벤트/장난감 이미지는 간식보다 한 단계 더 크게 */
+                  const isEventOrToySection = block.sectionKey === 'event' || block.sectionKey === 'toy'
                   /** 첫 구역 맨 앞 몇 칸만 우선 로드 — 나머지는 지연 로드로 대역폭 절약 */
                   const thumbPriority = blockIdx === 0 && itemIdx < 4
                   const meetsLevel = level >= item.level_required
@@ -788,7 +798,9 @@ export default function MarketTab({
                       key={item.id}
                       type="button"
                       onClick={() => handleItemClick(item, frameKey)}
-                      className={`relative flex w-24 md:landscape:w-28 shrink-0 snap-start flex-col rounded-xl bg-white/95 p-1 pt-1.5 shadow-md ring-1 ring-black/[0.06] transition-transform active:scale-[0.98] ${
+                      className={`relative flex w-24 md:landscape:w-28 shrink-0 snap-start flex-col rounded-xl bg-white/95 p-1 pt-1.5 shadow-md ring-1 ring-black/[0.06] transition-transform active:scale-[0.98] md:landscape:px-0.5 md:landscape:pt-0.5 md:landscape:pb-1 ${
+                        isUnifiedLargeSection ? 'md:landscape:w-[8rem] md:landscape:min-h-[144px]' : ''
+                      } ${
                         isDimmed ? 'grayscale brightness-[0.72]' : ''
                       }`}
                     >
@@ -803,14 +815,24 @@ export default function MarketTab({
                         </span>
                       )}
 
-                      <div className="relative flex w-full items-end justify-center overflow-visible" style={{ height: SHELF_IMG_AREA_PX }}>
-                        <div className="flex max-h-full max-w-full items-end justify-center">
+                      <div
+                        className={[
+                          'relative flex w-full items-end justify-center overflow-visible md:landscape:items-center',
+                          isUnifiedLargeSection ? 'md:landscape:h-[96px]' : '',
+                        ].join(' ')}
+                        style={{ height: SHELF_IMG_AREA_PX }}
+                      >
+                        <div className="flex max-h-full max-w-full items-end justify-center md:landscape:items-center md:landscape:translate-y-6">
                           <StoreItemThumbnail
                             imageUrl={item.image_url}
                             frame={frameKey}
                             height={SHELF_SPRITE_H}
                             width={SHELF_IMG_AREA_PX}
-                            className="max-h-full max-w-full object-contain object-bottom"
+                            className={[
+                              'max-h-full max-w-full object-contain object-bottom md:landscape:object-center',
+                              isUnifiedLargeSection ? 'md:landscape:scale-[1.46]' : '',
+                              isEventOrToySection ? 'md:landscape:scale-[1.5]' : '',
+                            ].join(' ')}
                             style={{ maxHeight: SHELF_SPRITE_H }}
                             priority={thumbPriority}
                             loading="lazy"
@@ -819,13 +841,17 @@ export default function MarketTab({
                         </div>
                       </div>
 
-                      <div className="mt-0.5 flex flex-col items-center gap-0.5">
+                      {/**
+                       * 크레딧 알약은 태블릿 가로에서 더 크게 보이고,
+                       * 카드 안에서 살짝 아래로 내려오도록 상단 여백을 늘립니다.
+                       */}
+                      <div className="mt-0.5 flex flex-col items-center gap-0.5 md:landscape:mt-9">
                         <div
-                          className="inline-flex max-w-full items-center gap-0.5 rounded-full border border-gray-100 bg-white px-1 py-px shadow-sm"
+                          className="inline-flex max-w-full items-center gap-0.5 rounded-full border border-gray-100 bg-white px-1 py-px shadow-sm md:landscape:gap-1 md:landscape:px-2.5 md:landscape:py-1"
                           style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.06)' }}
                         >
-                          <SpriteImage sheet={ICONS} frame="credit" width={11} clipRotated={false} />
-                          <span className="truncate text-[10px] font-black tabular-nums text-brand-blue">
+                          <SpriteImage sheet={ICONS} frame="credit" width={15} clipRotated={false} />
+                          <span className="truncate text-[10px] font-black tabular-nums text-brand-blue md:landscape:text-sm">
                             {formatMarketCreditLabel(item.credit_price)}
                           </span>
                         </div>

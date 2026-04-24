@@ -244,6 +244,28 @@ export default function HomeTab({ childrenData }: Props) {
                 </div>
               </ParentEnterChildUiLink>
 
+              {/* 모바일 전용: 자녀 프로필 바로 아래에 오늘의 진행도를 배치합니다. */}
+              <div className="rounded-2xl bg-white p-4 shadow-sm md:hidden">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <p className="text-sm font-bold text-gray-700">오늘의 진행도</p>
+                  <span className="text-sm font-black tabular-nums text-[#4A90E2]">
+                    {missionRate}%
+                    <span className="ml-1 text-[10px] font-normal text-gray-400">
+                      ({child.todayCompleted}/{child.totalMissions})
+                    </span>
+                  </span>
+                </div>
+                <div className="h-2 overflow-hidden rounded-full bg-gray-100">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-[#F8E71C] to-[#7ED321] transition-all"
+                    style={{ width: `${missionRate}%` }}
+                  />
+                </div>
+                {missionRate === 100 && child.totalMissions > 0 && (
+                  <p className="mt-1 text-right text-[10px] font-bold text-[#7ED321]">오늘 미션 모두 완료!</p>
+                )}
+              </div>
+
               <EconomicEqPanel
                 stats={{
                   eq_routine_rate: s?.eq_routine_rate ?? 0,
@@ -264,8 +286,8 @@ export default function HomeTab({ childrenData }: Props) {
 
             {/* 우 컬럼: 오늘의 진행도 + 코칭 카드(ParentAgentHomeCards) + 최근 활동 — 리포트 본문은 좌측 EQ 패널 */}
             <div className="flex flex-col gap-4">
-              {/* 오늘의 진행도 */}
-              <div className="rounded-2xl bg-white p-4 shadow-sm">
+              {/* md 이상: 기존 위치(우 컬럼 상단)에 오늘의 진행도를 유지합니다. */}
+              <div className="hidden rounded-2xl bg-white p-4 shadow-sm md:block">
                 <div className="mb-2 flex items-center justify-between gap-2">
                   <p className="text-sm font-bold text-gray-700">오늘의 진행도</p>
                   <span className="text-sm font-black tabular-nums text-[#4A90E2]">

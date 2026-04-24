@@ -44,6 +44,7 @@ export function useParentAgentReport(childId: string | undefined): UseParentAgen
     setRunState('idle')
     const agentBaseUrl = getAgentBaseUrl()
     try {
+      const supabase = createClient()
       const getCtrl = new AbortController()
       const getTimeout = window.setTimeout(() => getCtrl.abort(), 15_000)
       const existing = await fetch(
@@ -56,6 +57,23 @@ export function useParentAgentReport(childId: string | undefined): UseParentAgen
 
       if (existing) {
         setRow(existing)
+        setLoading(false)
+        return
+      }
+
+      // 외부 에이전트 API가 일시적으로 비정상이어도, 이미 DB에 저장된 최신 리포트가 있으면
+      // 부모 홈에서 "리포트 없음"으로 오판하지 않도록 Supabase를 한 번 더 조회합니다.
+      const { data: dbLatest, error: dbErr } = await supabase
+        .from('agent_reports')
+        .select('id, child_id, week_start, report_text, coaching_text, eq_scores, suggestions, created_at')
+        .eq('child_id', childId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (!dbErr && dbLatest) {
+        setRow(dbLatest as AgentLatestReportRow)
+        setRunState('success')
         setLoading(false)
         return
       }

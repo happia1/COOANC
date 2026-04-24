@@ -62,6 +62,8 @@ function hasDisplayableAgentContent(row: AgentLatestReportRow | null | undefined
     return coaching || p.text.trim().length > 0
   }
   const d = p.data
+  // 최신 에이전트 응답에서 개별 섹션 대신 report_body_text 한 덩어리만 내려오는 경우도
+  // "표시 가능한 리포트"로 취급해야 부모 홈에서 "리포트 없음" 오판이 나지 않습니다.
   const report =
     Boolean(
       (d.calendar_notice && d.calendar_notice.trim()) ||
@@ -70,7 +72,8 @@ function hasDisplayableAgentContent(row: AgentLatestReportRow | null | undefined
         (d.credit_comment && d.credit_comment.trim()) ||
         (d.wishlist_comment && d.wishlist_comment.trim()) ||
         (d.cheer_message && d.cheer_message.trim()) ||
-        (d.parent_guide && d.parent_guide.trim()),
+        (d.parent_guide && d.parent_guide.trim()) ||
+        (d.report_body_text && d.report_body_text.trim()),
     )
   return coaching || report
 }

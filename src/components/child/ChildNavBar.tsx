@@ -25,11 +25,22 @@ type Props = {
 
 const tabItemCls = [
   'relative flex flex-1 flex-col items-center justify-center gap-1 min-h-[56px] transition-transform active:scale-95',
-  'md:landscape:w-full md:landscape:flex-none md:landscape:flex-row md:landscape:justify-center md:landscape:min-h-0 md:landscape:py-4',
+  /**
+   * 태블릿 가로 독바: 아이콘 아래 텍스트를 함께 보여 주고,
+   * 탭 간 구분이 잘 되도록 내부 간격/패딩을 키웁니다.
+   */
+  'md:landscape:w-full md:landscape:flex-none md:landscape:flex-col md:landscape:justify-center md:landscape:gap-2 md:landscape:min-h-0 md:landscape:py-5',
 ].join(' ')
 
 const exitItemCls = [
-  'relative flex flex-1 flex-col items-center justify-center gap-1 min-h-[56px] transition-transform active:scale-95 no-underline text-inherit',
+  /**
+   * 요청사항: 모바일 하단 독바에서는 나가기 버튼을 숨기고,
+   * 태블릿 가로 사이드바에서만 표시합니다.
+   */
+  'relative hidden flex-1 flex-col items-center justify-center gap-1 min-h-[56px] transition-transform active:scale-95 no-underline text-inherit md:landscape:flex',
+  /**
+   * 요청사항: 나가기 버튼은 태블릿 가로 독바의 맨 아래에 배치합니다.
+   */
   'md:landscape:w-full md:landscape:flex-none md:landscape:flex-col md:landscape:justify-center md:landscape:min-h-0 md:landscape:py-3 md:landscape:mt-auto',
 ].join(' ')
 
@@ -60,7 +71,7 @@ export default function ChildNavBar({ isParentPreview = false }: Props) {
       ].join(' ')}
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
-      <div className="mx-auto flex h-16 w-full items-stretch md:landscape:h-full md:landscape:w-full md:landscape:max-w-none md:landscape:flex-col md:landscape:items-center md:landscape:py-2">
+      <div className="mx-auto flex h-16 w-full items-stretch md:landscape:h-full md:landscape:w-full md:landscape:max-w-none md:landscape:flex-col md:landscape:items-center md:landscape:justify-center md:landscape:gap-2 md:landscape:py-3">
         {TABS.map(({ href, label, icon }) => {
           const isActive = effectivePath === href || effectivePath.startsWith(href + '/')
           const tone = isActive ? 'text-slate-700' : 'text-slate-400'
@@ -76,7 +87,7 @@ export default function ChildNavBar({ isParentPreview = false }: Props) {
                 <span className="absolute left-0 top-1/2 hidden h-8 w-1 -translate-y-1/2 rounded-r-full bg-slate-700 md:landscape:block" />
               )}
               <DockTabIcon id={icon} className={`h-8 w-8 shrink-0 ${tone}`} />
-              <span className={`text-xs font-bold leading-none md:landscape:hidden ${tone}`}>{label}</span>
+              <span className={`text-xs font-bold leading-none md:landscape:block md:landscape:text-[11px] ${tone}`}>{label}</span>
             </>
           )
 

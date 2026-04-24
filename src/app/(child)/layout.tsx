@@ -48,11 +48,12 @@ export default async function ChildLayout({ children }: { children: ReactNode })
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <a
           href={exitHref}
-          className="fixed left-3 z-50 flex h-9 w-9 items-center justify-center rounded-full bg-white/75 shadow-md backdrop-blur-sm transition active:scale-95 md:landscape:hidden"
+          className="fixed left-3 z-50 flex h-9 w-9 items-center justify-center bg-transparent shadow-none transition active:scale-95 md:landscape:hidden"
           style={{ top: 'max(12px, env(safe-area-inset-top))' }}
           aria-label="나가기"
         >
-          <img src="/assets/img/common/ui/exit.png" alt="" width={20} height={20} className="h-5 w-5 object-contain" />
+          {/** 문(나가기) 아이콘 자체를 키워 모바일에서도 더 잘 보이게 합니다. */}
+          <img src="/assets/img/common/ui/exit.png" alt="" width={32} height={32} className="h-8 w-8 object-contain" />
         </a>
 
         {/**

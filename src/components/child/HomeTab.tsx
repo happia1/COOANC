@@ -166,6 +166,23 @@ export default function HomeTab({
     </div>
   )
 
+  /**
+   * 모바일 전용 상단 중앙 타이틀:
+   * - 상단의 좌측 나가기 버튼과 우측 스티커 아이콘 사이에 배치되도록 중앙 고정합니다.
+   * - 태블릿 landscape에서는 기존 overlay 타이틀을 사용하므로 숨깁니다.
+   */
+  const mobileTopCenterTitle = (
+    <div
+      className="pointer-events-none fixed left-1/2 z-50 -translate-x-1/2 md:landscape:hidden"
+      style={{ top: 'max(12px, env(safe-area-inset-top))' }}
+      aria-hidden
+    >
+      <span className="inline-flex max-w-[58vw] items-center justify-center truncate text-sm font-black text-white [text-shadow:0_1px_6px_rgba(0,0,0,0.45)]">
+        나의 꾸미기 방
+      </span>
+    </div>
+  )
+
   const homeBottomPanelClass =
     'relative z-10 mt-5 flex min-h-0 flex-[4] basis-0 flex-col gap-1 overflow-hidden px-3 pb-2 pt-0.5 sm:mt-6 md:landscape:hidden'
 
@@ -191,7 +208,7 @@ export default function HomeTab({
          * - 요청사항대로 배경은 더 아래로 내리고
          * - 크기는 이전보다 더 축소해 화면 답답함을 줄입니다.
          */
-        className={`absolute inset-0 h-full w-full object-cover object-[center_90%] brightness-[1.2] [transform:translateY(6%)_scale(1.18)] md:landscape:[transform:translateY(20%)_scale(1.4)]`}
+        className={`absolute inset-0 h-full w-full object-cover object-[center_90%] brightness-[1.2] [transform:translateY(4%)_scale(1.08)] md:landscape:[transform:translateY(26%)_scale(1.52)]`}
         loading="eager"
         decoding="async"
         fetchPriority="high"
@@ -213,8 +230,9 @@ export default function HomeTab({
 
       {/* top-right: sticker */}
       <div className="pointer-events-none absolute right-4 top-4 z-20 hidden gap-2 md:landscape:flex">
-        <OverlayIconButton onClick={openBearFromFab} ariaLabel="스티커 보관함 열기">
-          <Image src="/assets/img/common/ui/sticker_icon.png" alt="" width={20} height={20} className="h-5 w-5 object-contain" />
+        <OverlayIconButton onClick={openBearFromFab} ariaLabel="스티커 보관함 열기" bare>
+          {/** 곰돌이 얼굴 스티커 아이콘을 한 단계 더 키워 태블릿에서 더 또렷하게 보이게 합니다. */}
+          <Image src="/assets/img/common/ui/sticker_icon.png" alt="" width={44} height={44} className="h-11 w-11 object-contain" />
         </OverlayIconButton>
       </div>
     </>
@@ -225,7 +243,7 @@ export default function HomeTab({
    */
   const islandSection = (
     <div className="flex min-h-0 flex-1 flex-col justify-end gap-1.5">
-      <div className="relative mx-auto flex min-h-0 w-full max-w-sm flex-1 flex-col items-center justify-end -mt-2 sm:-mt-4">
+      <div className="relative mx-auto flex min-h-0 w-full max-w-sm flex-1 flex-col items-center justify-end mt-2 sm:-mt-1">
         {stickerTopRightButton}
         <ChildHomeIslandStage density="flex" homeAvatarUrl={childAvatarUrl} showIslandArt={false} />
       </div>
@@ -235,6 +253,7 @@ export default function HomeTab({
   return (
     <>
       <div className={homeFullBleedShellClass}>
+        {mobileTopCenterTitle}
         {/**
          * 왼쪽 패널 (모바일: 전체 화면 / 태블릿 landscape: 50%)
          * - background가 이 div 안에 있어 태블릿에서 왼쪽 절반만 덮음
@@ -262,7 +281,7 @@ export default function HomeTab({
 
             {/* 모바일 전용 꾸미기 인벤토리 */}
             <section className={homeBottomPanelClass} aria-label="내 캐릭터 꾸미기">
-              <CharacterDecorInventory unlockedIndexes={effectiveDecorUnlocked} />
+              <CharacterDecorInventory unlockedIndexes={effectiveDecorUnlocked} stats={stats} />
             </section>
           </div>
         </div>
@@ -299,13 +318,18 @@ function OverlayIconButton({
   onClick,
   href,
   ariaLabel,
+  bare = false,
 }: {
   children: React.ReactNode
   onClick?: () => void
   href?: string
   ariaLabel: string
+  /** true면 배경 네모 박스/그림자를 제거하고 아이콘만 표시합니다. */
+  bare?: boolean
 }) {
-  const cls = 'pointer-events-auto flex h-10 w-10 items-center justify-center rounded-xl bg-white/80 shadow-sm transition active:scale-95 focus-visible:outline-none'
+  const cls = bare
+    ? 'pointer-events-auto flex h-10 w-10 items-center justify-center rounded-xl bg-transparent shadow-none transition active:scale-95 focus-visible:outline-none'
+    : 'pointer-events-auto flex h-10 w-10 items-center justify-center rounded-xl bg-white/80 shadow-sm transition active:scale-95 focus-visible:outline-none'
   if (href) {
     return <a href={href} className={cls} aria-label={ariaLabel}>{children}</a>
   }
@@ -491,9 +515,6 @@ function TabletDecorPanel({
 
 // ─── Mobile decor inventory ────────────────────────────────────────
 
-const DECOR_ITEM_COUNT = ASSETS.characters.decorItemImages.length
-const DECOR_GRID_COLS = DECOR_ITEM_COUNT / 2
-
 function DecorLockIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
@@ -504,60 +525,128 @@ function DecorLockIcon({ className }: { className?: string }) {
   )
 }
 
-function CharacterDecorInventory({ unlockedIndexes }: { unlockedIndexes: number[] }) {
+function CharacterDecorInventory({
+  unlockedIndexes,
+  stats,
+}: {
+  unlockedIndexes: number[]
+  stats: ChildStats | null
+}) {
+  // 모바일에서도 태블릿과 동일한 카테고리 탭 구조를 유지합니다.
+  const [activeCategory, setActiveCategory] = useState<DecorCategoryId>('outfit')
+
+  // 태블릿과 동일하게 선택 카테고리 기준으로 아이템 목록을 필터링합니다.
+  const filteredItems = ASSETS.characters.decorItemImages
+    .map((src, index) => ({ src, index }))
+    .filter(({ index }) => getCategoryForIndex(index) === activeCategory)
+
+  // 하단 크레딧 바에 표시할 보유 골드 값을 계산합니다.
+  const walletCredits = stats?.credits_wallet ?? stats?.credits ?? 0
+
   return (
-    <div className="flex min-h-0 w-full flex-1 flex-col" aria-labelledby="child-decor-heading">
-      <div className="mb-2 flex shrink-0 flex-wrap items-center gap-x-2 gap-y-1 pl-2 pr-2 pb-0.5 pt-0.5">
-        <h2 id="child-decor-heading" className="min-w-0 truncate text-sm font-black leading-tight text-brand-text">
-          내 캐릭터 꾸미기
+    <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden rounded-2xl border border-gray-100 bg-white/80 opacity-80 shadow-sm backdrop-blur-[1px]" aria-labelledby="child-decor-heading">
+      {/* 접근성 제목은 유지하고, 실제 시각 제목은 모바일 상단 오버레이에서 표시합니다. */}
+      <div className="flex shrink-0 items-center justify-center bg-white py-1.5">
+        <h2
+          id="child-decor-heading"
+          className="sr-only"
+        >
+          나의 꾸미기 방
         </h2>
       </div>
+
+      {/* 모바일에서는 상단 실선을 제거하고 탭 높이를 더 줄여 아이템 영역을 넓힙니다. */}
+      <div className="flex shrink-0 flex-row justify-around border-b border-gray-100 bg-white py-0.5">
+        {DECOR_CATEGORIES.map(({ id, label }) => {
+          const isActive = activeCategory === id
+          return (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setActiveCategory(id)}
+              className={[
+                'flex flex-col items-center gap-0 px-1.5 pb-0.5 pt-0 text-[10px] font-bold leading-tight transition-colors',
+                isActive
+                  ? 'border-b-2 border-brand-blue text-brand-blue'
+                  : 'border-b-2 border-transparent text-slate-400',
+              ].join(' ')}
+              aria-pressed={isActive}
+              aria-label={`${label} 카테고리 보기`}
+            >
+              <CategoryIcon id={id} className="h-3.5 w-3.5" />
+              <span>{label}</span>
+            </button>
+          )
+        })}
+      </div>
+
+      {/* 모바일도 첨부 이미지처럼 4열 카드 그리드를 사용합니다. */}
       <div
-        className="-mx-1 min-h-0 flex-1 overflow-x-auto overflow-y-hidden px-2 pb-0.5 pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden snap-x snap-mandatory"
+        className="flex-1 overflow-y-auto p-2.5 [scrollbar-width:thin]"
         style={{ WebkitOverflowScrolling: 'touch' }}
         role="region"
-        aria-label="캐릭터 꾸미기 아이템 목록, 위아래 두 줄"
+        aria-label="선택한 카테고리의 캐릭터 꾸미기 아이템 목록"
       >
-        <div className="flex h-full min-h-0 w-max items-start gap-1.5 pt-0.5 pr-1">
-          {Array.from({ length: DECOR_GRID_COLS }).map((_, col) => (
-            <div
-              key={`decor-col-${col}`}
-              role="group"
-              aria-label={`꾸미기 아이템 ${col * 2 + 1}번·${col * 2 + 2}번`}
-              className="grid w-[min(18vw,76px)] shrink-0 snap-center grid-rows-2 gap-y-1"
-            >
-              {[0, 1].map((rowInCol) => {
-                const index = col * 2 + rowInCol
-                const unlocked = unlockedIndexes.includes(index)
-                return (
-                  <div
-                    key={`decor-item-${index}`}
-                    aria-disabled={!unlocked}
-                    aria-label={`꾸미기 아이템 ${index + 1}번${unlocked ? ', 잠금 해제됨' : ', 잠금됨'}`}
-                    className="pointer-events-none aspect-square w-full"
-                  >
-                    <div className="relative size-full overflow-hidden rounded-xl border border-amber-100/90 bg-[#f7f4eb] shadow-sm">
-                      <Image
-                        src={ASSETS.characters.decorItemImages[index]}
-                        alt=""
-                        fill
-                        loading="lazy"
-                        sizes="(max-width: 448px) 18vw, 76px"
-                        className={`object-contain p-0.5 transition-all duration-500 ${unlocked ? '' : 'grayscale opacity-[0.55]'}`}
-                        draggable={false}
-                      />
-                      {!unlocked && (
-                        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                          <DecorLockIcon className="size-[28%] min-h-[22px] min-w-[22px] max-h-9 max-w-9 text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.45)]" />
-                        </div>
-                      )}
-                    </div>
+        {filteredItems.length === 0 ? (
+          <p className="pt-8 text-center text-sm text-gray-400">아이템이 없어요</p>
+        ) : (
+          <div className="grid grid-cols-5 justify-items-center gap-1">
+            {filteredItems.map(({ src, index }) => {
+              const owned = unlockedIndexes.includes(index)
+              return (
+                <div
+                  key={index}
+                  aria-disabled={!owned}
+                  aria-label={`꾸미기 아이템 ${index + 1}번${owned ? ', 잠금 해제됨' : ', 잠금됨'}`}
+                  className={[
+                    'relative flex w-full max-w-[58px] flex-col overflow-hidden rounded-lg border bg-white',
+                    owned ? 'border-brand-blue ring-2 ring-brand-blue/30' : 'border-gray-100',
+                  ].join(' ')}
+                >
+                  <div className="relative aspect-square">
+                    <Image
+                      src={src}
+                      alt=""
+                      fill
+                      loading="lazy"
+                      sizes="(max-width: 768px) 18vw, 58px"
+                      className={`object-contain p-1 ${owned ? '' : 'grayscale opacity-60'}`}
+                      draggable={false}
+                    />
+                    {!owned && (
+                      <div className="absolute inset-0 flex items-center justify-center rounded-t-lg bg-black/20">
+                        <DecorLockIcon className="h-4 w-4 text-white drop-shadow" />
+                      </div>
+                    )}
                   </div>
-                )
-              })}
-            </div>
-          ))}
-        </div>
+                  <div className="flex items-center justify-center px-0.5 py-1">
+                    {owned ? (
+                      <span className="rounded-full bg-gray-100 px-1.5 py-0.5 text-[9px] font-bold text-gray-500">
+                        보유
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-0.5 rounded-full bg-slate-700 px-1.5 py-0.5 text-[9px] font-bold text-amber-200">
+                        🪙 {DECOR_ITEM_PRICE}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* 첨부 요청사항에 맞춰 모바일에도 하단 크레딧 정보를 동일하게 노출합니다. */}
+      <div className="flex shrink-0 items-center justify-center gap-6 border-t border-gray-100 bg-white py-3">
+        <span className="text-sm font-bold text-brand-text">
+          보유 골드: <span className="text-amber-500">🪙 {walletCredits.toLocaleString('ko-KR')}</span>
+        </span>
+        {(stats?.credits_piggy ?? 0) > 0 && (
+          <span className="text-sm font-bold text-brand-text">
+            저금통: <span className="text-sky-600">🐷 {(stats?.credits_piggy ?? 0).toLocaleString('ko-KR')}</span>
+          </span>
+        )}
       </div>
     </div>
   )

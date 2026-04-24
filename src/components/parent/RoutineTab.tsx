@@ -34,7 +34,7 @@ import {
   isRoutineSectionMission,
   isSpecialSectionMission,
 } from '@/lib/specialMissionChips'
-import { sortMissionsByRoutineFlow } from '@/lib/routineChips'
+import { isRetiredRoutineMissionTitle, sortMissionsByRoutineFlow } from '@/lib/routineChips'
 import SpriteImage from '@/components/common/SpriteImage'
 import { ICONS } from '@/constants/sprites'
 import { TOPBAR_LOGO_SRC } from '@/constants/branding'
@@ -555,7 +555,14 @@ export default function RoutineTab({
     setMissions(scopedInitial)
   }, [scopedInitial])
 
-  const routineOnly = useMemo(() => missions.filter(isRoutineMission), [missions])
+  const routineOnly = useMemo(
+    () =>
+      missions
+        .filter(isRoutineMission)
+        // 폐지된 일상 키워드(예: 간식먹기)는 부모 루틴 카드에서도 숨깁니다.
+        .filter((m) => !isRetiredRoutineMissionTitle(m.title)),
+    [missions],
+  )
   /** 폐지된 스페셜 키워드(설거지·방청소·심부름 등)는 DB 에 남아 있어도 목록에서 제외 — `051` 마이그레이션으로 행 삭제 권장 */
   const specialOnly = useMemo(
     () => missions.filter(isSpecialMission).filter((m) => !isRetiredSpecialMissionTitle(m.title)),

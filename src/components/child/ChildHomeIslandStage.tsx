@@ -398,7 +398,7 @@ export default function ChildHomeIslandStage({
         <div
           /**
            * 작은 화면에서 캐릭터를 살짝 아래로 내려 답답해 보이는 느낌을 줄입니다.
-           * - 기본(작은 화면): bottom 24%
+           * - 기본(작은 화면): 기존보다 조금 더 아래
            * - sm 이상: 기존처럼 bottom 30%
            */
           /**
@@ -406,7 +406,7 @@ export default function ChildHomeIslandStage({
            * - 모바일에서는 캐릭터를 한참 아래로 내려 배치합니다.
            * - 패드 가로(`md:landscape`)에서는 캐릭터를 더 위로 올립니다.
            */
-          className="pointer-events-none absolute left-1/2 -translate-x-1/2 -bottom-[14%] z-[2] flex justify-center sm:bottom-[34%] md:landscape:bottom-[42%]"
+          className="pointer-events-none absolute left-1/2 -translate-x-1/2 -bottom-[16%] z-[2] flex justify-center sm:bottom-[34%] md:landscape:bottom-[42%]"
         >
           {density === 'flex' ? (
             <div
@@ -414,10 +414,10 @@ export default function ChildHomeIslandStage({
               aria-label="나의 쿠앵이 캐릭터"
               /**
                * 요청사항 반영:
-               * - 현재 캐릭터 크기를 3분의 2(약 66.7%)로 줄입니다.
-               * - 태블릿 가로도 같은 비율로 함께 축소합니다.
+               * - 기본(모바일) 캐릭터 크기는 그대로 유지하고
+               * - 홈탭 태블릿 가로에서는 캐릭터를 한 단계 더 크게 보여 존재감을 높입니다.
                */
-              className="origin-bottom [transform:scale(1)] md:landscape:[transform:scale(1.27)]"
+              className="origin-bottom [transform:scale(1)] md:landscape:[transform:scale(1.42)]"
             >
               <HomeIslandHeroSprite sprite={homeStageSprite} />
             </div>

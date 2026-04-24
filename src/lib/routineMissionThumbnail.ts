@@ -49,17 +49,26 @@ const PNG_BY_TITLE: Record<string, string> = {
   씻기: `${BASE}/p.m/shower.png`,
   잠옷갈아입기: `${BASE}/p.m/pajama.png`,
   '빨래통에 옷넣기': `${BASE}/p.m/roundrybasket.png`,
-  '잠자리 독서': `${BASE}/p.m/book.png`,
-  잠자기: `${BASE}/p.m/goodnight.png`,
+  /**
+   * 잠자리 독서 이미지는 현재 파일명(`read_book.png`) 기준으로 고정합니다.
+   * (기존 `book.png`/`p.m/book.png` 혼용으로 카드별 이미지가 다르게 보이던 문제 정리)
+   */
+  '잠자리 독서': `${BASE}/p.m/read_book.png`,
+  잠자리독서: `${BASE}/p.m/read_book.png`,
+  /**
+   * 취침/잠자기 계열은 현재 파일(`go_to_bed.png`)로 통일합니다.
+   * (구 파일명 `goodnight.png` 는 현재 리포지토리에 없음)
+   */
+  잠자기: `${BASE}/p.m/go_to_bed.png`,
 
   // --- 키워드 칩 (046 제목과 다른 이름) ---
   '가방 챙기기': `${BASE}/p.m/bag_packing.png`,
-  독서활동: `${BASE}/p.m/book.png`,
+  독서활동: `${BASE}/p.m/read_book.png`,
   '모두 제자리': `${BASE}/p.m/organize_toys.png`,
   '목욕/샤워': `${BASE}/p.m/shower.png`,
   '잠자리 양치': `${BASE}/a.m/brush_teeth.png`,
   '잠옷 갈아입기': `${BASE}/p.m/pajama.png`,
-  취침: `${BASE}/p.m/goodnight.png`,
+  취침: `${BASE}/p.m/go_to_bed.png`,
 
   // --- 스페셜 시드(046 긴 이름) ---
   스스로옷입기: `${BASE}/special/self_change.png`,
@@ -78,7 +87,11 @@ const PNG_BY_TITLE: Record<string, string> = {
   '옷 개키기': `${BASE}/special/organize_cloth.png`,
   빨래개기: `${BASE}/special/organize_cloth.png`,
   명상하기: `${BASE}/special/meditation.png`,
-  숙제하기: `${BASE}/special/homework.png`,
+  /**
+   * 숙제 일러스트는 현재 실파일(`diary_homework.png`)로 매칭합니다.
+   * (기존 `homework.png` 는 현재 리포지토리에 없음)
+   */
+  숙제하기: `${BASE}/special/diary_homework.png`,
   저금하기: `${BASE}/special/saving.png`,
   저축하기: `${BASE}/special/saving.png`,
   손톱깎기: `${BASE}/special/nail_cliper.png`,
@@ -96,6 +109,11 @@ const PNG_BY_TITLE: Record<string, string> = {
   /** 레거시 스페셜 칩 「식사후 정리」 별칭 유지 */
   식사후정리: `${BASE}/special/clean_up_all.png`,
   '식사후 정리': `${BASE}/special/clean_up_all.png`,
+  /** 요청 반영: 띄어쓰기 형태(식사 후 정리)도 동일 이미지로 매칭 */
+  '식사 후 정리': `${BASE}/special/clean_up_all.png`,
+  /** 새 표기명 */
+  '밥 다 먹기': `${BASE}/special/clean_up_all.png`,
+  '밥 다먹기': `${BASE}/special/clean_up_all.png`,
   '빨래통에 넣기': `${BASE}/p.m/roundrybasket.png`,
   /** 옷걸이에 외투 걸기 — `hanging_cloth` 일러스트 사용 */
   외투걸어두기: `${BASE}/special/hanging_cloth.png`,

@@ -30,7 +30,6 @@ export const AM_CHIPS: ChipDef[] = [
 
 export const PM_CHIPS: ChipDef[] = [
   { id: 'pm-hands', title: '손씻기', emoji: '', type: 'recommended', apiBlock: 'afternoon' },
-  { id: 'pm-snack', title: '간식먹기', emoji: '', type: 'recommended', apiBlock: 'afternoon' },
   { id: 'pm-water', title: '물마시기', emoji: '', type: 'recommended', apiBlock: 'afternoon' },
   { id: 'pm-out', title: '야외놀이', emoji: '', type: 'optional', apiBlock: 'afternoon' },
   { id: 'pm-in', title: '실내놀이', emoji: '', type: 'optional', apiBlock: 'afternoon' },
@@ -98,6 +97,21 @@ export function sortMissionsByRoutineFlow<T extends RoutineFlowSortable>(mission
 
 /** 키워드 칩 제목 집합 — 삭제·동기화 시 이 제목의 daily/weekly 템플릿만 정리 */
 export const ROUTINE_KEYWORD_CHIP_TITLES: string[] = [...AM_CHIPS, ...PM_CHIPS].map((c) => c.title)
+
+/**
+ * 더 이상 노출하지 않는(폐지된) 일상 미션 제목 목록입니다.
+ * - 기존 DB 행이 남아 있어도 자녀/부모 앱 카드에서 공통으로 숨기기 위해 사용합니다.
+ */
+const RETIRED_ROUTINE_MISSION_TITLES = new Set<string>([
+  '간식먹기',
+])
+
+/** 입력 제목이 폐지된 일상 미션인지 확인합니다. */
+export function isRetiredRoutineMissionTitle(title: string | null | undefined): boolean {
+  const normalized = (title ?? '').trim()
+  if (!normalized) return false
+  return RETIRED_ROUTINE_MISSION_TITLES.has(normalized)
+}
 
 export function defaultSelectedIds(pool: ChipDef[], forSchool: boolean): string[] {
   return pool

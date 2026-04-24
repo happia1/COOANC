@@ -99,44 +99,55 @@ export const MISSION_CARD_SCROLLER_CLASSNAME =
  * 미션 일러스트 78px + 좌우 12px → 최소 너비는 w max(6.5rem,…) 등으로 여유 있게.
  */
 export const MISSION_CARD_BUTTON_BASE_CLASSNAME =
-  'snap-center flex w-28 md:w-36 lg:w-44 min-h-[10rem] md:min-h-[12rem] shrink-0 flex-col items-stretch gap-y-1.5 overflow-hidden rounded-2xl border bg-white px-[10px] pt-[14px] pb-3 text-left font-sans text-brand-text shadow-md transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue focus-visible:ring-offset-1 active:scale-[0.97]' as const
+  /**
+   * 태블릿 가로에서 오늘의 미션 카드를 더 크게 보여 달라는 요청 반영:
+   * - 카드 너비/최소 높이를 한 단계 키워 화면을 더 꽉 채웁니다.
+   * - 모바일·일반 md 세로 레이아웃은 기존 크기를 유지합니다.
+   * - 추가 요청으로 모바일 카드도 한 단계 더 확대해 터치성과 가독성을 높입니다.
+   */
+  'snap-center flex w-48 md:w-44 md:landscape:w-52 lg:w-52 min-h-[15rem] md:min-h-[14rem] md:landscape:min-h-[16rem] shrink-0 flex-col items-stretch gap-y-2 overflow-hidden rounded-2xl border bg-white px-3 pt-4 pb-3.5 text-left font-sans text-brand-text shadow-md transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue focus-visible:ring-offset-1 active:scale-[0.97]' as const
 
 /**
  * 일러스트 블록과 제목·부제 블록을 세로로만 묶습니다.
  * 버튼의 gap-y-1.5 는 이 묶음 전체와 **보상 알약 줄** 사이에만 적용되고, 그림과 글 사이는 gap-y-0 으로 최대한 붙입니다.
  */
 export const MISSION_CARD_IMAGE_TEXT_STACK_CLASSNAME =
-  'flex w-full min-w-0 shrink-0 flex-col gap-y-2' as const
+  'flex w-full min-w-0 shrink-0 flex-col gap-y-2.5' as const
 
 /**
  * 카드 상단 루틴 일러스트 영역 — 78px(약 4.875rem) 정사각이 잘리지 않게 **5.5rem** 정도만 확보(위·아래 여백 최소).
  */
 export const MISSION_CARD_IMAGE_AREA_CLASSNAME =
-  'mx-auto flex h-20 md:h-28 lg:h-32 w-full shrink-0 items-center justify-center overflow-visible rounded-[14px]' as const
+  /**
+   * 카드 안 이미지를 더 크게 보이게 하기 위해 이미지 영역 높이를 한 단계 확장합니다.
+   * (카드 외곽은 유지하고, 내부 일러스트가 차지하는 공간만 늘리는 방식)
+   */
+  'mx-auto flex h-36 md:h-36 md:landscape:h-40 lg:h-40 w-full shrink-0 items-center justify-center overflow-visible rounded-[14px]' as const
 
 /** 루틴 PNG / 아틀라스 썸네일 한 변 길이(px) */
-export const MISSION_CARD_ROUTINE_SPRITE_WIDTH_PX = 100
+/** 카드 확대에 맞춰 스프라이트 자체도 더 크게 렌더링합니다. (모바일도 소폭 확대) */
+export const MISSION_CARD_ROUTINE_SPRITE_WIDTH_PX = 136
 
 /** 제목·부제 묶음 */
 export const MISSION_CARD_TEXT_BLOCK_CLASSNAME = 'shrink-0 space-y-0.5 px-px text-center' as const
 
 /** 카드 제목 두 줄까지 */
 export const MISSION_CARD_TITLE_CLASSNAME =
-  'line-clamp-2 text-xs md:text-sm font-medium leading-snug text-[#3d3d3a]' as const
+  'line-clamp-2 text-sm md:text-base font-semibold leading-snug text-[#3d3d3a]' as const
 
 /** 카드 부제 한 줄 */
 export const MISSION_CARD_SUBTITLE_CLASSNAME =
-  'line-clamp-1 text-[7px] font-medium leading-snug text-gray-500' as const
+  'line-clamp-1 text-[10px] md:text-xs font-medium leading-snug text-gray-500' as const
 
 /** 크레딧·EXP 알약 줄 바깥 중앙 정렬 */
 export const MISSION_CARD_REWARD_ROW_CLASSNAME = 'flex shrink-0 justify-center' as const
 
 /** 알약 공통(배경만 일반/특별로 나뉨) */
 export const MISSION_CARD_REWARD_PILL_BASE_CLASSNAME =
-  'inline-flex max-w-full flex-nowrap items-center justify-center gap-x-0.5 rounded-full px-1.5 py-0.5 text-[10px] md:text-xs font-black tabular-nums tracking-tight text-[#888888] shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] ring-1 ring-black/[0.06]' as const
+  'inline-flex max-w-full flex-nowrap items-center justify-center gap-x-1 rounded-full px-2 py-1 text-xs md:text-sm font-black tabular-nums tracking-tight text-[#888888] shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] ring-1 ring-black/[0.06]' as const
 
 /** 알약 안 동전·하트 아이콘 가로(px) */
-export const MISSION_CARD_REWARD_ICON_WIDTH_PX = 12
+export const MISSION_CARD_REWARD_ICON_WIDTH_PX = 14
 
 // ── 게임 레이어 추가 상수 (하트 시스템) ──────────────────────────────────────
 
