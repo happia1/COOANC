@@ -779,6 +779,15 @@ export default function ApprovalTab({
           </ParentEnterChildUiLink>
         )}
 
+        {/**
+         * 모바일 전용 배치:
+         * - 요청사항에 맞춰 프로필 블록 바로 아래에 칭찬 스티커 보상 패널을 둡니다.
+         * - 태블릿 가로(md 이상)는 기존 우측 컬럼 배치를 유지합니다.
+         */}
+        <div className="md:hidden">
+          <PraiseStickerPanel childId={currentId} childName={currentChild?.name ?? '자녀'} />
+        </div>
+
         {/* 구매 요청 */}
         <section id="parent-purchase-requests">
           <div className="mb-2 flex items-center justify-between">
@@ -1057,7 +1066,10 @@ export default function ApprovalTab({
       {/* ── 우 컬럼: 칭찬 스티커 + 마켓 제어 ── */}
       <div className="flex flex-col gap-5">
 
-        <PraiseStickerPanel childId={currentId} childName={currentChild?.name ?? '자녀'} />
+        {/* 태블릿 가로/데스크톱 전용: 기존 위치 유지 */}
+        <div className="hidden md:block">
+          <PraiseStickerPanel childId={currentId} childName={currentChild?.name ?? '자녀'} />
+        </div>
 
         {/* `id`: 홈 경제 EQ 코칭 카드의 「자녀 보상 등록」링크가 이 구역으로 스크롤되게 함 */}
         <section id="parent-approval-market-rewards" aria-label="자녀 마켓 보상 설정">

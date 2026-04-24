@@ -198,12 +198,12 @@ export default function HomeTab({ childrenData }: Props) {
                 </div>
                 <div className="h-2 overflow-hidden rounded-full bg-gray-100">
                   <div
-                    className="h-full rounded-full bg-gradient-to-r from-[#F8E71C] to-[#7ED321] transition-all"
+                    className="h-full rounded-full bg-gradient-to-r from-[#93C5FD] to-[#2563EB] transition-all"
                     style={{ width: `${missionRate}%` }}
                   />
                 </div>
                 {missionRate === 100 && child.totalMissions > 0 && (
-                  <p className="mt-1 text-right text-[10px] font-bold text-[#7ED321]">오늘 미션 모두 완료!</p>
+                  <p className="mt-1 text-right text-[10px] font-bold text-[#2563EB]">오늘 미션 모두 완료!</p>
                 )}
               </div>
 
@@ -230,12 +230,12 @@ export default function HomeTab({ childrenData }: Props) {
                 </div>
                 <div className="h-2 overflow-hidden rounded-full bg-gray-100">
                   <div
-                    className="h-full rounded-full bg-gradient-to-r from-[#F8E71C] to-[#7ED321] transition-all"
+                    className="h-full rounded-full bg-gradient-to-r from-[#93C5FD] to-[#2563EB] transition-all"
                     style={{ width: `${missionRate}%` }}
                   />
                 </div>
                 {missionRate === 100 && child.totalMissions > 0 && (
-                  <p className="mt-1 text-right text-[10px] font-bold text-[#7ED321]">오늘 미션 모두 완료!</p>
+                  <p className="mt-1 text-right text-[10px] font-bold text-[#2563EB]">오늘 미션 모두 완료!</p>
                 )}
               </div>
 

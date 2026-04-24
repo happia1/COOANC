@@ -429,8 +429,8 @@ function DelayHalfGauge({
     >
       <defs>
         <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="0%">
-          <stop offset="0%" stopColor="#fb923c" />
-          <stop offset="100%" stopColor="#22c55e" />
+          <stop offset="0%" stopColor="#93C5FD" />
+          <stop offset="100%" stopColor="#2563EB" />
         </linearGradient>
       </defs>
       <path
