@@ -105,11 +105,6 @@ function AgentOnboardingProgressCard({ daysWithData }: { daysWithData: number })
   const progressPercent = Math.min(100, (clampedDays / 7) * 100)
   return (
     <div className="rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 p-5">
-      {/* Header */}
-      <div className="mb-3 flex items-center gap-2">
-        <p className="text-sm font-bold text-blue-900">AI 리포트 준비 중이에요</p>
-      </div>
-
       {/* Progress bar — days collected / 7 */}
       <div className="mb-3">
         <div className="mb-1 flex justify-between text-xs text-blue-700">
@@ -172,105 +167,97 @@ export default function ParentAgentHomeCards({
     calendarNoticeText?.trim() ||
     rawCalendarNotice ||
     '이번 주는 특별 일정이 없어요. 루틴에 집중하기 좋은 한 주예요.'
+  const blockCardClass = 'w-full rounded-2xl bg-white p-4 shadow-sm'
 
   return (
     <div className="w-full space-y-3">
       {/* 일정 코멘트는 경제 EQ 패널이 아닌, AI 리포트 블록 상단에서 항상 보여 줍니다. */}
-      {calendarUpcomingEvents.length === 0 ? (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-amber-900">
-          <div className="flex items-center justify-between gap-3">
-            <p className="flex-1 whitespace-pre-line text-sm text-amber-800">
-              {noticeText}
-            </p>
-            <button
-              type="button"
-              onClick={onOpenCalendarEventSheet}
-              className="ml-3 shrink-0 whitespace-nowrap rounded-lg border border-blue-200 px-3 py-1.5 text-xs font-medium text-blue-600 transition-colors hover:bg-blue-50"
-            >
-              일정 등록하기
-            </button>
-          </div>
-        </div>
-      ) : (
-        <div className="rounded-xl border border-blue-200 border-l-4 border-l-blue-400 bg-blue-50 p-4">
-          {calendarUpcomingEvents.map((event) => (
-            <div key={event.id} className="mb-2 flex items-center gap-2 last:mb-0">
-              <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
-                {event.dateLabel}
-              </span>
-              <span className="text-sm font-medium text-blue-900">
-                {event.title}
-              </span>
-              <span className="ml-auto text-xs text-blue-500">
-                {event.impactLabel}
-              </span>
-            </div>
-          ))}
-          <div className="mt-3 flex gap-2 border-t border-blue-100 pt-3">
-            <Link
-              href="/parent/routine"
-              className="text-xs font-medium text-blue-600"
-            >
-              캘린더에서 보기 →
-            </Link>
-            <button
-              type="button"
-              onClick={onOpenCalendarEventSheet}
-              className="ml-auto rounded-lg bg-blue-500 px-3 py-1.5 text-xs font-medium text-white"
-            >
-              일정 등록하기
-            </button>
-          </div>
-        </div>
-      )}
-
-      {loading ? (
-        <div className="w-full flex items-center justify-center gap-2 rounded-2xl border border-sky-100 bg-white/80 py-6 shadow-sm">
-          <span className="h-5 w-5 animate-spin rounded-full border-2 border-sky-200 border-t-sky-500" aria-hidden />
-          <span className="text-xs font-bold text-sky-800">AI 요약 불러오는 중…</span>
-        </div>
-      ) : null}
-
-      {!loading && runState === 'generating' ? (
-        <div className="w-full flex items-center justify-center gap-2 rounded-2xl border border-violet-100 bg-violet-50/80 py-6 shadow-sm">
-          <span className="h-5 w-5 animate-spin rounded-full border-2 border-violet-200 border-t-violet-500" aria-hidden />
-          <span className="text-xs font-bold text-violet-800">AI 리포트 생성 중… (최대 2분)</span>
-        </div>
-      ) : null}
-
-      {!loading && runState === 'insufficient' ? (
-        <AgentOnboardingProgressCard daysWithData={distinctDays} />
-      ) : null}
-
-      {!loading && runState === 'error' ? (
-        <div className="w-full rounded-2xl bg-red-50 p-4 shadow-sm ring-1 ring-red-100">
-          <p className="text-center text-sm font-black text-red-700">⚠️ AI 분석 연결 실패</p>
-          <p className="mt-1 text-center text-[11px] font-semibold text-red-500">에이전트 서버에 연결할 수 없어요.</p>
+      <section className={blockCardClass}>
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <p className="text-sm font-bold text-gray-700">일정 브리핑</p>
           <button
             type="button"
-            onClick={() => void reload()}
-            className="mx-auto mt-3 flex items-center gap-1 rounded-lg bg-red-100 px-3 py-1.5 text-[11px] font-bold text-red-700 active:bg-red-200"
+            onClick={onOpenCalendarEventSheet}
+            className="text-xs font-medium text-[#4A90E2]"
           >
-            다시 시도
+            일정 등록하기
           </button>
         </div>
-      ) : null}
+        {calendarUpcomingEvents.length === 0 ? (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-amber-900">
+            <p className="whitespace-pre-line text-sm text-amber-800">
+              {noticeText}
+            </p>
+          </div>
+        ) : (
+        <div className="rounded-xl bg-gray-50/80 px-3 py-3">
+            {calendarUpcomingEvents.map((event) => (
+              <div key={event.id} className="mb-2 flex items-center gap-2 last:mb-0">
+              <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-bold text-gray-500 ring-1 ring-gray-200">
+                  {event.dateLabel}
+                </span>
+              <span className="text-[11px] font-bold text-gray-700">
+                  {event.title}
+                </span>
+              <span className="ml-auto text-[10px] font-semibold text-gray-500">
+                  {event.impactLabel}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
 
-      {!loading && runState === 'idle' && !hasContent ? (
-        <AgentOnboardingProgressCard daysWithData={distinctDays} />
-      ) : null}
+      <section className={blockCardClass}>
+        <p className="mb-3 text-sm font-bold text-gray-700">AI 리포트</p>
+        {loading ? (
+          <div className="w-full flex items-center justify-center gap-2 rounded-xl bg-gray-50/80 py-6">
+            <span className="h-5 w-5 animate-spin rounded-full border-2 border-gray-200 border-t-[#4A90E2]" aria-hidden />
+            <span className="text-xs font-bold text-gray-600">AI 요약 불러오는 중…</span>
+          </div>
+        ) : null}
 
-      {!loading && hasContent && coachingFull ? (
-        <button
-          type="button"
-          onClick={() => setSheet('coaching')}
-          className="group w-full flex flex-col rounded-2xl bg-gradient-to-br from-sky-100/90 via-indigo-50 to-violet-50 p-4 text-left shadow-md ring-1 ring-sky-100/80 transition active:scale-[0.99]"
-        >
-          <span className="text-xs font-black text-sky-950">💡 경제 습관 코칭 가이드</span>
-          <p className="mt-2 line-clamp-2 text-[11px] font-semibold leading-snug text-sky-900/90">{coachingPreview}</p>
-          <span className="mt-3 text-[10px] font-bold text-sky-700/80">탭해서 전체 보기 →</span>
-        </button>
-      ) : null}
+        {!loading && runState === 'generating' ? (
+          <div className="w-full flex items-center justify-center gap-2 rounded-xl bg-gray-50/80 py-6">
+            <span className="h-5 w-5 animate-spin rounded-full border-2 border-gray-200 border-t-[#4A90E2]" aria-hidden />
+            <span className="text-xs font-bold text-gray-600">AI 리포트 생성 중… (최대 2분)</span>
+          </div>
+        ) : null}
+
+        {!loading && runState === 'insufficient' ? (
+          <AgentOnboardingProgressCard daysWithData={distinctDays} />
+        ) : null}
+
+        {!loading && runState === 'error' ? (
+          <div className="w-full rounded-xl bg-gray-50/80 p-4">
+            <p className="text-center text-sm font-black text-gray-700">AI 분석 연결 실패</p>
+            <p className="mt-1 text-center text-[11px] font-semibold text-gray-500">에이전트 서버에 연결할 수 없어요.</p>
+            <button
+              type="button"
+              onClick={() => void reload()}
+              className="mx-auto mt-3 flex items-center gap-1 rounded-lg border border-blue-200 px-3 py-1.5 text-[11px] font-bold text-blue-600 transition-colors hover:bg-blue-50"
+            >
+              다시 시도
+            </button>
+          </div>
+        ) : null}
+
+        {!loading && runState === 'idle' && !hasContent ? (
+          <AgentOnboardingProgressCard daysWithData={distinctDays} />
+        ) : null}
+
+        {!loading && hasContent && coachingFull ? (
+          <button
+            type="button"
+            onClick={() => setSheet('coaching')}
+            className="group w-full rounded-xl bg-gray-50/80 px-3 py-3 text-left transition active:scale-[0.99]"
+          >
+            <span className="text-[11px] font-bold text-gray-600">경제 습관 코칭 가이드</span>
+            <p className="mt-2 line-clamp-2 text-[11px] font-semibold leading-snug text-gray-700">{coachingPreview}</p>
+            <span className="mt-3 text-[10px] font-bold text-[#4A90E2]">탭해서 전체 보기 →</span>
+          </button>
+        ) : null}
+      </section>
 
       <ParentAgentBottomSheet
         open={sheet === 'coaching'}
