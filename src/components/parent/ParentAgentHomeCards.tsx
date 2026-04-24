@@ -212,14 +212,14 @@ export default function ParentAgentHomeCards({
         <p className="mb-3 text-sm font-bold text-gray-700">AI 리포트</p>
         {loading ? (
           <div className="w-full flex items-center justify-center gap-2 rounded-xl bg-gray-50/80 py-6">
-            <span className="h-5 w-5 animate-spin rounded-full border-2 border-gray-200 border-t-[#4A90E2]" aria-hidden />
+            <span className="h-5 w-5 animate-spin rounded-full border-2 border-gray-200 border-t-gray-500" aria-hidden />
             <span className="text-xs font-bold text-gray-600">AI 요약 불러오는 중…</span>
           </div>
         ) : null}
 
         {!loading && runState === 'generating' ? (
           <div className="w-full flex items-center justify-center gap-2 rounded-xl bg-gray-50/80 py-6">
-            <span className="h-5 w-5 animate-spin rounded-full border-2 border-gray-200 border-t-[#4A90E2]" aria-hidden />
+            <span className="h-5 w-5 animate-spin rounded-full border-2 border-gray-200 border-t-gray-500" aria-hidden />
             <span className="text-xs font-bold text-gray-600">AI 리포트 생성 중… (최대 2분)</span>
           </div>
         ) : null}
@@ -235,7 +235,7 @@ export default function ParentAgentHomeCards({
             <button
               type="button"
               onClick={() => void reload()}
-              className="mx-auto mt-3 flex items-center gap-1 rounded-lg border border-blue-200 px-3 py-1.5 text-[11px] font-bold text-blue-600 transition-colors hover:bg-blue-50"
+              className="mx-auto mt-3 flex items-center gap-1 rounded-lg border border-gray-300 px-3 py-1.5 text-[11px] font-bold text-gray-600 transition-colors hover:bg-gray-100"
             >
               다시 시도
             </button>
@@ -254,7 +254,7 @@ export default function ParentAgentHomeCards({
           >
             <span className="text-[11px] font-bold text-gray-600">경제 습관 코칭 가이드</span>
             <p className="mt-2 line-clamp-2 text-[11px] font-semibold leading-snug text-gray-700">{coachingPreview}</p>
-            <span className="mt-3 text-[10px] font-bold text-[#4A90E2]">탭해서 전체 보기 →</span>
+            <span className="mt-3 text-[10px] font-bold text-gray-500">탭해서 전체 보기 →</span>
           </button>
         ) : null}
       </section>
