@@ -31,6 +31,58 @@ export type AgentEqScores = {
   routine_completion?: number
 }
 
+/**
+ * `agent_reports.report_text` 에 JSON 으로 저장되는 주간 리포트 카드 페이로드(v1).
+ * - 구버전(한 덩어리 문자열)은 `parseAgentReportPayload` 가 legacy 로 분기합니다.
+ */
+export type AgentReportDrillDown = {
+  /** 최근 14일 미션에서 획득한 크레딧 합 */
+  credits_earned_14d?: number
+  /** 최근 14일 저금통으로 들어온 이체 합 */
+  piggy_transfer_total?: number
+  /** 최근 14일 지갑에서 나간 이체 + 승인·대기 구매액 합(대략적 지출 규모) */
+  wallet_transfer_and_purchase_total?: number
+  /** DB `eq_save_ratio`(지갑+저금통 중 저금통 %) — 메인에서는 숨기고 드릴다운에서만 표시 */
+  save_ratio_pct?: number
+}
+
+export type AgentReportJsonV1 = {
+  version?: number
+  calendar_notice?: string
+  level_comment?: string
+  routine_comment?: string
+  /** `up` | `down` | `flat` — 루틴 카드 화살표 아이콘 */
+  routine_trend?: string
+  credit_comment?: string
+  wishlist_comment?: string
+  wishlist_items?: unknown[]
+  cheer_message?: string
+  parent_guide?: string
+  drill_down?: AgentReportDrillDown
+  /** 에이전트가 섹션 제목을 붙인 연속 텍스트(검색·미리보기용, UI 카드는 위 필드 우선) */
+  report_body_text?: string
+}
+
+export type ParsedAgentReport =
+  | { kind: 'json'; data: AgentReportJsonV1 }
+  | { kind: 'legacy'; text: string }
+
+/**
+ * `report_text` 가 JSON 객체인지(신규), 아니면 예전처럼 긴 문자열인지 구분합니다.
+ */
+export function parseAgentReportPayload(reportText: string | null | undefined): ParsedAgentReport {
+  const raw = String(reportText ?? '').trim()
+  if (!raw) return { kind: 'legacy', text: '' }
+  if (!raw.startsWith('{')) return { kind: 'legacy', text: raw }
+  try {
+    const data = JSON.parse(raw) as AgentReportJsonV1
+    if (data && typeof data === 'object') return { kind: 'json', data }
+  } catch {
+    /* fallthrough */
+  }
+  return { kind: 'legacy', text: raw }
+}
+
 export type AgentParseEvent = {
   type: string
   title: string

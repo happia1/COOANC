@@ -9,7 +9,7 @@ import BearStickerSheet from '@/components/child/BearStickerSheet'
 import PraiseGiftArrivalModal from '@/components/child/PraiseGiftArrivalModal'
 import ChildHomeIslandStage from '@/components/child/ChildHomeIslandStage'
 import ChildHomeSceneryBand from '@/components/child/ChildHomeSceneryBand'
-import { MapActionPill, StickerActionPill } from '@/components/child/ChildSceneryTopPills'
+import { StickerActionPill } from '@/components/child/ChildSceneryTopPills'
 import { mergePraiseStickerGrantsFromServer } from '@/lib/mergePraiseStickerGrantsFromServer'
 import { normalizeChildStatsCreditsSplit } from '@/lib/childCreditsSplit'
 import {
@@ -186,7 +186,12 @@ export default function HomeTab({
       <img
         src={`${ASSETS.layouts.childHomeBackgroundSecondScreen}?v=${CHILD_HOME_BACKGROUND_CACHE_BUST}`}
         alt=""
-        className={`absolute inset-0 h-full w-full object-cover object-[center_90%] brightness-[1.2]`}
+        /**
+         * 방 배경 위치·크기 조정:
+         * - 요청사항대로 배경은 더 아래로 내리고
+         * - 크기는 이전보다 더 축소해 화면 답답함을 줄입니다.
+         */
+        className={`absolute inset-0 h-full w-full object-cover object-[center_90%] brightness-[1.2] [transform:translateY(6%)_scale(1.18)] md:landscape:[transform:translateY(20%)_scale(1.4)]`}
         loading="eager"
         decoding="async"
         fetchPriority="high"
@@ -206,11 +211,8 @@ export default function HomeTab({
         <span className="text-sm font-black text-white [text-shadow:0_1px_6px_rgba(0,0,0,0.45)]">나의 꾸미기 방</span>
       </div>
 
-      {/* top-right: map + sticker */}
+      {/* top-right: sticker */}
       <div className="pointer-events-none absolute right-4 top-4 z-20 hidden gap-2 md:landscape:flex">
-        <OverlayIconButton onClick={() => setMapOpen(true)} ariaLabel="항해지도 열기">
-          <Image src="/assets/img/common/ui/map.png" alt="" width={20} height={20} className="h-5 w-5 object-contain" />
-        </OverlayIconButton>
         <OverlayIconButton onClick={openBearFromFab} ariaLabel="스티커 보관함 열기">
           <Image src="/assets/img/common/ui/sticker_icon.png" alt="" width={20} height={20} className="h-5 w-5 object-contain" />
         </OverlayIconButton>
@@ -224,12 +226,6 @@ export default function HomeTab({
   const islandSection = (
     <div className="flex min-h-0 flex-1 flex-col justify-end gap-1.5">
       <div className="relative mx-auto flex min-h-0 w-full max-w-sm flex-1 flex-col items-center justify-end -mt-2 sm:-mt-4">
-        {/* 지도 단추: 모바일용 (태블릿에서는 overlay 사용) */}
-        <div className="pointer-events-none absolute left-0 top-0 z-20 flex items-start pl-0.5 pt-5 sm:pl-1 sm:pt-6 md:landscape:hidden">
-          <div className="pointer-events-auto shrink-0">
-            <MapActionPill onClick={() => setMapOpen(true)} />
-          </div>
-        </div>
         {stickerTopRightButton}
         <ChildHomeIslandStage density="flex" homeAvatarUrl={childAvatarUrl} showIslandArt={false} />
       </div>

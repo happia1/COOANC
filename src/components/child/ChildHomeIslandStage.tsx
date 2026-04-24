@@ -396,13 +396,28 @@ export default function ChildHomeIslandStage({
 
       {scene === 'bunny' ? (
         <div
-          className="pointer-events-none absolute left-1/2 -translate-x-1/2 bottom-[30%] z-[2] flex justify-center"
+          /**
+           * 작은 화면에서 캐릭터를 살짝 아래로 내려 답답해 보이는 느낌을 줄입니다.
+           * - 기본(작은 화면): bottom 24%
+           * - sm 이상: 기존처럼 bottom 30%
+           */
+          /**
+           * 요청사항:
+           * - 모바일에서는 캐릭터를 한참 아래로 내려 배치합니다.
+           * - 패드 가로(`md:landscape`)에서는 캐릭터를 더 위로 올립니다.
+           */
+          className="pointer-events-none absolute left-1/2 -translate-x-1/2 -bottom-[14%] z-[2] flex justify-center sm:bottom-[34%] md:landscape:bottom-[42%]"
         >
           {density === 'flex' ? (
             <div
               role="img"
               aria-label="나의 쿠앵이 캐릭터"
-              className="origin-bottom [transform:scale(0.9)]"
+              /**
+               * 요청사항 반영:
+               * - 현재 캐릭터 크기를 3분의 2(약 66.7%)로 줄입니다.
+               * - 태블릿 가로도 같은 비율로 함께 축소합니다.
+               */
+              className="origin-bottom [transform:scale(1)] md:landscape:[transform:scale(1.27)]"
             >
               <HomeIslandHeroSprite sprite={homeStageSprite} />
             </div>

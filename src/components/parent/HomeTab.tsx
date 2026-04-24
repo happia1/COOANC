@@ -3,7 +3,7 @@
 /**
  * 부모 앱 「홈」 탭 본문입니다.
  * - 위쪽에서 자녀를 바꾸면(◀▶ 또는 스와이프) 아래 카드·통계가 그 아이 기준으로 바뀝니다.
- * - 「우리아이 경제 EQ 지수」패널 상단에는 Railway AI 에이전트 카드(리포트·코칭)가 있고, 아래 차트는 child_stats 의 eq_* 필드를 씁니다.
+ * - 「우리아이 경제 EQ 지수」패널에는 AI 리포트 카드(JSON)·저축 습관 반원이 있고, 코칭 카드는 우측 열의 `ParentAgentHomeCards` 만 담당합니다(동일 `useParentAgentReport` 데이터).
  * - Realtime 으로 child_stats 를 구독해 부모가 같은 화면에 있을 때 도넛·반원 수치가 바로 따라갑니다.
  * - 미션 완료 시 막대는 daily_missions Realtime 과 동일 패턴입니다.
  * - 프로필 카드를 누르면 그 아이의 「자녀용 앱 화면」(미션·홈 등)으로 들어갑니다(쿠키 설정 후 /home).
@@ -25,6 +25,7 @@ import { useParentStore } from '@/store/parentStore'
 import ChildProfileNav, { type ChildTab } from '@/components/parent/ChildProfileNav'
 import EconomicEqPanel from '@/components/parent/EconomicEqPanel'
 import ParentAgentHomeCards from '@/components/parent/ParentAgentHomeCards'
+import { useParentAgentReport } from '@/hooks/useParentAgentReport'
 import SpriteImage from '@/components/common/SpriteImage'
 import { ICONS } from '@/constants/sprites'
 
@@ -93,6 +94,9 @@ export default function HomeTab({ childrenData }: Props) {
   const child = childrenData.find((c) => c.id === currentId) ?? childrenData[0]
 
   const s = child?.stats ?? null
+
+  /** Agent A 최신 행 — 홈 좌측 EQ 패널과 우측 코칭 카드가 같이 씁니다. */
+  const agentReport = useParentAgentReport(child?.id)
 
   /** 선택 자녀가 바뀌면 서버에서 받은 주간 막대 데이터로 맞춘 뒤, Realtime 으로 최신화합니다. */
   const [weeklyRoutine, setWeeklyRoutine] = useState<WeeklyRoutineDay[]>(child?.weeklyRoutine ?? [])
@@ -247,15 +251,18 @@ export default function HomeTab({ childrenData }: Props) {
                   eq_save_ratio: s?.eq_save_ratio ?? 0,
                   streak_days: s?.streak_days ?? 0,
                   credits: s?.credits ?? 0,
+                  current_level: s?.current_level ?? 0,
                 }}
                 weeklyRoutine={weeklyRoutine}
                 childName={child.name}
+                agentChildId={child.id}
+                agentRow={agentReport.row}
+                agentLoading={agentReport.loading}
               />
 
             </div>
 
-            {/* 우 컬럼: 오늘의 진행도 + AI 꿀팁(ParentAgentHomeCards) + 최근 활동 + 데이터 모으는 중
-                ParentAgentHomeCards 가 데이터 있을 땐 AI 카드, 없을 땐 「데이터 모으는 중」을 모두 처리함 */}
+            {/* 우 컬럼: 오늘의 진행도 + 코칭 카드(ParentAgentHomeCards) + 최근 활동 — 리포트 본문은 좌측 EQ 패널 */}
             <div className="flex flex-col gap-4">
               {/* 오늘의 진행도 */}
               <div className="rounded-2xl bg-white p-4 shadow-sm">
@@ -279,7 +286,7 @@ export default function HomeTab({ childrenData }: Props) {
                 )}
               </div>
 
-              <ParentAgentHomeCards childId={child.id} />
+              <ParentAgentHomeCards agent={agentReport} />
 
               {/* 최근 활동: 토글 헤더(기본 접힘) + 펼칠 때만 미션 완료 로그 목록 */}
               {child.recentActivity.length > 0 && (

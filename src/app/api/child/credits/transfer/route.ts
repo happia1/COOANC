@@ -20,6 +20,29 @@ const KINDS = [
 
 type Kind = (typeof KINDS)[number]
 
+type CreditBucket = 'basket' | 'piggy' | 'wallet'
+
+/**
+ * API 의 kind(영문 코드)를 DB credit_transfer_logs 의 bucket 이름으로 바꿉니다.
+ * - basket: child_stats 기준 「가용」= credits - wallet - piggy (앱에서는 돈바구니/float)
+ */
+function bucketsForTransferKind(kind: Kind): { from_bucket: CreditBucket; to_bucket: CreditBucket } {
+  switch (kind) {
+    case 'float_to_wallet':
+      return { from_bucket: 'basket', to_bucket: 'wallet' }
+    case 'float_to_piggy':
+      return { from_bucket: 'basket', to_bucket: 'piggy' }
+    case 'wallet_to_float':
+      return { from_bucket: 'wallet', to_bucket: 'basket' }
+    case 'piggy_to_float':
+      return { from_bucket: 'piggy', to_bucket: 'basket' }
+    case 'wallet_to_piggy':
+      return { from_bucket: 'wallet', to_bucket: 'piggy' }
+    case 'piggy_to_wallet':
+      return { from_bucket: 'piggy', to_bucket: 'wallet' }
+  }
+}
+
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
   const {
@@ -123,6 +146,20 @@ export async function POST(req: NextRequest) {
   if (error) {
     return NextResponse.json({ error: '저장에 실패했어요' }, { status: 500 })
   }
+
+  // 이체 감사 로그: 응답 속도에 영향 없이 백그라운드로 적재 (실패는 서버 로그만)
+  const { from_bucket, to_bucket } = bucketsForTransferKind(kind as Kind)
+  void supabase
+    .from('credit_transfer_logs')
+    .insert({
+      child_id: childId,
+      from_bucket,
+      to_bucket,
+      amount,
+    })
+    .then(({ error: logErr }) => {
+      if (logErr) console.error('[credit_transfer_logs]', logErr.message)
+    })
 
   // ── 게임 트리거 ──
   let triggerResult = { fired: false, unlockedItemIndex: null as number | null }

@@ -703,7 +703,12 @@ export default function MarketTab({
    */
   return (
     <div
-      className="-mx-4 -mt-4 flex min-h-0 flex-1 flex-col overflow-hidden pb-0"
+      /**
+       * 모바일은 부모 패딩을 상쇄하려고 `-mx-4 -mt-4`를 유지합니다.
+       * 태블릿 가로에서는 왼쪽 독바와 겹치지 않도록 음수 마진을 해제해
+       * 마켓 전체가 오른쪽 본문 영역 안에서 시작되게 맞춥니다.
+       */
+      className="-mx-4 -mt-4 flex min-h-0 flex-1 flex-col overflow-hidden pb-0 md:landscape:mx-0 md:landscape:mt-0"
       style={{ background: '#FAF5EF' }}
     >
 
