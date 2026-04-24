@@ -656,9 +656,12 @@ export function CalendarEventSheet({
       {/* 오른쪽 슬라이드 패널: 닫힘=오른쪽 바깥, 열림=제자리 */}
       <div
         className={[
-          'fixed top-0 right-0 z-50 h-full w-full max-w-[420px] bg-white shadow-xl',
+          // 모바일: 하단 시트 / md+: 우측 슬라이드 패널
+          'fixed inset-x-0 bottom-0 z-50 h-[min(88dvh,100vh-2rem)] w-full rounded-t-3xl bg-white shadow-xl md:inset-x-auto md:top-0 md:right-0 md:h-full md:max-w-[420px] md:rounded-none',
           'transform transition-transform duration-300 ease-in-out',
-          panelOpen ? 'translate-x-0' : 'translate-x-full',
+          panelOpen
+            ? 'translate-y-0 md:translate-y-0 md:translate-x-0'
+            : 'translate-y-full md:translate-y-0 md:translate-x-full',
         ].join(' ')}
         onClick={(e) => e.stopPropagation()}
       >
@@ -836,15 +839,31 @@ function EmptyDayBottomSheet({
   onClose: () => void
   onAddSchedule: (dk: string) => void
 }) {
+  const [panelOpen, setPanelOpen] = useState(false)
+
+  useEffect(() => {
+    const t = window.setTimeout(() => setPanelOpen(true), 10)
+    return () => window.clearTimeout(t)
+  }, [])
+
   return (
-    <div className="fixed inset-0 z-[100] flex flex-col justify-end" role="dialog" aria-modal="true">
-      <button type="button" className="absolute inset-0 bg-black/40" aria-label="닫기" onClick={onClose} />
+    <div className="fixed inset-0 z-[100]" role="dialog" aria-modal="true">
+      <button type="button" className="absolute inset-0 z-40 bg-black/40" aria-label="닫기" onClick={onClose} />
       <div
-        className="relative flex max-h-[min(85dvh,100vh-2rem)] w-full max-w-md flex-col rounded-t-3xl bg-white shadow-2xl"
+        className={[
+          // 모바일: 하단 시트 / md+: 우측 슬라이드 패널
+          'fixed inset-x-0 bottom-0 z-50 flex h-[min(85dvh,100vh-2rem)] w-full flex-col rounded-t-3xl bg-white shadow-xl md:inset-x-auto md:top-0 md:right-0 md:h-full md:max-w-[420px] md:rounded-none',
+          'transform transition-transform duration-300 ease-in-out',
+          panelOpen
+            ? 'translate-y-0 md:translate-y-0 md:translate-x-0'
+            : 'translate-y-full md:translate-y-0 md:translate-x-full',
+        ].join(' ')}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-gray-200" aria-hidden />
-        <div className="min-h-0 flex-1 overflow-y-auto p-5 pb-2">
+        <div className="shrink-0 border-b border-gray-100 px-5 py-4">
+          <p className="text-base font-black text-brand-text">일정 안내</p>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto p-5 pb-2 pt-4">
           <p className="mb-1 text-center text-base font-black text-brand-text">{formatDateKeyKorean(dateKey)}</p>
           <p className="mb-4 text-center text-xs text-gray-500">이 날짜에 등록된 일정이 없어요</p>
           <button
@@ -884,18 +903,34 @@ function EventDetailBottomSheet({
   onEdit: (ev: LocalCalendarEvent) => void
   onDelete: (id: string) => void
 }) {
+  const [panelOpen, setPanelOpen] = useState(false)
+
+  useEffect(() => {
+    const t = window.setTimeout(() => setPanelOpen(true), 10)
+    return () => window.clearTimeout(t)
+  }, [])
+
   return (
-    <div className="fixed inset-0 z-[100] flex flex-col justify-end" role="dialog" aria-modal="true">
-      <button type="button" className="absolute inset-0 bg-black/40" aria-label="닫기" onClick={onClose} />
+    <div className="fixed inset-0 z-[100]" role="dialog" aria-modal="true">
+      <button type="button" className="absolute inset-0 z-40 bg-black/40" aria-label="닫기" onClick={onClose} />
       <div
-        className="relative flex max-h-[min(85dvh,100vh-2rem)] w-full max-w-md flex-col rounded-t-3xl bg-white shadow-2xl"
+        className={[
+          // 모바일: 하단 시트 / md+: 우측 슬라이드 패널
+          'fixed inset-x-0 bottom-0 z-50 flex h-[min(85dvh,100vh-2rem)] w-full flex-col rounded-t-3xl bg-white shadow-xl md:inset-x-auto md:top-0 md:right-0 md:h-full md:max-w-[420px] md:rounded-none',
+          'transform transition-transform duration-300 ease-in-out',
+          panelOpen
+            ? 'translate-y-0 md:translate-y-0 md:translate-x-0'
+            : 'translate-y-full md:translate-y-0 md:translate-x-full',
+        ].join(' ')}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-gray-200" aria-hidden />
-        <div className="min-h-0 flex-1 overflow-y-auto p-5 pb-2">
+        <div className="shrink-0 border-b border-gray-100 px-5 py-4">
+          <p className="text-base font-black text-brand-text">일정 상세</p>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto p-5 pb-2 pt-4">
           {/* 제목은 가운데, +는 오른쪽(캘린더 헤더 +와 같은 스타일·동작) */}
           <div className="relative mb-3 flex min-h-7 items-center justify-center">
-            <p className="text-base font-black text-brand-text">일정 상세</p>
+            <p className="text-sm font-black text-brand-text">선택한 날짜 일정</p>
             <button
               type="button"
               onClick={onAddSchedule}

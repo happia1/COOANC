@@ -22,6 +22,7 @@ import {
 } from '@/lib/koreaDate'
 import { buildWeeklyRoutineDays, type WeeklyRoutineDay } from '@/lib/childWeeklyRoutine'
 import { COOANC_CALENDAR_EVENTS_STORAGE_KEY } from '@/lib/localStorageChildScope'
+import { COOANC_CALENDAR_STORAGE_UPDATE_EVENT } from '@/lib/syncAgentEventToLocalCalendar'
 import { useParentStore } from '@/store/parentStore'
 import ChildProfileNav, { type ChildTab } from '@/components/parent/ChildProfileNav'
 import EconomicEqPanel from '@/components/parent/EconomicEqPanel'
@@ -93,6 +94,72 @@ export default function HomeTab({ childrenData, upcomingEvents }: Props) {
   const [weeklyRoutine, setWeeklyRoutine] = useState<WeeklyRoutineDay[]>(child?.weeklyRoutine ?? [])
   /** 홈에서도 루틴 탭과 같은 일정 등록 시트를 그대로 재사용합니다. */
   const [calendarEventSheetOpen, setCalendarEventSheetOpen] = useState(false)
+  /**
+   * 원인 보정:
+   * - 캘린더 탭 등록은 현재 localStorage(`cooanc_calendar_events_v1`) 기반인데,
+   * - 홈 브리핑은 서버 `calendar_events` 조회값을 기본으로 써서 즉시 반영이 누락될 수 있습니다.
+   * => 홈에서도 localStorage 일정을 읽어 7일 브리핑 계산에 함께 반영합니다.
+   */
+  const [localUpcomingEvents, setLocalUpcomingEvents] = useState<
+    {
+      start_date: string
+      end_date: string
+      routine_override: string
+      title?: string | null
+    }[]
+  >([])
+
+  useEffect(() => {
+    const today = getSeoulDateString()
+    const sevenDaysLater = addSeoulCalendarDays(today, 7)
+    const reloadLocalCalendar = () => {
+      try {
+        const raw = localStorage.getItem(COOANC_CALENDAR_EVENTS_STORAGE_KEY)
+        const parsed = raw ? (JSON.parse(raw) as unknown[]) : []
+        const rows = Array.isArray(parsed) ? parsed : []
+        const filtered = rows
+          .map((row) => {
+            const r = row as {
+              childId?: string | null
+              startDate?: string
+              endDate?: string
+              routineOverride?: string
+              title?: string
+            }
+            return {
+              childId: r.childId ?? null,
+              startDate: String(r.startDate ?? ''),
+              endDate: String(r.endDate ?? ''),
+              routineOverride: String(r.routineOverride ?? ''),
+              title: r.title ?? null,
+            }
+          })
+          // 현재 선택 자녀 또는 전체(childId=null) 일정만 홈 브리핑에 반영
+          .filter((r) => !r.childId || r.childId === child?.id)
+          // [오늘~+7일]과 겹치는 일정만 반영
+          .filter((r) => r.endDate >= today && r.startDate <= sevenDaysLater)
+          .sort((a, b) => a.startDate.localeCompare(b.startDate))
+          .slice(0, 5)
+          .map((r) => ({
+            start_date: r.startDate,
+            end_date: r.endDate,
+            routine_override: r.routineOverride,
+            title: r.title,
+          }))
+        setLocalUpcomingEvents(filtered)
+      } catch {
+        setLocalUpcomingEvents([])
+      }
+    }
+
+    reloadLocalCalendar()
+    window.addEventListener(COOANC_CALENDAR_STORAGE_UPDATE_EVENT, reloadLocalCalendar)
+    window.addEventListener('storage', reloadLocalCalendar)
+    return () => {
+      window.removeEventListener(COOANC_CALENDAR_STORAGE_UPDATE_EVENT, reloadLocalCalendar)
+      window.removeEventListener('storage', reloadLocalCalendar)
+    }
+  }, [child?.id])
 
   // 자녀 목록이 바뀌면(삭제 등) 선택 id 가 없거나 목록에 없으면 첫 자녀로 맞춤
   useEffect(() => {
@@ -146,20 +213,26 @@ export default function HomeTab({ childrenData, upcomingEvents }: Props) {
     ? Math.round((child.todayCompleted / child.totalMissions) * 100)
     : 0
 
+  const effectiveUpcomingEvents = useMemo(() => {
+    // localStorage 일정이 있으면 우선 사용(캘린더 등록 직후 즉시 반영 목적)
+    if (localUpcomingEvents.length > 0) return localUpcomingEvents
+    return upcomingEvents ?? []
+  }, [localUpcomingEvents, upcomingEvents])
+
   const calendarNoticeText = useMemo(() => {
-    if (!upcomingEvents || upcomingEvents.length === 0) {
+    if (!effectiveUpcomingEvents || effectiveUpcomingEvents.length === 0) {
       return '이번 주는 특별 일정이 없어요. 루틴에 집중하기 좋은 한 주예요.'
     }
-    const next = upcomingEvents[0]
+    const next = effectiveUpcomingEvents[0]
     const label =
       next.title?.trim() ||
       (next.routine_override === 'none' ? '공휴일' : '방학·특별일정')
     const dateStr = next.start_date.slice(5).replace('-', '/')
-    if (upcomingEvents.length === 1) {
+    if (effectiveUpcomingEvents.length === 1) {
       return `이번 주 ${dateStr}에 ${label}이 있어요. 루틴 조정이 필요할 수 있어요.`
     }
-    return `이번 주 ${dateStr} 외 ${upcomingEvents.length - 1}개 일정이 있어요.`
-  }, [upcomingEvents])
+    return `이번 주 ${dateStr} 외 ${effectiveUpcomingEvents.length - 1}개 일정이 있어요.`
+  }, [effectiveUpcomingEvents])
 
   const tabs: ChildTab[] = childrenData.map((c) => ({ id: c.id, name: c.name }))
 
