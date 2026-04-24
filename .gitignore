@@ -83,6 +83,5 @@ supabase/.temp/
 .claude/worktrees/
 
 # ========================
-# AI 에이전트 (별도 Git 저장소 — COOANC-agent 등에서만 커밋/푸시)
+# AI 에이전트
 # ========================
-cooanc-agent/
