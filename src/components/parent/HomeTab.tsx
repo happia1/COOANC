@@ -21,10 +21,12 @@ import {
   getSeoulMondayOfWeekContaining,
 } from '@/lib/koreaDate'
 import { buildWeeklyRoutineDays, type WeeklyRoutineDay } from '@/lib/childWeeklyRoutine'
+import { COOANC_CALENDAR_EVENTS_STORAGE_KEY } from '@/lib/localStorageChildScope'
 import { useParentStore } from '@/store/parentStore'
 import ChildProfileNav, { type ChildTab } from '@/components/parent/ChildProfileNav'
 import EconomicEqPanel from '@/components/parent/EconomicEqPanel'
 import ParentAgentHomeCards from '@/components/parent/ParentAgentHomeCards'
+import { CalendarEventSheet } from '@/components/parent/CalendarSection'
 import { CompactChildProfileCard } from '@/components/parent/CompactChildProfileCard'
 import { useParentAgentReport } from '@/hooks/useParentAgentReport'
 import SpriteImage from '@/components/common/SpriteImage'
@@ -83,6 +85,8 @@ export default function HomeTab({ childrenData }: Props) {
 
   /** 선택 자녀가 바뀌면 서버에서 받은 주간 막대 데이터로 맞춘 뒤, Realtime 으로 최신화합니다. */
   const [weeklyRoutine, setWeeklyRoutine] = useState<WeeklyRoutineDay[]>(child?.weeklyRoutine ?? [])
+  /** 홈에서도 루틴 탭과 같은 일정 등록 시트를 그대로 재사용합니다. */
+  const [calendarEventSheetOpen, setCalendarEventSheetOpen] = useState(false)
 
   // 자녀 목록이 바뀌면(삭제 등) 선택 id 가 없거나 목록에 없으면 첫 자녀로 맞춤
   useEffect(() => {
@@ -211,7 +215,10 @@ export default function HomeTab({ childrenData }: Props) {
                * 요청 반영: "데이터 모으는 중" 카드가 포함된 AI 블록을 좌측으로 이동합니다.
                * (`ParentAgentHomeCards`는 로딩/insufficient/코칭 상태를 공통으로 담당)
                */}
-              <ParentAgentHomeCards agent={agentReport} />
+              <ParentAgentHomeCards
+                agent={agentReport}
+                onOpenCalendarEventSheet={() => setCalendarEventSheetOpen(true)}
+              />
 
             </div>
 
@@ -261,6 +268,24 @@ export default function HomeTab({ childrenData }: Props) {
           </div>
         </>
       )}
+      {child && calendarEventSheetOpen ? (
+        <CalendarEventSheet
+          initialStartDate={getSeoulDateString()}
+          initialEndDate={getSeoulDateString()}
+          childId={child.id}
+          onSave={(ev) => {
+            try {
+              const raw = localStorage.getItem(COOANC_CALENDAR_EVENTS_STORAGE_KEY)
+              const prev = raw ? (JSON.parse(raw) as unknown[]) : []
+              const safePrev = Array.isArray(prev) ? prev : []
+              localStorage.setItem(COOANC_CALENDAR_EVENTS_STORAGE_KEY, JSON.stringify([...safePrev, ev]))
+            } catch {
+              // 홈탭에서 저장 실패해도 앱이 멈추지 않게 방어합니다.
+            }
+          }}
+          onClose={() => setCalendarEventSheetOpen(false)}
+        />
+      ) : null}
     </div>
   )
 }

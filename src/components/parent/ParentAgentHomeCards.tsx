@@ -81,6 +81,8 @@ function hasDisplayableAgentContent(row: AgentLatestReportRow | null | undefined
 type Props = {
   /** `useParentAgentReport` 한 번만 호출한 결과를 넘깁니다. */
   agent: UseParentAgentReportResult
+  /** 홈탭에서 공용 일정 등록 시트를 열 때 사용합니다. */
+  onOpenCalendarEventSheet?: () => void
 }
 
 /**
@@ -96,7 +98,6 @@ function AgentOnboardingProgressCard({ daysWithData }: { daysWithData: number })
     <div className="rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 p-5">
       {/* Header */}
       <div className="mb-3 flex items-center gap-2">
-        <span aria-hidden>🌱</span>
         <p className="text-sm font-bold text-blue-900">AI 리포트 준비 중이에요</p>
       </div>
 
@@ -126,16 +127,15 @@ function AgentOnboardingProgressCard({ daysWithData }: { daysWithData: number })
       {/* Teaser cards — what will be shown */}
       <div className="grid grid-cols-2 gap-2">
         {[
-          { icon: '📈', label: '루틴 성실도' },
-          { icon: '💰', label: '저축 습관' },
-          { icon: '🎯', label: '레벨 분석' },
-          { icon: '💬', label: 'AI 코멘트' },
+          { label: '루틴 성실도' },
+          { label: '저축 습관' },
+          { label: '레벨 분석' },
+          { label: 'AI 코멘트' },
         ].map((item) => (
           <div
             key={item.label}
             className="flex items-center gap-2 rounded-xl border border-blue-100 bg-white/70 p-3 opacity-50"
           >
-            <span className="text-base" aria-hidden>{item.icon}</span>
             <span className="text-xs font-medium text-blue-800">{item.label}</span>
             <span className="ml-auto text-[10px] text-blue-400">준비 중</span>
           </div>
@@ -145,7 +145,7 @@ function AgentOnboardingProgressCard({ daysWithData }: { daysWithData: number })
   )
 }
 
-export default function ParentAgentHomeCards({ agent }: Props) {
+export default function ParentAgentHomeCards({ agent, onOpenCalendarEventSheet }: Props) {
   const { row, loading, runState, distinctDays, reload } = agent
   const [sheet, setSheet] = useState<SheetKind>(null)
 
@@ -154,15 +154,22 @@ export default function ParentAgentHomeCards({ agent }: Props) {
   const coachingPreview = previewLine(row?.coaching_text)
   const parsed = parseAgentReportPayload(row?.report_text ?? null)
   const rawCalendarNotice = parsed.kind === 'json' ? String(parsed.data.calendar_notice ?? '').trim() : ''
-  const calendarNotice = rawCalendarNotice || '이번 주는 특별 일정이 없어요. 루틴에 집중하기 좋은 한 주예요.'
-  // 한 문장 카드라도 읽기 쉽게 2줄로 보이도록 마침표 뒤 공백을 줄바꿈으로 바꿉니다.
-  const calendarNoticeMultiline = calendarNotice.replace(/\. +/g, '.\n')
+  const calendarNoticeText = rawCalendarNotice || '이번 주는 특별 일정이 없어요. 루틴에 집중하기 좋은 한 주예요.'
 
   return (
     <div className="w-full space-y-3">
       {/* 일정 코멘트는 경제 EQ 패널이 아닌, AI 리포트 블록 상단에서 항상 보여 줍니다. */}
       <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-amber-900">
-        <p className="whitespace-pre-line text-center text-xs leading-relaxed">{calendarNoticeMultiline}</p>
+        <div className="flex items-center justify-between gap-2">
+          <p className="whitespace-pre-line text-center text-xs leading-relaxed">{calendarNoticeText}</p>
+          <button
+            type="button"
+            onClick={onOpenCalendarEventSheet}
+            className="ml-3 shrink-0 rounded-lg border border-blue-200 px-3 py-1.5 text-xs font-medium text-blue-600 transition-colors hover:bg-blue-50"
+          >
+            일정 등록하기
+          </button>
+        </div>
       </div>
 
       {loading ? (

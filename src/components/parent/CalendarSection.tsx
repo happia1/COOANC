@@ -13,6 +13,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import type { LocalCalendarEvent } from '@/types/database'
 import { getSeoulDateString } from '@/lib/koreaDate'
 import { COOANC_CALENDAR_EVENTS_STORAGE_KEY } from '@/lib/localStorageChildScope'
@@ -527,18 +528,18 @@ export default function CalendarSection({ childId }: Props) {
       </div>
 
       {sheet && (
-        <EventSheet
+        <CalendarEventSheet
           key={sheet.existing?.id ?? `new-${sheet.startDate}-${sheet.presetType ?? 'p'}`}
           initialStartDate={sheet.startDate}
           initialEndDate={sheet.endDate}
           existing={sheet.existing}
           presetEventType={sheet.presetType}
           childId={childId}
+          hideRoutineLink
           onSave={(ev) => {
             saveEvents((prev) =>
               sheet.existing ? prev.map((e) => (e.id === ev.id ? ev : e)) : [...prev, ev],
             )
-            closeSheet()
           }}
           onDelete={
             sheet.existing
@@ -589,12 +590,13 @@ export default function CalendarSection({ childId }: Props) {
   )
 }
 
-function EventSheet({
+export function CalendarEventSheet({
   initialStartDate,
   initialEndDate,
   existing,
   presetEventType,
   childId,
+  hideRoutineLink = false,
   onSave,
   onDelete,
   onClose,
@@ -604,10 +606,12 @@ function EventSheet({
   existing?: LocalCalendarEvent
   presetEventType?: LocalCalendarEvent['eventType']
   childId: string | null
+  hideRoutineLink?: boolean
   onSave: (ev: LocalCalendarEvent) => void
   onDelete?: (id: string) => void
   onClose: () => void
 }) {
+  const router = useRouter()
   const [title, setTitle] = useState(existing?.title ?? '')
   const [startDate, setStart] = useState(existing?.startDate ?? initialStartDate)
   const [endDate, setEnd] = useState(existing?.endDate ?? initialEndDate)
@@ -617,6 +621,17 @@ function EventSheet({
   const [override, setOverride] = useState<OverrideType>(existing?.routineOverride ?? 'weekend')
   // 구버전 일정(JSON)에는 description 키가 없을 수 있음 → 빈 문자열로 시작
   const [description, setDescription] = useState(existing?.description ?? '')
+  /**
+   * 저장 성공 후에는 즉시 닫지 않고 완료 액션을 보여 줍니다.
+   * - routine 탭 내부에서 쓰일 때는 "캘린더 보러가기" 버튼을 숨길 수 있게 확장할 예정입니다.
+   */
+  const [savedDone, setSavedDone] = useState(false)
+  const [panelOpen, setPanelOpen] = useState(false)
+
+  useEffect(() => {
+    const t = window.setTimeout(() => setPanelOpen(true), 10)
+    return () => window.clearTimeout(t)
+  }, [])
 
   function handleSave() {
     if (!title.trim()) return
@@ -631,141 +646,177 @@ function EventSheet({
       eventType,
       routineOverride: override,
     })
+    setSavedDone(true)
   }
 
   return (
-    <div
-      className="fixed inset-0 z-[100] flex flex-col justify-end"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="event-sheet-title"
-    >
-      {/* 독바(z-50)보다 위 레이어 + 하단 버튼은 고정 푸터로 분리해 가림 방지 */}
-      <button type="button" className="absolute inset-0 bg-black/40" aria-label="닫기" onClick={onClose} />
+    <div className="fixed inset-0 z-[100]" role="dialog" aria-modal="true" aria-labelledby="event-sheet-title">
+      {/* 오버레이: 패널 뒤 배경 클릭 시 닫기 */}
+      <button type="button" className="absolute inset-0 z-40 bg-black/40" aria-label="닫기" onClick={onClose} />
+      {/* 오른쪽 슬라이드 패널: 닫힘=오른쪽 바깥, 열림=제자리 */}
       <div
-        className="relative flex max-h-[min(88dvh,100vh-2rem)] w-full max-w-md flex-col rounded-t-3xl bg-white shadow-2xl"
+        className={[
+          'fixed top-0 right-0 z-50 h-full w-full max-w-[420px] bg-white shadow-xl',
+          'transform transition-transform duration-300 ease-in-out',
+          panelOpen ? 'translate-x-0' : 'translate-x-full',
+        ].join(' ')}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-gray-200" aria-hidden />
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-2 pt-4">
-          <p id="event-sheet-title" className="text-base font-black text-brand-text">
-            {existing ? '일정 편집' : '일정 추가'}
-          </p>
-
-          <div className="mt-4">
-            <label className="mb-1 block text-xs font-bold text-gray-500">일정 이름</label>
-            <input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="예: 여름방학"
-              className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue/40"
-            />
+        <div className="flex h-full flex-col">
+          <div className="shrink-0 border-b border-gray-100 px-5 py-4">
+            <p id="event-sheet-title" className="text-base font-black text-brand-text">
+              {existing ? '일정 편집' : '일정 추가'}
+            </p>
           </div>
+          <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-2 pt-4">
+            {savedDone ? (
+              <div className="flex flex-col items-center gap-3 py-8">
+                <p className="font-medium text-gray-800">일정이 등록됐어요!</p>
+                <div className="flex w-full gap-2">
+                  {!hideRoutineLink ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        router.push('/parent/routine')
+                        onClose()
+                      }}
+                      className="flex-1 rounded-xl border border-blue-200 py-2.5 text-sm font-medium text-blue-600"
+                    >
+                      캘린더 보러가기
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="flex-1 rounded-xl bg-gray-100 py-2.5 text-sm font-medium text-gray-600"
+                  >
+                    닫기
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="mt-1">
+                  <label className="mb-1 block text-xs font-bold text-gray-500">일정 이름</label>
+                  <input
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder="예: 여름방학"
+                    className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue/40"
+                  />
+                </div>
 
-          <div className="mt-4 grid grid-cols-2 gap-3">
-            <div>
-              <label className="mb-1 block text-xs font-bold text-gray-500">시작일</label>
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStart(e.target.value)}
-                className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue/40"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-bold text-gray-500">종료일</label>
-              <input
-                type="date"
-                value={endDate}
-                min={startDate}
-                onChange={(e) => setEnd(e.target.value)}
-                className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue/40"
-              />
-            </div>
-          </div>
+                <div className="mt-4 grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="mb-1 block text-xs font-bold text-gray-500">시작일</label>
+                    <input
+                      type="date"
+                      value={startDate}
+                      onChange={(e) => setStart(e.target.value)}
+                      className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue/40"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-bold text-gray-500">종료일</label>
+                    <input
+                      type="date"
+                      value={endDate}
+                      min={startDate}
+                      onChange={(e) => setEnd(e.target.value)}
+                      className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue/40"
+                    />
+                  </div>
+                </div>
 
-          <div className="mt-4">
-            <label className="mb-2 block text-xs font-bold text-gray-500">이벤트 종류</label>
-            {/* 네 칸은 한 줄에 넣기 어려워 2×2 그리드 */}
-            <div className="grid grid-cols-2 gap-2">
-              {EVENT_TYPES_ORDER.map((type) => (
-                <button
-                  key={type}
-                  type="button"
-                  onClick={() => setType(type)}
-                  className={`rounded-xl border-2 py-2.5 text-xs font-bold transition-all ${
-                    eventType === type
-                      ? `border-current ${EVENT_COLORS[type].bg} ${EVENT_COLORS[type].text}`
-                      : 'border-gray-200 text-gray-400'
-                  }`}
-                >
-                  {EVENT_TYPE_LABELS[type]}
-                </button>
-              ))}
-            </div>
-          </div>
+                <div className="mt-4">
+                  <label className="mb-2 block text-xs font-bold text-gray-500">이벤트 종류</label>
+                  {/* 네 칸은 한 줄에 넣기 어려워 2×2 그리드 */}
+                  <div className="grid grid-cols-2 gap-2">
+                    {EVENT_TYPES_ORDER.map((type) => (
+                      <button
+                        key={type}
+                        type="button"
+                        onClick={() => setType(type)}
+                        className={`rounded-xl border-2 py-2.5 text-xs font-bold transition-all ${
+                          eventType === type
+                            ? `border-current ${EVENT_COLORS[type].bg} ${EVENT_COLORS[type].text}`
+                            : 'border-gray-200 text-gray-400'
+                        }`}
+                      >
+                        {EVENT_TYPE_LABELS[type]}
+                      </button>
+                    ))}
+                  </div>
+                </div>
 
-          <div className="mt-4">
-            <label className="mb-2 block text-xs font-bold text-gray-500">루틴 적용</label>
-            <div className="flex gap-2">
-              {(['weekend', 'none'] as const).map((v) => (
-                <button
-                  key={v}
-                  type="button"
-                  onClick={() => setOverride(v)}
-                  className={`flex-1 rounded-xl border-2 py-2 text-xs font-bold transition-all ${
-                    override === v ? 'border-brand-blue bg-brand-blue/10 text-brand-blue' : 'border-gray-200 text-gray-400'
-                  }`}
-                >
-                  {v === 'weekend' ? '휴일 루틴 적용' : '미션 없음'}
-                </button>
-              ))}
-            </div>
-          </div>
+                <div className="mt-4">
+                  <label className="mb-2 block text-xs font-bold text-gray-500">루틴 적용</label>
+                  <div className="flex gap-2">
+                    {(['weekend', 'none'] as const).map((v) => (
+                      <button
+                        key={v}
+                        type="button"
+                        onClick={() => setOverride(v)}
+                        className={`flex-1 rounded-xl border-2 py-2 text-xs font-bold transition-all ${
+                          override === v ? 'border-brand-blue bg-brand-blue/10 text-brand-blue' : 'border-gray-200 text-gray-400'
+                        }`}
+                      >
+                        {v === 'weekend' ? '휴일 루틴 적용' : '미션 없음'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
 
-          {/* 루틴 설정 아래: 부가 정보(여러 줄 가능) */}
-          <div className="mt-4">
-            <label htmlFor="calendar-event-description" className="mb-1 block text-xs font-bold text-gray-500">
-              간단한 설명
-            </label>
-            <textarea
-              id="calendar-event-description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="예: 준비물 챙기기, 장소 안내 등"
-              rows={3}
-              className="w-full resize-y rounded-xl border border-gray-200 px-4 py-2.5 text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-brand-blue/40"
-            />
-          </div>
-        </div>
-
-        <div className="shrink-0 border-t border-gray-100 bg-white px-5 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-          <div className="flex gap-2">
-            {onDelete && existing && (
-              <button
-                type="button"
-                onClick={() => onDelete(existing.id)}
-                className="rounded-2xl border border-red-200 px-3 py-3 text-sm font-bold text-red-500"
-              >
-                삭제
-              </button>
+                {/* 루틴 설정 아래: 부가 정보(여러 줄 가능) */}
+                <div className="mt-4">
+                  <label htmlFor="calendar-event-description" className="mb-1 block text-xs font-bold text-gray-500">
+                    간단한 설명
+                  </label>
+                  <textarea
+                    id="calendar-event-description"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="예: 준비물 챙기기, 장소 안내 등"
+                    rows={3}
+                    className="w-full resize-y rounded-xl border border-gray-200 px-4 py-2.5 text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-brand-blue/40"
+                  />
+                </div>
+              </>
             )}
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 rounded-2xl border border-gray-200 py-3 text-sm font-bold text-gray-500"
-            >
-              취소
-            </button>
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={!title.trim()}
-              className="flex-1 rounded-2xl bg-brand-blue py-3 text-sm font-bold text-white shadow-md active:scale-95 disabled:opacity-50"
-            >
-              저장
-            </button>
           </div>
+
+          {!savedDone ? (
+            <div className="shrink-0 border-t border-gray-100 bg-white px-5 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+              <div className="flex gap-2">
+                {onDelete && existing && (
+                  <button
+                    type="button"
+                    onClick={() => onDelete(existing.id)}
+                    className="rounded-2xl border border-red-200 px-3 py-3 text-sm font-bold text-red-500"
+                  >
+                    삭제
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="flex-1 rounded-2xl border border-gray-200 py-3 text-sm font-bold text-gray-500"
+                >
+                  취소
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSave}
+                  disabled={!title.trim()}
+                  className="flex-1 rounded-2xl bg-brand-blue py-3 text-sm font-bold text-white shadow-md active:scale-95 disabled:opacity-50"
+                >
+                  저장
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="h-3 shrink-0" />
+          )}
         </div>
       </div>
     </div>
