@@ -3,6 +3,7 @@
 # ========================
 .env
 .env.local
+.env.production
 .env.development.local
 .env.test.local
 .env.production.local
@@ -85,3 +86,5 @@ supabase/.temp/
 # ========================
 # AI 에이전트
 # ========================
+# Python 에이전트(cooanc-agent)는 별도 저장소·로컬 워크스페이스 — 모노레포에는 서브모듈로 두지 않음
+cooanc-agent/
