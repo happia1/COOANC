@@ -21,7 +21,7 @@ import type { CSSProperties } from 'react'
  *
  * ── 미션 카드 본문 비율·간격 ──
  * • 카드 버튼 `MISSION_CARD_BUTTON_BASE_CLASSNAME`
- *   - 너비·그림자·링 동일. 안쪽 좌우 px-1.5·상하 py-1. 카드·이미지 영역 min-h 는 일러스트(px 상수)에 맞춤. **(그림+제목) 묶음** ↔ **보상 줄** 은 gap-y-1.5
+ *   - 너비·바깥 그림자는 `CHILD_TODAY_MISSION_CARD_AM_SHADOW_CLASSNAME` / `_PM_` 을 오전·오후에 따라 버튼에 붙임. 링 동일. 안쪽 좌우 px-1.5·상하 py-1. 카드·이미지 영역 min-h 는 일러스트(px 상수)에 맞춤. **(그림+제목) 묶음** ↔ **보상 줄** 은 gap-y-1.5
  * • 그림↔제목 간격: `MISSION_CARD_IMAGE_TEXT_STACK_CLASSNAME` (gap-y-0 — 이미지 바로 아래에 글 붙임)
  * • 이미지 영역 `MISSION_CARD_IMAGE_AREA_CLASSNAME` + `MISSION_CARD_ROUTINE_SPRITE_WIDTH_PX` (=78, 42의 2배 84에서 살짝 축소)
  * • 텍스트 `MISSION_CARD_TEXT_BLOCK/TITLE/SUBTITLE` — 줄 수·글자 크기(8px/7px)·space-y-0.5
@@ -94,6 +94,15 @@ export const MISSION_CARD_SCROLLER_CLASSNAME =
   'flex min-h-0 min-w-0 w-full flex-none snap-x snap-mandatory items-start gap-0.5 overflow-x-auto py-0 pl-2 pr-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden' as const
 
 /**
+ * 자녀 앱 「오늘의 미션」 카드 — 오전 루틴: 연한 노란 그림자 / 오후 루틴: 연한 파란 그림자.
+ * (`isAfternoonMission` 과 함께 쓰며, 부모 앱 루틴 편집 UI에는 사용하지 않습니다.)
+ */
+export const CHILD_TODAY_MISSION_CARD_AM_SHADOW_CLASSNAME =
+  'shadow-[0_4px_18px_-4px_rgba(253,224,71,0.38),0_2px_8px_-2px_rgba(250,204,21,0.22)]' as const
+export const CHILD_TODAY_MISSION_CARD_PM_SHADOW_CLASSNAME =
+  'shadow-[0_4px_18px_-4px_rgba(147,197,253,0.42),0_2px_8px_-2px_rgba(96,165,250,0.26)]' as const
+
+/**
  * 미션 카드 버튼 본체 — gap·텍스트·보상 알약·패딩(px-1.5 py-1) 유지.
  * **min-h** 는 이미지 영역을 낮춘 만큼 함께 줄여 카드가 전체적으로 짧아 보이게 함(내용은 그대로 들어감).
  * 미션 일러스트 78px + 좌우 12px → 최소 너비는 w max(6.5rem,…) 등으로 여유 있게.
@@ -105,7 +114,7 @@ export const MISSION_CARD_BUTTON_BASE_CLASSNAME =
    * - 모바일·일반 md 세로 레이아웃은 기존 크기를 유지합니다.
    * - 추가 요청으로 모바일 카드도 한 단계 더 확대해 터치성과 가독성을 높입니다.
    */
-  'snap-center flex w-48 md:w-44 md:landscape:w-52 lg:w-52 min-h-[15rem] md:min-h-[14rem] md:landscape:min-h-[16rem] shrink-0 flex-col items-stretch gap-y-2 overflow-hidden rounded-2xl border bg-white px-3 pt-4 pb-3.5 text-left font-sans text-brand-text shadow-md transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue focus-visible:ring-offset-1 active:scale-[0.97]' as const
+  'snap-center flex w-48 md:w-44 md:landscape:w-52 lg:w-52 min-h-[15rem] md:min-h-[14rem] md:landscape:min-h-[16rem] shrink-0 flex-col items-stretch gap-y-2 overflow-hidden rounded-2xl border bg-white px-3 pt-4 pb-3.5 text-left font-sans text-brand-text transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue focus-visible:ring-offset-1 active:scale-[0.97]' as const
 
 /**
  * 일러스트 블록과 제목·부제 블록을 세로로만 묶습니다.

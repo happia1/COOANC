@@ -253,15 +253,19 @@ export default async function ParentHomePage() {
   const daysWithData = daysWithDataByChild[primaryChildId] ?? 0
 
   const lastReport = (agentReportsRes.data ?? [])[0]
-  const shouldRunAgent = !lastReport || (lastReport.created_at ? daysSince(lastReport.created_at) >= 7 : true)
   const agentBaseUrl = process.env.AGENT_BASE_URL
 
-  // 홈 진입 시 최신 리포트가 없고 데이터가 최소 3일 이상이면 Agent A를 백그라운드로 깨웁니다.
-  if (agentBaseUrl && shouldRunAgent && daysWithData >= 3) {
+  /**
+   * 서버 사이드 트리거: 리포트가 아예 없는 경우(최초 접속)에만 에이전트를 깨웁니다.
+   * - 7일 이상 된 리포트의 갱신은 클라이언트 훅(useParentAgentReport)이 LLM_COOLDOWN_MS(1시간)
+   *   쿨다운과 함께 백그라운드에서 처리합니다.
+   * - 서버에서 "7일 이상" 조건을 추가하면 매 접속마다 외부 에이전트가 호출되므로 제거했습니다.
+   */
+  const shouldRunAgent = !lastReport && daysWithData >= 3
+  if (agentBaseUrl && shouldRunAgent) {
     void fetch(`${agentBaseUrl}/agent-a/run`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      // agent-a/run 스키마에 맞춰 parent_id를 함께 전달해야 422 없이 실행됩니다.
       body: JSON.stringify({ child_id: primaryChildId, parent_id: auth.user.id }),
     }).catch((e) => console.warn('[agent-a] trigger failed', e))
   }

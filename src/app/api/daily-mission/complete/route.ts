@@ -147,13 +147,16 @@ export async function POST(req: NextRequest) {
   const keepWallet = readChildStatInt(stats.credits_wallet)
   const keepPiggy = readChildStatInt(stats.credits_piggy)
   const baseCredits = readChildStatInt(stats.credits)
+  const baseHearts = readChildStatInt(stats.hearts)
+  const baseTotalCreditsEarned = readChildStatInt(stats.total_credits_earned)
 
   // ── 배 이동: 오늘 완료율 90% 이상 + 오늘 첫 달성 시 boat_step 증가 ──
+  /** `daily_missions` 배정 열은 `date` 입니다(`assigned_date` 는 mission_logs 전용). */
   const { data: todayMissions } = await supabase
     .from('daily_missions')
     .select('id, is_completed')
     .eq('child_id', childId)
-    .eq('assigned_date', completionDay)
+    .eq('date', completionDay)
 
   const totalToday = todayMissions?.length ?? 0
   const completedToday = (todayMissions?.filter((m) => m.is_completed).length ?? 0) + 1 // +1 낙관적
@@ -184,8 +187,8 @@ export async function POST(req: NextRequest) {
       credits: baseCredits + creditEarned,
       credits_wallet: keepWallet,
       credits_piggy: keepPiggy,
-      hearts: stats.hearts + heartEarned,
-      total_credits_earned: stats.total_credits_earned + creditEarned,
+      hearts: baseHearts + heartEarned,
+      total_credits_earned: baseTotalCreditsEarned + creditEarned,
       exp: newExp,
       current_level: newLevel,
       exp_to_next_level: newExpToNext,
@@ -206,6 +209,10 @@ export async function POST(req: NextRequest) {
   // ── 게임 트리거: 첫 미션 완료 ──
   const triggerResult = await fireGameTrigger(supabase, childId, 'FIRST_MISSION')
 
+  const newCredits = baseCredits + creditEarned
+  const newHearts = baseHearts + heartEarned
+  const newTotalEarned = baseTotalCreditsEarned + creditEarned
+
   return NextResponse.json({
     creditReward: creditEarned,
     heartReward: heartEarned,
@@ -213,7 +220,12 @@ export async function POST(req: NextRequest) {
     rewardMultiplier,
     newLevel,
     newExp,
+    newExpToNext,
     newStreak,
+    /** 클라이언트가 child_stats 를 서버와 동일하게 즉시 반영할 수 있게 함 */
+    newCredits,
+    newHearts,
+    totalCreditsEarned: newTotalEarned,
     boatAdvanced: boatShouldAdvance,
     itemUnlocked: triggerResult.fired && triggerResult.unlockedItemIndex !== null
       ? { index: triggerResult.unlockedItemIndex, triggerKey: 'FIRST_MISSION' }

@@ -40,6 +40,7 @@ export const ASSETS = {
      * - 실제 파일은 `public/assets/img/characters/items/` 에 있으며, 괄호 안 숫자가 작은 것부터 큰 순으로 정렬해 두었습니다.
      * - (2)~(8) 번 파일은 현재 폴더에 없으므로 목록에서 빠져 있습니다.
      * - 파일명에 공백이 있어도 Next/Image 가 그대로 요청할 수 있습니다.
+     * - legacyIndex: DB의 item_index 값(0-based)과 일치합니다.
      */
     decorItemImages: [
       assetImg('characters', 'items', 'items (1).png'),
@@ -73,6 +74,53 @@ export const ASSETS = {
       assetImg('characters', 'items', 'items (36).png'),
       assetImg('characters', 'items', 'items (37).png'),
     ] as const,
+
+    /**
+     * 꾸미기 아이템을 카테고리(옷·악세서리·배경)별로 분류한 목록입니다.
+     * - 각 폴더(cloth / acc / background)에 실제 파일이 있는 이미지만 포함합니다.
+     * - legacyIndex: 위 decorItemImages 배열의 0-based 인덱스 → DB item_index 와 동일합니다.
+     *   (잠금 해제 여부를 확인할 때 이 값으로 unlockedIndexes 를 조회합니다.)
+     *
+     * 비개발자 설명:
+     * - 옷(cloth): 캐릭터가 입는 의상 아이템
+     * - 악세서리(acc): 모자·안경 등 꾸밈 소품
+     * - 배경(background): 캐릭터 뒤에 깔리는 배경 이미지
+     */
+    decorItemsByCategory: {
+      cloth: [
+        { src: assetImg('characters', 'items', 'cloth', 'items (18).png'), legacyIndex: 10 },
+        { src: assetImg('characters', 'items', 'cloth', 'items (19).png'), legacyIndex: 11 },
+        { src: assetImg('characters', 'items', 'cloth', 'items (23).png'), legacyIndex: 15 },
+        { src: assetImg('characters', 'items', 'cloth', 'items (35).png'), legacyIndex: 27 },
+        { src: assetImg('characters', 'items', 'cloth', 'items (37).png'), legacyIndex: 29 },
+      ],
+      acc: [
+        { src: assetImg('characters', 'items', 'acc', 'items (1).png'),  legacyIndex: 0  },
+        { src: assetImg('characters', 'items', 'acc', 'items (9).png'),  legacyIndex: 1  },
+        { src: assetImg('characters', 'items', 'acc', 'items (10).png'), legacyIndex: 2  },
+        { src: assetImg('characters', 'items', 'acc', 'items (12).png'), legacyIndex: 4  },
+        { src: assetImg('characters', 'items', 'acc', 'items (13).png'), legacyIndex: 5  },
+        { src: assetImg('characters', 'items', 'acc', 'items (14).png'), legacyIndex: 6  },
+        { src: assetImg('characters', 'items', 'acc', 'items (17).png'), legacyIndex: 9  },
+        { src: assetImg('characters', 'items', 'acc', 'items (22).png'), legacyIndex: 14 },
+        { src: assetImg('characters', 'items', 'acc', 'items (24).png'), legacyIndex: 16 },
+      ],
+      background: [
+        { src: assetImg('characters', 'items', 'background', 'items (20).png'), legacyIndex: 12 },
+        { src: assetImg('characters', 'items', 'background', 'items (21).png'), legacyIndex: 13 },
+        { src: assetImg('characters', 'items', 'background', 'items (25).png'), legacyIndex: 17 },
+        { src: assetImg('characters', 'items', 'background', 'items (26).png'), legacyIndex: 18 },
+        { src: assetImg('characters', 'items', 'background', 'items (27).png'), legacyIndex: 19 },
+        { src: assetImg('characters', 'items', 'background', 'items (28).png'), legacyIndex: 20 },
+        { src: assetImg('characters', 'items', 'background', 'items (29).png'), legacyIndex: 21 },
+        { src: assetImg('characters', 'items', 'background', 'items (30).png'), legacyIndex: 22 },
+        { src: assetImg('characters', 'items', 'background', 'items (31).png'), legacyIndex: 23 },
+        { src: assetImg('characters', 'items', 'background', 'items (32).png'), legacyIndex: 24 },
+        { src: assetImg('characters', 'items', 'background', 'items (33).png'), legacyIndex: 25 },
+        { src: assetImg('characters', 'items', 'background', 'items (34).png'), legacyIndex: 26 },
+        { src: assetImg('characters', 'items', 'background', 'items (36).png'), legacyIndex: 28 },
+      ],
+    },
   },
 
   /** 농장·미니게임·이펙트·콘페티·지도 */

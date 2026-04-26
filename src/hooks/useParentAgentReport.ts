@@ -22,6 +22,19 @@ const CACHE_KEY_PREFIX = 'cooanc_agent_report_cache_v2_'
 /** 리포트 자동 갱신 주기: 7일 */
 const REPORT_REFRESH_MS = 7 * 24 * 60 * 60 * 1000
 
+/**
+ * DB 동기화 쿨다운: 마지막 동기화로부터 이 시간 이내 재접속이면
+ * Supabase DB 조회를 건너뛰고 localStorage 캐시를 바로 씁니다.
+ * (빠른 반복 접속 시 불필요한 네트워크 요청 방지)
+ */
+const SYNC_COOLDOWN_MS = 10 * 60 * 1000  // 10분
+
+/**
+ * LLM 트리거 쿨다운: 마지막 LLM 실행 요청으로부터 이 시간 이내이면
+ * 다시 트리거하지 않습니다. (7일 된 리포트가 있어도 매 접속마다 재실행되는 문제 방지)
+ */
+const LLM_COOLDOWN_MS = 60 * 60 * 1000  // 1시간
+
 /** DB 조회 select 절 — pollLatestReport 와 동일하게 맞춥니다. */
 const REPORT_SELECT =
   'id, child_id, week_start, report_text, coaching_text, eq_scores, suggestions, created_at'
@@ -29,6 +42,10 @@ const REPORT_SELECT =
 type ReportCache = {
   row: AgentLatestReportRow
   cachedAt: string
+  /** 마지막 DB 동기화 시각 (ISO) — SYNC_COOLDOWN_MS 이내 재접속 스킵에 사용 */
+  lastSyncAt?: string
+  /** 마지막 LLM 트리거 시각 (ISO) — LLM_COOLDOWN_MS 이내 재트리거 방지에 사용 */
+  lastLlmAt?: string
 }
 
 /** localStorage에서 캐시를 읽습니다. 만료 체크 없이 항상 반환 — 갱신 필요 여부는 row.created_at 으로 판단합니다. */
@@ -44,14 +61,37 @@ function readReportCache(childId: string): AgentLatestReportRow | null {
   }
 }
 
-/** localStorage에 리포트 캐시를 저장합니다. */
+/** localStorage에 리포트 캐시를 저장합니다. 기존 lastSyncAt·lastLlmAt 은 유지합니다. */
 function writeReportCache(childId: string, row: AgentLatestReportRow): void {
   if (typeof window === 'undefined') return
   try {
-    const cache: ReportCache = { row, cachedAt: new Date().toISOString() }
-    window.localStorage.setItem(CACHE_KEY_PREFIX + childId, JSON.stringify(cache))
+    const key = CACHE_KEY_PREFIX + childId
+    let existing: Partial<ReportCache> = {}
+    try {
+      const raw = window.localStorage.getItem(key)
+      if (raw) existing = JSON.parse(raw) as ReportCache
+    } catch { /* 무시 */ }
+    const cache: ReportCache = {
+      row,
+      cachedAt: new Date().toISOString(),
+      lastSyncAt: existing.lastSyncAt,
+      lastLlmAt: existing.lastLlmAt,
+    }
+    window.localStorage.setItem(key, JSON.stringify(cache))
   } catch {
     // 저장 공간 부족 등 무시
+  }
+}
+
+/** localStorage에서 캐시 전체 객체(메타 포함)를 읽습니다. */
+function readReportCacheFull(childId: string): ReportCache | null {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = window.localStorage.getItem(CACHE_KEY_PREFIX + childId)
+    if (!raw) return null
+    return JSON.parse(raw) as ReportCache
+  } catch {
+    return null
   }
 }
 
@@ -63,6 +103,32 @@ function clearReportCache(childId: string): void {
   } catch {
     // 무시
   }
+}
+
+/** 캐시에 lastSyncAt 을 현재 시각으로 갱신합니다. */
+function touchSyncTime(childId: string): void {
+  if (typeof window === 'undefined') return
+  try {
+    const key = CACHE_KEY_PREFIX + childId
+    const raw = window.localStorage.getItem(key)
+    if (!raw) return
+    const cache = JSON.parse(raw) as ReportCache
+    cache.lastSyncAt = new Date().toISOString()
+    window.localStorage.setItem(key, JSON.stringify(cache))
+  } catch { /* 무시 */ }
+}
+
+/** 캐시에 lastLlmAt 을 현재 시각으로 갱신합니다. */
+function touchLlmTime(childId: string): void {
+  if (typeof window === 'undefined') return
+  try {
+    const key = CACHE_KEY_PREFIX + childId
+    const raw = window.localStorage.getItem(key)
+    if (!raw) return
+    const cache = JSON.parse(raw) as ReportCache
+    cache.lastLlmAt = new Date().toISOString()
+    window.localStorage.setItem(key, JSON.stringify(cache))
+  } catch { /* 무시 */ }
 }
 
 /**
@@ -314,6 +380,13 @@ export function useParentAgentReport(
    * 화면 표시 후 백그라운드에서 DB 최신 데이터를 가져오고,
    * 필요하면 자동으로 새 LLM 분석을 실행합니다.
    *
+   * ─ 최적화 포인트 ─
+   * 1) SYNC_COOLDOWN_MS(10분) 이내 재접속이면 DB 쿼리를 건너뛰고 캐시를 그대로 씁니다.
+   *    → 빠른 반복 접속 시 Supabase 요청이 발생하지 않아 즉시 표시됩니다.
+   * 2) LLM_COOLDOWN_MS(1시간) 이내에 이미 트리거했으면 재실행하지 않습니다.
+   *    → 7일 된 리포트가 있어도 매 접속마다 LLM이 돌지 않습니다.
+   *
+   * ─ 일반 흐름 ─
    * - DB에 리포트가 있으면: 캐시·화면을 갱신하고, 7일 이상 됐으면 백그라운드 LLM 재실행
    * - DB에 리포트가 없고(최초 접속), 데이터가 7일 이상 쌓였으면: 전경 LLM 실행
    */
@@ -324,6 +397,20 @@ export function useParentAgentReport(
         setLoading(false)
       }
       return
+    }
+
+    // ── SYNC 쿨다운 체크: 최근 동기화했으면 DB 조회 없이 캐시 적용 후 종료 ──
+    const fullCache = readReportCacheFull(childId)
+    if (fullCache?.lastSyncAt && fullCache.row) {
+      const msSinceSync = Date.now() - new Date(fullCache.lastSyncAt).getTime()
+      if (msSinceSync < SYNC_COOLDOWN_MS) {
+        if (mountedRef.current) {
+          setRow(fullCache.row)
+          setRunState('success')
+          setLoading(false)
+        }
+        return
+      }
     }
 
     try {
@@ -341,22 +428,30 @@ export function useParentAgentReport(
       if (!error && dbLatest) {
         const freshRow = dbLatest as AgentLatestReportRow
         writeReportCache(childId, freshRow)
+        touchSyncTime(childId)
         setRow(freshRow)
         setRunState('success')
         setLoading(false)
 
-        // 리포트가 7일 이상 됐고 충분한 데이터가 있으면 백그라운드 LLM 재실행
+        // ── LLM 쿨다운 체크: 리포트가 7일 이상 됐어도 최근에 이미 트리거했으면 스킵 ──
         if (isReportOutdated(freshRow) && daysRef.current >= 7) {
-          void runLLM(childId, supabase, { background: true })
+          const cache = readReportCacheFull(childId)
+          const lastLlm = cache?.lastLlmAt ? new Date(cache.lastLlmAt).getTime() : 0
+          if (Date.now() - lastLlm >= LLM_COOLDOWN_MS) {
+            touchLlmTime(childId)
+            void runLLM(childId, supabase, { background: true })
+          }
         }
         return
       }
 
       // DB 에도 리포트가 없는 경우 (최초 접속)
+      touchSyncTime(childId)
       setLoading(false)
       const days = daysRef.current
       if (days >= 7) {
         // 데이터가 충분하면 전경 로딩으로 LLM을 최초 실행합니다.
+        touchLlmTime(childId)
         await runLLM(childId, supabase, { background: false })
       } else {
         setRunState('insufficient')
@@ -376,10 +471,12 @@ export function useParentAgentReport(
 
   const reload = useCallback(async () => {
     if (!childId) return
+    // 수동 재분석: 쿨다운 무시하고 캐시 초기화 후 전경 실행
     clearReportCache(childId)
     setErrorReason('none')
     setRunState('idle')
     const supabase = createClient()
+    touchLlmTime(childId)
     await runLLM(childId, supabase, { background: false })
   }, [childId, runLLM])
 

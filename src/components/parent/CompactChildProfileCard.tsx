@@ -82,7 +82,11 @@ export function CompactChildProfileCard({
              */
             <div className="flex h-full w-full items-center justify-center p-0.5">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={avatarUrl} alt="" className="h-full w-full object-contain object-center" />
+              <img
+                src={avatarUrl}
+                alt=""
+                className="h-full w-full translate-y-1 object-contain object-center"
+              />
             </div>
           ) : (
             <span className="flex h-full w-full items-center justify-center px-1 text-center text-[11px] font-black leading-tight text-gray-700">

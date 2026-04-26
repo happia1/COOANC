@@ -20,6 +20,7 @@ import {
   isCategoryExcludedFromMarket,
   parentMarketSectionIdForItem,
 } from '@/lib/parentMarketMenuSections'
+import { activeFoodSortIndex, isBetaActive } from '@/constants/betaMarketConfig'
 
 export type ParentMarketMenuControlProps = {
   childId: string | null
@@ -153,12 +154,35 @@ export default function ParentMarketMenuControl({
 
   /**
    * 구역별 상품 목록 — 간식 / 장난감 / 이벤트(활동+체험) / 기타 순, 비어 있으면 구역 제목 숨김
-   * - 정렬: 마켓에 켜 둔 항목(숨김 아님)을 먼저, 그다음 꺼진 항목 — 같은 그룹 안에서는 이름 순.
-   * - 배치: 펼침일 때만 타일을 그립니다. 2줄 이상이면 열 방향 채움(위칸→아래칸→다음 열). 접힘이면 상품 줄 전체 숨김.
+   * - 간식: 베타 활성(`activeFood` 순) → 준비중 항목(이름순); 같은 그룹 안에서는 표시 켜진 항목 먼저.
+   * - 그 외 구역: 마켓에 켜 둔 항목 먼저, 그다음 꺼진 항목 — 같은 그룹 안에서는 이름 순.
+   * - 배치: 펼침일 때만 타일을 그립니다. 2줄 이상이면 열 방향 채움. 접힘이면 상품 줄 전체 숨김.
    */
   const menuSectionsToRender = useMemo(() => {
+    /** 간식 외 구역: 마켓 표시(켜짐) 먼저, 그다음 이름순 */
     const sortItemsForSection = (items: StoreItem[]) =>
       [...items].sort((a, b) => {
+        const aOn = !hiddenItemIds.has(a.id)
+        const bOn = !hiddenItemIds.has(b.id)
+        if (aOn !== bOn) return aOn ? -1 : 1
+        return a.name.localeCompare(b.name, 'ko')
+      })
+
+    /**
+     * 간식(food) 구역: 베타 활성 항목을 `activeFood` 순서대로 앞에 두고,
+     * 준비중(비활성) 항목은 뒤에 이름순으로 둡니다.
+     * 같은 그룹 안에서는 표시 켜진 항목을 먼저 둡니다.
+     */
+    const sortSnackItems = (items: StoreItem[]) =>
+      [...items].sort((a, b) => {
+        const aBeta = isBetaActive(a.name, a.category ?? '')
+        const bBeta = isBetaActive(b.name, b.category ?? '')
+        if (aBeta !== bBeta) return aBeta ? -1 : 1
+        if (aBeta && bBeta) {
+          const ia = activeFoodSortIndex(a.name)
+          const ib = activeFoodSortIndex(b.name)
+          if (ia !== ib) return ia - ib
+        }
         const aOn = !hiddenItemIds.has(a.id)
         const bOn = !hiddenItemIds.has(b.id)
         if (aOn !== bOn) return aOn ? -1 : 1
@@ -169,7 +193,9 @@ export default function ParentMarketMenuControl({
     for (const sec of PARENT_MARKET_MENU_SECTIONS) {
       const items = itemsForChild.filter((it) => parentMarketSectionIdForItem(it.category) === sec.id)
       if (items.length > 0) {
-        rows.push({ sectionKey: sec.id, title: sec.title, items: sortItemsForSection(items) })
+        const sorted =
+          sec.id === 'snack' ? sortSnackItems(items) : sortItemsForSection(items)
+        rows.push({ sectionKey: sec.id, title: sec.title, items: sorted })
       }
     }
     const other = itemsForChild.filter((it) => parentMarketSectionIdForItem(it.category) === 'other')
@@ -269,43 +295,62 @@ export default function ParentMarketMenuControl({
     const spriteFrame = marketFrameKeyForItemId(it.id, it.name)
     const price = effectiveCreditPrice(it)
     const hasOverride = creditOverrides[it.id] !== undefined
+    /**
+     * 베타에서 허용 목록 외 상품 → 흐리게 + 「준비중」 오버레이 표시
+     * 기능 자체(토글·크레딧 수정)는 살아있어 미리 설정해 둘 수 있습니다.
+     */
+    const isBeta = isBetaActive(it.name, it.category ?? '')
+    const isBlocked = !isBeta
+
     return (
-      <div key={it.id} className="flex min-w-0 snap-start flex-col items-center gap-0.5">
-        {/** 이미지 블록 가로를 줄여 한 화면에 더 많은 칸이 들어가게 합니다. */}
-        <div className="flex h-12 w-full max-w-[3.25rem] items-center justify-center overflow-hidden rounded-lg bg-gray-50 ring-1 ring-gray-100 sm:max-w-[3.5rem]">
-          {it.image_url ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={it.image_url}
-              alt=""
-              className="max-h-[34px] max-w-[34px] object-contain object-center"
-              draggable={false}
-            />
-          ) : (
-            <MarketItemImage frame={spriteFrame} height={34} />
-          )}
+      <div key={it.id} className="relative flex min-w-0 snap-start flex-col items-center gap-0.5">
+        {/* 베타 미포함 상품: 흐리게 처리 */}
+        <div className={isBlocked ? 'opacity-40 grayscale pointer-events-none' : ''}>
+          {/** 이미지 블록 가로를 줄여 한 화면에 더 많은 칸이 들어가게 합니다. */}
+          <div className="flex h-12 w-full max-w-[3.25rem] items-center justify-center overflow-hidden rounded-lg bg-gray-50 ring-1 ring-gray-100 sm:max-w-[3.5rem]">
+            {it.image_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={it.image_url}
+                alt=""
+                className="max-h-[34px] max-w-[34px] object-contain object-center"
+                draggable={false}
+              />
+            ) : (
+              <MarketItemImage frame={spriteFrame} height={34} />
+            )}
+          </div>
+          <p
+            className="w-full truncate text-center text-[9px] font-bold leading-tight text-gray-700"
+            title={it.name}
+          >
+            {it.name}
+          </p>
+          {/** 이 자녀 기준 실제 가격 + 탭하면 숫자를 바꿀 수 있음 */}
+          <button
+            type="button"
+            onClick={() => openCreditEdit(it)}
+            title={hasOverride ? `기본 ${it.credit_price}크레딧 → 이 자녀만 ${price}` : '크레딧 바꾸기'}
+            className="max-w-full truncate rounded-md px-0.5 text-[8px] font-black leading-tight text-brand-blue underline-offset-2 hover:underline"
+          >
+            {formatMarketCreditLabel(price)}
+            {hasOverride ? '·맞춤' : ''}
+          </button>
+          <VisibilityToggle
+            on={visible}
+            ariaLabel={visible ? `${it.name} 마켓에서 숨기기` : `${it.name} 마켓에 표시하기`}
+            onToggle={() => toggleHidden(it.id, visible)}
+          />
         </div>
-        <p
-          className="w-full truncate text-center text-[9px] font-bold leading-tight text-gray-700"
-          title={it.name}
-        >
-          {it.name}
-        </p>
-        {/** 이 자녀 기준 실제 가격 + 탭하면 숫자를 바꿀 수 있음 */}
-        <button
-          type="button"
-          onClick={() => openCreditEdit(it)}
-          title={hasOverride ? `기본 ${it.credit_price}크레딧 → 이 자녀만 ${price}` : '크레딧 바꾸기'}
-          className="max-w-full truncate rounded-md px-0.5 text-[8px] font-black leading-tight text-brand-blue underline-offset-2 hover:underline"
-        >
-          {formatMarketCreditLabel(price)}
-          {hasOverride ? '·맞춤' : ''}
-        </button>
-        <VisibilityToggle
-          on={visible}
-          ariaLabel={visible ? `${it.name} 마켓에서 숨기기` : `${it.name} 마켓에 표시하기`}
-          onToggle={() => toggleHidden(it.id, visible)}
-        />
+
+        {/* 베타 미포함 상품 준비중 오버레이 */}
+        {isBlocked && (
+          <div className="absolute inset-0 flex items-end justify-center pb-0.5 pointer-events-none">
+            <span className="rounded-full bg-black/40 px-1.5 py-px text-[8px] font-bold text-white">
+              준비중
+            </span>
+          </div>
+        )}
       </div>
     )
   }
@@ -407,6 +452,12 @@ export default function ParentMarketMenuControl({
                     <span className="shrink-0 text-[9px] font-extralight tabular-nums tracking-tight text-gray-400">
                       {block.items.length}개
                     </span>
+                    {/* 장난감·이벤트 구역은 베타에서 준비중 배지 표시 */}
+                    {(block.sectionKey === 'toy' || block.sectionKey === 'event') && (
+                      <span className="shrink-0 rounded-full bg-gray-100 px-1.5 py-px text-[8px] font-bold text-gray-400">
+                        준비중
+                      </span>
+                    )}
                   </div>
                   <button
                     type="button"

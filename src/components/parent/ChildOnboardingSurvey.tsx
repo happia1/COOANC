@@ -132,7 +132,7 @@ export default function ChildOnboardingSurvey({ childName, onComplete }: Props) 
             scheduled_time: m.scheduled_time,
             credit_reward:  m.credit_reward,
             exp_reward:     m.exp_reward,
-            heart_reward:   0,
+            heart_reward:   1,
             difficulty:     m.difficulty,
             repeat_type:    'daily',
             level_required: 0,

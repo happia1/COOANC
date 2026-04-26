@@ -22,12 +22,13 @@ import { useRouter } from 'next/navigation'
 import RapidTapConfirmModal from '@/components/child/RapidTapConfirmModal'
 import SpriteImage from '@/components/common/SpriteImage'
 import { CharacterSprite } from '@/components/sprites/CharacterSprite'
-import { resolveHomeIslandStageSprite } from '@/lib/childHomeCharacterFromAvatar'
+import { BUNNY_HOME_DISPLAY_SCALE, resolveHomeIslandStageSprite } from '@/lib/childHomeCharacterFromAvatar'
 import { BACKGROUND_ANCHORS } from '@/constants/backgroundAnchors'
 import { getUnlockedFeatures } from '@/constants/childScreenFeatures'
 import { useContainerSize } from '@/hooks/useContainerSize'
 import ChildMissionCard from '@/components/child/ChildMissionCard'
 import ChildPanelOverlay, { type PanelType } from '@/components/child/ChildPanelOverlay'
+import ChildLevelStatsCard from '@/components/child/ChildLevelStatsCard'
 import { normalizeChildStatsCreditsSplit, mergeChildStatsPatch } from '@/lib/childCreditsSplit'
 import { completionRateToHearts } from '@/lib/missionHeartCount'
 import { isSpecialSectionMission, isRetiredSpecialMissionTitle } from '@/lib/specialMissionChips'
@@ -44,6 +45,8 @@ import type {
   PraiseStickerPlacement,
 } from '@/types/database'
 import { createClient } from '@/lib/supabase/client'
+import { fireMissionCardConfetti } from '@/lib/missionCardConfetti'
+import { tryApplyCompletePayload } from '@/lib/applyDailyMissionCompleteStats'
 
 // ─── 파티클 타입 정의 ────────────────────────────────────────────────────────
 
@@ -221,8 +224,10 @@ export default function ChildScreen({
   const containerRef = useRef<HTMLDivElement>(null)
   const { height: containerH } = useContainerSize(containerRef)
 
-  /** 크레딧 배지 ref — 파티클 도착 좌표(getBoundingClientRect) 계산에 사용 */
+  /** 크레딧 배지 ref — 동전 파티클이 날아가는 목적지(숫자·아이콘 줄) */
   const creditBadgeRef = useRef<HTMLDivElement>(null)
+  /** Mission Complete 하트 5칸 ref — **애정 하트(미션 보상)** 파티클 목적지 */
+  const missionHeartsRef = useRef<HTMLDivElement>(null)
 
   /** 현재 화면에 떠 있는 파티클 목록 */
   const [particles, setParticles] = useState<Particle[]>([])
@@ -393,25 +398,42 @@ export default function ChildScreen({
       creditReward: number,
       heartReward: number,
     ) => {
+      /**
+       * 카드가 사라지는 순간 그 위치에서 컨페티(새로 추가).
+       * 비개발자: “완료” 글자 화면 대신 색종이가 터지는 느낌으로 축하합니다.
+       */
+      fireMissionCardConfetti(cardRect)
+
       /** 낙관적 완료 — DOM에서 카드를 제거하기 전에 파티클을 먼저 띄웁니다 */
       const containerRect = containerRef.current?.getBoundingClientRect()
       const badgeRect = creditBadgeRef.current?.getBoundingClientRect()
+      const missionHeartsRow = missionHeartsRef.current?.getBoundingClientRect()
 
       if (containerRect && badgeRect) {
         const startX = cardRect.left + cardRect.width / 2 - containerRect.left
         const startY = cardRect.top + cardRect.height / 2 - containerRect.top
-        const endX = badgeRect.left + badgeRect.width / 2 - containerRect.left
-        const endY = badgeRect.top + badgeRect.height / 2 - containerRect.top
+        const endCoinX = badgeRect.left + badgeRect.width / 2 - containerRect.left
+        const endCoinY = badgeRect.top + badgeRect.height / 2 - containerRect.top
+        /**
+         * 애정 하트는 상단 **Mission Complete** 막대(하트 5칸) 중심으로 날아갑니다.
+         * (없으면 예전과 같이 크레딧 배지로 떨어짐)
+         */
+        const endHeartX = missionHeartsRow
+          ? missionHeartsRow.left + missionHeartsRow.width / 2 - containerRect.left
+          : endCoinX
+        const endHeartY = missionHeartsRow
+          ? missionHeartsRow.top + missionHeartsRow.height / 2 - containerRect.top
+          : endCoinY
 
         const base = Date.now()
         const newParticles: Particle[] = [
-          { id: base,     startX,            startY, endX, endY, type: 'coin', delay: 0   },
-          { id: base + 1, startX: startX - 20, startY, endX, endY, type: 'coin', delay: 60  },
-          { id: base + 2, startX: startX + 20, startY, endX, endY, type: 'coin', delay: 120 },
+          { id: base,     startX,            startY, endX: endCoinX, endY: endCoinY, type: 'coin', delay: 0   },
+          { id: base + 1, startX: startX - 20, startY, endX: endCoinX, endY: endCoinY, type: 'coin', delay: 60  },
+          { id: base + 2, startX: startX + 20, startY, endX: endCoinX, endY: endCoinY, type: 'coin', delay: 120 },
         ]
         if (heartReward > 0) {
           newParticles.push(
-            { id: base + 3, startX, startY: startY + 10, endX, endY, type: 'heart', delay: 80 },
+            { id: base + 3, startX, startY: startY + 10, endX: endHeartX, endY: endHeartY, type: 'heart', delay: 80 },
           )
         }
         setParticles((prev) => [...prev, ...newParticles])
@@ -433,7 +455,16 @@ export default function ChildScreen({
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ dailyMissionId: dm.id, today, childId }),
           })
-          if (!res.ok) {
+          const text = await res.text()
+          let json: unknown = {}
+          try {
+            json = text ? JSON.parse(text) : {}
+          } catch {
+            /* 응답이 JSON이 아니면 stats 동기화 생략 */
+          }
+          if (res.ok) {
+            setStats((prev) => tryApplyCompletePayload(prev, json) ?? prev)
+          } else {
             setDone((prev) => {
               const next = new Set(prev)
               next.delete(dm.id)
@@ -573,8 +604,18 @@ export default function ChildScreen({
   /** 배경 앵커 상수 */
   const anchor = BACKGROUND_ANCHORS.kids_background
 
-  /** 캐릭터 표시 높이 (px) — 배경 높이의 characterScale 비율 */
-  const characterDisplayH = containerH > 0 ? Math.round(containerH * anchor.characterScale) : 0
+  /**
+   * 토끼(기본/토끼 프로필)일 때만 홈에서 살짝 더 크게 — `BUNNY_HOME_DISPLAY_SCALE` 배율을 곱합니다.
+   * 비개발자: 여우·곰 등 다른 캐릭터 크기는 그대로 두고 토끼만 키웁니다.
+   */
+  const homeCharacterSizeMultiplier =
+    characterSprite.character === 'bunny' ? BUNNY_HOME_DISPLAY_SCALE : 1
+
+  /** 캐릭터 표시 높이 (px) — 배경 높이의 characterScale 비율(토끼는 추가 배율 적용) */
+  const characterDisplayH =
+    containerH > 0
+      ? Math.round(containerH * anchor.characterScale * homeCharacterSizeMultiplier)
+      : 0
 
   // ─────────────────────────────────────────────────────────────────────────
   // 렌더링
@@ -592,10 +633,14 @@ export default function ChildScreen({
       >
         {/* ── L1: 배경 이미지 ─────────────────────────────────────────────── */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
+        {/*
+          배경 `objectPosition` x% = imageObjectPositionX(50=중앙, 작을수록 왼쪽·클수록 오른쪽)
+        */}
         <img
           src={`${ASSETS.layouts.childHomeBackgroundSecondScreen}?v=${CHILD_HOME_BACKGROUND_CACHE_BUST}`}
           alt=""
-          className="absolute inset-0 h-full w-full object-cover object-center brightness-[1.1] pointer-events-none select-none"
+          className="absolute inset-0 h-full w-full object-cover brightness-[1.1] pointer-events-none select-none"
+          style={{ objectPosition: `${anchor.imageObjectPositionX}% 50%` }}
           draggable={false}
           fetchPriority="high"
           loading="eager"
@@ -626,133 +671,121 @@ export default function ChildScreen({
         {/* ── L3: UI 오버레이 ──────────────────────────────────────────────── */}
         <div className="absolute inset-0 z-20 flex flex-col pointer-events-none">
 
-          {/* ── 상단 바 ─────────────────────────────────────────────────── */}
+          {/* ── 상단 영역: 좌(레벨 블록) / 우(나가기 + 아이콘 스택) ──────── */}
           <div
-            className="flex justify-between items-start px-4 pointer-events-auto"
+            className="flex justify-between items-start px-4 gap-3"
             style={{ paddingTop: 'max(16px, env(safe-area-inset-top))' }}
           >
-            {/* 좌측: 나가기 문 버튼 — bg-white/60으로 반투명 처리 */}
-            <a
-              href={exitHref}
-              className="w-11 h-11 bg-white/60 rounded-2xl flex items-center justify-center shadow-md backdrop-blur-sm transition active:scale-95"
-              aria-label="나가기"
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/assets/img/common/ui/exit.png" alt="" width={28} height={28} className="h-7 w-7 object-contain" />
-            </a>
-
-            {/* 우측: 해금된 기능 아이콘들 — 모두 bg-white/60으로 반투명 처리 */}
-            <div className="flex gap-2">
-              {features.sticker && (
-                <button
-                  type="button"
-                  onClick={() => setActivePanel('sticker')}
-                  className="w-11 h-11 bg-white/60 rounded-2xl flex items-center justify-center shadow-md backdrop-blur-sm transition active:scale-95"
-                  aria-label="칭찬 스티커 판 열기"
-                >
-                  {/* 칭찬 스티커 아이콘 — heart(1).png 대표 이미지 */}
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={`/assets/img/items/stickers/${encodeURIComponent('heart (1).png')}`} alt="" width={30} height={30} className="h-[30px] w-[30px] object-contain" />
-                </button>
+            {/* 좌측: 레벨 스탯 카드 (크레딧 + 하트)
+                - creditBadgeRef: 파티클이 날아오는 목적지
+                - badgeShine: 파티클 도착 시 반짝임 트리거 */}
+            <div className="pointer-events-none min-w-0">
+              {stats && (
+                <ChildLevelStatsCard
+                  ref={missionHeartsRef}
+                  stats={stats}
+                  filledHearts={filledHearts}
+                  creditRef={creditBadgeRef}
+                  shine={badgeShine}
+                />
               )}
-              {features.dressUp && (
+              {/* 별 이펙트 — 크레딧 행 주변에 황금빛 점들이 방사됩니다 */}
+              {badgeShine && creditBadgeRef.current && (
+                <BadgeStarBurst badgeRef={creditBadgeRef} />
+              )}
+            </div>
+
+            {/* 우측: 나가기 버튼(맨 위) + 기능 아이콘 수직 스택 */}
+            <div className="flex flex-col items-center gap-2 pointer-events-auto shrink-0">
+              {/* 나가기 문 버튼 — 배경 없이 아이콘만, 약간 크게 */}
+              <a
+                href={exitHref}
+                className="w-12 h-12 flex items-center justify-center transition active:scale-95"
+                aria-label="나가기"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/assets/img/common/ui/exit.png" alt="" width={36} height={36} className="h-9 w-9 object-contain drop-shadow-md" />
+              </a>
+
+              {/* 아이템(꾸미기) 아이콘 — 베타 미노출 */}
+              {/* {features.dressUp && (
                 <button
                   type="button"
                   onClick={() => setActivePanel('dressup')}
-                  className="w-11 h-11 bg-white/60 rounded-2xl flex items-center justify-center shadow-md backdrop-blur-sm transition active:scale-95"
+                  className="w-11 h-11 bg-white/40 rounded-2xl flex items-center justify-center shadow-md backdrop-blur-sm transition active:scale-95"
                   aria-label="캐릭터 꾸미기 열기"
                 >
-                  {/*
-                   * 아이템(꾸미기) 아이콘 — icons.png의 Row7 우측 큰 금별
-                   * 이미지 크기 226×825px, 2열×8행 구조
-                   * Row6(y≈618), 오른쪽 열(x=113): 큰 금별
-                   * 표시 28px 기준 스케일 0.2478 → backgroundSize 56×204px
-                   */}
-                  <div
-                    aria-hidden
-                    style={{
-                      width: 28,
-                      height: 26,
-                      backgroundImage: "url('/assets/img/common/ui/icons.png')",
-                      backgroundSize: '56px 204px',
-                      backgroundPosition: '-28px -153px',
-                      backgroundRepeat: 'no-repeat',
-                    }}
+                  <img
+                    src={`/assets/img/characters/items/background/${encodeURIComponent('items (21).png')}`}
+                    alt=""
+                    width={30}
+                    height={30}
+                    className="h-[30px] w-[30px] object-contain"
                   />
                 </button>
-              )}
+              )} */}
+
+              {/* 코인 주머니 아이콘 */}
               {features.coinPocket && (
                 <button
                   type="button"
                   onClick={() => setActivePanel('coins')}
-                  className="w-11 h-11 bg-white/60 rounded-2xl flex items-center justify-center shadow-md backdrop-blur-sm transition active:scale-95"
+                  className="w-11 h-11 bg-white/40 rounded-2xl flex items-center justify-center shadow-md backdrop-blur-sm transition active:scale-95"
                   aria-label="내 크레딧 열기"
                 >
                   <span className="text-xl" role="img" aria-hidden>💰</span>
                 </button>
               )}
-              {features.market && (
-                <button
-                  type="button"
-                  onClick={() => setActivePanel('market')}
-                  className="w-11 h-11 bg-white/60 rounded-2xl flex items-center justify-center shadow-md backdrop-blur-sm transition active:scale-95"
-                  aria-label="마켓 열기"
-                >
-                  {/*
-                   * 마켓 아이콘 — icons.png의 Row4 우측 상점 이미지
-                   * Row3(y≈309), 오른쪽 열(x=113): 마켓/상점
-                   * 표시 28px 기준 스케일 0.2478 → backgroundSize 56×204px
-                   */}
-                  <div
-                    aria-hidden
-                    style={{
-                      width: 28,
-                      height: 26,
-                      backgroundImage: "url('/assets/img/common/ui/icons.png')",
-                      backgroundSize: '56px 204px',
-                      backgroundPosition: '-28px -77px',
-                      backgroundRepeat: 'no-repeat',
-                    }}
-                  />
-                </button>
-              )}
+
             </div>
           </div>
 
-          {/* ── 크레딧/하트 배지 (나가기 버튼 아래) ────────────────────── */}
-          <div className="flex flex-col gap-2 px-4 mt-2 pointer-events-none">
-            {/* 크레딧 배지 — ref 를 달아 파티클 목적지 좌표를 계산하고, 반짝임 애니메이션을 적용합니다 */}
-            <div
-              ref={creditBadgeRef}
-              className="flex items-center gap-1.5 bg-yellow-300/90 rounded-full px-3 py-1.5 self-start shadow-sm"
-              style={badgeShine ? { animation: 'badgeShine 0.6s ease-out' } : undefined}
-            >
-              <span className="text-base" aria-hidden>🪙</span>
-              <span
-                className={`font-black text-yellow-900 tabular-nums text-sm transition-transform duration-200 ${badgeShine ? 'scale-125' : 'scale-100'}`}
+          {/* ── 캐릭터 발 라인 좌우 끝 아이콘 ──────────────────────────── */}
+          {/* 오른쪽 끝 아이콘 스택 — 스티커(위) + 마켓(아래), 캐릭터 발 Y보다 약간 위 */}
+          <div
+            className="absolute right-3 pointer-events-auto flex flex-col items-center gap-2"
+            style={{
+              top: `${(anchor.characterFootY - 0.12) * 100}%`,
+              transform: 'translateY(-50%)',
+            }}
+          >
+            {/* 스티커(하트) — 위 */}
+            {features.sticker && (
+              <button
+                type="button"
+                onClick={() => setActivePanel('sticker')}
+                className="flex items-center justify-center transition active:scale-95"
+                aria-label="칭찬 스티커 판 열기"
               >
-                {totalCredits.toLocaleString('ko-KR')}
-              </span>
-            </div>
-
-            {/* 별 이펙트 — 배지 반짝임 시 주변으로 작은 점들이 방사됩니다 */}
-            {badgeShine && creditBadgeRef.current && (
-              <BadgeStarBurst badgeRef={creditBadgeRef} />
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={`/assets/img/items/stickers/${encodeURIComponent('heart (5).png')}`}
+                  alt=""
+                  width={48}
+                  height={48}
+                  className="h-12 w-12 object-contain drop-shadow-md"
+                />
+              </button>
             )}
 
-            {/* 하트 배지 */}
-            <div className="flex gap-0.5 bg-white/80 rounded-full px-2.5 py-1.5 self-start shadow-sm">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <span
-                  key={i}
-                  className={`text-sm transition-opacity ${i < filledHearts ? 'opacity-100' : 'opacity-25'}`}
-                  role="img"
-                  aria-label={i < filledHearts ? '채워진 하트' : '빈 하트'}
-                >
-                  ❤️
-                </span>
-              ))}
-            </div>
+            {/* 마켓(장바구니) — 아래 */}
+            {features.market && (
+              <button
+                type="button"
+                onClick={() => setActivePanel('market')}
+                className="mt-1.5 flex items-center justify-center transition active:scale-95"
+                aria-label="마켓 열기"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="/assets/img/common/ui/basket_filled.png"
+                  alt=""
+                  width={48}
+                  height={48}
+                  className="h-12 w-12 object-contain drop-shadow-md"
+                />
+              </button>
+            )}
           </div>
 
           {/* ── 스페이서 ────────────────────────────────────────────────── */}

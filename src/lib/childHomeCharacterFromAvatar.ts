@@ -35,6 +35,12 @@ const DEFAULT_STAGE: HomeIslandStageSprite = {
 }
 
 /**
+ * 홈 화면(자녀 방 배경)에서 토끼만 살짝 더 크게 보이게 할 때 쓰는 배율입니다.
+ * 비개발자 설명: 1이면 기존과 같고, 1.09면 키가 약 9% 정도만 커집니다(다른 동물·곰·여우 등은 그대로).
+ */
+export const BUNNY_HOME_DISPLAY_SCALE = 1.09
+
+/**
  * 곰 홈 캐릭터는 토끼 높이에 맞추지 않고, `bears.png`의 bear1(Bears (1)) 프레임 자체를 기준으로 계산합니다.
  * - rotated 프레임은 시각상 가로/세로가 뒤집히므로 natural width/height 를 보정합니다.
  * - 스케일은 곰 전용 상수로만 제어합니다.

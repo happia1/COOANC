@@ -13,6 +13,24 @@ module.exports = {
   theme: {
     extend: {
       keyframes: {
+        /** 자녀 미션 카드: +크레딧 숫자가 위로 떠오르며 사라지는 연출 */
+        fadeUp: {
+          '0%': { opacity: '1', transform: 'translateX(-50%) translateY(0)' },
+          '100%': { opacity: '0', transform: 'translateX(-50%) translateY(-24px)' },
+        },
+        /** 자녀 미션 카드: 완료 시 체크 아이콘이 통통 튀어오르는 연출 */
+        popIn: {
+          '0%': { transform: 'scale(0.4)', opacity: '0' },
+          '60%': { transform: 'scale(1.25)', opacity: '1' },
+          '80%': { transform: 'scale(0.9)' },
+          '100%': { transform: 'scale(1)', opacity: '1' },
+        },
+        /** 스티커 판: 슬롯에 스티커가 쏙 들어가는 연출 */
+        stickerPop: {
+          '0%': { transform: 'translate(-50%, -50%) scale(0)' },
+          '70%': { transform: 'translate(-50%, -50%) scale(1.15)' },
+          '100%': { transform: 'translate(-50%, -50%) scale(1)' },
+        },
         /** 마켓 배달: 상품이 낙하산처럼 위에서 아래로 내려오는 연출 */
         marketParachuteDrop: {
           '0%': { transform: 'translateY(-55vh) translateX(-12px) scale(0.88)', opacity: '0' },

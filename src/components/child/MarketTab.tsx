@@ -20,6 +20,7 @@ import {
   parentMarketSectionIdForItem,
   type ParentMarketSectionId,
 } from '@/lib/parentMarketMenuSections'
+import { BETA_MARKET_CONFIG } from '@/constants/betaMarketConfig'
 
 type Props = {
   childId: string
@@ -58,9 +59,11 @@ type DeliveryOverlay = {
  * 마켓 상단 지붕 PNG를 교체할 때마다 아래 숫자를 1 올리면
  * 브라우저 캐시를 우회해 새 이미지를 즉시 받아옵니다.
  */
-const MARKET_ROOF_CACHE_BUST = 3
-/** 실제 표시 URL — `/public` 기준 정적 경로 + 캐시 끊기용 쿼리 */
-const ROOF_SRC = `/assets/img/layouts/backgrounds/market_roof_.png?v=${MARKET_ROOF_CACHE_BUST}`
+const MARKET_ROOF_CACHE_BUST = 5
+/** 기본 지붕 이미지 (1236px 너비) — 일반/좁은 화면용 */
+const ROOF_SRC = `/assets/img/layouts/backgrounds/market_roof.png?v=${MARKET_ROOF_CACHE_BUST}`
+/** 넓은 화면 지붕 이미지 (1536px 너비) — 전체화면/와이드 화면에서 이미지 잘림 방지 */
+const ROOF_FILL_SRC = `/assets/img/layouts/backgrounds/market_roof_fill.png?v=${MARKET_ROOF_CACHE_BUST}`
 /** 요청사항: 물건이 담긴 장바구니 아이콘(공용 정적 이미지) */
 const BASKET_FILLED_SRC = '/assets/img/common/ui/basket_filled.png'
 
@@ -172,6 +175,30 @@ export default function MarketTab({
     const hidden = new Set(hiddenStoreItemIds)
     return marketEligibleItems.filter((item) => !hidden.has(item.id))
   }, [marketEligibleItems, hiddenStoreItemIds])
+
+  /**
+   * 베타 활성 상품만 추출합니다.
+   * - 간식(food) → activeFood 목록에 있는 것만
+   * - 이벤트(experience/activity) → activeEvents 목록에 있는 것만
+   * - toy 등 나머지 카테고리는 완전 제외
+   * - 순서: 간식 먼저, 그다음 이벤트
+   *
+   * 비개발자 설명: 베타 기간에 자녀 마켓에 보일 상품만 걸러냅니다.
+   */
+  const betaItems = useMemo(() => {
+    const activeFood = BETA_MARKET_CONFIG.activeFood as readonly string[]
+    const activeEvents = BETA_MARKET_CONFIG.activeEvents as readonly string[]
+
+    const food = visibleItems.filter(
+      (i) => i.category === 'food' && activeFood.includes(i.name),
+    )
+    const events = visibleItems.filter(
+      (i) =>
+        (i.category === 'experience' || i.category === 'activity') &&
+        activeEvents.includes(i.name),
+    )
+    return [...food, ...events]
+  }, [visibleItems])
 
   /**
    * 부모 「메뉴 제어」와 같은 순서(간식 → 장난감 → 이벤트 → 기타)로 구역을 나눕니다.
@@ -733,105 +760,100 @@ export default function MarketTab({
           document.body,
         )}
 
-      {/* 가게 지붕: next/image localPatterns 제약 없이 쓰기 위해 <img> 사용 (장식용 이미지) */}
+      {/*
+       * 가게 지붕: <picture> 태그로 화면 너비에 따라 이미지를 자동 전환합니다.
+       * - 1236px 미만: market_roof.png (기본)
+       * - 1236px 이상(전체화면/와이드): market_roof_fill.png (1536px 너비, 잘림 없음)
+       * next/image localPatterns 제약 없이 쓰기 위해 <img> 사용 (장식용 이미지)
+       */}
       <div className="shrink-0 w-full overflow-hidden leading-none">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={ROOF_SRC}
-          alt=""
-          className="block h-auto w-full max-h-[4.5rem] select-none object-cover object-bottom"
-          draggable={false}
-          onError={(e) => {
-            e.currentTarget.style.display = 'none'
-          }}
-        />
+        <picture>
+          {/* 넓은 화면에서는 더 넓은 fill 이미지로 전환 */}
+          <source media="(min-width: 1236px)" srcSet={ROOF_FILL_SRC} />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={ROOF_SRC}
+            alt=""
+            className="block h-auto w-full max-h-[5.5rem] select-none object-cover object-top"
+            draggable={false}
+            onError={(e) => {
+              e.currentTarget.style.display = 'none'
+            }}
+          />
+        </picture>
       </div>
 
-      {visibleItems.length === 0 ? (
+      {betaItems.length === 0 ? (
         <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 py-8">
           <SpriteImage sheet={ICONS} frame="market" width={56} />
           <p className="font-bold text-brand-text">아직 상품이 없어요</p>
           <p className="text-sm text-gray-400">부모님이 상품을 추가해주실 거예요!</p>
         </div>
       ) : (
-        <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {/* 이벤트 → 간식 → 장난감 3단 선반을 동시에 노출 */}
-          {marketSectionsWithShelves.map((block, blockIdx) => (
-            <section key={block.sectionKey} className="shrink-0">
-              <h3 className="mb-1 flex items-center gap-1 border-b border-amber-900/10 px-2 pb-0.5 text-[10px] font-black tracking-tight text-amber-950/90">
-                {block.title}
-                <span className="ml-auto tabular-nums text-[9px] font-bold text-amber-900/40">{block.items.length}개</span>
-              </h3>
-              {/* 선반 내부만 좌우 슬라이드 — 가로 스크롤바 숨김 */}
-              <div className="flex snap-x snap-mandatory gap-1.5 overflow-x-auto px-1 py-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                {block.items.map((item, itemIdx) => {
-                  const frameKey = marketFrameKeyForItemId(item.id, item.name)
-                  /** 첫 구역 맨 앞 몇 칸만 우선 로드 — 나머지는 지연 로드로 대역폭 절약 */
-                  const thumbPriority = blockIdx === 0 && itemIdx < 4
-                  const meetsLevel = level >= item.level_required
-                  const isPending = shelfBlockedItemIds.has(item.id)
-                  /** 레벨 미달만 흐림 처리 (잔액 부족은 구매 버튼에서만 안내) */
-                  const isDimmed = !meetsLevel
-                  const isBest = item.id === bestItemId
+        /*
+         * 베타 마켓: 카테고리 선반 구조 없이 단일 가로 스크롤 한 줄로 표시합니다.
+         * 순서: 간식 → 이벤트 (betaItems 배열 순서 그대로)
+         *
+         * 비개발자 설명: 상품들이 카드 형태로 가로로 쭉 늘어서 있고, 좌우로 밀어서 볼 수 있습니다.
+         */
+        <div className="flex min-h-0 flex-1 flex-row gap-4 overflow-x-auto px-5 py-5 snap-x snap-mandatory [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [-webkit-overflow-scrolling:touch]">
+          {betaItems.map((item, itemIdx) => {
+            const frameKey = marketFrameKeyForItemId(item.id, item.name)
+            const isPending = shelfBlockedItemIds.has(item.id)
+            const canAfford = currentWallet >= item.credit_price
+            /** 첫 몇 장만 우선 로드 */
+            const thumbPriority = itemIdx < 4
 
-                  return (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => handleItemClick(item, frameKey)}
-                      className={`relative flex w-[4.5rem] shrink-0 snap-start flex-col rounded-xl bg-white/95 p-1 shadow-md ring-1 ring-black/[0.06] transition-transform active:scale-[0.98] ${
-                        isDimmed ? 'grayscale brightness-[0.72]' : ''
-                      }`}
-                    >
-                      {isBest && !isDimmed && (
-                        <span className="absolute right-0.5 top-0.5 z-10 rounded-full bg-green-500 px-1 py-px text-[7px] font-black leading-none text-white">
-                          BEST
-                        </span>
-                      )}
-                      {isPending && (
-                        <span className="absolute left-0.5 top-0.5 z-10 text-[9px]" aria-hidden>
-                          ⏳
-                        </span>
-                      )}
+            return (
+              /*
+               * 베타 마켓 카드 — w-[140px] 고정 너비, 큰 이미지 + 이름 + 구매 버튼
+               * 탭 시 기존 「구매 / 장바구니」 액션 시트를 재활용합니다.
+               */
+              <div
+                key={item.id}
+                className="relative flex w-[140px] flex-shrink-0 snap-start flex-col items-center gap-3 rounded-3xl border border-[#f0ece4] bg-white pt-5 px-3 pb-4 shadow-lg overflow-hidden"
+              >
+                {/* 진행 중 요청 표시 */}
+                {isPending && (
+                  <span className="absolute left-2 top-2 z-10 text-sm" aria-hidden>⏳</span>
+                )}
 
-                      {/* 이미지 영역 — SHELF_IMG_AREA_PX(48px) 고정 높이 */}
-                      <div
-                        className="relative flex w-full items-end justify-center overflow-visible"
-                        style={{ height: SHELF_IMG_AREA_PX }}
-                      >
-                        <div className="flex max-h-full max-w-full items-end justify-center">
-                          <StoreItemThumbnail
-                            imageUrl={item.image_url}
-                            frame={frameKey}
-                            height={SHELF_SPRITE_H}
-                            width={SHELF_IMG_AREA_PX}
-                            className="max-h-full max-w-full object-contain object-bottom"
-                            style={{ maxHeight: SHELF_SPRITE_H }}
-                            priority={thumbPriority}
-                            loading="lazy"
-                            sizes={`${SHELF_IMG_AREA_PX}px`}
-                          />
-                        </div>
-                      </div>
+                {/* 상품 이미지 — 100×100px */}
+                <div className="flex h-[100px] w-[100px] items-center justify-center">
+                  <StoreItemThumbnail
+                    imageUrl={item.image_url}
+                    frame={frameKey}
+                    height={88}
+                    width={100}
+                    className="max-h-full max-w-full object-contain"
+                    priority={thumbPriority}
+                    loading="lazy"
+                    sizes="100px"
+                  />
+                </div>
 
-                      {/* 크레딧 알약 */}
-                      <div className="mt-0.5 flex flex-col items-center">
-                        <div
-                          className="inline-flex max-w-full items-center gap-0.5 rounded-full border border-gray-100 bg-white px-1 py-px shadow-sm"
-                          style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.06)' }}
-                        >
-                          <SpriteImage sheet={ICONS} frame="credit" width={12} clipRotated={false} />
-                          <span className="truncate text-[9px] font-black tabular-nums text-brand-blue">
-                            {formatMarketCreditLabel(item.credit_price)}
-                          </span>
-                        </div>
-                      </div>
-                    </button>
-                  )
-                })}
+                {/* 상품명 */}
+                <p className="w-full text-center text-sm font-bold leading-snug text-gray-800 line-clamp-1">
+                  {item.name}
+                </p>
+
+                {/* 구매 버튼 — 탭 시 기존 액션 시트 오픈 */}
+                <button
+                  type="button"
+                  onClick={() => handleItemClick(item, frameKey)}
+                  disabled={isPending}
+                  className={[
+                    'w-full rounded-2xl py-2 text-xs font-bold transition-colors active:scale-95',
+                    canAfford && !isPending
+                      ? 'bg-yellow-400 text-yellow-900 active:bg-yellow-500'
+                      : 'bg-gray-100 text-gray-400',
+                  ].join(' ')}
+                >
+                  🪙 {item.credit_price}
+                </button>
               </div>
-            </section>
-          ))}
+            )
+          })}
         </div>
       )}
 

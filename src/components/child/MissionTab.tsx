@@ -48,6 +48,8 @@ import {
   normalizeChildStatsCreditsSplit,
 } from '@/lib/childCreditsSplit'
 import {
+  CHILD_TODAY_MISSION_CARD_AM_SHADOW_CLASSNAME,
+  CHILD_TODAY_MISSION_CARD_PM_SHADOW_CLASSNAME,
   MISSION_CARD_BUTTON_BASE_CLASSNAME,
   MISSION_CARD_IMAGE_AREA_CLASSNAME,
   MISSION_CARD_IMAGE_TEXT_STACK_CLASSNAME,
@@ -66,6 +68,9 @@ import {
 } from '@/lib/missionTodayLayoutSpec'
 import MissionHeartRow from '@/components/child/MissionHeartRow'
 import { completionRateToHearts } from '@/lib/missionHeartCount'
+import { fireMissionCardConfetti } from '@/lib/missionCardConfetti'
+import { tryApplyCompletePayload } from '@/lib/applyDailyMissionCompleteStats'
+import { isAfternoonMission } from '@/lib/missionAmPm'
 
 type Props = {
   childId: string
@@ -159,17 +164,6 @@ function isMorningInSeoulNow(): boolean {
   return getSeoulNowParts().hour < 12
 }
 
-/** 미션 카드가 오후 시간대(afternoon/evening/bedtime 또는 12시 이후 시각)인지 */
-function isAfternoonMission(dm: DailyMissionWithTemplate): boolean {
-  const block = dm.missions?.block
-  if (block === 'afternoon' || block === 'evening' || block === 'bedtime') return true
-  if (block === 'morning') return false
-  const hhmm = dm.scheduled_time
-  if (!hhmm || hhmm.length < 2) return false
-  const hour = Number(hhmm.slice(0, 2))
-  return Number.isFinite(hour) && hour >= 12
-}
-
 /** 특별 배달 미션 팝업에 넣을 필드만 골라 냅니다(이미 본 적이면 null). */
 function trySpecialDeliveryPopupFields(
   dm: DailyMissionWithTemplate,
@@ -238,6 +232,7 @@ export default function MissionTab({
     missionDescription: string | null
     /** 완료 보상 — 카드와 같은 규칙(배율 적용) */
     creditReward: number
+    heartReward: number
     expReward: number
     /** 2·3배 보너스일 때 배너 스프라이트와 함께 표시 */
     rewardMultiplier: RewardMultiplier
@@ -363,6 +358,7 @@ export default function MissionTab({
         missionTitle: m.title,
         missionDescription: m.description ?? null,
         creditReward: rw.credit,
+        heartReward: rw.heart,
         expReward: rw.exp,
         rewardMultiplier: rw.mult,
       })
@@ -389,21 +385,26 @@ export default function MissionTab({
       return
     }
 
+    /** 누른 카드의 화면 위치(크레딧 이펙트·컨페티·낙관적 제거에 공통으로 사용) */
+    const cardRect = ev.currentTarget.getBoundingClientRect()
+
     if (!isFullRestDay) {
       /**
-       * 사용자가 누른 카드 중심 좌표를 시작점으로 저장해,
        * 동전이 "카드에서 출발해 상단 크레딧으로 이동"하는 것처럼 보이게 합니다.
        */
-      const rect = ev.currentTarget.getBoundingClientRect()
       setCreditFxStart({
-        x: rect.left + rect.width * 0.5,
-        y: rect.top + rect.height * 0.5,
+        x: cardRect.left + cardRect.width * 0.5,
+        y: cardRect.top + cardRect.height * 0.5,
       })
       setCreditFxNonce((n) => n + 1)
       setCreditFxOn(true)
     }
 
-    /** 낙관적: API 기다리지 않고 카드 제거(슬라이더에서 숨김). 콘페티는 전부 완료될 때만 별도 레이어에서 연출 */
+    /**
+     * 카드가 사라질 위치에서 컨페티 — 홈 단일 화면(ChildMissionCard)과 같은 축하 느낌을 맞춥니다.
+     * 낙관적: API 응답을 기다리지 않고 슬라이더에서 카드를 뺍니다.
+     */
+    fireMissionCardConfetti(cardRect)
     setDone((prev) => new Set([...prev, dm.id]))
 
     void (async () => {
@@ -430,6 +431,8 @@ export default function MissionTab({
           showToast(typeof json.error === 'string' ? json.error : '미션 완료에 실패했어요')
           return
         }
+        /** 부모/DB와 동일한 크레딧·하트·EXP 수치로 상단 저금통·지갑·통계를 바로 맞춤 */
+        setStats((prev) => tryApplyCompletePayload(prev, json) ?? prev)
       } catch {
         setDone((prev) => {
           const next = new Set(prev)
@@ -590,6 +593,9 @@ export default function MissionTab({
                 aria-label={`${m.title} 미션 완료하기`}
                 className={[
                   MISSION_CARD_BUTTON_BASE_CLASSNAME,
+                  isAfternoonMission(dm)
+                    ? CHILD_TODAY_MISSION_CARD_PM_SHADOW_CLASSNAME
+                    : CHILD_TODAY_MISSION_CARD_AM_SHADOW_CLASSNAME,
                   special
                     ? 'border-amber-300 ring-2 ring-amber-200/60 bg-gradient-to-b from-amber-50 via-amber-100 to-yellow-200'
                     : 'border-[#ede9e0]',
@@ -641,20 +647,20 @@ export default function MissionTab({
                 </div>
 
                 {/**
-                 * 보상 줄: 실제 파일은 `public/assets/img/common/ui/icons.png` 이고,
-                 * 여기서는 `ICONS` 상수로 같은 PNG를 가리킵니다(`/assets/img/common/ui/icons.png`).
-                 * 시안과 동일하게 한 줄: [크레딧 아이콘+숫자] [하트 아이콘+숫자] — 오른쪽은 EXP(텍스트 없이 하트로 표현).
+                 * 보상 줄: [크레딧] [애정 하트(부모·자녀 child_stats.hearts에 더해짐)] [EXP는 별 아이콘].
+                 * (이전에는 EXP를 하트 아이콘으로만 보여 “하트” 통계와 숫자가 어긋난 것처럼 보였습니다.)
                  */}
                 <div className={MISSION_CARD_REWARD_ROW_CLASSNAME}>
                   <div
                     className={[
                       MISSION_CARD_REWARD_PILL_BASE_CLASSNAME,
+                      'max-w-full flex-wrap gap-x-1 gap-y-0.5',
                       special ? 'bg-amber-100/90' : 'bg-stone-100/95',
                     ].join(' ')}
                     role="group"
-                    aria-label={`미션 보상: 크레딧 ${rewards.credit}, 경험치 ${rewards.exp}`}
+                    aria-label={`미션 보상: 크레딧 ${rewards.credit}, 애정 하트 ${rewards.heart}, 경험치 ${rewards.exp}`}
                   >
-                    {/** 왼쪽: 크레딧(동전) */}
+                    {/** 획득 크레딧(총액·잔디 — 완료 API와 동일) */}
                     <span className="inline-flex items-center gap-[1px]">
                       <SpriteImage
                         sheet={ICONS}
@@ -665,12 +671,23 @@ export default function MissionTab({
                       />
                       <span>{rewards.credit}</span>
                     </span>
-                    {/** 오른쪽: 경험치 — 하트 그림이 EXP를 뜻함 */}
-                    <span className="inline-flex items-center gap-[1px]" title="경험치(EXP)">
+                    {/** 애정 하트(부모앱·상단 child_stats 하트와 동일 의미) */}
+                    <span className="inline-flex items-center gap-[1px]" title="애정 하트">
                       <SpriteImage
                         sheet={ICONS}
                         frame="heart"
                         width={MISSION_CARD_REWARD_ICON_WIDTH_PX}
+                        className="shrink-0 select-none"
+                      />
+                      <span>{rewards.heart}</span>
+                    </span>
+                    {/** 경험치(EXP) — 레벨 바에 쌓이는 수치 */}
+                    <span className="inline-flex items-center gap-[1px]" title="경험치(EXP)">
+                      <SpriteImage
+                        sheet={ICONS}
+                        frame="star"
+                        width={MISSION_CARD_REWARD_ICON_WIDTH_PX - 1}
+                        clipRotated={false}
                         className="shrink-0 select-none"
                       />
                       <span>{rewards.exp}</span>
@@ -678,7 +695,7 @@ export default function MissionTab({
                   </div>
                 </div>
                 {/**
-                 * 위 알약에 이미 배율이 곱해진 크레딧·EXP가 나오므로 「보상 N배」 중복 문구는 넣지 않습니다.
+                 * 위 알약에 배율이 곱해진 보상이 나옵니다. 「보상 N배」 중복 문구는 넣지 않습니다.
                  */}
               </button>
             )
@@ -717,7 +734,7 @@ export default function MissionTab({
         <p className="mt-2 text-center text-sm font-bold text-amber-800">{specialPopup.missionTitle}</p>
         {/**
          * 보너스(2·3배)일 때 분홍 뾰족 배지 위에 xN배 텍스트를 얹어 보여 줍니다.
-         * 미션 카드 하단과 같은 아이콘: 크레딧 · 경험치(EXP는 하트 스프라이트).
+         * 미션 카드와 동일: 크레딧 · 애정 하트 · EXP(별).
          */}
         <div className="mt-4 flex items-center justify-center px-1">
           {/**
@@ -726,12 +743,12 @@ export default function MissionTab({
            */}
           <div className="relative inline-block">
             <div
-              className="inline-flex max-w-full flex-nowrap items-center justify-center gap-x-2 rounded-full px-3 py-2 text-sm font-black tabular-nums tracking-tight text-gray-800 shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] ring-1 ring-black/[0.06] bg-amber-100/90"
+              className="inline-flex max-w-full flex-wrap items-center justify-center gap-x-2 gap-y-1 rounded-full px-3 py-2 text-sm font-black tabular-nums tracking-tight text-gray-800 shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] ring-1 ring-black/[0.06] bg-amber-100/90"
               role="group"
               aria-label={
                 specialPopup.rewardMultiplier > 1
-                  ? `보너스 ${specialPopup.rewardMultiplier}배, 크레딧 ${specialPopup.creditReward}, 경험치 ${specialPopup.expReward}`
-                  : `미션 보상: 크레딧 ${specialPopup.creditReward}, 경험치 ${specialPopup.expReward}`
+                  ? `보너스 ${specialPopup.rewardMultiplier}배, 크레딧 ${specialPopup.creditReward}, 애정 하트 ${specialPopup.heartReward}, 경험치 ${specialPopup.expReward}`
+                  : `미션 보상: 크레딧 ${specialPopup.creditReward}, 애정 하트 ${specialPopup.heartReward}, 경험치 ${specialPopup.expReward}`
               }
             >
               <span className="inline-flex items-center gap-1">
@@ -744,8 +761,12 @@ export default function MissionTab({
                 />
                 <span>{specialPopup.creditReward}</span>
               </span>
-              <span className="inline-flex items-center gap-1" title="경험치(EXP)">
+              <span className="inline-flex items-center gap-1" title="애정 하트">
                 <SpriteImage sheet={ICONS} frame="heart" width={18} className="shrink-0 select-none" />
+                <span>{specialPopup.heartReward}</span>
+              </span>
+              <span className="inline-flex items-center gap-1" title="경험치(EXP)">
+                <SpriteImage sheet={ICONS} frame="star" width={17} clipRotated={false} className="shrink-0 select-none" />
                 <span>{specialPopup.expReward}</span>
               </span>
             </div>

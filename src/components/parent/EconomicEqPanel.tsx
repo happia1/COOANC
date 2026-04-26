@@ -2,9 +2,8 @@
 
 /**
  * 부모 홈 「우리아이 경제 EQ 지수」 패널입니다.
- * - 상단: AI 리포트 카드(JSON `report_text` 파싱) — 캘린더 안내, 레벨, 루틴, 크레딧(글만), 위시, 응원, 부모 가이드
- * - 메인에는 퍼센트 숫자를 크게 강조하지 않고, 주간 루틴 완료율 막대는 카드 본문에서도 바로 보여 줍니다.
- * - `eq_delay_score` 반원 게이지는 「저축 습관」이라는 이름으로 남기고, 탭하면 계산 설명 모달이 열립니다.
+ * - 저축 습관(반원 게이지) + 주간 루틴 완료율(막대)을 3:7 비율로 한 블록에 배치합니다.
+ * - 하단 EQ 지수 종합: 저축 비율·루틴 완주율을 원형 게이지로 표시합니다.
  */
 
 import { createPortal } from 'react-dom'
@@ -17,6 +16,7 @@ import {
   type AgentLatestReportRow,
   type AgentReportJsonV1,
 } from '@/lib/agentApi'
+import { PARENT_NEUTRAL_CARD_CLASSNAME } from '@/lib/parentNeutralBlockStyle'
 
 /** 차트·피드백에 필요한 `child_stats` 일부 + 레벨 뱃지 표시용 레벨 */
 export type EconomicEqStatsSlice = Pick<
@@ -33,18 +33,16 @@ export type EconomicEqStatsSlice = Pick<
 
 type Props = {
   stats: EconomicEqStatsSlice
-  /** 이번 주(월~일) 루틴 완주율 — 드릴다운 시트 안에서만 막대로 보여 줍니다. */
+  /** 이번 주(월~일) 루틴 완주율 막대 */
   weeklyRoutine: WeeklyRoutineDay[]
   childName: string
-  /** 있으면 `/agent-a/latest` 로 받은 `agentRow` 를 카드 형태로 풀어 그립니다. */
   agentChildId?: string | null
   agentRow?: AgentLatestReportRow | null
   agentLoading?: boolean
 }
 
-/**
- * 저축 습관(반원 게이지) 설명 모달 — 본문에는 **큰 퍼센트 숫자를 넣지 않고** 말로만 해석합니다.
- */
+// ─── 저축 습관 설명 모달 ──────────────────────────────────────────────────────
+
 function EqDelayExplainModal({
   onClose,
   childName,
@@ -98,11 +96,9 @@ function EqDelayExplainModal({
                 전체 크레딧 중 저금통에 {savingsRate}%가 있어요
               </p>
             </div>
-
             <p className="text-sm text-gray-600">
               전체 크레딧 중 저금통에 보관된 비율이에요. 당장 쓰지 않고 나중을 위해 모아두는 습관을 보여줘요.
             </p>
-
             <div className="mt-4 pt-4 border-t border-gray-100">
               <p className="text-xs text-gray-400 font-medium mb-1">참고</p>
               <p className="text-sm text-gray-500">
@@ -130,44 +126,219 @@ function EqDelayExplainModal({
   )
 }
 
-/** 카드 래퍼 — 흰 배경·둥근 모서리로 리포트 문단을 구분합니다. */
+// ─── 카드 래퍼 ───────────────────────────────────────────────────────────────
+
 function ReportCard({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className={['rounded-xl border border-gray-100 bg-white p-3 text-sm text-gray-800 shadow-sm', className ?? ''].join(' ')}>
+    <div className={[`${PARENT_NEUTRAL_CARD_CLASSNAME} p-3 text-sm text-gray-800`, className ?? ''].join(' ')}>
       {children}
     </div>
   )
 }
 
-/** EQ 지수(에이전트 분석) 막대 — 상세 팝업 하단에서 보여 줍니다. */
-function EqScoreBars({ eq }: { eq: AgentEqScores | null | undefined }) {
-  const delay = Math.min(100, Math.max(0, Number(eq?.delay_satisfaction ?? 0)))
-  const save = Math.min(100, Math.max(0, Number(eq?.save_ratio ?? 0)))
-  const routine = Math.min(100, Math.max(0, Number(eq?.routine_completion ?? 0)))
-  const rows = [
-    { label: '저축 습관', value: delay, color: 'from-amber-200 to-orange-300' },
-    { label: '저축 비율', value: save, color: 'from-lime-200 to-emerald-300' },
-    { label: '루틴 완주율', value: routine, color: 'from-sky-200 to-blue-400' },
-  ]
+// ─── 반원 게이지 (범용) ──────────────────────────────────────────────────────
+
+function DelayHalfGauge({
+  value,
+  gradientId,
+  startColor = '#93C5FD',
+  endColor = '#2563EB',
+}: {
+  value: number
+  gradientId: string
+  startColor?: string
+  endColor?: string
+}) {
+  const v = Math.min(100, Math.max(0, value))
+  const r = 36
+  const cx = 50
+  const cy = 52
+  const arcLen = Math.PI * r
+  const filled = (v / 100) * arcLen
+
   return (
-    <div className="space-y-3">
-      <p className="text-[11px] font-bold text-gray-600">EQ 지수 (에이전트 분석)</p>
-      {rows.map((r) => (
-        <div key={r.label}>
-          <div className="mb-1 flex justify-between text-[10px] font-bold text-gray-500">
-            <span>{r.label}</span>
-          </div>
-          <div className="h-2.5 w-full overflow-hidden rounded-full bg-gray-100">
-            <div
-              className={`h-full rounded-full bg-gradient-to-r ${r.color} transition-all duration-500`}
-              style={{ width: `${r.value}%` }}
-            />
-          </div>
+    <svg
+      viewBox="0 0 100 58"
+      className="h-[4.25rem] w-full mx-auto block max-w-[120px]"
+      aria-hidden
+    >
+      <defs>
+        <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stopColor={startColor} />
+          <stop offset="100%" stopColor={endColor} />
+        </linearGradient>
+      </defs>
+      <path
+        d={`M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy}`}
+        fill="none"
+        stroke="#e5e7eb"
+        strokeWidth="9"
+        strokeLinecap="round"
+      />
+      <path
+        d={`M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy}`}
+        fill="none"
+        stroke={`url(#${gradientId})`}
+        strokeWidth="9"
+        strokeLinecap="round"
+        strokeDasharray={`${filled} ${arcLen}`}
+      />
+    </svg>
+  )
+}
+
+// ─── 전체 원형 게이지 (저축 비율·루틴 완주율) ───────────────────────────────
+
+/**
+ * 반원 게이지 스타일을 360° 전체 원형으로 확장합니다.
+ * 12시 방향에서 시작해 시계 방향으로 채워집니다.
+ */
+function EqCircleGauge({
+  value,
+  gradientId,
+  label,
+  startColor,
+  endColor,
+}: {
+  value: number
+  gradientId: string
+  label: string
+  startColor: string
+  endColor: string
+}) {
+  const v = Math.min(100, Math.max(0, Math.round(value)))
+  const r = 34
+  const cx = 50
+  const cy = 50
+  const circumference = 2 * Math.PI * r
+  const filled = (v / 100) * circumference
+
+  return (
+    <div className="flex flex-col items-center gap-1.5">
+      <div className="relative h-[4.5rem] w-[4.5rem]">
+        <svg viewBox="0 0 100 100" className="h-full w-full" aria-hidden>
+          <defs>
+            <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor={startColor} />
+              <stop offset="100%" stopColor={endColor} />
+            </linearGradient>
+          </defs>
+          {/* 배경 트랙 */}
+          <circle
+            cx={cx}
+            cy={cy}
+            r={r}
+            fill="none"
+            stroke="#e5e7eb"
+            strokeWidth="10"
+            strokeLinecap="round"
+          />
+          {/* 값 채우기 — 12시 방향 시작 */}
+          <circle
+            cx={cx}
+            cy={cy}
+            r={r}
+            fill="none"
+            stroke={`url(#${gradientId})`}
+            strokeWidth="10"
+            strokeLinecap="round"
+            strokeDasharray={`${filled} ${circumference}`}
+            transform={`rotate(-90 ${cx} ${cy})`}
+          />
+        </svg>
+        {/* 중앙 퍼센트 */}
+        <div className="absolute inset-0 flex items-center justify-center">
+          <span className="text-[13px] font-black tabular-nums text-gray-700">{v}%</span>
         </div>
-      ))}
+      </div>
+      <span className="text-[10px] font-bold text-gray-500 text-center">{label}</span>
     </div>
   )
 }
+
+// ─── EQ 지수 종합 (저축 비율·저축 습관 원형 게이지) ────────────────────────
+
+/**
+ * 저축 관련 두 지표를 원형 게이지로 나란히 보여 줍니다.
+ * - 저축 비율: eq_scores.save_ratio (저금통 이체 비율)
+ * - 저축 습관: eq_scores.delay_satisfaction (만족 지연 지수)
+ * 스타일은 주간 루틴 블록·홈「오늘의 진행도」와 동일 — `PARENT_NEUTRAL_CARD_CLASSNAME`.
+ */
+function EqScoreCircles({
+  eq,
+  gradSaveId,
+  gradHabitId,
+}: {
+  eq: AgentEqScores | null | undefined
+  gradSaveId: string
+  gradHabitId: string
+}) {
+  const save  = Number(eq?.save_ratio         ?? 0)
+  const habit = Number(eq?.delay_satisfaction ?? 0)
+
+  return (
+    <div className={`${PARENT_NEUTRAL_CARD_CLASSNAME} px-3 py-3`}>
+      <p className="mb-3 text-[11px] font-bold text-gray-600 text-center">EQ 지수 종합</p>
+      <div className="flex items-start justify-around gap-2">
+        <EqCircleGauge
+          value={save}
+          gradientId={gradSaveId}
+          label="저축 비율"
+          startColor="#86efac"
+          endColor="#10b981"
+        />
+        <EqCircleGauge
+          value={habit}
+          gradientId={gradHabitId}
+          label="저축 습관"
+          startColor="#fcd34d"
+          endColor="#f59e0b"
+        />
+      </div>
+    </div>
+  )
+}
+
+// ─── 요일별 루틴 완료율 막대 ─────────────────────────────────────────────────
+
+function WeekdayRoutineBars({ days }: { days: WeeklyRoutineDay[] }) {
+  if (!Array.isArray(days) || days.length === 0) {
+    return (
+      <div className="rounded-lg bg-white/70 px-2 py-3 text-center text-[11px] font-bold text-gray-400">
+        이번 주 루틴 데이터가 아직 없어요.
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex items-end justify-between gap-1 min-h-[5.5rem]">
+      {days.map((d) => {
+        const h = d.hasMissions ? d.ratePercent : 0
+        const title = d.hasMissions
+          ? `${d.date} (${d.weekdayShort}): ${d.ratePercent}% 완주`
+          : `${d.date} (${d.weekdayShort}): 배정된 미션 없음`
+        return (
+          <div key={d.date} className="flex flex-1 flex-col items-center gap-0.5 min-w-0" title={title}>
+            <div className="w-full flex flex-col justify-end h-[52px] bg-gray-200/60 rounded-full overflow-hidden">
+              <div
+                className={[
+                  'w-full rounded-full transition-all duration-500',
+                  d.hasMissions ? 'bg-[#4A90E2] min-h-[2px]' : 'bg-transparent h-0 min-h-0',
+                ].join(' ')}
+                style={d.hasMissions ? { height: `${h}%` } : undefined}
+              />
+            </div>
+            <div className="flex flex-col items-center leading-tight">
+              <span className="text-[9px] font-bold text-gray-500 tabular-nums">{d.weekdayShort}</span>
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+// ─── 메인 패널 ───────────────────────────────────────────────────────────────
 
 export default function EconomicEqPanel({
   stats,
@@ -178,24 +349,25 @@ export default function EconomicEqPanel({
   agentLoading,
 }: Props) {
   const gradId = useId().replace(/:/g, '')
-  const [delayExplainOpen, setDelayExplainOpen] = useState(false)
 
   const parsed = parseAgentReportPayload(agentRow?.report_text ?? null)
   const jsonReport: AgentReportJsonV1 | null = parsed.kind === 'json' ? parsed.data : null
   const legacyText = parsed.kind === 'legacy' ? parsed.text : ''
 
-  const drill = jsonReport?.drill_down
-
   const showAgentBlock = Boolean(agentChildId)
-  // 현재 잔액 기준 저축 습관 비율: 저금통 / (돈바구니 + 지갑 + 저금통)
-  const totalCredits = (stats.credits ?? 0) + (stats.credits_wallet ?? 0) + (stats.credits_piggy ?? 0)
-  const savingsRate = totalCredits > 0 ? Math.round(((stats.credits_piggy ?? 0) / totalCredits) * 100) : 0
+
+  // 이번 주 미션이 배정된 날들의 평균 완주율 (0~100)
+  const daysWithMissions = weeklyRoutine.filter((d) => d.hasMissions)
+  const weeklyCompletionRate =
+    daysWithMissions.length > 0
+      ? Math.round(daysWithMissions.reduce((sum, d) => sum + d.ratePercent, 0) / daysWithMissions.length)
+      : 0
 
   return (
-    <section className="w-full bg-white rounded-2xl p-4 shadow-sm space-y-4">
+    <section className="w-full space-y-4">
       <p className="text-sm font-bold text-gray-700">우리아이 경제 EQ 지수</p>
 
-      {/* ── AI 리포트 카드(JSON 또는 예전 한 덩어리 텍스트) ───────────────── */}
+      {/* ── AI 리포트 카드 ─────────────────────────────────────────────────── */}
       {showAgentBlock ? (
         <div className="space-y-3">
           {agentLoading && !agentRow ? (
@@ -215,7 +387,6 @@ export default function EconomicEqPanel({
                   </p>
                 </ReportCard>
               ) : null}
-
             </>
           ) : legacyText.trim() ? (
             <ReportCard>
@@ -226,171 +397,45 @@ export default function EconomicEqPanel({
         </div>
       ) : null}
 
-      {/* 캘린더·카드 글 아래에 두는 저축 습관 반원(메인에는 % 숫자 없음) */}
-      <div className="rounded-xl bg-gray-50/80 px-3 py-3">
-        <button
-          type="button"
-          onClick={() => setDelayExplainOpen(true)}
-          className="w-full text-left cursor-pointer transition-transform active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4A90E2] focus-visible:ring-offset-2 rounded-lg"
-          aria-haspopup="dialog"
-          aria-label="저축 습관 설명 보기"
-        >
-          {/* 현재는 child_stats 현재 잔액 기준으로 즉시 계산된 값을 보여 줍니다. */}
-          <p className="mb-2 text-center text-[11px] font-bold text-gray-600">저축 습관(현재 잔액 기준)</p>
-          <div className="-mt-2 pointer-events-none flex flex-col items-center">
-            {/* 반원 게이지 자체에는 텍스트를 겹치지 않고, 아래 플로우로 분리해 겹침을 방지합니다. */}
-            <div className="relative">
-              <DelayHalfGauge value={savingsRate} gradientId={`delay-${gradId}`} compact />
-            </div>
-            <div className="-mt-8 flex flex-col items-center">
-              <span className="text-2xl font-bold leading-none text-blue-600">{savingsRate}%</span>
-              <span className="mt-1 text-[11px] text-gray-400">저금통 비율</span>
+      {/* ── EQ 지수 종합 (저축 비율·저축 습관 원형 게이지) ──────────────── */}
+      <EqScoreCircles
+        eq={agentRow?.eq_scores as AgentEqScores | null}
+        gradSaveId={`eq-save-${gradId}`}
+        gradHabitId={`eq-habit-${gradId}`}
+      />
+
+      {/* ── 주간 루틴 완료율(7) + 루틴 완주율 게이지(3) 합산 블록 ─────────── */}
+      <div className={`${PARENT_NEUTRAL_CARD_CLASSNAME} px-3 py-3`}>
+        <div className="flex gap-3">
+          {/* 주간 루틴 완료율 막대 — 7/10 너비 (좌측) */}
+          <div className="flex flex-[7] flex-col gap-1.5">
+            <p className="text-[10px] font-bold text-gray-600 text-center">주간 루틴 완료율</p>
+            <WeekdayRoutineBars days={weeklyRoutine} />
+          </div>
+
+          {/* 구분선 */}
+          <div className="w-px self-stretch bg-gray-200/80" />
+
+          {/* 루틴 완주율 반원 게이지 — 3/10 너비 (우측) */}
+          <div className="flex flex-[3] flex-col items-center justify-center gap-0">
+            <span className="text-[10px] font-bold text-gray-600 mb-0.5 text-center">루틴 완주율</span>
+            <div className="w-full flex flex-col items-center">
+              <DelayHalfGauge
+                value={weeklyCompletionRate}
+                gradientId={`routine-${gradId}`}
+                startColor="#6EE7B7"
+                endColor="#059669"
+              />
+              <div className="-mt-5 flex flex-col items-center">
+                <span className="text-base font-black leading-none text-emerald-600 tabular-nums">
+                  {weeklyCompletionRate}%
+                </span>
+                <span className="mt-0.5 text-[9px] text-gray-400">이번 주 평균</span>
+              </div>
             </div>
           </div>
-        </button>
-      </div>
-
-      {/**
-       * 주간 루틴 완료율(이번 주) 블록:
-       * - 이전 홈 화면 구성처럼 EQ 카드 본문에서도 요일별 완주 막대를 바로 확인할 수 있게 복구합니다.
-       * - 막대를 누르면 상호작용은 없고, 상세 숫자 설명은 아래 "그래프 보기" 시트에서 이어서 볼 수 있습니다.
-       */}
-      <div className="rounded-xl bg-gray-50/80 px-2 py-3">
-        <p className="text-[11px] font-bold text-gray-600 mb-2 text-center">주간 루틴 완료율 (이번 주)</p>
-        <WeekdayRoutineBars days={weeklyRoutine} />
-      </div>
-
-      {/* 요청 반영: 팝업 정보를 주간 루틴 완료율 하단에 고정 배치합니다. */}
-      <div className="rounded-xl bg-white p-3 shadow-sm ring-1 ring-gray-100">
-        <p className="mb-2 text-xs font-bold text-gray-600">크레딧·저축 상세</p>
-        <ul className="space-y-3 text-xs text-gray-800">
-          <li className="flex justify-between gap-3 border-b border-gray-100 pb-2">
-            <span className="font-bold text-gray-600">14일간 획득 크레딧</span>
-            <span className="tabular-nums font-black text-[#4A90E2]">
-              {(drill?.credits_earned_14d ?? 0).toLocaleString()}
-            </span>
-          </li>
-          <li className="flex justify-between gap-3 border-b border-gray-100 pb-2">
-            <span className="font-bold text-gray-600">저금통으로 들어온 이체 합</span>
-            <span className="tabular-nums font-black text-gray-900">
-              {(drill?.piggy_transfer_total ?? 0).toLocaleString()}
-            </span>
-          </li>
-          <li className="flex justify-between gap-3 border-b border-gray-100 pb-2">
-            <span className="font-bold text-gray-600">지갑 나간 이체 + 구매 합</span>
-            <span className="tabular-nums font-black text-gray-900">
-              {(drill?.wallet_transfer_and_purchase_total ?? 0).toLocaleString()}
-            </span>
-          </li>
-          <li className="flex justify-between gap-3 pb-1">
-            <span className="font-bold text-gray-600">저축률 (지갑+저금통 중 저금통)</span>
-            <span className="tabular-nums font-black text-emerald-700">{drill?.save_ratio_pct ?? 0}%</span>
-          </li>
-        </ul>
-        <div className="mt-4 rounded-xl bg-sky-50/60 p-3 ring-1 ring-sky-100">
-          <EqScoreBars eq={agentRow?.eq_scores as AgentEqScores | null} />
         </div>
       </div>
-
-      {delayExplainOpen ? (
-        <EqDelayExplainModal
-          onClose={() => setDelayExplainOpen(false)}
-          childName={childName}
-          savingsRate={savingsRate}
-        />
-      ) : null}
     </section>
-  )
-}
-
-/**
- * 요일별 막대: 회색 트랙은 100% 높이, 파란 막대는 **아래에서 위로** 차오릅니다.
- */
-function WeekdayRoutineBars({ days }: { days: WeeklyRoutineDay[] }) {
-  if (!Array.isArray(days) || days.length === 0) {
-    return (
-      <div className="rounded-lg bg-white/70 px-3 py-4 text-center text-[11px] font-bold text-gray-400">
-        이번 주 루틴 데이터가 아직 없어요.
-      </div>
-    )
-  }
-
-  return (
-    <div className="flex items-end justify-between gap-1.5 min-h-[7.5rem] px-1">
-      {days.map((d) => {
-        const h = d.hasMissions ? d.ratePercent : 0
-        const title = d.hasMissions
-          ? `${d.date} (${d.weekdayShort}): ${d.ratePercent}% 완주`
-          : `${d.date} (${d.weekdayShort}): 배정된 미션 없음`
-        return (
-          <div key={d.date} className="flex flex-1 flex-col items-center gap-1 min-w-0" title={title}>
-            <div className="w-full flex flex-col justify-end h-[72px] bg-gray-200/60 rounded-full overflow-hidden">
-              <div
-                className={[
-                  'w-full rounded-full transition-all duration-500',
-                  d.hasMissions ? 'bg-[#4A90E2] min-h-[2px]' : 'bg-transparent h-0 min-h-0',
-                ].join(' ')}
-                style={d.hasMissions ? { height: `${h}%` } : undefined}
-              />
-            </div>
-            <div className="flex flex-col items-center leading-tight">
-              <span className="text-[10px] font-bold text-gray-500 tabular-nums">{d.weekdayShort}</span>
-              <span className="text-[8px] text-gray-400 tabular-nums">{d.dateLabelShort}</span>
-            </div>
-          </div>
-        )
-      })}
-    </div>
-  )
-}
-
-/** 반원 게이지 — `eq_delay_score`(총액 대비 저금통 %) 를 시각화합니다. */
-function DelayHalfGauge({
-  value,
-  gradientId,
-  compact = false,
-}: {
-  value: number
-  gradientId: string
-  compact?: boolean
-}) {
-  const v = Math.min(100, Math.max(0, value))
-  const r = 36
-  const cx = 50
-  const cy = 52
-  const arcLen = Math.PI * r
-  const filled = (v / 100) * arcLen
-
-  return (
-    <svg
-      viewBox="0 0 100 58"
-      className={[
-        'w-full mx-auto block',
-        compact ? 'h-[4.75rem] max-w-[130px]' : 'max-w-[220px] h-[7.25rem]',
-      ].join(' ')}
-      aria-hidden
-    >
-      <defs>
-        <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="0%">
-          <stop offset="0%" stopColor="#93C5FD" />
-          <stop offset="100%" stopColor="#2563EB" />
-        </linearGradient>
-      </defs>
-      <path
-        d={`M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy}`}
-        fill="none"
-        stroke="#e5e7eb"
-        strokeWidth="9"
-        strokeLinecap="round"
-      />
-      <path
-        d={`M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy}`}
-        fill="none"
-        stroke={`url(#${gradientId})`}
-        strokeWidth="9"
-        strokeLinecap="round"
-        strokeDasharray={`${filled} ${arcLen}`}
-      />
-    </svg>
   )
 }

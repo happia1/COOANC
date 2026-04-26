@@ -137,6 +137,27 @@
   }
 }
 
+/* ChildLevelStatsCard — 오늘 미션 완주율 하트: 새로 켜진 칸만 아래→위로 터짐(도달·차오름) */
+@keyframes mission-heart-slot-fill {
+  0% {
+    transform: scaleY(0.28);
+    opacity: 0.5;
+  }
+  72% {
+    transform: scaleY(1.1);
+    opacity: 1;
+  }
+  100% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+.mission-heart-slot-fill {
+  transform-origin: center bottom;
+  display: inline-flex;
+  animation: mission-heart-slot-fill 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
 /* 미션 탭: 잘 자요 / 아침 알람 바텀시트 슬라이드 */
 @keyframes mission-sheet-slide-up {
   from {
@@ -567,6 +588,64 @@
   width: 0; /* 세로 막대가 차지하던 폭 제거 */
   height: 0; /* 가로 막대가 차지하던 높이 제거 */
   display: none; /* Chromium/Safari 등 WebKit 계열 */
+}
+
+/* ── 미션 완료 파티클 이펙트 ───────────────────────────────────── */
+
+/**
+ * 파티클이 카드 위치에서 크레딧 배지로 날아가는 애니메이션.
+ * --tx, --ty CSS 변수로 목적지 오프셋을 주입합니다.
+ *
+ * 비개발자 설명: 미션 카드를 탭하면 코인/하트가 상단 배지로 날아가는 효과입니다.
+ */
+@keyframes particleFly {
+  0% {
+    transform: translate(-50%, -50%) scale(1.2);
+    opacity: 1;
+  }
+  70% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(
+      calc(var(--tx) - 50%),
+      calc(var(--ty) - 50%)
+    ) scale(0.6);
+    opacity: 0;
+  }
+}
+
+/**
+ * 미션 카드 완료 시 살짝 커졌다가 사라지는 애니메이션.
+ *
+ * 비개발자 설명: 카드를 탭하면 살짝 부풀었다가 사라집니다.
+ */
+@keyframes cardComplete {
+  0%   { transform: scale(1);    opacity: 1; }
+  40%  { transform: scale(1.08); opacity: 1; }
+  100% { transform: scale(0);    opacity: 0; }
+}
+
+/**
+ * 크레딧 배지 반짝임 — 파티클이 도착한 직후 배지가 빛나는 효과.
+ *
+ * 비개발자 설명: 코인이 도착하면 배지가 황금빛으로 빛납니다.
+ */
+@keyframes badgeShine {
+  0%   { box-shadow: 0 0 0 0   rgba(255, 210, 0, 0);   transform: scale(1); }
+  30%  { box-shadow: 0 0 0 8px rgba(255, 210, 0, 0.55); transform: scale(1.12); }
+  60%  { box-shadow: 0 0 0 14px rgba(255, 210, 0, 0.2); transform: scale(1.06); }
+  100% { box-shadow: 0 0 0 18px rgba(255, 210, 0, 0);   transform: scale(1); }
+}
+
+/**
+ * 배지 주변 별/점 방사 효과.
+ *
+ * 비개발자 설명: 배지 주변에서 작은 점들이 튀어나가 반짝이는 효과입니다.
+ */
+@keyframes starBurst {
+  0%   { transform: translate(-50%, -50%) scale(0)   rotate(0deg);  opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(2.5) rotate(45deg); opacity: 0; }
 }
 
 /* 루틴 도우미 상단 키워드 행: 우측 끝 페이드(스크롤 여유가 있음을 힌트, 파스텔 흰·연보라) */

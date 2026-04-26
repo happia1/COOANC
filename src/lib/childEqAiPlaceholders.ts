@@ -68,14 +68,8 @@ export function buildPlaceholderCoachingGuide(input: EqInsightInput): string {
   const { stats, growthStageName, childName } = input
 
   return [
-    `「${childName}야, ${growthStageName} 단계에서 이렇게 해보자」는 식으로 가볍게 시작해 보세요.`,
-    '',
-    `지금 수치를 보면 만족 지연 ${stats.eq_delay_score}%, 저축 비중 ${stats.eq_save_ratio}%예요.`,
-    '',
-    '구체적으로 한 가지 행동만 골라 칭찬하세요.',
-    '예: “오늘은 사고 싶은 걸 바로 쓰지 않고 적어 둔 거 정말 대단해.”',
-    '같은 문장은 아이의 자기조절을 긍정적으로 고정시킵니다.',
-    '',
-    '이 단락은 RAG·LLM 연동 전 템플릿이며, 나중에 자녀 연령·기관 유형·미션 태그에 맞는 문서를 검색해 바꿔 끼우면 됩니다.',
+    '이 단락은 RAG·LLM 연동 전 템플릿입니다.',
+    '이번 주에는 구체적으로 한 가지 행동만 골라 칭찬해보세요.',
+    '예: “오늘은 사고 싶은 걸 바로 쓰지 않고 적어 둔 거 정말 대단해.” 같은 문장은 아이의 자기조절을 긍정적으로 고정시킵니다.',
   ].join('\n')
 }

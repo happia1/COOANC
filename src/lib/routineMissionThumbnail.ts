@@ -37,7 +37,9 @@ const PNG_BY_TITLE: Record<string, string> = {
   버스타기: `${BASE}/a.m/school_bus.png`,
   '등원/등교하기': `${BASE}/a.m/school_bus.png`,
   등원하기: `${BASE}/a.m/school_bus.png`,
-  세수: `${BASE}/p.m/wash_hand.png`,
+  // 아침 세수 — 얼굴 씻기 이미지(a.m/wash_face.png)로 고정
+  세수하기: `${BASE}/a.m/wash_face.png`,
+  세수: `${BASE}/a.m/wash_face.png`,
 
   // --- 오후·저녁·취침 전 (046) ---
   야외놀이: `${BASE}/p.m/paly_outside.png`,

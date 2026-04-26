@@ -26,6 +26,7 @@ import { COOANC_CALENDAR_STORAGE_UPDATE_EVENT } from '@/lib/syncAgentEventToLoca
 import { useParentStore } from '@/store/parentStore'
 import ChildProfileNav, { type ChildTab } from '@/components/parent/ChildProfileNav'
 import EconomicEqPanel from '@/components/parent/EconomicEqPanel'
+import { PARENT_NEUTRAL_CARD_CLASSNAME } from '@/lib/parentNeutralBlockStyle'
 import ParentAgentHomeCards from '@/components/parent/ParentAgentHomeCards'
 import { CalendarEventSheet } from '@/components/parent/CalendarSection'
 import { CompactChildProfileCard } from '@/components/parent/CompactChildProfileCard'
@@ -415,9 +416,9 @@ export default function HomeTab({ childrenData, upcomingEvents, daysWithDataByCh
                 />
               </ParentEnterChildUiLink>
 
-              {/* 모바일 전용: 자녀 프로필 바로 아래에 오늘의 진행도를 배치합니다. */}
-              <div className="rounded-2xl bg-white p-4 shadow-sm md:hidden">
-                <div className="mb-2 flex items-center justify-between gap-2">
+              {/* 모바일: 루틴 탭과 동일한 중립 카드(테두리·그림자) */}
+              <div className={`${PARENT_NEUTRAL_CARD_CLASSNAME} space-y-2 px-3 py-3 md:hidden`}>
+                <div className="flex items-center justify-between gap-2">
                   <p className="text-sm font-bold text-gray-700">오늘의 진행도</p>
                   <span className="text-sm font-black tabular-nums text-[#4A90E2]">
                     {missionRate}%
@@ -433,7 +434,7 @@ export default function HomeTab({ childrenData, upcomingEvents, daysWithDataByCh
                   />
                 </div>
                 {missionRate === 100 && child.totalMissions > 0 && (
-                  <p className="mt-1 text-right text-[10px] font-bold text-[#2563EB]">오늘 미션 모두 완료!</p>
+                  <p className="text-right text-[10px] font-bold text-[#2563EB]">오늘 미션 모두 완료!</p>
                 )}
               </div>
 
@@ -461,9 +462,9 @@ export default function HomeTab({ childrenData, upcomingEvents, daysWithDataByCh
 
             {/* 우 컬럼: 오늘의 진행도 + 우리아이 경제 EQ 지수 */}
             <div className="flex flex-col gap-4">
-              {/* md 이상: 기존 위치(우 컬럼 상단)에 오늘의 진행도를 유지합니다. */}
-              <div className="hidden rounded-2xl bg-white p-4 shadow-sm md:block">
-                <div className="mb-2 flex items-center justify-between gap-2">
+              {/* 데스크톱: 모바일과 동일 카드 스타일 */}
+              <div className={`hidden md:block ${PARENT_NEUTRAL_CARD_CLASSNAME} space-y-2 px-3 py-3`}>
+                <div className="flex items-center justify-between gap-2">
                   <p className="text-sm font-bold text-gray-700">오늘의 진행도</p>
                   <span className="text-sm font-black tabular-nums text-[#4A90E2]">
                     {missionRate}%
@@ -479,7 +480,7 @@ export default function HomeTab({ childrenData, upcomingEvents, daysWithDataByCh
                   />
                 </div>
                 {missionRate === 100 && child.totalMissions > 0 && (
-                  <p className="mt-1 text-right text-[10px] font-bold text-[#2563EB]">오늘 미션 모두 완료!</p>
+                  <p className="text-right text-[10px] font-bold text-[#2563EB]">오늘 미션 모두 완료!</p>
                 )}
               </div>
 

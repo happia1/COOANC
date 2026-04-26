@@ -2,28 +2,28 @@
 
 "chics (1).png":
 {
-	"frame": {"x":613,"y":2,"w":274,"h":480},
+	"frame": {"x":614,"y":2,"w":272,"h":480},
 	"rotated": false,
 	"trimmed": false,
-	"spriteSourceSize": {"x":0,"y":0,"w":274,"h":480},
+	"spriteSourceSize": {"x":0,"y":0,"w":272,"h":480},
 	"sourceSize": {"w":274,"h":480},
 	"pivot": {"x":0.5,"y":0.5}
 },
 "chics (2).png":
 {
-	"frame": {"x":2,"y":2,"w":292,"h":481},
+	"frame": {"x":3,"y":2,"w":290,"h":481},
 	"rotated": false,
 	"trimmed": false,
-	"spriteSourceSize": {"x":0,"y":0,"w":292,"h":481},
+	"spriteSourceSize": {"x":0,"y":0,"w":290,"h":481},
 	"sourceSize": {"w":292,"h":481},
 	"pivot": {"x":0.5,"y":0.5}
 },
 "chics (3).png":
 {
-	"frame": {"x":296,"y":2,"w":315,"h":480},
+	"frame": {"x":297,"y":2,"w":313,"h":480},
 	"rotated": false,
 	"trimmed": false,
-	"spriteSourceSize": {"x":0,"y":0,"w":315,"h":480},
+	"spriteSourceSize": {"x":0,"y":0,"w":313,"h":480},
 	"sourceSize": {"w":315,"h":480},
 	"pivot": {"x":0.5,"y":0.5}
 }},

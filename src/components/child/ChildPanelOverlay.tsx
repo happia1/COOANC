@@ -137,15 +137,14 @@ export default function ChildPanelOverlay({
           'bg-white rounded-t-3xl',
           'flex flex-col',
           /*
-           * 꾸미기 패널은 배경 탭(가장 많은 아이템) 기준으로 고정 높이를 설정합니다.
-           * - 모바일: 5열 3행 → 60dvh
-           * - 태블릿 세로(md ≥768px): 7열 2행 → 66dvh (스크롤바 없음)
-           * - 태블릿 가로(lg ≥1024px): 9열 2행 → 62dvh (스크롤바 없음)
-           * 나머지 패널은 h-[85dvh] 고정.
+           * 꾸미기 패널: 68dvh 고정 — 아이템 수와 무관하게 일정한 높이.
+           *   계산 근거: 최소 가로모드 기기(높이 375px) 기준
+           *   68dvh ≈ 255px → 헤더+탭 86px 제외 → 그리드 공간 169px
+           *   480px+ 기기의 7열 2행(가장 많은 아이템인 배경 탭) = 약 150px → 여유 있음
+           *   overflow-hidden 으로 스크롤바 원천 차단.
+           * 나머지 패널: 85dvh 최대 (콘텐츠에 맞게 자동 확장).
            */
-          active === 'dressup'
-            ? 'h-[60dvh] md:h-[66dvh] lg:h-[62dvh]'
-            : 'h-[85dvh]',
+          active === 'dressup' ? 'h-[68dvh]' : 'max-h-[85dvh]',
           'transform transition-transform duration-300 ease-out',
           isSlideUpOpen ? 'translate-y-0' : 'translate-y-full',
         ].join(' ')}
@@ -367,8 +366,13 @@ function DressUpPanel({
 }) {
   const [activeCategory, setActiveCategory] = useState<DecorCategoryId>('cloth')
 
-  /** 현재 탭에 해당하는 아이템 목록 (폴더별 이미지 경로 + legacyIndex 포함) */
-  const filteredItems = ASSETS.characters.decorItemsByCategory[activeCategory]
+  /**
+   * 현재 탭에 해당하는 아이템 목록 (폴더별 이미지 경로 + legacyIndex 포함)
+   * Array<...> 로 명시해 TypeScript가 배열 길이를 고정 리터럴(5|9|13)로 추론하지 않도록 합니다.
+   * 그렇지 않으면 `.length === 0` 비교에서 "no overlap" 타입 오류가 발생합니다.
+   */
+  const filteredItems: ReadonlyArray<{ src: string; legacyIndex: number }> =
+    ASSETS.characters.decorItemsByCategory[activeCategory]
 
   return (
     <div className="flex flex-col min-h-0">
@@ -395,11 +399,12 @@ function DressUpPanel({
       </div>
 
       {/* 아이템 그리드 */}
-      <div className="flex-1 overflow-y-auto p-4 [scrollbar-width:thin]">
+      {/* overflow-hidden 으로 스크롤바를 원천 차단합니다 */}
+      <div className="flex-1 overflow-hidden p-4">
         {filteredItems.length === 0 ? (
           <p className="pt-8 text-center text-sm text-gray-400">아이템이 없어요</p>
         ) : (
-          <div className="grid grid-cols-5 md:grid-cols-7 lg:grid-cols-9 gap-1.5">
+          <div className="grid grid-cols-5 min-[480px]:grid-cols-7 lg:grid-cols-9 gap-1.5">
             {filteredItems.map(({ src, legacyIndex }) => {
               const owned = unlockedIndexes.includes(legacyIndex)
               return (
@@ -416,7 +421,7 @@ function DressUpPanel({
                       alt=""
                       fill
                       loading="lazy"
-                      sizes="(min-width: 1024px) 9vw, (min-width: 768px) 12vw, 15vw"
+                      sizes="(min-width: 1024px) 9vw, (min-width: 480px) 12vw, 15vw"
                       className={`object-contain p-1 ${owned ? '' : 'grayscale opacity-60'}`}
                       draggable={false}
                     />

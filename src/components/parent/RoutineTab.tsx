@@ -41,6 +41,7 @@ import { ICONS } from '@/constants/sprites'
 import { TOPBAR_LOGO_SRC } from '@/constants/branding'
 import { MISSION_ROUTINES_ATLAS } from '@/constants/missionRoutineAtlas'
 import { missionRoutineIconFrame } from '@/lib/missionRoutineIconFrame'
+import { PARENT_NEUTRAL_CARD_CLASSNAME, PARENT_NEUTRAL_CARD_OVERFLOW_X_CLASSNAME } from '@/lib/parentNeutralBlockStyle'
 import { resolveRoutineMissionPngUrl } from '@/lib/routineMissionThumbnail'
 
 /**
@@ -227,7 +228,8 @@ function renderRoutineMissionStrip(list: Mission[], emptyHint: string, onOpenRew
 }
 
 /**
- * 오전·오후를 하나의 흰 카드에 넣고, 스페셜 미션과 같이 접기/펼치기 + 가로 슬라이드 목록으로 둡니다.
+ * 오전·오후를 하나의 흰 카드에 넣고, 접기/펼치기 + 가로 슬라이드 목록으로 둡니다.
+ * (시간대별 색 그림자는 자녀 앱 오늘의 미션 카드에만 적용합니다.)
  * - `amCaption` / `pmCaption`: 라벨 옆 한 줄 안내(`ROUTINE_DESC_TEXT_CLASS` 와 동일)
  */
 function AmPmRoutineBlock({
@@ -258,7 +260,7 @@ function AmPmRoutineBlock({
   pmCaption?: string
 }) {
   return (
-    <div className="overflow-x-hidden rounded-xl border border-gray-100 bg-white shadow-sm">
+    <div className={PARENT_NEUTRAL_CARD_OVERFLOW_X_CLASSNAME}>
       <button
         type="button"
         onClick={onToggleAm}
@@ -351,7 +353,7 @@ function SpecialDailyEventBlock({
   )
 
   return (
-    <div className="overflow-x-hidden rounded-xl border border-gray-100 bg-white shadow-sm">
+    <div className={PARENT_NEUTRAL_CARD_OVERFLOW_X_CLASSNAME}>
       <button
         type="button"
         onClick={onToggleDaily}
@@ -812,7 +814,7 @@ export default function RoutineTab({
                 <div className="space-y-1.5">
                   <p className="px-0.5 text-[11px] font-normal text-gray-400">주간</p>
                   {weekdayActive.length === 0 ? (
-                    <p className={`rounded-xl border border-gray-100 bg-white py-3 text-center shadow-sm ${ROUTINE_DESC_TEXT_CLASS}`}>
+                    <p className={`${PARENT_NEUTRAL_CARD_CLASSNAME} py-3 text-center ${ROUTINE_DESC_TEXT_CLASS}`}>
                       주간 미션이 없어요
                     </p>
                   ) : (
@@ -835,7 +837,7 @@ export default function RoutineTab({
                 <div className="space-y-1.5">
                   <p className="px-0.5 text-[11px] font-normal text-gray-400">주말, 휴일</p>
                   {weekendActive.length === 0 ? (
-                    <p className={`rounded-xl border border-gray-100 bg-white py-3 text-center shadow-sm ${ROUTINE_DESC_TEXT_CLASS}`}>
+                    <p className={`${PARENT_NEUTRAL_CARD_CLASSNAME} py-3 text-center ${ROUTINE_DESC_TEXT_CLASS}`}>
                       주말, 휴일 미션이 없어요
                     </p>
                   ) : (

@@ -33,7 +33,7 @@ values
   ('디저트', '달콤한 디저트예요.', '/assets/img/items/shop/items/dessert.png', 45, 'real', 'food', 1, true),
   ('푸딩', '부드러운 푸딩이에요.', '/assets/img/items/shop/items/pudding.png', 40, 'real', 'food', 1, true),
   ('아이스크림', '시원한 아이스크림이에요.', '/assets/img/items/shop/items/icecream.png', 45, 'real', 'food', 1, true),
-  ('탄산음료', '시원한 음료수예요.', '/assets/img/items/shop/items/drink.png', 35, 'real', 'food', 1, true),
+  ('음료수', '시원한 음료수예요.', '/assets/img/items/shop/items/drink.png', 35, 'real', 'food', 1, true),
   ('블루베리 주스', '상큼한 블루베리 주스예요.', '/assets/img/items/shop/items/bluberry_juice.png', 40, 'real', 'food', 1, true),
   ('딸기 주스', '상큼한 딸기 주스예요.', '/assets/img/items/shop/items/strawberry_juice.png', 40, 'real', 'food', 1, true),
   ('망고 주스', '달콤한 망고 주스예요.', '/assets/img/items/shop/items/mango_juice.png', 40, 'real', 'food', 1, true),

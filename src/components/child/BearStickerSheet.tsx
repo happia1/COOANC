@@ -170,8 +170,8 @@ export default function BearStickerSheet({
   const [placing, setPlacing] = useState(false)
   /** 저장 실패 시 콘솔만 스쳐 지나가지 않도록, 시트 안에 남겨 두는 안내 문구입니다 */
   const [placeSnapError, setPlaceSnapError] = useState<string | null>(null)
-  /** 드래그 중 자석으로 당겨지는 빈 슬롯(시각 강조) */
-  const [magneticPreviewSlot, setMagneticPreviewSlot] = useState<number | null>(null)
+  /** 탭으로 선택된 grant ID — 선택 후 빈 슬롯을 탭하면 배치됩니다 */
+  const [selectedGrantId, setSelectedGrantId] = useState<string | null>(null)
   const [boardCompleteModalOpen, setBoardCompleteModalOpen] = useState(false)
   const [boardCompleteConfetti, setBoardCompleteConfetti] = useState(false)
   /** 닫힐 때 짧은 페이드아웃 후 언마운트(바텀시트 대신 중앙 팝업용) */
@@ -187,18 +187,7 @@ export default function BearStickerSheet({
   /** `praiseGrantsRevision` 이 오르면 merge 없이 `initialGrants` 로 grants state 를 덮어씁니다 */
   const grantsRevisionAppliedRef = useRef(0)
 
-  /** 드래그 중인 grant id (포인터는 window 에서 추적) */
-  const dragRef = useRef<{
-    grantId: string
-    startX: number
-    startY: number
-    origX: number
-    origY: number
-    el: HTMLElement
-    pointerId: number
-  } | null>(null)
-
-  /** 스티커 좌표(%)는 이 박스(종횡비 보드) 기준이어야 함 — 바깥 래퍼와 크기가 다르면 드롭·위치가 틀어짐 */
+  /** 스티커 좌표(%)는 이 박스(종횡비 보드) 기준이어야 함 */
   const boardRef = useRef<HTMLDivElement>(null)
   /**
    * `setPlacing(true)` 보다 먼저 막는 동시 진입 방지용 — 같은 턴에 `placeOnSlot` 이 두 번 불리면
@@ -311,7 +300,7 @@ export default function BearStickerSheet({
 
   useEffect(() => {
     if (!open) {
-      setMagneticPreviewSlot(null)
+      setSelectedGrantId(null)
       setBoardCompleteConfetti(false)
     }
   }, [open])
@@ -548,119 +537,16 @@ export default function BearStickerSheet({
     [childId, occupiedSlots, onBoardCleared, onInventoryChange, bumpBoardCycle],
   )
 
-  // dragRef 는 state 가 아니라서 변경돼도 effect 가 다시 안 돕니다. 리스너는 항상 달고, 핸들러 안에서만 dragRef 를 검사합니다.
-  useEffect(() => {
-    if (!open) return
-
-    const onMove = (e: PointerEvent) => {
-      const d = dragRef.current
-      if (!d) return
-      const br = boardRef.current?.getBoundingClientRect()
-      if (!br || br.width <= 0 || br.height <= 0) return
-      const dx = ((e.clientX - d.startX) / br.width) * 100
-      const dy = ((e.clientY - d.startY) / br.height) * 100
-      const cxPct = d.origX + dx
-      const cyPct = d.origY + dy
-      const stickerCenterX = br.left + (cxPct / 100) * br.width
-      const stickerCenterY = br.top + (cyPct / 100) * br.height
-      const slotMag = nearestFreeSlotAtPixels(
-        stickerCenterX,
-        stickerCenterY,
-        e.clientX,
-        e.clientY,
-        MAGNET_RADIUS_SCALE,
-      )
-      setMagneticPreviewSlot(slotMag)
-      if (slotMag != null) {
-        const c = slotCenterPercent(slotMag)
-        if (c) {
-          setFloatPos((prev) => ({
-            ...prev,
-            [d.grantId]: { x: c.x, y: c.y },
-          }))
-          return
-        }
-      }
-      setFloatPos((prev) => ({
-        ...prev,
-        [d.grantId]: { x: cxPct, y: cyPct },
-      }))
-    }
-
-    const onUp = (e: PointerEvent) => {
-      const d = dragRef.current
-      dragRef.current = null
-      if (!d) return
-      try {
-        if (d.el.hasPointerCapture(d.pointerId)) d.el.releasePointerCapture(d.pointerId)
-      } catch {
-        /* noop */
-      }
-      const br = boardRef.current?.getBoundingClientRect()
-      if (!br || br.width <= 0 || br.height <= 0) {
-        setFloatPos((prev) => ({
-          ...prev,
-          [d.grantId]: { x: d.origX, y: d.origY },
-        }))
-        return
-      }
-      const dx = ((e.clientX - d.startX) / br.width) * 100
-      const dy = ((e.clientY - d.startY) / br.height) * 100
-      const cxPct = d.origX + dx
-      const cyPct = d.origY + dy
-      setMagneticPreviewSlot(null)
-      const stickerCenterX = br.left + (cxPct / 100) * br.width
-      const stickerCenterY = br.top + (cyPct / 100) * br.height
-      const slot = nearestFreeSlotAtPixels(
-        stickerCenterX,
-        stickerCenterY,
-        e.clientX,
-        e.clientY,
-        DROP_RADIUS_SCALE,
-      )
-      if (slot != null) void placeOnSlot(d.grantId, slot)
-      else
-        setFloatPos((prev) => ({
-          ...prev,
-          [d.grantId]: { x: d.origX, y: d.origY },
-        }))
-    }
-
-    window.addEventListener('pointermove', onMove)
-    window.addEventListener('pointerup', onUp)
-    window.addEventListener('pointercancel', onUp)
-    return () => {
-      window.removeEventListener('pointermove', onMove)
-      window.removeEventListener('pointerup', onUp)
-      window.removeEventListener('pointercancel', onUp)
-    }
-  }, [open, nearestFreeSlotAtPixels, placeOnSlot])
-
-  const onStickerPointerDown = useCallback(
-    (e: React.PointerEvent, grantId: string) => {
+  /**
+   * 종이 위 스티커 탭 — 선택/선택 취소 토글
+   * 드래그 없이 탭만으로 선택하고, 이후 빈 슬롯을 탭하면 배치합니다.
+   */
+  const onStickerTap = useCallback(
+    (grantId: string) => {
       if (placing) return
-      const pos = floatPos[grantId]
-      if (!pos) return
-      e.preventDefault()
-      e.stopPropagation()
-      setMagneticPreviewSlot(null)
-      const el = e.currentTarget as HTMLElement
-      try {
-        el.setPointerCapture(e.pointerId)
-      } catch {
-        /* 일부 브라우저에서 실패해도 window 리스너로 이동은 됨 */
-      }
-      dragRef.current = {
-        grantId,
-        startX: e.clientX,
-        startY: e.clientY,
-        origX: pos.x,
-        origY: pos.y,
-        el,
-        pointerId: e.pointerId,
-      }
+      setSelectedGrantId((prev) => (prev === grantId ? null : grantId))
     },
-    [floatPos, placing],
+    [placing],
   )
 
   return (
@@ -712,22 +598,33 @@ export default function BearStickerSheet({
             </button>
             <BearBoardFromAtlas atlas={atlas} />
 
-            {/* 1~20 드롭 영역(투명, 약한 테두리 — 터치는 넉넉한 원) */}
+            {/* 1~20 슬롯 — 선택된 스티커가 있을 때 탭하면 배치됩니다 */}
             {Array.from({ length: SLOT_TOTAL }, (_, i) => i + 1).map((slot) => {
               const c = slotCenterPercent(slot)
               if (!c) return null
               const taken = occupiedSlots.has(slot)
-              const magnetHere = !taken && magneticPreviewSlot === slot
+              const canPlace = !taken && !!selectedGrantId && !placing
+
               return (
-                <div
+                <button
                   key={slot}
-                  className={`absolute z-[5] rounded-full border border-dashed transition-all duration-150 ${
+                  type="button"
+                  disabled={taken || placing}
+                  onClick={() => {
+                    if (!canPlace) return
+                    void placeOnSlot(selectedGrantId!, slot)
+                    setSelectedGrantId(null)
+                  }}
+                  className={[
+                    'absolute z-[5] rounded-full border border-dashed transition-all duration-150 focus:outline-none',
                     taken
-                      ? 'border-transparent'
-                      : magnetHere
-                        ? 'border-brand-yellow bg-brand-yellow/25 shadow-[0_0_12px_rgba(250,204,21,0.55)] ring-2 ring-brand-yellow/80'
-                        : 'border-white/25 bg-white/5'
-                  }`}
+                      ? 'border-transparent cursor-default'
+                      : canPlace
+                        ? 'border-brand-yellow bg-brand-yellow/30 shadow-[0_0_10px_rgba(250,204,21,0.5)] ring-2 ring-brand-yellow/70 cursor-pointer active:scale-95'
+                        : selectedGrantId
+                          ? 'border-white/40 bg-white/10 cursor-pointer'
+                          : 'border-white/25 bg-white/5 cursor-default',
+                  ].join(' ')}
                   style={{
                     left: `${c.x}%`,
                     top: `${c.y}%`,
@@ -735,7 +632,8 @@ export default function BearStickerSheet({
                     aspectRatio: '1',
                     transform: 'translate(-50%, -50%)',
                   }}
-                  aria-hidden
+                  aria-label={taken ? undefined : `${slot}번 칸에 스티커 붙이기`}
+                  aria-hidden={taken}
                 />
               )
             })}
@@ -766,18 +664,25 @@ export default function BearStickerSheet({
             {unplacedGrants.map((g) => {
               const pos = floatPos[g.id]
               if (!pos) return null
+              const isSelected = selectedGrantId === g.id
               return (
                 <button
                   key={g.id}
                   type="button"
-                  className="absolute z-[20] cursor-grab touch-none border-0 bg-transparent p-0 shadow-none outline-none ring-0 active:cursor-grabbing focus-visible:ring-2 focus-visible:ring-brand-blue/40"
+                  onClick={() => onStickerTap(g.id)}
+                  className={[
+                    'absolute z-[20] border-0 bg-transparent p-0 shadow-none outline-none transition-all duration-150 active:scale-95',
+                    isSelected
+                      ? 'ring-[3px] ring-blue-400 ring-offset-1 rounded-full scale-110 drop-shadow-[0_0_8px_rgba(96,165,250,0.8)]'
+                      : 'cursor-pointer hover:scale-105',
+                  ].join(' ')}
                   style={{
                     left: `${pos.x}%`,
                     top: `${pos.y}%`,
                     transform: 'translate(-50%, -50%)',
                   }}
-                  onPointerDown={(e) => onStickerPointerDown(e, g.id)}
-                  aria-label="스티커를 드래그해 숫자 칸에 놓기"
+                  aria-label={isSelected ? '선택됨 — 빈 칸을 탭해 붙이세요' : '스티커 탭해서 선택'}
+                  aria-pressed={isSelected}
                 >
                   <GrantStickerThumb spriteKey={g.sprite_key} w={44} atlas={atlas} plain />
                 </button>

@@ -338,7 +338,8 @@ async function createMissionsFromIds(
         scheduled_time: time,
         credit_reward: 10,
         exp_reward: 10,
-        heart_reward: 0,
+        /** DB 기본(1)과 맞춤 — 0이면 자녀 미션 카드·부모 `하트`와 어긋나 보임 */
+        heart_reward: 1,
         difficulty: 'easy',
         repeat_type: repeatType,
         level_required: 0,
@@ -370,7 +371,7 @@ async function createMissionsFromIds(
           scheduled_time: t,
           credit_reward: 10,
           exp_reward: 10,
-          heart_reward: 0,
+          heart_reward: 1,
           difficulty: 'easy',
           repeat_type: 'daily',
           level_required: 0,
