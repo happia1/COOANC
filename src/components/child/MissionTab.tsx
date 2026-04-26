@@ -552,9 +552,8 @@ export default function MissionTab({
           <p className="text-sm text-gray-400">부모님이 미션을 만들어주실 거예요!</p>
         </div>
       ) : incompleteOrdered.length === 0 ? (
-        <div className="flex flex-col items-center justify-center gap-1 px-6 py-6 text-center">
-          <p className="text-sm font-bold text-gray-500">오늘의 미션을 모두 완료했어요</p>
-        </div>
+        // 전부 완료 시 인라인 문구 제거 — 자녀 홈(ChildScreen)의 AllMissionCompleteOverlay만 사용
+        <div className="shrink-0 px-6 py-2" aria-hidden />
       ) : (
         <>
           {/**

@@ -48,6 +48,11 @@ import { createClient } from '@/lib/supabase/client'
 import { fireMissionCardConfetti } from '@/lib/missionCardConfetti'
 import { tryApplyCompletePayload } from '@/lib/applyDailyMissionCompleteStats'
 import AllMissionCompleteOverlay from '@/components/child/AllMissionCompleteOverlay'
+import SleepModeScreen from '@/components/child/SleepModeScreen'
+import MorningWakeScreen from '@/components/child/MorningWakeScreen'
+import SleepReadyPopup from '@/components/child/SleepReadyPopup'
+import SchoolTimePopup from '@/components/child/SchoolTimePopup'
+import { readRoutineAlarmPrefs } from '@/lib/routineAlarmLocalPrefs'
 
 // ─── 파티클 타입 정의 ────────────────────────────────────────────────────────
 
@@ -258,6 +263,33 @@ export default function ChildScreen({
   /** 총 크레딧 (지갑+저금통+돈바구니 합산) */
   const totalCredits = stats?.credits ?? 0
 
+  /**
+   * 부모가 저장한 「잘 준비」 알림 시각 (HH:MM) — child_stats.sleep_ready_time
+   * 비개발자 설명: 이 시간이 되면 잠자리 준비 알림 팝업이 한 번 떠요.
+   */
+  const sleepReadyTimeHHMM = useMemo(() => {
+    const t = initialStats?.sleep_ready_time?.trim()
+    if (!t || !/^\d{1,2}:\d{2}$/.test(t)) return null
+    const [h, m] = t.split(':')
+    return `${h.padStart(2, '0')}:${m.padStart(2, '0')}`
+  }, [initialStats?.sleep_ready_time])
+
+  /** 등원 알람 시각 — child_stats.school_time */
+  const schoolTimeHHMM = useMemo(() => {
+    const t = initialStats?.school_time?.trim()
+    if (!t || !/^\d{1,2}:\d{2}$/.test(t)) return null
+    const [h, m] = t.split(':')
+    return `${h.padStart(2, '0')}:${m.padStart(2, '0')}`
+  }, [initialStats?.school_time])
+
+  /** DB 플래그 — 주중·주말·전체 사용 (서버 기본값과 맞춤) */
+  const schoolTimeEnabled = initialStats?.school_time_enabled ?? false
+  const schoolTimeWeekday = initialStats?.school_time_weekday ?? true
+  const schoolTimeWeekend = initialStats?.school_time_weekend ?? true
+  const sleepReadyTimeEnabled = initialStats?.sleep_ready_time_enabled ?? true
+  const sleepReadyTimeWeekday = initialStats?.sleep_ready_time_weekday ?? true
+  const sleepReadyTimeWeekend = initialStats?.sleep_ready_time_weekend ?? true
+
   // ── 미션 완료 상태 ─────────────────────────────────────────────────────────
 
   const [done, setDone] = useState<Set<string>>(
@@ -290,13 +322,49 @@ export default function ChildScreen({
 
   /** 전체 미션 완주 축하 오버레이 표시 여부 */
   const [showCelebration, setShowCelebration] = useState(false)
-  /** 같은 날·세션에서 축하를 한 번만 띄우기 위한 플래그 (날짜가 바뀌면 다시 false 로 리셋) */
-  const [celebrationShown, setCelebrationShown] = useState(false)
+  /**
+   * 같은 날·세션에서 축하 스케줄을 한 번만 걸기 위한 ref (useState 대신 stale closure 방지)
+   * 비개발자 설명: 마지막 미션을 탭해 완료 처리할 때만 true 로 바뀌며, 날짜가 바뀌면 다시 false 로 돌아갑니다.
+   */
+  const celebrationShownRef = useRef(false)
+  /** 700ms 뒤 오버레이 표시 예약 — API 실패 롤백 시 clearTimeout */
+  const celebrationShowTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null)
   /**
    * 오늘(이 브라우저 세션에서) 미션 완료로 누적한 코인 합.
    * 비개발자 설명: 화면에 다시 들어온 뒤 이미 끝낸 미션이 있으면 0에서 시작할 수 있습니다.
    */
   const [todayEarnedCredits, setTodayEarnedCredits] = useState(0)
+
+  /** 미션 완주 후 수면 모드(잘자 화면) */
+  const [isSleeping, setIsSleeping] = useState(false)
+  /** 수면 모드 다음 아침 인사 화면 */
+  const [showMorningWake, setShowMorningWake] = useState(false)
+  /**
+   * 루틴 기상 알람 시각 "HH:MM" — 부모가 알람을 끄면 null (자동 아침 인사 없음, 탭으로만 깸)
+   * 비개발자 설명: 이 태블릿 브라우저에 저장된 루틴 알람 설정을 읽습니다.
+   */
+  const [routineWakeAlarmHHMM, setRoutineWakeAlarmHHMM] = useState<string | null>(null)
+
+  /** 잘 준비 알림 팝업 — 하루 한 번(날짜 바뀌면 ref 리셋) */
+  const [showSleepReady, setShowSleepReady] = useState(false)
+  const sleepReadyShownRef = useRef(false)
+  /** 등원 알림 팝업 — 하루 한 번 */
+  const [showSchoolTime, setShowSchoolTime] = useState(false)
+  const schoolTimeShownRef = useRef(false)
+  /** 축하·수면·기상·다른 루틴 팝업이 떠 있으면 새 알림을 띄우지 않음 */
+  const blockRoutineAlarmPopupsRef = useRef(false)
+
+  /** 클라이언트에서만 루틴 기상 시각 로드 */
+  useEffect(() => {
+    const p = readRoutineAlarmPrefs()
+    const t = p.wakeTime?.trim()
+    if (p.notifyWake && t && /^\d{1,2}:\d{2}$/.test(t)) {
+      const [hh, mm] = t.split(':')
+      setRoutineWakeAlarmHHMM(`${hh.padStart(2, '0')}:${mm.padStart(2, '0')}`)
+    } else {
+      setRoutineWakeAlarmHHMM(null)
+    }
+  }, [])
 
   useEffect(() => {
     setMissionList(dailyMissions)
@@ -305,10 +373,99 @@ export default function ChildScreen({
 
   /** 날짜(오늘)이 바뀌면 축하·누적 코인 상태를 초기화합니다. */
   useEffect(() => {
-    setCelebrationShown(false)
+    celebrationShownRef.current = false
+    if (celebrationShowTimerRef.current != null) {
+      clearTimeout(celebrationShowTimerRef.current)
+      celebrationShowTimerRef.current = null
+    }
     setShowCelebration(false)
     setTodayEarnedCredits(0)
+    setIsSleeping(false)
+    setShowMorningWake(false)
+    sleepReadyShownRef.current = false
+    setShowSleepReady(false)
+    schoolTimeShownRef.current = false
+    setShowSchoolTime(false)
   }, [today])
+
+  /** 루틴 시각 알림은 ref 로 ‘하루 1회’만 — 축하·수면·아침 화면만 막음 */
+  useEffect(() => {
+    blockRoutineAlarmPopupsRef.current = !!(showCelebration || isSleeping || showMorningWake)
+  }, [showCelebration, isSleeping, showMorningWake])
+
+  /**
+   * 잘 준비·등원 시각 도달 시 팝업 — 30초마다 현재 시각과 비교
+   * 비개발자 설명: 배터리를 아끼려고 1초마다 돌리지 않고, 대략 반분 안에 맞춰 뜹니다.
+   */
+  useEffect(() => {
+    if (!sleepReadyTimeHHMM && !schoolTimeHHMM) return
+    const check = () => {
+      if (blockRoutineAlarmPopupsRef.current) return
+      const now = new Date()
+      const hh = String(now.getHours()).padStart(2, '0')
+      const mm = String(now.getMinutes()).padStart(2, '0')
+      const current = `${hh}:${mm}`
+      const isWeekend = [0, 6].includes(now.getDay())
+
+      const allowSleepReady =
+        sleepReadyTimeHHMM &&
+        sleepReadyTimeEnabled &&
+        (isWeekend ? sleepReadyTimeWeekend : sleepReadyTimeWeekday)
+      if (allowSleepReady && current === sleepReadyTimeHHMM && !sleepReadyShownRef.current) {
+        sleepReadyShownRef.current = true
+        setShowSleepReady(true)
+        // #region agent log
+        fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'c8e235' },
+          body: JSON.stringify({
+            sessionId: 'c8e235',
+            hypothesisId: 'H1',
+            location: 'ChildScreen.tsx:routineAlarmCheck',
+            message: 'sleep_ready popup triggered',
+            data: { current, isWeekend },
+            timestamp: Date.now(),
+          }),
+        }).catch(() => {})
+        // #endregion
+      } else {
+        const allowSchool =
+          schoolTimeHHMM &&
+          schoolTimeEnabled &&
+          (isWeekend ? schoolTimeWeekend : schoolTimeWeekday)
+        if (allowSchool && current === schoolTimeHHMM && !schoolTimeShownRef.current) {
+          schoolTimeShownRef.current = true
+          setShowSchoolTime(true)
+          // #region agent log
+          fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'c8e235' },
+            body: JSON.stringify({
+              sessionId: 'c8e235',
+              hypothesisId: 'H2',
+              location: 'ChildScreen.tsx:routineAlarmCheck',
+              message: 'school_time popup triggered',
+              data: { current, isWeekend },
+              timestamp: Date.now(),
+            }),
+          }).catch(() => {})
+          // #endregion
+        }
+      }
+    }
+    check()
+    const id = window.setInterval(check, 30000)
+    return () => clearInterval(id)
+  }, [
+    sleepReadyTimeHHMM,
+    schoolTimeHHMM,
+    sleepReadyTimeEnabled,
+    sleepReadyTimeWeekday,
+    sleepReadyTimeWeekend,
+    schoolTimeEnabled,
+    schoolTimeWeekday,
+    schoolTimeWeekend,
+  ])
 
   /** 자정 자동 새로고침 */
   useEffect(() => {
@@ -388,32 +545,6 @@ export default function ChildScreen({
   )
 
   /**
-   * 가시 미션(숨겨진·폐지된 것 제외)이 모두 완료되면 잠시 뒤 축하 화면을 띄웁니다.
-   * 비개발자 설명: 오늘 할 일이 하나도 남지 않았을 때만 한 번 터집니다.
-   */
-  useEffect(() => {
-    const hasAny = visibleMissions.length > 0
-    const allDone = visibleMissions.every((dm) => done.has(dm.id))
-
-    // 디버그: 전체 미션 완주 축하가 언제 뜨는지 브라우저 콘솔에서 확인 (배포 전 제거 권장)
-    console.log('[celebration]', {
-      hasAny,
-      allDone,
-      celebrationShown,
-      visibleCount: visibleMissions.length,
-      doneCount: done.size,
-      doneIds: [...done].slice(0, 3),
-      visibleIds: visibleMissions.map((m) => m.id).slice(0, 3),
-    })
-
-    if (allDone && hasAny && !celebrationShown) {
-      setCelebrationShown(true)
-      const t = window.setTimeout(() => setShowCelebration(true), 700)
-      return () => clearTimeout(t)
-    }
-  }, [visibleMissions, done, celebrationShown])
-
-  /**
    * 배지 반짝임 트리거 — 파티클이 모두 도착한 뒤(650 ms) 호출됩니다.
    *
    * 비개발자 설명: 코인이 배지에 닿으면 황금빛 빛남 + 숫자가 잠깐 커집니다.
@@ -491,7 +622,21 @@ export default function ChildScreen({
       }
 
       setTimeout(() => {
-        setDone((prev) => new Set([...prev, dm.id]))
+        setDone((prev) => {
+          const next = new Set([...prev, dm.id])
+          const allNowDone = visibleMissions.every((m) => next.has(m.id))
+          if (allNowDone && visibleMissions.length > 0 && !celebrationShownRef.current) {
+            celebrationShownRef.current = true
+            if (celebrationShowTimerRef.current != null) {
+              clearTimeout(celebrationShowTimerRef.current)
+            }
+            celebrationShowTimerRef.current = window.setTimeout(() => {
+              celebrationShowTimerRef.current = null
+              setShowCelebration(true)
+            }, 700)
+          }
+          return next
+        })
       }, 220)
 
       void (async () => {
@@ -512,6 +657,12 @@ export default function ChildScreen({
             setStats((prev) => tryApplyCompletePayload(prev, json) ?? prev)
           } else {
             setTodayEarnedCredits((p) => Math.max(0, p - creditReward))
+            if (celebrationShowTimerRef.current != null) {
+              clearTimeout(celebrationShowTimerRef.current)
+              celebrationShowTimerRef.current = null
+            }
+            celebrationShownRef.current = false
+            setShowCelebration(false)
             setDone((prev) => {
               const next = new Set(prev)
               next.delete(dm.id)
@@ -520,6 +671,12 @@ export default function ChildScreen({
           }
         } catch {
           setTodayEarnedCredits((p) => Math.max(0, p - creditReward))
+          if (celebrationShowTimerRef.current != null) {
+            clearTimeout(celebrationShowTimerRef.current)
+            celebrationShowTimerRef.current = null
+          }
+          celebrationShownRef.current = false
+          setShowCelebration(false)
           setDone((prev) => {
             const next = new Set(prev)
             next.delete(dm.id)
@@ -528,7 +685,7 @@ export default function ChildScreen({
         }
       })()
     },
-    [today, childId, triggerBadgeShine],
+    [today, childId, triggerBadgeShine, visibleMissions],
   )
 
   const handleMissionComplete = useCallback(
@@ -863,11 +1020,8 @@ export default function ChildScreen({
                 </div>
               </div>
             ) : incompleteOrdered.length === 0 ? (
-              <div className="px-5">
-                <div className="bg-white/80 backdrop-blur-sm rounded-2xl px-4 py-5 text-center">
-                  <p className="font-bold text-green-600 text-sm">🎉 오늘의 미션을 모두 완료했어요!</p>
-                </div>
-              </div>
+              // 전부 완료 시 인라인 배너는 쓰지 않음 — 축하는 AllMissionCompleteOverlay 한 곳에서만 처리
+              <div className="px-5 shrink-0" aria-hidden />
             ) : (
               <div
                 className="flex flex-row gap-3 overflow-x-auto px-5 pb-3 pt-1 snap-x snap-mandatory [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
@@ -924,13 +1078,41 @@ export default function ChildScreen({
         onDeny={handleRapidTapDeny}
       />
 
+      {showSchoolTime && !isSleeping && !showMorningWake ? (
+        <SchoolTimePopup childName={childName} onClose={() => setShowSchoolTime(false)} />
+      ) : showSleepReady && !isSleeping && !showMorningWake ? (
+        <SleepReadyPopup
+          childName={childName}
+          onGoMission={() => setShowSleepReady(false)}
+          onClose={() => setShowSleepReady(false)}
+        />
+      ) : null}
+
       {showCelebration && (
         <AllMissionCompleteOverlay
           todayCredits={todayEarnedCredits}
           childName={childName}
-          onClose={() => setShowCelebration(false)}
+          onSleep={() => {
+            setShowCelebration(false)
+            setIsSleeping(true)
+          }}
         />
       )}
+
+      {isSleeping && !showMorningWake ? (
+        <SleepModeScreen
+          childName={childName}
+          alarmTime={routineWakeAlarmHHMM}
+          onWake={() => {
+            setIsSleeping(false)
+            setShowMorningWake(true)
+          }}
+        />
+      ) : null}
+
+      {showMorningWake ? (
+        <MorningWakeScreen childName={childName} onStart={() => setShowMorningWake(false)} />
+      ) : null}
     </>
   )
 }

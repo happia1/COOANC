@@ -3,7 +3,8 @@
 /**
  * 부모 「루틴 알람 설정」전용 시트 — 알람시계(alarm.png) 느낌의 생활 알람만 다룹니다.
  * - 알림·공지는 상단 `notice.png` 버튼의 ParentBellBoardSheet 를 씁니다(루틴 설정은 알람시계 버튼만).
- * - 온보딩과 동일한 기상·하원·귀가·취침 + 추가 일정, 우측 + 로 추가, 행마다 삭제 가능
+ * - 온보딩과 동일한 기상·등원·하원·귀가·잘 준비·취침 + 추가 일정, 우측 + 로 추가, 행마다 삭제 가능
+ * - 등원·잘 준비는 child_stats 에 시각·주중/주말·(주중|주말 중 하나라도 켜면 true 인) 사용 여부를 저장합니다.
  */
 
 import { useCallback, useEffect, useLayoutEffect, useState } from 'react'
@@ -15,11 +16,13 @@ import {
   type RoutineAlarmPrefsLoaded,
   type RoutineCustomAlarmStored,
 } from '@/lib/routineAlarmLocalPrefs'
+import { createClient } from '@/lib/supabase/client'
+import { useParentStore } from '@/store/parentStore'
 
 type SoundItem = { id: string; label: string; url: string }
 
 type SoundPickTarget =
-  | { type: 'core'; row: 'wake' | 'return' | 'sleep' }
+  | { type: 'core'; row: 'wake' | 'return' | 'sleep' | 'school' | 'sleepReady' }
   | { type: 'custom'; index: number }
 
 type Props = {
@@ -39,6 +42,7 @@ const ROUTINE_ALARM_CARD_GRID = 'grid w-full min-w-0 grid-cols-[minmax(0,1fr)_au
 const ROUTINE_ALARM_RIGHT_CLUSTER = 'flex shrink-0 items-center justify-end gap-0.5'
 
 export default function RoutineAlarmSettingsSheet({ open, onClose }: Props) {
+  const selectedChildId = useParentStore((s) => s.selectedChildId)
   const [hasSchool, setHasSchool] = useState(true)
   const [wakeTime, setWakeTime] = useState('07:00')
   const [sleepTime, setSleepTime] = useState('21:00')
@@ -52,6 +56,16 @@ export default function RoutineAlarmSettingsSheet({ open, onClose }: Props) {
   const [soundWake, setSoundWake] = useState('')
   const [soundReturn, setSoundReturn] = useState('')
   const [soundSleep, setSoundSleep] = useState('')
+  const [soundSchool, setSoundSchool] = useState('')
+  const [soundSleepReady, setSoundSleepReady] = useState('')
+  /** 등원 알람 — child_stats.school_time* 과 동기화 (전체 사용 여부는 주중·주말 중 하나라도 켜면 true 로 저장) */
+  const [schoolTime, setSchoolTime] = useState('08:30')
+  const [schoolWeekday, setSchoolWeekday] = useState(true)
+  const [schoolWeekend, setSchoolWeekend] = useState(true)
+  /** 잘 준비 알람 — child_stats.sleep_ready_time* 과 동기화 */
+  const [sleepReadyTime, setSleepReadyTime] = useState('20:30')
+  const [sleepReadyWeekday, setSleepReadyWeekday] = useState(true)
+  const [sleepReadyWeekend, setSleepReadyWeekend] = useState(true)
   const [customAlarms, setCustomAlarms] = useState<RoutineCustomAlarmStored[]>([])
   const [alarmSounds, setAlarmSounds] = useState<SoundItem[]>([])
   const [soundSheet, setSoundSheet] = useState<{ open: false } | { open: true; target: SoundPickTarget }>({
@@ -98,6 +112,14 @@ export default function RoutineAlarmSettingsSheet({ open, onClose }: Props) {
     setSoundWake(p.soundWake)
     setSoundReturn(p.soundReturn)
     setSoundSleep(p.soundSleep)
+    setSoundSchool(p.soundSchool)
+    setSoundSleepReady(p.soundSleepReady)
+    setSchoolTime(p.schoolTime)
+    setSchoolWeekday(p.schoolWeekday)
+    setSchoolWeekend(p.schoolWeekend)
+    setSleepReadyTime(p.sleepReadyTime)
+    setSleepReadyWeekday(p.sleepReadyWeekday)
+    setSleepReadyWeekend(p.sleepReadyWeekend)
     setCustomAlarms(p.customAlarms.map((c) => ({ ...c })))
 
     let cancelled = false
@@ -111,12 +133,47 @@ export default function RoutineAlarmSettingsSheet({ open, onClose }: Props) {
         setSoundWake((prev) => prev || first)
         setSoundReturn((prev) => prev || first)
         setSoundSleep((prev) => prev || first)
+        setSoundSchool((prev) => prev || first)
+        setSoundSleepReady((prev) => prev || first)
       })
       .catch(() => {})
     return () => {
       cancelled = true
     }
   }, [open])
+
+  /** 선택된 자녀가 있으면 서버에 저장된 등원·잘 준비 알람을 우선 표시 */
+  useEffect(() => {
+    if (!open || !selectedChildId) return
+    let cancelled = false
+    ;(async () => {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from('child_stats')
+        .select(
+          'school_time, school_time_enabled, school_time_weekday, school_time_weekend, sleep_ready_time, sleep_ready_time_enabled, sleep_ready_time_weekday, sleep_ready_time_weekend',
+        )
+        .eq('child_id', selectedChildId)
+        .maybeSingle()
+      if (cancelled || error || !data) return
+      const norm = (raw: unknown) => {
+        if (typeof raw !== 'string' || !/^\d{1,2}:\d{2}$/.test(raw)) return null
+        const [hh, mm] = raw.split(':')
+        return `${hh.padStart(2, '0')}:${mm.padStart(2, '0')}`
+      }
+      const st = norm(data.school_time)
+      if (st) setSchoolTime(st)
+      if (typeof data.school_time_weekday === 'boolean') setSchoolWeekday(data.school_time_weekday)
+      if (typeof data.school_time_weekend === 'boolean') setSchoolWeekend(data.school_time_weekend)
+      const sr = norm(data.sleep_ready_time)
+      if (sr) setSleepReadyTime(sr)
+      if (typeof data.sleep_ready_time_weekday === 'boolean') setSleepReadyWeekday(data.sleep_ready_time_weekday)
+      if (typeof data.sleep_ready_time_weekend === 'boolean') setSleepReadyWeekend(data.sleep_ready_time_weekend)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [open, selectedChildId])
 
   useEffect(() => {
     if (!addOpen || alarmSounds.length === 0) return
@@ -136,8 +193,17 @@ export default function RoutineAlarmSettingsSheet({ open, onClose }: Props) {
     }
   }, [])
 
-  function openSoundPickerCore(row: 'wake' | 'return' | 'sleep') {
-    const cur = row === 'wake' ? soundWake : row === 'return' ? soundReturn : soundSleep
+  function openSoundPickerCore(row: 'wake' | 'return' | 'sleep' | 'school' | 'sleepReady') {
+    const cur =
+      row === 'wake'
+        ? soundWake
+        : row === 'return'
+          ? soundReturn
+          : row === 'sleep'
+            ? soundSleep
+            : row === 'school'
+              ? soundSchool
+              : soundSleepReady
     setPickerSound(cur || alarmSounds[0]?.id || '')
     setSoundSheet({ open: true, target: { type: 'core', row } })
   }
@@ -156,7 +222,9 @@ export default function RoutineAlarmSettingsSheet({ open, onClose }: Props) {
     } else {
       if (t.row === 'wake') setSoundWake(v)
       else if (t.row === 'return') setSoundReturn(v)
-      else setSoundSleep(v)
+      else if (t.row === 'sleep') setSoundSleep(v)
+      else if (t.row === 'school') setSoundSchool(v)
+      else setSoundSleepReady(v)
     }
     setSoundSheet({ open: false })
   }
@@ -194,7 +262,9 @@ export default function RoutineAlarmSettingsSheet({ open, onClose }: Props) {
     setCustomAlarms((prev) => prev.map((c, i) => (i === index ? { ...c, ...patch } : c)))
   }
 
-  function handleSave() {
+  async function handleSave() {
+    const schoolEnabledOut = schoolWeekday || schoolWeekend
+    const sleepReadyEnabledOut = sleepReadyWeekday || sleepReadyWeekend
     const next: RoutineAlarmPrefsLoaded = {
       notifyWake,
       notifyReturn,
@@ -209,8 +279,37 @@ export default function RoutineAlarmSettingsSheet({ open, onClose }: Props) {
       wakeOnWeekend,
       returnOnWeekend,
       sleepOnWeekend,
+      sleepReadyTime,
+      soundSleepReady,
+      sleepReadyEnabled: sleepReadyEnabledOut,
+      sleepReadyWeekday,
+      sleepReadyWeekend,
+      schoolTime,
+      soundSchool,
+      schoolEnabled: schoolEnabledOut,
+      schoolWeekday,
+      schoolWeekend,
     }
     writeRoutineAlarmPrefs(next)
+    if (selectedChildId) {
+      const supabase = createClient()
+      const { error } = await supabase
+        .from('child_stats')
+        .update({
+          school_time: schoolTime,
+          school_time_enabled: schoolEnabledOut,
+          school_time_weekday: schoolWeekday,
+          school_time_weekend: schoolWeekend,
+          sleep_ready_time: sleepReadyTime,
+          sleep_ready_time_enabled: sleepReadyEnabledOut,
+          sleep_ready_time_weekday: sleepReadyWeekday,
+          sleep_ready_time_weekend: sleepReadyWeekend,
+        })
+        .eq('child_id', selectedChildId)
+      if (error) {
+        console.warn('[routine alarm] 등원·잘 준비 알람 저장 실패:', error.message)
+      }
+    }
     onClose()
   }
 
@@ -269,6 +368,17 @@ export default function RoutineAlarmSettingsSheet({ open, onClose }: Props) {
                 soundTitle={soundLabel(soundWake)}
                 onPickSound={() => openSoundPickerCore('wake')}
               />
+              <AlarmScheduleRow
+                label="등원"
+                time={schoolTime}
+                onTimeChange={setSchoolTime}
+                notify={schoolWeekday}
+                onNotifyChange={setSchoolWeekday}
+                weekendOn={schoolWeekend}
+                onWeekendChange={setSchoolWeekend}
+                soundTitle={soundLabel(soundSchool)}
+                onPickSound={() => openSoundPickerCore('school')}
+              />
               {hasSchool ? (
                 <AlarmScheduleRow
                   label="하원·귀가"
@@ -284,6 +394,17 @@ export default function RoutineAlarmSettingsSheet({ open, onClose }: Props) {
               ) : (
                 <p className="py-2 text-[10px] text-gray-400">가정보육으로 설정된 경우 하원·귀가 알람은 쓰지 않아요.</p>
               )}
+              <AlarmScheduleRow
+                label="잘 준비"
+                time={sleepReadyTime}
+                onTimeChange={setSleepReadyTime}
+                notify={sleepReadyWeekday}
+                onNotifyChange={setSleepReadyWeekday}
+                weekendOn={sleepReadyWeekend}
+                onWeekendChange={setSleepReadyWeekend}
+                soundTitle={soundLabel(soundSleepReady)}
+                onPickSound={() => openSoundPickerCore('sleepReady')}
+              />
               <AlarmScheduleRow
                 label="취침"
                 time={sleepTime}
@@ -326,7 +447,7 @@ export default function RoutineAlarmSettingsSheet({ open, onClose }: Props) {
               </button>
               <button
                 type="button"
-                onClick={handleSave}
+                onClick={() => void handleSave()}
                 className="flex-1 rounded-xl bg-[#4A90E2] py-2.5 text-xs font-bold text-white"
               >
                 저장

@@ -592,6 +592,7 @@ export default function RoutineOnboarding({ onComplete, linkedChildId }: Props) 
             wakeOnWeekend: true,
             returnOnWeekend: true,
             sleepOnWeekend: true,
+            sleepReadyTime: '20:30',
           }),
         )
       }

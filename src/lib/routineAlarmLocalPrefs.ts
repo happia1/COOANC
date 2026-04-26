@@ -21,6 +21,18 @@ export type RoutineAlarmPrefsJson = {
   wakeTime?: string
   returnHomeTime?: string
   sleepTime?: string
+  /** 잘 준비 알림 시각 HH:MM — child_stats.sleep_ready_time 과 함께 쓰기 위해 로컬에도 보관 */
+  sleepReadyTime?: string
+  /** 등원 알람 — 시각·소리·주중/주말·전체 사용 (소리 id 는 알람 음원 목록) */
+  school?: string
+  schoolTime?: string
+  schoolEnabled?: boolean
+  schoolWeekday?: boolean
+  schoolWeekend?: boolean
+  soundSleepReady?: string
+  sleepReadyEnabled?: boolean
+  sleepReadyWeekday?: boolean
+  sleepReadyWeekend?: boolean
   custom?: RoutineCustomAlarmStored[]
   /** 토·일(및 앱에서 주말로 보는 날)에도 해당 알림을 울릴지 — 없으면 true(기존 동작) */
   wakeOnWeekend?: boolean
@@ -32,6 +44,8 @@ const DEFAULTS = {
   wakeTime: '07:00',
   returnHomeTime: '15:00',
   sleepTime: '21:00',
+  sleepReadyTime: '20:30',
+  schoolTime: '08:30',
 } as const
 
 /** 루틴 탭에서 선택한 자녀의 기관 여부(하원·귀가 행 표시용) */
@@ -59,6 +73,17 @@ export type RoutineAlarmPrefsLoaded = {
   wakeOnWeekend: boolean
   returnOnWeekend: boolean
   sleepOnWeekend: boolean
+  /** 잘 준비 알림 시각 (HH:MM) */
+  sleepReadyTime: string
+  soundSleepReady: string
+  sleepReadyEnabled: boolean
+  sleepReadyWeekday: boolean
+  sleepReadyWeekend: boolean
+  schoolTime: string
+  soundSchool: string
+  schoolEnabled: boolean
+  schoolWeekday: boolean
+  schoolWeekend: boolean
 }
 
 function parsePrefsJson(raw: string | null): Partial<RoutineAlarmPrefsJson> {
@@ -86,6 +111,16 @@ export function readRoutineAlarmPrefs(): RoutineAlarmPrefsLoaded {
     wakeOnWeekend: true,
     returnOnWeekend: true,
     sleepOnWeekend: true,
+    sleepReadyTime: DEFAULTS.sleepReadyTime,
+    soundSleepReady: '',
+    sleepReadyEnabled: true,
+    sleepReadyWeekday: true,
+    sleepReadyWeekend: true,
+    schoolTime: DEFAULTS.schoolTime,
+    soundSchool: '',
+    schoolEnabled: true,
+    schoolWeekday: true,
+    schoolWeekend: true,
   }
   if (typeof window === 'undefined') return empty
 
@@ -102,6 +137,28 @@ export function readRoutineAlarmPrefs(): RoutineAlarmPrefsLoaded {
       : DEFAULTS.returnHomeTime
   const sleepTime =
     typeof j.sleepTime === 'string' && /^\d{2}:\d{2}$/.test(j.sleepTime) ? j.sleepTime : DEFAULTS.sleepTime
+  const sleepReadyTimeRaw = typeof j.sleepReadyTime === 'string' ? j.sleepReadyTime : ''
+  const sleepReadyTime =
+    /^\d{1,2}:\d{2}$/.test(sleepReadyTimeRaw)
+      ? (() => {
+          const [hh, mm] = sleepReadyTimeRaw.split(':')
+          return `${hh.padStart(2, '0')}:${mm.padStart(2, '0')}`
+        })()
+      : DEFAULTS.sleepReadyTime
+
+  const schoolTimeRaw = typeof j.schoolTime === 'string' ? j.schoolTime : ''
+  const schoolTime =
+    /^\d{1,2}:\d{2}$/.test(schoolTimeRaw)
+      ? (() => {
+          const [hh, mm] = schoolTimeRaw.split(':')
+          return `${hh.padStart(2, '0')}:${mm.padStart(2, '0')}`
+        })()
+      : DEFAULTS.schoolTime
+
+  const sleepReadyWeekday = typeof j.sleepReadyWeekday === 'boolean' ? j.sleepReadyWeekday : true
+  const sleepReadyWeekend = typeof j.sleepReadyWeekend === 'boolean' ? j.sleepReadyWeekend : true
+  const schoolWeekday = typeof j.schoolWeekday === 'boolean' ? j.schoolWeekday : true
+  const schoolWeekend = typeof j.schoolWeekend === 'boolean' ? j.schoolWeekend : true
 
   return {
     notifyWake: nw === null ? true : nw === '1',
@@ -125,6 +182,16 @@ export function readRoutineAlarmPrefs(): RoutineAlarmPrefsLoaded {
     wakeOnWeekend: typeof j.wakeOnWeekend === 'boolean' ? j.wakeOnWeekend : true,
     returnOnWeekend: typeof j.returnOnWeekend === 'boolean' ? j.returnOnWeekend : true,
     sleepOnWeekend: typeof j.sleepOnWeekend === 'boolean' ? j.sleepOnWeekend : true,
+    sleepReadyTime,
+    soundSleepReady: typeof j.soundSleepReady === 'string' ? j.soundSleepReady : '',
+    sleepReadyWeekday,
+    sleepReadyWeekend,
+    sleepReadyEnabled: sleepReadyWeekday || sleepReadyWeekend,
+    schoolTime,
+    soundSchool: typeof j.school === 'string' ? j.school : '',
+    schoolWeekday,
+    schoolWeekend,
+    schoolEnabled: schoolWeekday || schoolWeekend,
   }
 }
 
@@ -145,6 +212,16 @@ export function writeRoutineAlarmPrefs(p: RoutineAlarmPrefsLoaded): void {
     wakeOnWeekend: p.wakeOnWeekend,
     returnOnWeekend: p.returnOnWeekend,
     sleepOnWeekend: p.sleepOnWeekend,
+    sleepReadyTime: p.sleepReadyTime,
+    soundSleepReady: p.soundSleepReady,
+    sleepReadyEnabled: p.sleepReadyEnabled,
+    sleepReadyWeekday: p.sleepReadyWeekday,
+    sleepReadyWeekend: p.sleepReadyWeekend,
+    schoolTime: p.schoolTime,
+    school: p.soundSchool,
+    schoolEnabled: p.schoolEnabled,
+    schoolWeekday: p.schoolWeekday,
+    schoolWeekend: p.schoolWeekend,
   }
   localStorage.setItem('cooanc_alarm_prefs', JSON.stringify(payload))
 }

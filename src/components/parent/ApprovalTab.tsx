@@ -28,6 +28,7 @@ import {
 } from '@/lib/koreaDate'
 import { PARENT_EXTERNAL_SHOP_URL } from '@/constants/parentShop'
 import { purchaseRequestStatusPill } from '@/lib/purchaseRequestStatusUi'
+import { playAudio, CHILD_AUDIO } from '@/lib/childAudio'
 
 /** mission_logs 조회 시 부모 탭 목록과 동일한 필드(실시간 갱신용) */
 const MISSION_LOG_SELECT_FOR_LIST =
@@ -587,6 +588,7 @@ export default function ApprovalTab({
     if (!currentId) return
     setLoading(log.id)
     try {
+      playAudio(CHILD_AUDIO.dontLie)
       const res = await fetch('/api/mission/rollback', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

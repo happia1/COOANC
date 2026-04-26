@@ -5,31 +5,31 @@
  *
  * 비개발자 설명:
  * - 반투명 배경 위에 “미션 완료!” 메시지와 오늘 번 코인 합을 보여줍니다.
- * - 화면이 켜질 때 색종이(컨페티)가 잠시 터지도록 해 기분 좋은 마무리를 합니다.
- * - [좋아! 내일도 할게요]를 누르면 onClose로 닫힙니다.
+ * - 화면이 켜질 때는 소리 없이 색종이(컨페티)만 터집니다.
+ * - [내일 만나자! 잘자~]를 누르면 잘 준비 음성 후 수면 모드로 넘어갑니다(onSleep).
  */
 
 import { useEffect } from 'react'
 import confetti from 'canvas-confetti'
+import { playAudio, CHILD_AUDIO } from '@/lib/childAudio'
 
 interface Props {
   /** 오늘(이 세션에서) 미션으로 번 코인의 합 — 숫자 앞에 + 로 표시 */
   todayCredits: number
   /** 화면에 보일 아이 이름 */
   childName: string
-  /** 닫기 버튼 / 완료 시 부모에 알림 */
-  onClose: () => void
+  /** 잘 준비 음성 재생 후 수면 모드로 전환 */
+  onSleep: () => void
 }
 
 export default function AllMissionCompleteOverlay({
   todayCredits,
   childName,
-  onClose,
+  onSleep,
 }: Props) {
   useEffect(() => {
-    // 화면이 뜨고 아주 잠시 후에 색종이를 쏴서, 레이아웃이 잡힌 뒤에 터지게 합니다
+    // 화면이 뜨고 아주 잠시 후에 색종이를 쏴서, 레이아웃이 잡힌 뒤에 터지게 합니다 (팝업 오픈 시 음성 없음)
     const t1 = setTimeout(() => {
-      // 왼쪽 아래 쪽에서 위로 쏘는 느낌
       confetti({
         particleCount: 80,
         angle: 60,
@@ -38,7 +38,6 @@ export default function AllMissionCompleteOverlay({
         colors: ['#FFD700', '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A'],
         zIndex: 9999,
       })
-      // 오른쪽 대칭
       confetti({
         particleCount: 80,
         angle: 120,
@@ -49,7 +48,6 @@ export default function AllMissionCompleteOverlay({
       })
     }, 100)
 
-    // 잠시 뒤 가운데에서 한 번 더 크게
     const t2 = setTimeout(() => {
       confetti({
         particleCount: 150,
@@ -60,7 +58,6 @@ export default function AllMissionCompleteOverlay({
       })
     }, 300)
 
-    // 1초 뒤 좌·우에서 한 번씩 가볍게
     const t3 = setTimeout(() => {
       confetti({
         particleCount: 60,
@@ -87,26 +84,16 @@ export default function AllMissionCompleteOverlay({
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-center justify-center"
+      className="fixed inset-0 z-[9999] flex items-center justify-center"
       style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(6px)' }}
       role="dialog"
       aria-modal="true"
       aria-labelledby="all-mission-complete-title"
     >
       <div
-        className="bg-white rounded-3xl px-8 py-10 mx-6 text-center shadow-2xl w-full max-w-sm"
+        className="bg-white rounded-3xl px-8 pt-6 pb-10 mx-6 text-center shadow-2xl w-full max-w-sm"
         style={{ animation: 'celebratePopIn 0.5s cubic-bezier(0.34,1.56,0.64,1)' }}
       >
-        {/* 병아리 이모지: 위아래로 통통(글로벌 키프레임 celebrateJump) */}
-        <div
-          className="text-6xl mb-2 inline-block"
-          style={{ animation: 'celebrateJump 0.5s ease-in-out infinite alternate' }}
-        >
-          🐥
-        </div>
-
-        <div className="text-2xl mb-1">✨ 🎉 ✨</div>
-
         <p id="all-mission-complete-title" className="text-2xl font-black text-gray-800 mb-1">
           미션 완료!
         </p>
@@ -123,11 +110,10 @@ export default function AllMissionCompleteOverlay({
         >
           <p className="text-xs font-bold text-yellow-600 mb-2 tracking-wide">오늘 번 코인</p>
           <div className="flex items-center justify-center gap-2">
-            <span className="text-4xl" aria-hidden>🪙</span>
-            <span
-              className="text-5xl font-black"
-              style={{ color: '#D4A000' }}
-            >
+            <span className="text-4xl" aria-hidden>
+              🪙
+            </span>
+            <span className="text-5xl font-black" style={{ color: '#D4A000' }}>
               +{todayCredits}
             </span>
           </div>
@@ -137,7 +123,10 @@ export default function AllMissionCompleteOverlay({
 
         <button
           type="button"
-          onClick={onClose}
+          onClick={() => {
+            playAudio(CHILD_AUDIO.sleepReady)
+            window.setTimeout(() => onSleep(), 800)
+          }}
           className="w-full py-4 rounded-2xl font-black text-white text-lg
                      active:scale-95 transition-transform"
           style={{
@@ -145,7 +134,7 @@ export default function AllMissionCompleteOverlay({
             boxShadow: '0 4px 20px rgba(124,108,248,0.4)',
           }}
         >
-          좋아! 내일도 할게요 🚀
+          내일 만나자! 잘자~ 🌙
         </button>
       </div>
     </div>

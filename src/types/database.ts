@@ -65,6 +65,18 @@ export type ChildStats = {
   boat_step?: number
   /** 하루 1회 배 이동 게이트: 마지막으로 하트 5개를 채운 날짜 (YYYY-MM-DD) */
   last_hearts_full_date?: string | null
+  /**
+   * 잘 준비 알림 시각 HH:MM — 부모 루틴 알람 설정에서 지정, 자녀 화면에서 해당 분에 팝업
+   */
+  sleep_ready_time?: string | null
+  sleep_ready_time_enabled?: boolean
+  sleep_ready_time_weekday?: boolean
+  sleep_ready_time_weekend?: boolean
+  /** 등원 알림 HH:MM */
+  school_time?: string | null
+  school_time_enabled?: boolean
+  school_time_weekday?: boolean
+  school_time_weekend?: boolean
   created_at: string
   updated_at: string
 }

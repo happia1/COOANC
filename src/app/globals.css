@@ -676,6 +676,30 @@
   100% { transform: scale(1);   opacity: 1; }
 }
 
+/* 수면 모드(SleepModeScreen) 별 반짝임 */
+@keyframes starTwinkle {
+  from { opacity: 0.3; transform: scale(0.8); }
+  to   { opacity: 1;   transform: scale(1.2); }
+}
+
+/* 수면 모드 달 살짝 떠다님 */
+@keyframes moonFloat {
+  0%, 100% { transform: translateY(0) rotate(-5deg); }
+  50%      { transform: translateY(-15px) rotate(5deg); }
+}
+
+/* 기상 화면(MorningWakeScreen) 해 등장 */
+@keyframes sunRise {
+  from { transform: translateY(40px) scale(0.5); opacity: 0; }
+  to   { transform: translateY(0) scale(1);     opacity: 1; }
+}
+
+/* 수면 모드 하단 안내 문구 은은한 깜빡임 */
+@keyframes shimmer {
+  0%, 100% { opacity: 0.45; }
+  50%      { opacity: 0.85; }
+}
+
 /* 루틴 도우미 상단 키워드 행: 우측 끝 페이드(스크롤 여유가 있음을 힌트, 파스텔 흰·연보라) */
 .routine-agent-intent-scroll-fade {
   position: relative;

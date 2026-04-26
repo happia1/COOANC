@@ -17,6 +17,7 @@ import {
 } from '@/lib/parentBellPurchaseAck'
 import ParentBellBoardSheet from '@/components/parent/ParentBellBoardSheet'
 import RoutineAlarmSettingsSheet from '@/components/parent/RoutineAlarmSettingsSheet'
+import { playAudio, CHILD_AUDIO } from '@/lib/childAudio'
 
 /** 알림·공지(벨) 버튼용 PNG — `public/assets/img/common/ui/notice.png` */
 const PARENT_NOTICE_BELL_ICON_SRC = '/assets/img/common/ui/notice.png' as const
@@ -213,7 +214,10 @@ export default function ParentRoutineAlarmButton({ initialPendingApprovalCount }
 
         <button
           type="button"
-          onClick={() => setRoutineOpen(true)}
+          onClick={() => {
+            playAudio(CHILD_AUDIO.timeToGo)
+            setRoutineOpen(true)
+          }}
           className="flex h-8 w-8 items-center justify-center transition-opacity hover:opacity-80"
           aria-label="루틴 알람 설정"
         >
