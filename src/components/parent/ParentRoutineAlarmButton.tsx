@@ -36,6 +36,17 @@ export default function ParentRoutineAlarmButton({ initialPendingApprovalCount }
   /** 첫 번째 대기 목록 fetch 가 끝났는지 — 뱃지를 서버 숫자와 맞출 때 사용 */
   const [fetchDone, setFetchDone] = useState(false)
 
+  /**
+   * 최근 10분 이내에 미확인된 연속 탭 알림 목록.
+   * 각 항목: { id, child_id, detected_at, mission_count }
+   */
+  const [rapidTapAlerts, setRapidTapAlerts] = useState<{
+    id: string
+    child_id: string
+    detected_at: string
+    mission_count: number
+  }[]>([])
+
   /** 클라이언트에서만: 예전에 확인해 둔 id 를 불러옵니다 */
   useEffect(() => {
     setAcknowledgedIds(readAcknowledgedPurchaseRequestIds())
@@ -78,13 +89,64 @@ export default function ParentRoutineAlarmButton({ initialPendingApprovalCount }
     setFetchDone(true)
   }, [])
 
+  /**
+   * 최근 10분 이내 미확인 연속 탭 알림을 조회합니다.
+   * purchase_requests 폴링과 동일한 주기(30초)로 실행합니다.
+   */
+  const refreshRapidTapAlerts = useCallback(async () => {
+    const supabase = createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) return
+
+    const { data: links } = await supabase
+      .from('family_links')
+      .select('child_id')
+      .eq('parent_id', user.id)
+    const childIds = (links ?? []).map((r: { child_id: string }) => r.child_id)
+    if (childIds.length === 0) return
+
+    /** 10분 이내 미확인 알림만 조회합니다 */
+    const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString()
+    const { data } = await supabase
+      .from('rapid_tap_alerts')
+      .select('id, child_id, detected_at, mission_count')
+      .in('child_id', childIds)
+      .eq('acknowledged', false)
+      .gte('detected_at', tenMinutesAgo)
+      .order('detected_at', { ascending: false })
+      .limit(5)
+
+    setRapidTapAlerts(
+      (data ?? []) as { id: string; child_id: string; detected_at: string; mission_count: number }[],
+    )
+  }, [])
+
+  /** 연속 탭 알림을 확인 처리합니다(acknowledged = true). */
+  const acknowledgeRapidTapAlerts = useCallback(async () => {
+    if (rapidTapAlerts.length === 0) return
+    const supabase = createClient()
+    const ids = rapidTapAlerts.map((a) => a.id)
+    await supabase
+      .from('rapid_tap_alerts')
+      .update({ acknowledged: true })
+      .in('id', ids)
+    setRapidTapAlerts([])
+  }, [rapidTapAlerts])
+
   useEffect(() => {
     void refreshPendingPurchaseRows()
+    void refreshRapidTapAlerts()
     const interval = window.setInterval(() => {
       void refreshPendingPurchaseRows()
+      void refreshRapidTapAlerts()
     }, 30000)
     const onVisible = () => {
-      if (document.visibilityState === 'visible') void refreshPendingPurchaseRows()
+      if (document.visibilityState === 'visible') {
+        void refreshPendingPurchaseRows()
+        void refreshRapidTapAlerts()
+      }
     }
     window.addEventListener('focus', onVisible)
     document.addEventListener('visibilitychange', onVisible)
@@ -93,7 +155,7 @@ export default function ParentRoutineAlarmButton({ initialPendingApprovalCount }
       window.removeEventListener('focus', onVisible)
       document.removeEventListener('visibilitychange', onVisible)
     }
-  }, [refreshPendingPurchaseRows])
+  }, [refreshPendingPurchaseRows, refreshRapidTapAlerts])
 
   /** 아직 시트에서 확인하지 않은 대기 요청만 */
   const unreadPendingIds = useMemo(
@@ -103,7 +165,9 @@ export default function ParentRoutineAlarmButton({ initialPendingApprovalCount }
   const unreadPendingCount = unreadPendingIds.length
 
   /** 첫 fetch 전에는 서버 건수로 뱃지를 보여 주고, 이후에는 미확인 건만 셉니다 */
-  const badgeCount = fetchDone ? unreadPendingCount : initialPendingApprovalCount
+  const baseBadgeCount = fetchDone ? unreadPendingCount : initialPendingApprovalCount
+  /** 연속 탭 알림도 뱃지에 합산합니다 */
+  const badgeCount = baseBadgeCount + rapidTapAlerts.length
   const hasParentAlarms = badgeCount > 0
 
   /** 승인 탭으로 가기 직전: 현재 보이던 대기 건을 모두 「확인」처리 */
@@ -162,6 +226,8 @@ export default function ParentRoutineAlarmButton({ initialPendingApprovalCount }
         onClose={() => setBoardOpen(false)}
         unreadPendingCount={unreadPendingCount}
         onAcknowledgePurchaseNotifications={acknowledgePurchaseNotifications}
+        rapidTapAlerts={rapidTapAlerts}
+        onAcknowledgeRapidTapAlerts={acknowledgeRapidTapAlerts}
       />
 
       <RoutineAlarmSettingsSheet open={routineOpen} onClose={() => setRoutineOpen(false)} />

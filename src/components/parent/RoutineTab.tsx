@@ -655,11 +655,11 @@ export default function RoutineTab({
     setMissions((prev) => prev.map((x) => (x.id === updated.id ? updated : x)))
   }
 
-  async function handleSaveMissionRewards(missionId: string, credit: number, exp: number) {
+  async function handleSaveMissionRewards(missionId: string, credit: number, heart: number, exp: number) {
     const res = await fetch('/api/mission/patch-rewards', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ missionId, credit_reward: credit, exp_reward: exp }),
+      body: JSON.stringify({ missionId, credit_reward: credit, heart_reward: heart, exp_reward: exp }),
     })
     const json = await res.json().catch(() => ({}))
     if (!res.ok) {
@@ -696,7 +696,15 @@ export default function RoutineTab({
        * - md+: 하단 우측 고정 (bottom-6)
        */}
       <div className="pointer-events-none fixed inset-x-0 bottom-[calc(60px+env(safe-area-inset-bottom,0px)+10px)] z-[55] flex justify-center md:bottom-6">
-        <div className="routine-fab-cloud pointer-events-auto flex w-full max-w-md justify-end px-4 md:max-w-none md:px-8">
+        {/**
+         * pointer-events-none 을 래퍼 div에도 유지합니다.
+         * 이전에는 routine-fab-cloud div에 pointer-events-auto 를 두어
+         * 버튼 주변 빈 영역(w-full 전체 너비)이 클릭 이벤트를 가로챘습니다.
+         * 그로 인해 하단 콘텐츠(예: 「매일 일정」 토글 버튼)가 이 영역과 겹칠 때
+         * 탭해도 반응하지 않는 문제가 발생했습니다.
+         * pointer-events-auto 를 버튼 자체에만 적용해 빈 공간은 click-through 되도록 합니다.
+         */}
+        <div className="routine-fab-cloud pointer-events-none flex w-full max-w-md justify-end px-4 md:max-w-none md:px-8">
           <button
             type="button"
             disabled={!currentId}
@@ -706,7 +714,7 @@ export default function RoutineTab({
                 ? `루틴 도우미, 새 답장 ${routineAgentUnread}개. 열어서 확인하기`
                 : '루틴 도우미 챗봇 열기'
             }
-            className="relative flex h-12 w-12 shrink-0 items-center justify-center overflow-visible rounded-full border border-sky-100/90 bg-white shadow-[0_10px_28px_-6px_rgba(59,130,246,0.35),0_4px_14px_-4px_rgba(15,23,42,0.12)] transition active:scale-[0.94] disabled:pointer-events-none disabled:opacity-40"
+            className="pointer-events-auto relative flex h-12 w-12 shrink-0 items-center justify-center overflow-visible rounded-full border border-sky-100/90 bg-white shadow-[0_10px_28px_-6px_rgba(59,130,246,0.35),0_4px_14px_-4px_rgba(15,23,42,0.12)] transition active:scale-[0.94] disabled:pointer-events-none disabled:opacity-40"
           >
             {/* eslint-disable-next-line @next/next/no-img-element -- 작은 브랜드 마크 */}
             <img src={TOPBAR_LOGO_SRC} alt="" className="h-8 w-8 object-contain" />
@@ -1156,10 +1164,11 @@ function MissionRewardEditModal({
 }: {
   mission: Mission | null
   onClose: () => void
-  onSave: (missionId: string, credit: number, exp: number) => Promise<void>
+  onSave: (missionId: string, credit: number, heart: number, exp: number) => Promise<void>
 }) {
   const [portalReady, setPortalReady] = useState(false)
   const [credit, setCredit] = useState('0')
+  const [heart, setHeart] = useState('0')
   const [exp, setExp] = useState('0')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
@@ -1171,6 +1180,7 @@ function MissionRewardEditModal({
   useEffect(() => {
     if (!mission) return
     setCredit(String(Math.max(0, mission.credit_reward)))
+    setHeart(String(Math.max(0, mission.heart_reward)))
     setExp(String(Math.max(0, mission.exp_reward)))
     setErr(null)
     setBusy(false)
@@ -1179,13 +1189,14 @@ function MissionRewardEditModal({
   if (!mission || !portalReady) return null
 
   const parsedCredit = Math.max(0, Math.floor(Number(credit) || 0))
+  const parsedHeart = Math.max(0, Math.floor(Number(heart) || 0))
   const parsedExp = Math.max(0, Math.floor(Number(exp) || 0))
 
   async function submit() {
     setBusy(true)
     setErr(null)
     try {
-      await onSave(mission.id, parsedCredit, parsedExp)
+      await onSave(mission.id, parsedCredit, parsedHeart, parsedExp)
       onClose()
     } catch (e) {
       setErr(e instanceof Error ? e.message : '저장에 실패했어요')
@@ -1201,7 +1212,7 @@ function MissionRewardEditModal({
         <p className="text-center text-sm font-black text-gray-900">보상 수정</p>
         <p className="mt-1 text-center text-xs font-semibold text-gray-600">{mission.title}</p>
 
-        <div className="mt-3 grid grid-cols-2 gap-2">
+        <div className="mt-3 grid grid-cols-3 gap-2">
           <label className="flex flex-col gap-1 text-[11px] font-bold text-gray-600">
             크레딧
             <input
@@ -1211,6 +1222,17 @@ function MissionRewardEditModal({
               value={credit}
               onChange={(e) => setCredit(e.target.value)}
               className="rounded-lg border border-gray-200 px-2 py-2 text-sm font-black tabular-nums text-sky-900"
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-[11px] font-bold text-gray-600">
+            하트
+            <input
+              type="number"
+              min={0}
+              step={1}
+              value={heart}
+              onChange={(e) => setHeart(e.target.value)}
+              className="rounded-lg border border-gray-200 px-2 py-2 text-sm font-black tabular-nums text-rose-600"
             />
           </label>
           <label className="flex flex-col gap-1 text-[11px] font-bold text-gray-600">

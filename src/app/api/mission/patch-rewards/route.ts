@@ -5,7 +5,7 @@ import type { Mission } from '@/types/database'
 
 /**
  * PATCH /api/mission/patch-rewards
- * 부모가 연결된 자녀의 미션 템플릿 보상(크레딧·EXP)을 수정합니다.
+ * 부모가 연결된 자녀의 미션 템플릿 보상(크레딧·하트·EXP)을 수정합니다.
  */
 export async function PATCH(req: NextRequest) {
   const supabase = await createClient()
@@ -16,12 +16,14 @@ export async function PATCH(req: NextRequest) {
 
   let missionId = ''
   let credit_reward = 0
+  let heart_reward = 0
   let exp_reward = 0
   try {
     const b = await req.json()
     missionId = String(b.missionId ?? '').trim()
     credit_reward = Math.max(0, Math.floor(Number(b.credit_reward) || 0))
-    exp_reward = Math.max(0, Math.floor(Number(b.exp_reward) || 0))
+    heart_reward  = Math.max(0, Math.floor(Number(b.heart_reward)  || 0))
+    exp_reward    = Math.max(0, Math.floor(Number(b.exp_reward)    || 0))
   } catch {
     return NextResponse.json({ error: '요청 형식이 올바르지 않아요' }, { status: 400 })
   }
@@ -63,7 +65,7 @@ export async function PATCH(req: NextRequest) {
 
   const { data: updated, error: upErr } = await db
     .from('missions')
-    .update({ credit_reward, exp_reward })
+    .update({ credit_reward, heart_reward, exp_reward })
     .eq('id', missionId)
     .select('*')
     .maybeSingle()

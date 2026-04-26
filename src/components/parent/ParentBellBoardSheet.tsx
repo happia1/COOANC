@@ -12,6 +12,13 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { PARENT_BELL_NOTICE_ITEMS } from '@/lib/parentBellNoticeItems'
 
+type RapidTapAlert = {
+  id: string
+  child_id: string
+  detected_at: string
+  mission_count: number
+}
+
 type Props = {
   open: boolean
   onClose: () => void
@@ -19,6 +26,10 @@ type Props = {
   unreadPendingCount: number
   /** 승인 탭으로 이동하기 직전에 호출해, 해당 알림을 확인한 것으로 기록합니다 */
   onAcknowledgePurchaseNotifications: () => void
+  /** 최근 10분 이내 미확인 연속 탭 알림 목록 */
+  rapidTapAlerts?: RapidTapAlert[]
+  /** 연속 탭 알림 확인 처리 콜백 */
+  onAcknowledgeRapidTapAlerts?: () => void
 }
 
 export default function ParentBellBoardSheet({
@@ -26,6 +37,8 @@ export default function ParentBellBoardSheet({
   onClose,
   unreadPendingCount,
   onAcknowledgePurchaseNotifications,
+  rapidTapAlerts = [],
+  onAcknowledgeRapidTapAlerts,
 }: Props) {
   const router = useRouter()
   const [portalReady, setPortalReady] = useState(false)
@@ -69,25 +82,68 @@ export default function ParentBellBoardSheet({
           </div>
 
           <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-3">
-            {unreadPendingCount > 0 ? (
+            {(unreadPendingCount > 0 || rapidTapAlerts.length > 0) ? (
               <div>
                 <p className="mb-2 px-0.5 text-[10px] font-black uppercase tracking-wide text-gray-500">알림</p>
-                <Link
-                  href="/parent/approval"
-                  onClick={() => {
-                    onAcknowledgePurchaseNotifications()
-                    onClose()
-                  }}
-                  className="flex items-center justify-between gap-2 rounded-xl border border-gray-200 bg-white px-3 py-3 transition-colors hover:bg-gray-50"
-                >
-                  <div className="min-w-0">
-                    <p className="text-xs font-extrabold text-gray-900">구매 요청 {unreadPendingCount}건 대기 중</p>
-                    <p className="mt-1 text-[11px] leading-relaxed text-gray-600">승인 탭에서 처리할 수 있어요</p>
-                  </div>
-                  <span className="shrink-0 text-lg font-bold text-gray-400" aria-hidden>
-                    ›
-                  </span>
-                </Link>
+                <ul className="space-y-2">
+                  {/* 구매 승인 대기 알림 */}
+                  {unreadPendingCount > 0 ? (
+                    <li>
+                      <Link
+                        href="/parent/approval"
+                        onClick={() => {
+                          onAcknowledgePurchaseNotifications()
+                          onClose()
+                        }}
+                        className="flex items-center justify-between gap-2 rounded-xl border border-gray-200 bg-white px-3 py-3 transition-colors hover:bg-gray-50"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-xs font-extrabold text-gray-900">구매 요청 {unreadPendingCount}건 대기 중</p>
+                          <p className="mt-1 text-[11px] leading-relaxed text-gray-600">승인 탭에서 처리할 수 있어요</p>
+                        </div>
+                        <span className="shrink-0 text-lg font-bold text-gray-400" aria-hidden>›</span>
+                      </Link>
+                    </li>
+                  ) : null}
+
+                  {/* 연속 탭 알림 — 자녀가 3초 이내에 미션 5개 이상을 눌렀을 때 표시됩니다 */}
+                  {rapidTapAlerts.length > 0 ? (
+                    <li>
+                      <Link
+                        href="/parent/approval"
+                        onClick={() => {
+                          void onAcknowledgeRapidTapAlerts?.()
+                          onClose()
+                        }}
+                        className="flex items-center justify-between gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-3 transition-colors hover:bg-red-100"
+                      >
+                        <div className="min-w-0">
+                          <div className="mb-1 flex items-center gap-1.5">
+                            <span className="inline-block rounded-full bg-red-500 px-2 py-0.5 text-[9px] font-black text-white">
+                              주의
+                            </span>
+                            <p className="text-xs font-extrabold text-red-900">
+                              미션 카드 연속 탭 감지됨
+                            </p>
+                          </div>
+                          <p className="text-[11px] leading-relaxed text-red-700">
+                            {rapidTapAlerts.length > 1
+                              ? `${rapidTapAlerts.length}회 연속 탭이 감지됐어요.`
+                              : `미션 ${rapidTapAlerts[0]?.mission_count ?? 5}개를 3초 이내에 탭했어요.`}
+                            {' '}승인 탭에서 롤백할 수 있어요.
+                          </p>
+                          <p className="mt-1 text-[10px] text-red-500">
+                            {new Date(rapidTapAlerts[0]?.detected_at ?? '').toLocaleTimeString('ko-KR', {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })} 발생
+                          </p>
+                        </div>
+                        <span className="shrink-0 text-lg font-bold text-red-400" aria-hidden>›</span>
+                      </Link>
+                    </li>
+                  ) : null}
+                </ul>
               </div>
             ) : null}
 

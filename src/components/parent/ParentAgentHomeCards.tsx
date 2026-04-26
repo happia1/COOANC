@@ -6,7 +6,7 @@
  * - 이 컴포넌트는 `/agent-a/run` 이 돌아가는 동안의 안내와, 코칭 텍스트 바텀시트만 보여 줍니다.
  */
 
-import { type AgentLatestReportRow, parseAgentReportPayload } from '@/lib/agentApi'
+import { type AgentEqScores, type AgentLatestReportRow, parseAgentReportPayload } from '@/lib/agentApi'
 import type { ParentAgentErrorReason, UseParentAgentReportResult } from '@/hooks/useParentAgentReport'
 import Link from 'next/link'
 
@@ -88,6 +88,73 @@ type Props = {
   }[]
   /** 홈탭에서 공용 일정 등록 시트를 열 때 사용합니다. */
   onOpenCalendarEventSheet?: () => void
+}
+
+/**
+ * 루틴 성실도 / 저축 습관 블록 — 퍼센트 막대 + 짧은 AI 코멘트를 함께 보여 줍니다.
+ */
+function ReportScoreBlock({
+  label,
+  scoreValue,
+  comment,
+  barColor,
+  scoreColor,
+}: {
+  label: string
+  scoreValue: number
+  comment: string
+  barColor: string
+  scoreColor: string
+}) {
+  const pct = Math.min(100, Math.max(0, Math.round(scoreValue)))
+  return (
+    <div className="flex flex-col gap-1.5 rounded-xl border border-gray-100 bg-white p-3 shadow-sm">
+      <span className="text-[11px] font-bold text-gray-600">{label}</span>
+      <div className="flex items-center gap-2">
+        <div className="relative h-2 flex-1 overflow-hidden rounded-full bg-gray-100">
+          <div
+            className={`absolute inset-y-0 left-0 rounded-full ${barColor} transition-all duration-500`}
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+        <span className={`shrink-0 text-xs font-black tabular-nums ${scoreColor}`}>{pct}%</span>
+      </div>
+      {comment.trim() ? (
+        <p className="line-clamp-3 text-[10px] leading-relaxed text-gray-500">{comment.trim()}</p>
+      ) : null}
+    </div>
+  )
+}
+
+/**
+ * 레벨 분석 / AI 코멘트 블록 — 텍스트 위주로 보여 줍니다.
+ */
+function ReportTextBlock({
+  label,
+  comment,
+  badge,
+}: {
+  label: string
+  comment: string
+  badge?: string
+}) {
+  return (
+    <div className="flex flex-col gap-1.5 rounded-xl border border-gray-100 bg-white p-3 shadow-sm">
+      <div className="flex items-center gap-1.5">
+        {badge ? (
+          <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[9px] font-bold text-violet-700">
+            {badge}
+          </span>
+        ) : null}
+        <span className="text-[11px] font-bold text-gray-600">{label}</span>
+      </div>
+      {comment.trim() ? (
+        <p className="line-clamp-4 text-[10px] leading-relaxed text-gray-500">{comment.trim()}</p>
+      ) : (
+        <p className="text-[10px] text-gray-400">정보 없음</p>
+      )}
+    </div>
+  )
 }
 
 /**
@@ -256,26 +323,71 @@ export default function ParentAgentHomeCards({
           <AgentOnboardingProgressCard daysWithData={onboardingDays} />
         ) : null}
 
-        {!loading && hasContent && coachingFull ? (
-          <div className="w-full rounded-xl border border-gray-100 bg-white p-3 text-sm text-gray-800 shadow-sm">
-            <p className="text-xs font-bold text-gray-600">경제 습관 코칭 가이드</p>
-            <p className="mt-2 whitespace-pre-wrap text-[12px] font-normal leading-relaxed text-gray-700">
-              {coachingFull}
-            </p>
-          </div>
-        ) : null}
+        {/* ── 리포트 성공 상태: 루틴 성실도·저축 습관·레벨 분석·AI 코멘트 블록 ── */}
+        {!loading && runState === 'success' && hasContent ? (() => {
+          const eq = row?.eq_scores as AgentEqScores | null
+          const routineScore = Number(eq?.routine_completion ?? 0)
+          const savingsScore = Number(eq?.save_ratio ?? 0)
+          const routineComment = parsed.kind === 'json' ? String(parsed.data.routine_comment ?? '') : ''
+          const creditComment  = parsed.kind === 'json' ? String(parsed.data.credit_comment  ?? '') : ''
+          const levelComment   = parsed.kind === 'json' ? String(parsed.data.level_comment   ?? '') : ''
+          return (
+            <div className="space-y-3">
+              {/* 2×2 콘텐츠 블록 그리드 */}
+              <div className="grid grid-cols-2 gap-2">
+                <ReportScoreBlock
+                  label="루틴 성실도"
+                  scoreValue={routineScore}
+                  comment={routineComment}
+                  barColor="bg-gradient-to-r from-sky-300 to-blue-500"
+                  scoreColor="text-blue-600"
+                />
+                <ReportScoreBlock
+                  label="저축 습관"
+                  scoreValue={savingsScore}
+                  comment={creditComment}
+                  barColor="bg-gradient-to-r from-amber-300 to-orange-400"
+                  scoreColor="text-amber-600"
+                />
+                <ReportTextBlock
+                  label="레벨 분석"
+                  comment={levelComment}
+                  badge="성장"
+                />
+                <ReportTextBlock
+                  label="AI 코멘트"
+                  comment={coachingFull}
+                />
+              </div>
 
-        {/* 요청 반영: 성장 코멘트를 코칭 가이드 바로 아래에 배치합니다. */}
-        {!loading && parsed.kind === 'json' && parsed.data.level_comment?.trim() ? (
-          <div className="w-full rounded-xl border border-gray-100 bg-white p-3 text-sm text-gray-800 shadow-sm">
-            <div className="mb-2 flex items-center gap-2">
-              <span className="rounded-full bg-violet-100 px-2.5 py-0.5 text-xs font-bold text-violet-900">
-                성장 분석
-              </span>
-              <span className="text-xs font-bold text-gray-600">레벨 코멘트</span>
+              {/* 코칭 가이드 전문 (AI 코멘트가 길 경우 전체 표시) */}
+              {coachingFull.length > 80 ? (
+                <div className="w-full rounded-xl border border-gray-100 bg-white p-3 text-sm text-gray-800 shadow-sm">
+                  <p className="mb-1.5 text-xs font-bold text-gray-600">경제 습관 코칭 가이드</p>
+                  <p className="whitespace-pre-wrap text-[12px] font-normal leading-relaxed text-gray-700">
+                    {coachingFull}
+                  </p>
+                </div>
+              ) : null}
             </div>
-            <p className="whitespace-pre-wrap text-[12px] font-normal leading-relaxed text-gray-700">
-              {parsed.data.level_comment}
+          )
+        })() : null}
+
+        {/* 리포트가 정상 표시될 때 자동 업데이트 주기를 안내합니다. */}
+        {!loading && runState === 'success' && hasContent ? (
+          <div className="mt-1 flex items-start gap-1.5 px-1">
+            <span className="mt-0.5 shrink-0 text-[10px] text-gray-400">ℹ</span>
+            <p className="text-[10px] leading-relaxed text-gray-400">
+              이 분석 결과는 최근 14일간의 미션 활동을 기반으로 하며,{' '}
+              <strong className="font-semibold text-gray-500">7일마다 자동으로 업데이트</strong>됩니다.
+              {row?.created_at ? (
+                <>
+                  {' '}최종 분석:{' '}
+                  {new Date(row.created_at).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })}
+                  {' / '}다음 갱신 예정:{' '}
+                  {new Date(new Date(row.created_at).getTime() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })}
+                </>
+              ) : null}
             </p>
           </div>
         ) : null}

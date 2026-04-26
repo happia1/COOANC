@@ -19,7 +19,7 @@ export type ChipDef = {
 
 export const AM_CHIPS: ChipDef[] = [
   { id: 'am-wake', title: '기상', emoji: '', type: 'fixed', apiBlock: 'morning' },
-  { id: 'am-wash', title: '세수', emoji: '', type: 'recommended', apiBlock: 'morning' },
+  { id: 'am-wash', title: '세수하기', emoji: '', type: 'recommended', apiBlock: 'morning' },
   { id: 'am-brush', title: '양치', emoji: '', type: 'recommended', apiBlock: 'morning' },
   { id: 'am-meal', title: '아침식사', emoji: '', type: 'recommended', apiBlock: 'morning' },
   { id: 'am-water', title: '물마시기', emoji: '', type: 'recommended', apiBlock: 'morning' },
@@ -60,11 +60,24 @@ function minutesFromHHMMSafe(t: string | null | undefined): number {
 }
 
 /**
+ * DB 미션 제목 → 칩 제목 정규화 별칭 테이블.
+ * 마이그레이션 이전에 저장된 구버전 제목도 올바른 칩 순위를 받도록 합니다.
+ * - '일어나기' → '기상': 046 마이그레이션 이전 전역 템플릿 제목
+ * - '양치하기'  → '양치': 046 이전 전역 템플릿 제목
+ */
+const MISSION_TITLE_ALIASES: Record<string, string> = {
+  '일어나기': '기상',
+  '양치하기':  '양치',
+}
+
+/**
  * 기상부터 취침까지 일상 루틴에 맞는 순서 점수(작을수록 앞).
  * 제목이 칩과 같으면 칩 순서를 쓰고, 아니면 block·시간으로 뒤에 배치합니다.
+ * 별칭 테이블에 있는 제목도 해당 칩의 순위를 받습니다.
  */
 export function routineMissionFlowRank(m: RoutineFlowSortable): number {
-  const title = m.title.trim()
+  const raw = m.title.trim()
+  const title = MISSION_TITLE_ALIASES[raw] ?? raw
   const candidates = ALL_ROUTINE_FLOW_CHIPS.map((c, i) => ({ c, i })).filter((x) => x.c.title === title)
   if (candidates.length > 0) {
     if (candidates.length > 1 && m.block) {
