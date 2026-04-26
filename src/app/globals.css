@@ -648,6 +648,34 @@
   100% { transform: translate(-50%, -50%) scale(2.5) rotate(45deg); opacity: 0; }
 }
 
+/* 전체 미션 완료 팝업: 처음에 살짝 흔들리며 커지며 나타남 (AllMissionCompleteOverlay) */
+@keyframes celebratePopIn {
+  0%   { transform: scale(0.3) rotate(-10deg); opacity: 0; }
+  60%  { transform: scale(1.08) rotate(3deg); opacity: 1; }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+
+/**
+ * 전체 미션 완료 축하 팝업: 캐릭터(이모지)가 위아래로 통통 뛰는 루프 애니메이션.
+ *
+ * 비개발자 설명: 병아리가 기뻐하며 점프하는 듯한 움직임을 줍니다.
+ */
+@keyframes celebrateJump {
+  from { transform: translateY(0) scale(1) rotate(-8deg); }
+  to   { transform: translateY(-18px) scale(1.2) rotate(8deg); }
+}
+
+/**
+ * 전체 미션 완료 오버레이: 카드가 한 번에 쑥 커지며 나타나는 효과 (인라인 animation 이름용).
+ * Tailwind `theme.extend.keyframes.popIn`과 유사하나, style 속성에서 이름을 직접 쓰기 위해 globals에 둡니다.
+ */
+@keyframes popIn {
+  0%   { transform: scale(0.4);  opacity: 0; }
+  60%  { transform: scale(1.25); opacity: 1; }
+  80%  { transform: scale(0.9);  opacity: 1; }
+  100% { transform: scale(1);   opacity: 1; }
+}
+
 /* 루틴 도우미 상단 키워드 행: 우측 끝 페이드(스크롤 여유가 있음을 힌트, 파스텔 흰·연보라) */
 .routine-agent-intent-scroll-fade {
   position: relative;

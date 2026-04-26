@@ -47,6 +47,7 @@ import type {
 import { createClient } from '@/lib/supabase/client'
 import { fireMissionCardConfetti } from '@/lib/missionCardConfetti'
 import { tryApplyCompletePayload } from '@/lib/applyDailyMissionCompleteStats'
+import AllMissionCompleteOverlay from '@/components/child/AllMissionCompleteOverlay'
 
 // ─── 파티클 타입 정의 ────────────────────────────────────────────────────────
 
@@ -287,10 +288,27 @@ export default function ChildScreen({
   /** 연속 탭 확인 팝업 표시 여부 */
   const [rapidTapModalOpen, setRapidTapModalOpen] = useState(false)
 
+  /** 전체 미션 완주 축하 오버레이 표시 여부 */
+  const [showCelebration, setShowCelebration] = useState(false)
+  /** 같은 날·세션에서 축하를 한 번만 띄우기 위한 플래그 (날짜가 바뀌면 다시 false 로 리셋) */
+  const [celebrationShown, setCelebrationShown] = useState(false)
+  /**
+   * 오늘(이 브라우저 세션에서) 미션 완료로 누적한 코인 합.
+   * 비개발자 설명: 화면에 다시 들어온 뒤 이미 끝낸 미션이 있으면 0에서 시작할 수 있습니다.
+   */
+  const [todayEarnedCredits, setTodayEarnedCredits] = useState(0)
+
   useEffect(() => {
     setMissionList(dailyMissions)
     setDone(new Set(dailyMissions.filter((dm) => dm.is_completed).map((dm) => dm.id)))
   }, [dailyMissions])
+
+  /** 날짜(오늘)이 바뀌면 축하·누적 코인 상태를 초기화합니다. */
+  useEffect(() => {
+    setCelebrationShown(false)
+    setShowCelebration(false)
+    setTodayEarnedCredits(0)
+  }, [today])
 
   /** 자정 자동 새로고침 */
   useEffect(() => {
@@ -370,6 +388,32 @@ export default function ChildScreen({
   )
 
   /**
+   * 가시 미션(숨겨진·폐지된 것 제외)이 모두 완료되면 잠시 뒤 축하 화면을 띄웁니다.
+   * 비개발자 설명: 오늘 할 일이 하나도 남지 않았을 때만 한 번 터집니다.
+   */
+  useEffect(() => {
+    const hasAny = visibleMissions.length > 0
+    const allDone = visibleMissions.every((dm) => done.has(dm.id))
+
+    // 디버그: 전체 미션 완주 축하가 언제 뜨는지 브라우저 콘솔에서 확인 (배포 전 제거 권장)
+    console.log('[celebration]', {
+      hasAny,
+      allDone,
+      celebrationShown,
+      visibleCount: visibleMissions.length,
+      doneCount: done.size,
+      doneIds: [...done].slice(0, 3),
+      visibleIds: visibleMissions.map((m) => m.id).slice(0, 3),
+    })
+
+    if (allDone && hasAny && !celebrationShown) {
+      setCelebrationShown(true)
+      const t = window.setTimeout(() => setShowCelebration(true), 700)
+      return () => clearTimeout(t)
+    }
+  }, [visibleMissions, done, celebrationShown])
+
+  /**
    * 배지 반짝임 트리거 — 파티클이 모두 도착한 뒤(650 ms) 호출됩니다.
    *
    * 비개발자 설명: 코인이 배지에 닿으면 황금빛 빛남 + 숫자가 잠깐 커집니다.
@@ -398,6 +442,8 @@ export default function ChildScreen({
       creditReward: number,
       heartReward: number,
     ) => {
+      /** 오늘(세션) 누적 코인 — 축하 팝업의 "+n"에 사용, API 실패 시 응답 분기에서 되돌립니다. */
+      setTodayEarnedCredits((prev) => prev + creditReward)
       /**
        * 카드가 사라지는 순간 그 위치에서 컨페티(새로 추가).
        * 비개발자: “완료” 글자 화면 대신 색종이가 터지는 느낌으로 축하합니다.
@@ -465,6 +511,7 @@ export default function ChildScreen({
           if (res.ok) {
             setStats((prev) => tryApplyCompletePayload(prev, json) ?? prev)
           } else {
+            setTodayEarnedCredits((p) => Math.max(0, p - creditReward))
             setDone((prev) => {
               const next = new Set(prev)
               next.delete(dm.id)
@@ -472,6 +519,7 @@ export default function ChildScreen({
             })
           }
         } catch {
+          setTodayEarnedCredits((p) => Math.max(0, p - creditReward))
           setDone((prev) => {
             const next = new Set(prev)
             next.delete(dm.id)
@@ -875,6 +923,14 @@ export default function ChildScreen({
         onConfirm={handleRapidTapConfirm}
         onDeny={handleRapidTapDeny}
       />
+
+      {showCelebration && (
+        <AllMissionCompleteOverlay
+          todayCredits={todayEarnedCredits}
+          childName={childName}
+          onClose={() => setShowCelebration(false)}
+        />
+      )}
     </>
   )
 }

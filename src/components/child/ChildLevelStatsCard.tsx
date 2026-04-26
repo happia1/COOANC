@@ -12,7 +12,7 @@
  * - 미션이 완료되어 막대 하트가 늘어날 때, 새로 켜진 한 칸만 잠깐 `차오름` 애니메이션이 납니다.
  *
  * 구성:
- *   LV.{n}  {exp}/{exp_to_next}
+ *   Lv.{n}  {exp}/{exp_to_next}  (DB `current_level`과 동일, 부모 앱과 표기 통일)
  *   ────────────────────────────────
  *   [주황~노란 경험치 진행 바]
  *   ────────────────────────────────
@@ -162,13 +162,13 @@ const ChildLevelStatsCard = forwardRef<HTMLDivElement, ChildLevelStatsCardProps>
         className,
       ].join(' ')}
       role="region"
-      aria-label={`레벨 ${current_level + 1} 스탯 카드`}
+      aria-label={`레벨 ${current_level} 스탯 카드`}
     >
-      {/* ── 상단 행: LV.n + 경험치 ─────────────────────────────────────── */}
+      {/* ── 상단 행: Lv.n + 경험치 (부모/DB current_level과 동일) ─────────────── */}
       {/* justify-between 제거 → 내용 너비에 딱 맞게 붙여서 카드 폭을 줄입니다 */}
       <div className="flex items-baseline gap-2 mb-1">
         <span className="text-[14px] font-black text-[#5A3E28] tracking-wide leading-none whitespace-nowrap">
-          LV.{current_level + 1}
+          Lv.{current_level}
         </span>
         <span className="text-[10px] font-bold text-[#7A5C3A] tabular-nums leading-none whitespace-nowrap">
           {exp}/{exp_to_next_level}
