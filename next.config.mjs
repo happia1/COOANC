@@ -8,7 +8,7 @@ const WALLET_IMAGE_CACHE_BUST = '4'
  * 마켓 상단 지붕 PNG 캐시 버스트 — `src/components/child/MarketTab.tsx` 의 `MARKET_ROOF_CACHE_BUST` 와 **동일**해야 합니다.
  * (지붕 파일만 갈아끼웠는데 옛 그림이 보이면 양쪽 숫자를 같이 1 올리세요.)
  */
-const MARKET_ROOF_CACHE_BUST = '2'
+const MARKET_ROOF_CACHE_BUST = '3'
 
 /**
  * Supabase Storage 공개 URL — `store_items.image_url` 이 이 호스트 아래로 올 때 `next/image` 최적화 허용
@@ -76,7 +76,7 @@ const nextConfig = {
         search: `?v=${WALLET_IMAGE_CACHE_BUST}`,
       },
       {
-        pathname: '/assets/img/layouts/backgrounds/market_roof.png',
+        pathname: '/assets/img/layouts/backgrounds/market_roof_.png',
         search: `?v=${MARKET_ROOF_CACHE_BUST}`,
       },
       {

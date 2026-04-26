@@ -55,19 +55,18 @@ type DeliveryOverlay = {
 }
 
 /**
- * 마켓 상단 지붕 PNG(`public/.../market_roof.png`)를 **파일 이름은 그대로** 두고 내용만 바꿀 때,
- * 브라우저·중간 캐시가 예전 그림을 계속 보여 줄 수 있어요. 그때마다 아래 숫자만 1 올리면
- * 주소가 달라져서 새 이미지를 다시 받아옵니다.
+ * 마켓 상단 지붕 PNG를 교체할 때마다 아래 숫자를 1 올리면
+ * 브라우저 캐시를 우회해 새 이미지를 즉시 받아옵니다.
  */
-const MARKET_ROOF_CACHE_BUST = 2
+const MARKET_ROOF_CACHE_BUST = 3
 /** 실제 표시 URL — `/public` 기준 정적 경로 + 캐시 끊기용 쿼리 */
-const ROOF_SRC = `/assets/img/layouts/backgrounds/market_roof.png?v=${MARKET_ROOF_CACHE_BUST}`
+const ROOF_SRC = `/assets/img/layouts/backgrounds/market_roof_.png?v=${MARKET_ROOF_CACHE_BUST}`
 /** 요청사항: 물건이 담긴 장바구니 아이콘(공용 정적 이미지) */
 const BASKET_FILLED_SRC = '/assets/img/common/ui/basket_filled.png'
 
-/** 선반 카드 썸네일 크기 */
-const SHELF_IMG_AREA_PX = 64
-const SHELF_SPRITE_H = 56
+/** 선반 카드 썸네일 크기 — 팝업 높이 안에서 스크롤 없이 3개 섹션이 모두 보이도록 줄임 */
+const SHELF_IMG_AREA_PX = 48
+const SHELF_SPRITE_H = 42
 
 /**
  * 배달 풀스크린 연출(「배달 시작」→「상품이 도착했어요」→「받았어요」)을 켜거나 끕니다.
@@ -704,11 +703,10 @@ export default function MarketTab({
   return (
     <div
       /**
-       * 모바일은 부모 패딩을 상쇄하려고 `-mx-4 -mt-4`를 유지합니다.
-       * 태블릿 가로에서는 왼쪽 독바와 겹치지 않도록 음수 마진을 해제해
-       * 마켓 전체가 오른쪽 본문 영역 안에서 시작되게 맞춥니다.
+       * 패널 오버레이 안에서 전체 높이를 채우도록 flex-1 + min-h-0 을 유지합니다.
+       * 음수 마진(-mx-4 -mt-4)은 이전 탭 레이아웃용이라 패널 컨텍스트에서는 제거합니다.
        */
-      className="-mx-4 -mt-4 flex min-h-0 flex-1 flex-col overflow-hidden pb-0 md:landscape:mx-0 md:landscape:mt-0"
+      className="flex min-h-0 flex-1 flex-col overflow-hidden"
       style={{ background: '#FAF5EF' }}
     >
 
@@ -735,16 +733,13 @@ export default function MarketTab({
           document.body,
         )}
 
-      {/* 가게 지붕: 모바일 전용 — 태블릿 landscape에서는 숨김 */}
-      <div className="shrink-0 w-full overflow-hidden leading-none md:landscape:hidden">
-        <Image
+      {/* 가게 지붕: next/image localPatterns 제약 없이 쓰기 위해 <img> 사용 (장식용 이미지) */}
+      <div className="shrink-0 w-full overflow-hidden leading-none">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
           src={ROOF_SRC}
           alt=""
-          width={1200}
-          height={180}
-          priority
-          sizes="100vw"
-          className="block h-auto w-full max-h-[4.5rem] select-none object-cover object-bottom sm:max-h-[5rem]"
+          className="block h-auto w-full max-h-[4.5rem] select-none object-cover object-bottom"
           draggable={false}
           onError={(e) => {
             e.currentTarget.style.display = 'none'
@@ -759,37 +754,23 @@ export default function MarketTab({
           <p className="text-sm text-gray-400">부모님이 상품을 추가해주실 거예요!</p>
         </div>
       ) : (
-        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-1 pb-2 [scrollbar-width:thin]">
-          {/* 요청사항: 이벤트 → 간식 → 장난감 3단 선반을 동시에 노출 */}
+        <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {/* 이벤트 → 간식 → 장난감 3단 선반을 동시에 노출 */}
           {marketSectionsWithShelves.map((block, blockIdx) => (
             <section key={block.sectionKey} className="shrink-0">
-              <h3 className="mb-1.5 flex items-center gap-1.5 border-b border-amber-900/10 px-2 pb-1 text-[11px] font-black tracking-tight text-amber-950/90">
+              <h3 className="mb-1 flex items-center gap-1 border-b border-amber-900/10 px-2 pb-0.5 text-[10px] font-black tracking-tight text-amber-950/90">
                 {block.title}
                 <span className="ml-auto tabular-nums text-[9px] font-bold text-amber-900/40">{block.items.length}개</span>
               </h3>
-              {/* 선반 내부만 좌우 슬라이드 */}
-              <div className="flex snap-x snap-mandatory gap-2 md:landscape:gap-3 overflow-x-auto px-1 py-0.5 [-ms-overflow-style:none] [scrollbar-width:none]">
+              {/* 선반 내부만 좌우 슬라이드 — 가로 스크롤바 숨김 */}
+              <div className="flex snap-x snap-mandatory gap-1.5 overflow-x-auto px-1 py-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 {block.items.map((item, itemIdx) => {
                   const frameKey = marketFrameKeyForItemId(item.id, item.name)
-                  /**
-                   * 요청사항:
-                   * - 이벤트/장난감/간식 카드의 가로·세로 크기를 동일하게 통일
-                   * - 이미지와 크레딧 알약 간격/정렬도 같은 규칙으로 맞춤
-                   * (태블릿 가로에서만 적용, 모바일은 기존 유지)
-                   */
-                  const isUnifiedLargeSection =
-                    block.sectionKey === 'event' || block.sectionKey === 'toy' || block.sectionKey === 'snack'
-                  /** 요청사항: 이벤트/장난감 이미지는 간식보다 한 단계 더 크게 */
-                  const isEventOrToySection = block.sectionKey === 'event' || block.sectionKey === 'toy'
                   /** 첫 구역 맨 앞 몇 칸만 우선 로드 — 나머지는 지연 로드로 대역폭 절약 */
                   const thumbPriority = blockIdx === 0 && itemIdx < 4
                   const meetsLevel = level >= item.level_required
                   const isPending = shelfBlockedItemIds.has(item.id)
-                  /**
-                   * 카드 흐림(비활성) 원인 분리:
-                   * - 기존: 잔액 부족/레벨 미달 모두 흐림
-                   * - 변경: 레벨 미달만 흐림 (잔액 부족은 구매 버튼에서만 안내)
-                   */
+                  /** 레벨 미달만 흐림 처리 (잔액 부족은 구매 버튼에서만 안내) */
                   const isDimmed = !meetsLevel
                   const isBest = item.id === bestItemId
 
@@ -798,9 +779,7 @@ export default function MarketTab({
                       key={item.id}
                       type="button"
                       onClick={() => handleItemClick(item, frameKey)}
-                      className={`relative flex w-24 md:landscape:w-28 shrink-0 snap-start flex-col rounded-xl bg-white/95 p-1 pt-1.5 shadow-md ring-1 ring-black/[0.06] transition-transform active:scale-[0.98] md:landscape:px-0.5 md:landscape:pt-0.5 md:landscape:pb-1 ${
-                        isUnifiedLargeSection ? 'md:landscape:w-[8rem] md:landscape:min-h-[144px]' : ''
-                      } ${
+                      className={`relative flex w-[4.5rem] shrink-0 snap-start flex-col rounded-xl bg-white/95 p-1 shadow-md ring-1 ring-black/[0.06] transition-transform active:scale-[0.98] ${
                         isDimmed ? 'grayscale brightness-[0.72]' : ''
                       }`}
                     >
@@ -810,29 +789,23 @@ export default function MarketTab({
                         </span>
                       )}
                       {isPending && (
-                        <span className="absolute left-0.5 top-0.5 z-10 text-[10px]" aria-hidden>
+                        <span className="absolute left-0.5 top-0.5 z-10 text-[9px]" aria-hidden>
                           ⏳
                         </span>
                       )}
 
+                      {/* 이미지 영역 — SHELF_IMG_AREA_PX(48px) 고정 높이 */}
                       <div
-                        className={[
-                          'relative flex w-full items-end justify-center overflow-visible md:landscape:items-center',
-                          isUnifiedLargeSection ? 'md:landscape:h-[96px]' : '',
-                        ].join(' ')}
+                        className="relative flex w-full items-end justify-center overflow-visible"
                         style={{ height: SHELF_IMG_AREA_PX }}
                       >
-                        <div className="flex max-h-full max-w-full items-end justify-center md:landscape:items-center md:landscape:translate-y-6">
+                        <div className="flex max-h-full max-w-full items-end justify-center">
                           <StoreItemThumbnail
                             imageUrl={item.image_url}
                             frame={frameKey}
                             height={SHELF_SPRITE_H}
                             width={SHELF_IMG_AREA_PX}
-                            className={[
-                              'max-h-full max-w-full object-contain object-bottom md:landscape:object-center',
-                              isUnifiedLargeSection ? 'md:landscape:scale-[1.46]' : '',
-                              isEventOrToySection ? 'md:landscape:scale-[1.5]' : '',
-                            ].join(' ')}
+                            className="max-h-full max-w-full object-contain object-bottom"
                             style={{ maxHeight: SHELF_SPRITE_H }}
                             priority={thumbPriority}
                             loading="lazy"
@@ -841,17 +814,14 @@ export default function MarketTab({
                         </div>
                       </div>
 
-                      {/**
-                       * 크레딧 알약은 태블릿 가로에서 더 크게 보이고,
-                       * 카드 안에서 살짝 아래로 내려오도록 상단 여백을 늘립니다.
-                       */}
-                      <div className="mt-0.5 flex flex-col items-center gap-0.5 md:landscape:mt-9">
+                      {/* 크레딧 알약 */}
+                      <div className="mt-0.5 flex flex-col items-center">
                         <div
-                          className="inline-flex max-w-full items-center gap-0.5 rounded-full border border-gray-100 bg-white px-1 py-px shadow-sm md:landscape:gap-1 md:landscape:px-2.5 md:landscape:py-1"
+                          className="inline-flex max-w-full items-center gap-0.5 rounded-full border border-gray-100 bg-white px-1 py-px shadow-sm"
                           style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.06)' }}
                         >
-                          <SpriteImage sheet={ICONS} frame="credit" width={15} clipRotated={false} />
-                          <span className="truncate text-[10px] font-black tabular-nums text-brand-blue md:landscape:text-sm">
+                          <SpriteImage sheet={ICONS} frame="credit" width={12} clipRotated={false} />
+                          <span className="truncate text-[9px] font-black tabular-nums text-brand-blue">
                             {formatMarketCreditLabel(item.credit_price)}
                           </span>
                         </div>
@@ -869,29 +839,27 @@ export default function MarketTab({
         하단 크레딧 바(마켓 전용):
         마켓에서 쓸 수 있는 돈은 지갑(마켓) 잔액뿐이라, 저금통 등을 합친 '전체'는 보여주지 않습니다.
       */}
+      {/* 하단 크레딧 바 — py·이미지 크기를 줄여 선반 공간 확보 */}
       <div
-        className={`flex shrink-0 flex-col gap-1 border-t border-amber-900/10 bg-[#F3EBE2]/95 px-3 py-2 shadow-[0_-4px_12px_rgba(0,0,0,0.04)] backdrop-blur-[6px] sm:px-4 sm:py-2.5 ${
+        className={`flex shrink-0 items-center gap-2 border-t border-amber-900/10 bg-[#F3EBE2]/95 px-3 py-1.5 shadow-[0_-4px_12px_rgba(0,0,0,0.04)] backdrop-blur-[6px] ${
           myRequests.length > 0 || wishlistItemIds.length > 0 ? 'pr-[4.5rem]' : ''
         }`}
       >
-        <div className="flex items-center gap-2 sm:gap-2.5">
-          <span className="flex shrink-0 items-center" aria-hidden>
-            <Image
-              src={walletImageSrcByStage(animatedWalletIdx)}
-              alt=""
-              width={40}
-              height={40}
-              className="h-auto w-10 select-none object-contain"
-              draggable={false}
-            />
+        <span className="flex shrink-0 items-center" aria-hidden>
+          <Image
+            src={walletImageSrcByStage(animatedWalletIdx)}
+            alt=""
+            width={32}
+            height={32}
+            className="h-8 w-8 select-none object-contain"
+            draggable={false}
+          />
+        </span>
+        <div className="flex min-w-0 flex-1 items-baseline gap-1 text-gray-700">
+          <SpriteImage sheet={ICONS} frame="credit" width={14} clipRotated={false} />
+          <span className="truncate text-base font-black tabular-nums text-brand-blue">
+            {currentWallet.toLocaleString()}
           </span>
-          <div className="flex min-w-0 flex-1 items-baseline gap-1.5 text-gray-700">
-            {/* 요청사항: '지갑(마켓)' 텍스트 대신 크레딧 아이콘으로 의미를 표시 */}
-            <SpriteImage sheet={ICONS} frame="credit" width={16} clipRotated={false} />
-            <span className="truncate text-lg font-black tabular-nums text-brand-blue md:text-2xl">
-              {currentWallet.toLocaleString()}
-            </span>
-          </div>
         </div>
       </div>
 
