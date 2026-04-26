@@ -14,6 +14,7 @@ import {
   type RoutineAlarmPrefsLoaded,
   type RoutineCustomAlarmStored,
 } from '@/lib/routineAlarmLocalPrefs'
+import { playAudio, CHILD_AUDIO } from '@/lib/childAudio'
 
 type Props = {
   open: boolean
@@ -221,16 +222,27 @@ export default function ChildAlarmClockPopup({ open, onClose }: Props) {
     return () => clearInterval(timer)
   }, [open])
 
-  /** 뽀모도로 카운트다운(1초 단위) */
+  /**
+   * 뽀모도로 카운트다운(1초 단위)
+   * - 남은 시간이 10초~1초가 되는 매 초 tick-tock 효과음
+   * - 0초(완료) 시 짧은 완료 느낌의 `goodMorning` 효과음(기존 음원 재사용)
+   */
   useEffect(() => {
     if (!open || !running) return
     const timer = setInterval(() => {
       setSecondsLeft((prev) => {
         if (prev <= 1) {
           setRunning(false)
+          if (prev === 1) {
+            playAudio(CHILD_AUDIO.goodMorning, 0.8)
+          }
           return 0
         }
-        return prev - 1
+        const next = prev - 1
+        if (next > 0 && next <= 10) {
+          playAudio(CHILD_AUDIO.tickTock, 0.6)
+        }
+        return next
       })
     }, 1000)
     return () => clearInterval(timer)

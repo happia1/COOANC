@@ -18,6 +18,7 @@
  */
 
 import { useRef, useState, useCallback, useMemo, useEffect, memo } from 'react'
+import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import RapidTapConfirmModal from '@/components/child/RapidTapConfirmModal'
 import SpriteImage from '@/components/common/SpriteImage'
@@ -48,6 +49,7 @@ import { createClient } from '@/lib/supabase/client'
 import { fireMissionCardConfetti } from '@/lib/missionCardConfetti'
 import { tryApplyCompletePayload } from '@/lib/applyDailyMissionCompleteStats'
 import AllMissionCompleteOverlay from '@/components/child/AllMissionCompleteOverlay'
+import ChildAlarmClockPopup from '@/components/child/ChildAlarmClockPopup'
 import SleepModeScreen from '@/components/child/SleepModeScreen'
 import MorningWakeScreen from '@/components/child/MorningWakeScreen'
 import SleepReadyPopup from '@/components/child/SleepReadyPopup'
@@ -320,6 +322,12 @@ export default function ChildScreen({
   /** 연속 탭 확인 팝업 표시 여부 */
   const [rapidTapModalOpen, setRapidTapModalOpen] = useState(false)
 
+  /**
+   * 알람·뽀모도로 시계 팝업(ChildAlarmClockPopup) 열림 여부
+   * 비개발자 설명: 캐릭터 옆 시계를 누르면 true 가 되고, 닫기로 false 가 됩니다.
+   */
+  const [clockPopupOpen, setClockPopupOpen] = useState(false)
+
   /** 전체 미션 완주 축하 오버레이 표시 여부 */
   const [showCelebration, setShowCelebration] = useState(false)
   /**
@@ -328,7 +336,8 @@ export default function ChildScreen({
    */
   const celebrationShownRef = useRef(false)
   /** 700ms 뒤 오버레이 표시 예약 — API 실패 롤백 시 clearTimeout */
-  const celebrationShowTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null)
+  /** DOM 환경에서 setTimeout 은 `number` 핸들을 돌려줌(Node 의 Timeout 타입과 혼동 주의) */
+  const celebrationShowTimerRef = useRef<number | null>(null)
   /**
    * 오늘(이 브라우저 세션에서) 미션 완료로 누적한 코인 합.
    * 비개발자 설명: 화면에 다시 들어온 뒤 이미 끝낸 미션이 있으면 0에서 시작할 수 있습니다.
@@ -881,10 +890,11 @@ export default function ChildScreen({
             className="flex justify-between items-start px-4 gap-3"
             style={{ paddingTop: 'max(16px, env(safe-area-inset-top))' }}
           >
-            {/* 좌측: 레벨 스탯 카드 (크레딧 + 하트)
-                - creditBadgeRef: 파티클이 날아오는 목적지
-                - badgeShine: 파티클 도착 시 반짝임 트리거 */}
-            <div className="pointer-events-none min-w-0">
+            {/*
+              좌측: 레벨 스탯 카드(위) + 알람 시계(하단) — 세로로 쌓음
+              알람: 반투명 박스 없이 아이콘만, 이전(44px)의 2배 터치·이미지 크기
+            */}
+            <div className="pointer-events-none min-w-0 flex flex-col items-start gap-2">
               {stats && (
                 <ChildLevelStatsCard
                   ref={missionHeartsRef}
@@ -894,7 +904,23 @@ export default function ChildScreen({
                   shine={badgeShine}
                 />
               )}
-              {/* 별 이펙트 — 크레딧 행 주변에 황금빛 점들이 방사됩니다 */}
+              <button
+                type="button"
+                onClick={() => setClockPopupOpen(true)}
+                className="flex h-[5.5rem] w-[5.5rem] shrink-0 items-center justify-center
+                           border-0 bg-transparent p-0
+                           transition-transform active:scale-90 pointer-events-auto"
+                aria-label="시계 팝업 열기"
+              >
+                <Image
+                  src="/assets/img/common/ui/alarm.png"
+                  alt="알람"
+                  width={48}
+                  height={48}
+                  className="h-12 w-12 object-contain drop-shadow-md"
+                />
+              </button>
+              {/* 별 이펙트 — 크레딧 행 주변(고정 위치)에만 그려짐, 레이아웃 높이 없음 */}
               {badgeShine && creditBadgeRef.current && (
                 <BadgeStarBurst badgeRef={creditBadgeRef} />
               )}
@@ -1058,8 +1084,10 @@ export default function ChildScreen({
         initialHiddenStoreItemIds={initialHiddenStoreItemIds}
         marketRequests={marketRequests}
         initialWishlistEntries={initialWishlistEntries}
-        creditsWallet={stats?.credits_wallet ?? totalCredits}
+        creditsWallet={stats?.credits_wallet ?? 0}
+        creditsTotal={totalCredits}
         level={stats?.current_level ?? 0}
+        ageYears={ageYears}
         childStats={stats}
         onStatsUpdate={handleStatsUpdate}
         unlockedItemIndexes={initialUnlockedItemIndexes}
@@ -1113,6 +1141,12 @@ export default function ChildScreen({
       {showMorningWake ? (
         <MorningWakeScreen childName={childName} onStart={() => setShowMorningWake(false)} />
       ) : null}
+
+      {/*
+       * z-[160] 이상인 ChildAlarmClockPopup — DOM 순서상 마지막에 두어도 자체 z-index로 최상위에 뜸
+       * 비개발자 설명: 루틴 알람·뽀모도로 시계(부모 LocalStorage 설정 반영)를 여는 별도 창입니다.
+       */}
+      <ChildAlarmClockPopup open={clockPopupOpen} onClose={() => setClockPopupOpen(false)} />
     </>
   )
 }

@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { resolveApiActorChildId } from '@/lib/resolveApiActorChildId'
 import { creditsFloating, readChildStatInt } from '@/lib/childCreditsSplit'
 import { fireGameTrigger } from '@/lib/gameLayer/fireGameTrigger'
+import { usesSingleBucket, ageYearsFromProfileRow } from '@/constants/childAgeConfig'
 
 /**
  * POST /api/child/credits/transfer
@@ -75,11 +76,16 @@ export async function POST(req: NextRequest) {
   if (resolved.ok === false) return resolved.response
   const childId = resolved.childId
 
-  const { data: stats, error: statsErr } = await supabase
-    .from('child_stats')
-    .select('credits, credits_wallet, credits_piggy')
-    .eq('child_id', childId)
-    .maybeSingle()
+  const [statsRes, profileRes] = await Promise.all([
+    supabase
+      .from('child_stats')
+      .select('credits, credits_wallet, credits_piggy, current_level')
+      .eq('child_id', childId)
+      .maybeSingle(),
+    supabase.from('profiles').select('age, birth_date').eq('id', childId).maybeSingle(),
+  ])
+  const stats = statsRes.data
+  const statsErr = statsRes.error
 
   if (statsErr?.code === '42703') {
     return NextResponse.json(
@@ -91,6 +97,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: '스탯 정보를 읽지 못했어요' }, { status: 500 })
   }
   if (!stats) return NextResponse.json({ error: '스탯 정보를 찾을 수 없어요' }, { status: 404 })
+
+  const level = stats.current_level ?? 0
+  const ageYears = ageYearsFromProfileRow(profileRes.data)
+  if (usesSingleBucket(level, ageYears)) {
+    return NextResponse.json({ ok: true, skipped: true })
+  }
 
   const w = readChildStatInt(stats.credits_wallet)
   const p = readChildStatInt(stats.credits_piggy)

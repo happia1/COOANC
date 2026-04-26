@@ -66,8 +66,16 @@ type Props = {
   initialHiddenStoreItemIds: string[]
   marketRequests: PurchaseRequest[]
   initialWishlistEntries: { storeItemId: string; quantity: number }[]
+  /**
+   * 지갑(`credits_wallet`) 분 — 멀티 버킷 모드 마켓 구매·표시에 사용
+   * 단일 버킷이면 `creditsTotal`과 별도로 내려도 됨( MarketTab이 통합 )
+   */
   creditsWallet: number
+  /** 총 보유 코인 `child_stats.credits` — 단일 버킷 모드 마켓 잔액에 사용 */
+  creditsTotal: number
   level: number
+  /** 자녀 만 나이(세). null 이면 서버 API와 같이 레벨만으로 단일/멀티를 구분 */
+  ageYears: number | null
 
   /* ── 코인 패널 props ── */
   childStats: ChildStats | null
@@ -104,7 +112,9 @@ export default function ChildPanelOverlay({
   marketRequests,
   initialWishlistEntries,
   creditsWallet,
+  creditsTotal,
   level,
+  ageYears,
   childStats,
   onStatsUpdate,
   unlockedItemIndexes,
@@ -187,8 +197,10 @@ export default function ChildPanelOverlay({
               initialHiddenStoreItemIds={initialHiddenStoreItemIds}
               requests={marketRequests}
               creditsWallet={creditsWallet}
+              creditsTotal={creditsTotal}
               initialWishlistEntries={initialWishlistEntries}
               level={level}
+              ageYears={ageYears}
             />
           )}
           {active === 'coins' && features.coinPocket && (

@@ -12,6 +12,7 @@ import { getActorChildContext } from '@/lib/getActorChildContext'
 import MarketTab from '@/components/child/MarketTab'
 import { applyStoreItemCreditOverrides } from '@/lib/applyStoreItemCreditOverrides'
 import { readChildStatInt } from '@/lib/childCreditsSplit'
+import { ageYearsFromProfileRow } from '@/constants/childAgeConfig'
 import { isCategoryExcludedFromMarket } from '@/lib/parentMarketMenuSections'
 import type { StoreItem, PurchaseRequest } from '@/types/database'
 
@@ -20,7 +21,8 @@ export default async function MarketPage() {
   const [ctx, supabase] = await Promise.all([getActorChildContext(), createClient()])
   const childId = ctx.actorChildId
 
-  const [statsRes, familyRows, itemsRes, hiddenRes, requestsRes, wishRes, creditOvRes] = await Promise.all([
+  const [statsRes, familyRows, itemsRes, hiddenRes, requestsRes, wishRes, creditOvRes, childProfileRes] =
+    await Promise.all([
     supabase
       .from('child_stats')
       .select('credits, credits_wallet, credits_piggy, current_level')
@@ -51,11 +53,15 @@ export default async function MarketPage() {
       .from('child_store_item_credit_overrides')
       .select('store_item_id, credit_price')
       .eq('child_id', childId),
+    supabase.from('profiles').select('age, birth_date').eq('id', childId).maybeSingle(),
   ])
 
   const level = statsRes.data?.current_level ?? 0
-  const credits = statsRes.data?.credits ?? 0
+  const credits = readChildStatInt(statsRes.data?.credits)
   const creditsWallet = readChildStatInt(statsRes.data?.credits_wallet)
+  const ageYears = ageYearsFromProfileRow(
+    childProfileRes.data as { age: number | null; birth_date: string | null } | null,
+  )
   const initialWishlistEntries = wishRes.error
     ? []
     : (wishRes.data ?? []).map((r: { store_item_id: string; quantity?: number | null }) => ({
@@ -98,8 +104,10 @@ export default async function MarketPage() {
       initialHiddenStoreItemIds={initialHiddenStoreItemIds}
       requests={requests}
       creditsWallet={creditsWallet}
+      creditsTotal={credits}
       initialWishlistEntries={initialWishlistEntries}
       level={level}
+      ageYears={ageYears}
     />
   )
 }

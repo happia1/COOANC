@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
       .eq('child_id', childId)
       .order('requested_at', { ascending: false })
       .limit(12),
-    supabase.from('child_stats').select('credits_wallet').eq('child_id', childId).maybeSingle(),
+    supabase.from('child_stats').select('credits, credits_wallet').eq('child_id', childId).maybeSingle(),
   ])
 
   if (prRes.error) {
@@ -47,15 +47,15 @@ export async function GET(req: NextRequest) {
     )
   }
 
+  const srow = statsRes.data as { credits?: number; credits_wallet?: number } | null
   return NextResponse.json({
     hiddenStoreItemIds: hiddenRes.error
       ? []
       : ((hiddenRes.data ?? []) as { store_item_id: string }[]).map((r) => r.store_item_id).sort(),
     purchaseRequests: (prRes.data ?? []) as PurchaseRequest[],
-    creditsWallet:
-      statsRes.data && statsRes.data !== null && 'credits_wallet' in statsRes.data
-        ? readChildStatInt(statsRes.data.credits_wallet)
-        : null,
+    /** 총 코인(단일·멀티 공통) — `MarketTab`이 연령/레벨에 따라 총액·지갑 중 표시에 씀 */
+    credits: srow && typeof srow.credits === 'number' ? readChildStatInt(srow.credits) : null,
+    creditsWallet: srow && srow.credits_wallet !== undefined ? readChildStatInt(srow.credits_wallet) : null,
     /** 숨김·통계 조회 오류는 비치명적 — 클라이언트가 이전 상태를 유지 */
     partial: Boolean(hiddenRes.error || statsRes.error),
   })

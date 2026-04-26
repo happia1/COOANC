@@ -4,6 +4,7 @@ import { resolveApiActorChildId } from '@/lib/resolveApiActorChildId'
 import { readChildStatInt } from '@/lib/childCreditsSplit'
 import { isCategoryExcludedFromMarket } from '@/lib/parentMarketMenuSections'
 import { fireGameTrigger } from '@/lib/gameLayer/fireGameTrigger'
+import { usesSingleBucket, ageYearsFromProfileRow } from '@/constants/childAgeConfig'
 
 /**
  * POST /api/market/request
@@ -45,7 +46,7 @@ export async function POST(req: NextRequest) {
    * 상품·스탯·가격 덮어쓰기를 한 번에 병렬 조회해 왕복 지연을 줄입니다.
    * (이전에는 순차 await 로 네트워크 왕복이 여러 번 이어졌음)
    */
-  const [itemRes, statsRes, creditOvRes, existingPendingRes] = await Promise.all([
+  const [itemRes, statsRes, creditOvRes, existingPendingRes, profileRes] = await Promise.all([
     supabase.from('store_items').select('*').eq('id', itemId).eq('is_active', true).maybeSingle(),
     supabase
       .from('child_stats')
@@ -65,6 +66,7 @@ export async function POST(req: NextRequest) {
       .eq('item_id', itemId)
       .eq('status', 'pending')
       .maybeSingle(),
+    supabase.from('profiles').select('age, birth_date').eq('id', childId).maybeSingle(),
   ])
 
   const item = itemRes.data
@@ -89,15 +91,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: '스탯 정보를 찾을 수 없어요' }, { status: 404 })
   }
 
-  const wallet = readChildStatInt(stats.credits_wallet)
-
-  if (wallet < effectivePrice) {
-    return NextResponse.json(
-      { error: '지갑 크레딧이 부족해요. 미션 탭에서 돈바구니의 크레딧을 지갑으로 옮겨 주세요.' },
-      { status: 400 },
-    )
-  }
-
   if (stats.current_level < item.level_required) {
     return NextResponse.json({ error: '레벨이 부족해요' }, { status: 400 })
   }
@@ -107,23 +100,57 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: '이미 요청 중인 상품이에요' }, { status: 409 })
   }
 
+  const level = stats.current_level ?? 0
+  const ageYears = ageYearsFromProfileRow(profileRes.data)
+  const singleBucket = usesSingleBucket(level, ageYears)
   const piggy = typeof stats.credits_piggy === 'number' ? stats.credits_piggy : 0
-  const nextWallet = wallet - effectivePrice
-  const nextCredits = stats.credits - effectivePrice
+  const wallet = readChildStatInt(stats.credits_wallet)
+  const totalCredits = readChildStatInt(stats.credits)
 
-  // 총액·지갑에서 동시 차감(돈바구니·저금통에 둔 분량은 그대로)
-  const { error: deductErr } = await supabase
-    .from('child_stats')
-    .update({
-      credits: nextCredits,
-      credits_wallet: nextWallet,
-      credits_piggy: piggy,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('child_id', childId)
+  let nextCredits: number
+  let nextWallet: number
 
-  if (deductErr) {
-    return NextResponse.json({ error: '크레딧 차감에 실패했어요' }, { status: 500 })
+  if (singleBucket) {
+    if (totalCredits < effectivePrice) {
+      return NextResponse.json(
+        { error: '코인이 부족해요. 미션을 더 완료해서 코인을 모아보세요!' },
+        { status: 400 },
+      )
+    }
+    nextCredits = totalCredits - effectivePrice
+    nextWallet = wallet
+    const { error: deductErr } = await supabase
+      .from('child_stats')
+      .update({
+        credits: nextCredits,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('child_id', childId)
+    if (deductErr) {
+      return NextResponse.json({ error: '크레딧 차감에 실패했어요' }, { status: 500 })
+    }
+  } else {
+    if (wallet < effectivePrice) {
+      return NextResponse.json(
+        { error: '지갑 크레딧이 부족해요. 미션 탭에서 돈바구니의 크레딧을 지갑으로 옮겨 주세요.' },
+        { status: 400 },
+      )
+    }
+    nextWallet = wallet - effectivePrice
+    nextCredits = totalCredits - effectivePrice
+    // 총액·지갑에서 동시 차감(돈바구니·저금통에 둔 분량은 그대로)
+    const { error: deductErr } = await supabase
+      .from('child_stats')
+      .update({
+        credits: nextCredits,
+        credits_wallet: nextWallet,
+        credits_piggy: piggy,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('child_id', childId)
+    if (deductErr) {
+      return NextResponse.json({ error: '크레딧 차감에 실패했어요' }, { status: 500 })
+    }
   }
 
   // 구매 요청 생성
@@ -143,15 +170,24 @@ export async function POST(req: NextRequest) {
     .single()
 
   if (insertErr) {
-    // 삽입 실패 시 크레딧 환불
-    await supabase
-      .from('child_stats')
-      .update({
-        credits: stats.credits,
-        credits_wallet: wallet,
-        credits_piggy: piggy,
-      })
-      .eq('child_id', childId)
+    if (singleBucket) {
+      await supabase
+        .from('child_stats')
+        .update({
+          credits: totalCredits,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('child_id', childId)
+    } else {
+      await supabase
+        .from('child_stats')
+        .update({
+          credits: stats.credits,
+          credits_wallet: wallet,
+          credits_piggy: piggy,
+        })
+        .eq('child_id', childId)
+    }
     return NextResponse.json({ error: '요청 생성에 실패했어요. 다시 시도해 주세요.' }, { status: 500 })
   }
 
