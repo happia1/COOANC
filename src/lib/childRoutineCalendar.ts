@@ -12,7 +12,8 @@ export type ChildRoutineCalendarType = 'weekday' | 'weekend' | 'holiday' | 'vaca
  * 오늘 날짜가 각 일정 구간 안에 들어가는 행만 고른 뒤,
  * - 겹치는 일정이 없으면 → 요일로 평일/주말
  * - 하나라도 `routine_override === 'none'` 이면 → 휴식(holiday) — 일상 미션 풀 비움
- * - 그 외(주말 루틴 등) → vacation 브랜치로 `templatePoolForToday` 에 넘김
+ * - 하나라도 `routine_override === 'weekday'` 이면 → 평일 루틴 강제(주말이어도)
+ * - 그 외(예: `weekend`만) → vacation 브랜치로 `templatePoolForToday` 에 넘김
  */
 export function resolveRoutineTypeFromCalEvents(today: string, calendarEvents: CalEventRow[]): ChildRoutineCalendarType {
   const overlapping = calendarEvents.filter((e) => today >= e.start_date && today <= e.end_date)
@@ -22,6 +23,7 @@ export function resolveRoutineTypeFromCalEvents(today: string, calendarEvents: C
     return dow === 0 || dow === 6 ? 'weekend' : 'weekday'
   }
   if (overlapping.some((e) => e.routine_override === 'none')) return 'holiday'
+  if (overlapping.some((e) => e.routine_override === 'weekday')) return 'weekday'
   return 'vacation'
 }
 

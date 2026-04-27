@@ -65,6 +65,16 @@ const EVENT_TYPES_ORDER: LocalCalendarEvent['eventType'][] = [
 
 type OverrideType = LocalCalendarEvent['routineOverride']
 
+/**
+ * 캘린더 목록·상세에 보여 줄 루틴 오버라이드 문구
+ * (비개발자: 주중/주말(주간) 휴일 루틴/아예 루틴 없음 중 하나)
+ */
+function routineOverrideLabel(override: LocalCalendarEvent['routineOverride']): string {
+  if (override === 'none') return '루틴 없음'
+  if (override === 'weekend') return '주간 일정 적용'
+  return '주중 루틴 적용'
+}
+
 interface Props {
   childId: string | null
   /** 홈 브리핑 링크로 들어왔을 때 자동으로 선택해 열 날짜(YYYY-MM-DD) */
@@ -562,7 +572,7 @@ export default function CalendarSection({ childId, focusDate = null }: Props) {
                     <p className="text-[10px] text-gray-500">
                       {ev.startDate} ~ {ev.endDate}
                       &nbsp;·&nbsp;
-                      {ev.routineOverride === 'none' ? '미션 없음' : '휴일 루틴 적용'}
+                      {routineOverrideLabel(ev.routineOverride)}
                     </p>
                   </div>
                   <span className="shrink-0 text-[10px] font-bold text-gray-400">상세</span>
@@ -801,17 +811,18 @@ export function CalendarEventSheet({
 
                 <div className="mt-4">
                   <label className="mb-2 block text-xs font-bold text-gray-500">루틴 적용</label>
-                  <div className="flex gap-2">
-                    {(['weekend', 'none'] as const).map((v) => (
+                  {/* 주중 / 주말(주간) 휴일 루틴 / 루틴 없음 — 가로 3칸(좁은 화면은 줄바꿈) */}
+                  <div className="flex flex-wrap gap-2">
+                    {(['weekday', 'weekend', 'none'] as const).map((v) => (
                       <button
                         key={v}
                         type="button"
                         onClick={() => setOverride(v)}
-                        className={`flex-1 rounded-xl border-2 py-2 text-xs font-bold transition-all ${
+                        className={`min-w-[30%] flex-1 rounded-xl border-2 py-2 text-xs font-bold transition-all ${
                           override === v ? 'border-brand-blue bg-brand-blue/10 text-brand-blue' : 'border-gray-200 text-gray-400'
                         }`}
                       >
-                        {v === 'weekend' ? '휴일 루틴 적용' : '미션 없음'}
+                        {v === 'weekday' ? '주중 루틴 적용' : v === 'weekend' ? '주간 일정 적용' : '루틴 없음'}
                       </button>
                     ))}
                   </div>
@@ -1010,7 +1021,7 @@ function EventDetailBottomSheet({
                   기간: {ev.startDate} ~ {ev.endDate}
                 </p>
                 <p className="mt-0.5 text-xs text-gray-600">
-                  루틴: {ev.routineOverride === 'none' ? '미션 없음' : '휴일 루틴 적용'}
+                  루틴: {routineOverrideLabel(ev.routineOverride)}
                 </p>
                 {ev.description?.trim() && (
                   <p className="mt-2 whitespace-pre-wrap text-xs leading-relaxed text-gray-600">{ev.description.trim()}</p>

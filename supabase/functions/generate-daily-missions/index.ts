@@ -22,7 +22,7 @@ interface CalendarEvent {
   child_id: string | null
   start_date: string
   end_date: string
-  routine_override: 'weekend' | 'none'
+  routine_override: 'weekend' | 'none' | 'weekday'
 }
 
 interface Mission {
@@ -48,7 +48,11 @@ function getRoutineType(today: string, events: CalendarEvent[], childId: string,
     e.parent_id === parentId &&
     (e.child_id === null || e.child_id === childId)
   )
-  if (ev) return ev.routine_override === 'none' ? 'holiday' : 'vacation'
+  if (ev) {
+    if (ev.routine_override === 'none') return 'holiday'
+    if (ev.routine_override === 'weekday') return 'weekday'
+    return 'vacation'
+  }
   const dow = new Date(today).getDay()
   return dow === 0 || dow === 6 ? 'weekend' : 'weekday'
 }

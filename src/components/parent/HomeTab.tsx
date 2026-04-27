@@ -332,6 +332,7 @@ export default function HomeTab({ childrenData, upcomingEvents, daysWithDataByCh
     const routineMap: Record<string, string> = {
       none: '공휴일',
       weekend: '방학·특별일정',
+      weekday: '주중 루틴',
     }
     const eventMap: Record<string, string> = {
       holiday: '공휴일',

@@ -142,7 +142,8 @@ export type CalendarEvent = {
   start_date: string    // YYYY-MM-DD
   end_date: string      // YYYY-MM-DD
   event_type: 'holiday' | 'vacation' | 'special' | 'other' | 'event' | 'travel'
-  routine_override: 'weekend' | 'none'
+  /** 주중 루틴 강제 / 휴일(주말) 루틴 / 미션 없음 */
+  routine_override: 'weekend' | 'none' | 'weekday'
   created_at: string
 }
 
@@ -156,7 +157,8 @@ export type LocalCalendarEvent = {
   startDate: string       // YYYY-MM-DD
   endDate: string         // YYYY-MM-DD
   eventType: 'holiday' | 'vacation' | 'special' | 'other' | 'event' | 'travel'
-  routineOverride: 'weekend' | 'none'
+  /** 로컬 캘린더용 — `CalendarEvent` 와 동일한 세 가지 */
+  routineOverride: 'weekend' | 'none' | 'weekday'
 }
 
 export type MissionLog = {
