@@ -118,8 +118,7 @@ export const ROUTINE_KEYWORD_CHIP_TITLES: string[] = [...AM_CHIPS, ...PM_CHIPS].
  * - 기존 DB 행이 남아 있어도 자녀/부모 앱 카드에서 공통으로 숨기기 위해 사용합니다.
  */
 const RETIRED_ROUTINE_MISSION_TITLES = new Set<string>([
-  '간식먹기',
-  /** `세수하기`로 통일 — 구 템플릿 제목은 카드에서 숨김(065 마이그레이션·DB 삭제과 병행) */
+  /** `세수하기`로 통일 — 구 템플릿 제목은 카드에서 숨김(065 마이그레이션·DB 삭제과 병행). `간식먹기`는 폐지 목록에서 제거(활성 미션). */
   '세수',
 ])
 

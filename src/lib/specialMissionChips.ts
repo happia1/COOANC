@@ -190,19 +190,16 @@ export function displaySpecialMissionTitle(storedTitle: string): string {
 /**
  * 스페셜 칩에서 **완전히 뺀** 미션 제목 — DB 에 옛 템플릿이 남아 있어도 카드·시트에서 숨깁니다.
  * (마이그레이션 `051_remove_retired_special_mission_templates.sql` 로 행 삭제 권장)
+ * `설거지`·`골고루먹기`·`신발신기`/`신발 신기`는 활성 daily로 쓰이므로 숨김 대상에서 제외합니다.
  */
 const RETIRED_SPECIAL_DISPLAY_TITLES = new Set<string>([
-  '설거지',
   '방청소',
   '심부름',
   '심부름하기',
   '방 청소하기',
-  '골고루먹기',
   /** 과거 시드/레거시 미션: 더 이상 사용하지 않음 */
   '스스로양말신기',
   '양말신기',
-  '신발신기',
-  '신발 신기',
 ])
 
 /** 저장된 제목이 폐지된 스페셜 키워드인지 (레거시 별칭을 짧은 제목으로 푼 뒤에도 검사) */
