@@ -64,7 +64,8 @@ export default function ChildMissionCard({ mission, onComplete, tapResetKey = 0 
    * SSR 과 첫 클라이언트 페인트는 **같은 값**이어야 하므로 `window` 를 읽지 않고 `minPx` 로 시작한 뒤
    * `useLayoutEffect`에서 실제 너비로 맞춥니다(없으면 하이드레이션 경고 + SpriteImage 스타일 불일치).
    */
-  const [vw, setVw] = useState(CHILD_HOME_MISSION_FLUID_VW.minPx)
+  // minPx는 `as const` 리터럴(360)이라 그대로 두면 state 타입이 360만 허용됨 → resize 시 number를 넣을 수 없음
+  const [vw, setVw] = useState<number>(CHILD_HOME_MISSION_FLUID_VW.minPx)
   useLayoutEffect(() => {
     const onResize = () => setVw(window.innerWidth)
     onResize()

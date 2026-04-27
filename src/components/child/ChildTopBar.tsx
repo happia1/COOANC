@@ -2,7 +2,9 @@
 
 import Image from 'next/image'
 import { useState } from 'react'
+import SpriteImage from '@/components/common/SpriteImage'
 import { TOPBAR_LOGO_CLASSNAME, TOPBAR_LOGO_HEIGHT, TOPBAR_LOGO_SRC, TOPBAR_LOGO_WIDTH } from '@/constants/branding'
+import { ICONS } from '@/constants/sprites'
 import ChildAlarmClockPopup from '@/components/child/ChildAlarmClockPopup'
 
 type Props = {
@@ -16,10 +18,10 @@ type Props = {
 /**
  * 자녀 앱 공통 상단바
  * - 좌: 앱 파비콘과 동일한 마크(브라우저 탭 아이콘과 같은 이미지)
- * - 우: 알람시계 아이콘 + 나가기(이미지 아이콘)
+ * - 우: 뽀모도로 타이머 아이콘(스프라이트) + 나가기(이미지 아이콘)
  */
 export default function ChildTopBar({ isParentPreview = false }: Props) {
-  /** 시계 아이콘 팝업(뽀모도로/루틴 알람) 열림 상태 */
+  /** 타이머 아이콘 팝업(뽀모도로/루틴 알람) 열림 상태 */
   const [clockPopupOpen, setClockPopupOpen] = useState(false)
   const exitHref = isParentPreview ? '/api/parent/exit-child-ui' : '/parent/home'
 
@@ -39,16 +41,16 @@ export default function ChildTopBar({ isParentPreview = false }: Props) {
         />
         <div className="flex items-center justify-end gap-2.5 max-w-[min(100%,14rem)]">
           {/**
-           * 시계 아이콘을 누르면 2페이지 팝업(뽀모도로/루틴 알람)을 엽니다.
-           * - 비개발자용: 화면을 좌우로 밀어 두 페이지를 전환할 수 있습니다.
+           * 뽀모도로 타이머 아이콘 — 탭하면 중앙 팝업(뽀모도로/루틴 알람)이 열립니다.
+           * 비개발자용: 팝업 안에서 좌우로 밀어 두 페이지를 전환할 수 있습니다.
            */}
           <button
             type="button"
             onClick={() => setClockPopupOpen(true)}
             className="flex h-8 w-8 items-center justify-center shrink-0 transition-opacity hover:opacity-80"
-            aria-label="시계 팝업 열기"
+            aria-label="뽀모도로·알람 팝업 열기"
           >
-            <Image src="/assets/img/common/ui/alarm.png" alt="" width={20} height={20} className="h-5 w-5 object-contain" />
+            <SpriteImage sheet={ICONS} frame="timer" width={22} className="h-[22px] w-[22px] shrink-0 select-none object-contain" />
           </button>
           {/**
            * 부모 미리보기 시 `exitHref` 가 `/api/parent/exit-child-ui` 인데,

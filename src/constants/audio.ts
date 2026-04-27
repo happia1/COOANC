@@ -23,7 +23,7 @@ export const AUDIO = {
     KITTY_SWEET_MEOW: `${BASE}/character_sound/mixkit-sweet-kitty-meow-93.wav`,
   },
 
-  /** 카운트다운 - 타이머/미션 제한시간 */
+  /** 카운트다운 - 타이머/미션 제한시간 (`public/assets/audio/countdown/`) */
   COUNTDOWN: {
     HAPPY_COUNTDOWN: `${BASE}/countdown/alarm-children-happy-countdown-923.wav`,
   },

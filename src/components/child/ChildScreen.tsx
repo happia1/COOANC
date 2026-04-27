@@ -30,6 +30,7 @@ import {
   resolveHomeIslandStageSprite,
 } from '@/lib/childHomeCharacterFromAvatar'
 import { BACKGROUND_ANCHORS } from '@/constants/backgroundAnchors'
+import { ICONS } from '@/constants/sprites'
 import { getUnlockedFeatures } from '@/constants/childScreenFeatures'
 import { useContainerSize } from '@/hooks/useContainerSize'
 import ChildMissionCard from '@/components/child/ChildMissionCard'
@@ -360,8 +361,8 @@ export default function ChildScreen({
   const rollbackUiCooldownRef = useRef<Map<string, number>>(new Map())
 
   /**
-   * 알람·뽀모도로 시계 팝업(ChildAlarmClockPopup) 열림 여부
-   * 비개발자 설명: 캐릭터 옆 시계를 누르면 true 가 되고, 닫기로 false 가 됩니다.
+   * 뽀모도로·알람 팝업(ChildAlarmClockPopup) 열림 여부
+   * 비개발자 설명: 캐릭터 옆 타이머 아이콘을 누르면 true 가 되고, 닫기로 false 가 됩니다.
    */
   const [clockPopupOpen, setClockPopupOpen] = useState(false)
 
@@ -1167,8 +1168,7 @@ export default function ChildScreen({
             style={{ paddingTop: 'max(16px, env(safe-area-inset-top))' }}
           >
             {/*
-              좌측: 레벨 스탯 카드(위) + 알람 시계(하단) — 세로로 쌓음
-              알람: 반투명 박스 없이 아이콘만, 이전(44px)의 2배 터치·이미지 크기
+              좌측: 레벨 스탯 카드만 (뽀모도로는 화면 중앙 쪽 우측에 별도 배치)
             */}
             <div className="pointer-events-none min-w-0 flex flex-col items-start gap-2">
               {stats && (
@@ -1180,34 +1180,21 @@ export default function ChildScreen({
                   shine={badgeShine}
                 />
               )}
-              <button
-                type="button"
-                onClick={() => setClockPopupOpen(true)}
-                className="flex h-[5.5rem] w-[5.5rem] shrink-0 items-center justify-center
-                           border-0 bg-transparent p-0
-                           transition-transform active:scale-90 pointer-events-auto"
-                aria-label="시계 팝업 열기"
-              >
-                <Image
-                  src="/assets/img/common/ui/alarm.png"
-                  alt="알람"
-                  width={48}
-                  height={48}
-                  className="h-12 w-12 object-contain drop-shadow-md"
-                />
-              </button>
               {/* 별 이펙트 — 크레딧 행 주변(고정 위치)에만 그려짐, 레이아웃 높이 없음 */}
               {badgeShine && creditBadgeRef.current && (
                 <BadgeStarBurst badgeRef={creditBadgeRef} />
               )}
             </div>
 
-            {/* 우측: 나가기 버튼(맨 위) + 기능 아이콘 수직 스택 */}
-            <div className="flex flex-col items-center gap-2 pointer-events-auto shrink-0">
-              {/* 나가기 문 버튼 — 배경 없이 아이콘만, 약간 크게 */}
+            {/*
+              우측 상단: 나가기 → 코인만 고정.
+              뽀모도로·스티커·장바구니는 아래 별도 블록에서 화면 중앙 쪽으로 내려 배치합니다.
+            */}
+            <div className="flex flex-col items-center gap-3 pointer-events-auto shrink-0">
+              {/* 나가기 문 — 다른 아이콘과 같은 중앙 정렬 슬롯 */}
               <a
                 href={exitHref}
-                className="w-12 h-12 flex items-center justify-center transition active:scale-95"
+                className="flex h-14 w-14 shrink-0 items-center justify-center transition active:scale-95"
                 aria-label="나가기"
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -1232,36 +1219,52 @@ export default function ChildScreen({
                 </button>
               )} */}
 
-              {/* 코인 주머니 아이콘 */}
+              {/* 코인 주머니 — 슬롯 크기를 위와 맞춤 */}
               {features.coinPocket && (
                 <button
                   type="button"
                   onClick={() => setActivePanel('coins')}
-                  className="w-11 h-11 bg-white/40 rounded-2xl flex items-center justify-center shadow-md backdrop-blur-sm transition active:scale-95"
+                  className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/40 shadow-md backdrop-blur-sm transition active:scale-95"
                   aria-label="내 크레딧 열기"
                 >
-                  <span className="text-xl" role="img" aria-hidden>💰</span>
+                  <span className="text-xl" role="img" aria-hidden>
+                    💰
+                  </span>
                 </button>
               )}
-
             </div>
           </div>
 
-          {/* ── 캐릭터 발 라인 좌우 끝 아이콘 ──────────────────────────── */}
-          {/* 오른쪽 끝 아이콘 스택 — 스티커(위) + 마켓(아래), 캐릭터 발 Y보다 약간 위 */}
+          {/*
+            뽀모도로·스티커·장바구니 — 상단이 아니라 화면 세로 중앙에 가깝게(캐릭터 발 앵커 기준).
+            비개발자: 시계·하트·바구니만 아래로 내려가고, 나가기·코인은 오른쪽 위에 그대로 있습니다.
+          */}
           <div
-            className="absolute right-3 pointer-events-auto flex flex-col items-center gap-2"
+            className="absolute right-4 flex flex-col items-center gap-3 pointer-events-auto"
             style={{
               top: `${(anchor.characterFootY - 0.12) * 100}%`,
               transform: 'translateY(-50%)',
             }}
           >
-            {/* 스티커(하트) — 위 */}
+            <button
+              type="button"
+              onClick={() => setClockPopupOpen(true)}
+              className="flex h-14 w-14 shrink-0 items-center justify-center border-0 bg-transparent p-0 transition-transform active:scale-90"
+              aria-label="뽀모도로·알람 팝업 열기"
+            >
+              <SpriteImage
+                sheet={ICONS}
+                frame="timer"
+                width={48}
+                className="h-12 w-12 shrink-0 select-none object-contain drop-shadow-md"
+              />
+            </button>
+
             {features.sticker && (
               <button
                 type="button"
                 onClick={() => setActivePanel('sticker')}
-                className="flex items-center justify-center transition active:scale-95"
+                className="flex h-14 w-14 shrink-0 items-center justify-center transition active:scale-95"
                 aria-label="칭찬 스티커 판 열기"
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -1275,12 +1278,11 @@ export default function ChildScreen({
               </button>
             )}
 
-            {/* 마켓(장바구니) — 아래 */}
             {features.market && (
               <button
                 type="button"
                 onClick={() => setActivePanel('market')}
-                className="mt-1.5 flex items-center justify-center transition active:scale-95"
+                className="flex h-14 w-14 shrink-0 items-center justify-center transition active:scale-95"
                 aria-label="마켓 열기"
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -1433,7 +1435,7 @@ export default function ChildScreen({
 
       {/*
        * z-[160] 이상인 ChildAlarmClockPopup — DOM 순서상 마지막에 두어도 자체 z-index로 최상위에 뜸
-       * 비개발자 설명: 루틴 알람·뽀모도로 시계(부모 LocalStorage 설정 반영)를 여는 별도 창입니다.
+       * 비개발자 설명: 루틴 알람·뽀모도로(부모 LocalStorage 설정 반영)를 여는 중앙 팝업입니다.
        */}
       <ChildAlarmClockPopup open={clockPopupOpen} onClose={() => setClockPopupOpen(false)} />
     </>
