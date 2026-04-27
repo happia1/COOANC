@@ -68,10 +68,17 @@ type DeliveryOverlay = {
  * 브라우저 캐시를 우회해 새 이미지를 즉시 받아옵니다.
  */
 const MARKET_ROOF_CACHE_BUST = 5
-/** 기본 지붕 이미지 (1236px 너비) — 일반/좁은 화면용 */
-const ROOF_SRC = `/assets/img/layouts/backgrounds/market_roof.png?v=${MARKET_ROOF_CACHE_BUST}`
-/** 넓은 화면 지붕 이미지 (1536px 너비) — 전체화면/와이드 화면에서 이미지 잘림 방지 */
-const ROOF_FILL_SRC = `/assets/img/layouts/backgrounds/market_roof_fill.png?v=${MARKET_ROOF_CACHE_BUST}`
+/**
+ * 마켓 상단 지붕 — 넓은 화면용으로 제작된 `market_roof_fill.png`만 사용합니다.
+ *
+ * 비개발자 설명:
+ * - 예전에는 좁은/넓은 화면용 PNG를 나누고 `object-cover`로 채웠는데, cover 는 비율을 맞추느라
+ *   이미지 위·아래(또는 양옆)를 잘라서 전체화면에서 지붕이 잘리는 문제가 있었습니다.
+ * - fill 이미지는 가로가 길게 잡혀 있어, 작은 폰에서는 그대로 축소해 보여도 지붕 전체가 들어가고,
+ *   넓은 화면에서도 같은 파일로 반응형(`w-full` + contain) 처리하면 잘리지 않습니다.
+ * - (참고) 아주 오래된 단말 대역폭 최적화가 필요하면 나중에 `srcset`으로 작은 버전만 추가할 수 있습니다.
+ */
+const ROOF_IMAGE_SRC = `/assets/img/layouts/backgrounds/market_roof_fill.png?v=${MARKET_ROOF_CACHE_BUST}`
 /** 요청사항: 물건이 담긴 장바구니 아이콘(공용 정적 이미지) */
 const BASKET_FILLED_SRC = '/assets/img/common/ui/basket_filled.png'
 
@@ -782,26 +789,20 @@ export default function MarketTab({
         )}
 
       {/*
-       * 가게 지붕: <picture> 태그로 화면 너비에 따라 이미지를 자동 전환합니다.
-       * - 1236px 미만: market_roof.png (기본)
-       * - 1236px 이상(전체화면/와이드): market_roof_fill.png (1536px 너비, 잘림 없음)
-       * next/image localPatterns 제약 없이 쓰기 위해 <img> 사용 (장식용 이미지)
+       * 가게 지붕 — market_roof_fill.png 단일 에셋 + contain 으로 잘림 방지.
+       * object-cover 는 영역을 꽉 채우려고 자르기 때문에 전체화면에서 지붕이 잘렸음 → contain object-top 유지.
        */}
-      <div className="shrink-0 w-full overflow-hidden leading-none">
-        <picture>
-          {/* 넓은 화면에서는 더 넓은 fill 이미지로 전환 */}
-          <source media="(min-width: 1236px)" srcSet={ROOF_FILL_SRC} />
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={ROOF_SRC}
-            alt=""
-            className="block h-auto w-full max-h-[5.5rem] select-none object-cover object-top"
-            draggable={false}
-            onError={(e) => {
-              e.currentTarget.style.display = 'none'
-            }}
-          />
-        </picture>
+      <div className="shrink-0 w-full overflow-hidden leading-none bg-[#FAF5EF]">
+        {/* eslint-disable-next-line @next/next/no-img-element — 장식 PNG, 패턴 파일 등록 없이 고정 경로 */}
+        <img
+          src={ROOF_IMAGE_SRC}
+          alt=""
+          className="block h-auto w-full max-h-[6rem] select-none object-contain object-top"
+          draggable={false}
+          onError={(e) => {
+            e.currentTarget.style.display = 'none'
+          }}
+        />
       </div>
 
       {betaItems.length === 0 ? (
