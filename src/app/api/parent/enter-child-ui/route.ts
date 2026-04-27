@@ -18,69 +18,78 @@ import { getCachedFamilyLinksForChild, getCachedFamilyLinksForParent } from '@/l
  * `_rsc` 가 있으면 쿠키·리다이렉트 없이 **200 JSON no-op** 으로 끝냅니다. (실제 진입은 첫 요청 `?childId=…` 로 이미 처리됨)
  */
 export async function GET(req: NextRequest) {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  // 캐시·쿠키·리다이렉트 경로의 예상 밖 오류를 잡아 부모 UI 전환이 멈추지 않게 합니다.
+  try {
+    const supabase = await createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
 
-  const { data: profile } = user
-    ? await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle()
-    : { data: null }
+    const { data: profile } = user
+      ? await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle()
+      : { data: null }
 
-  const childIdParam = req.nextUrl.searchParams.get('childId')
-  const rsc = req.nextUrl.searchParams.get('_rsc')
+    const childIdParam = req.nextUrl.searchParams.get('childId')
+    const rsc = req.nextUrl.searchParams.get('_rsc')
 
-  /** 개발 환경 또는 RSC 보조 요청일 때만 — user/role/쿼리 불일치 원인 추적 */
-  if (process.env.NODE_ENV === 'development' || rsc !== null) {
-    console.log('enter-child-ui debug:', {
-      userId: user?.id,
-      role: profile?.role,
-      childId: childIdParam,
-      rsc,
+    /** 개발 환경 또는 RSC 보조 요청일 때만 — user/role/쿼리 불일치 원인 추적 */
+    if (process.env.NODE_ENV === 'development' || rsc !== null) {
+      console.log('enter-child-ui debug:', {
+        userId: user?.id,
+        role: profile?.role,
+        childId: childIdParam,
+        rsc,
+      })
+    }
+
+    if (req.nextUrl.searchParams.has('_rsc')) {
+      return NextResponse.json({ ok: true, noop: true, reason: 'next-rsc-prefetch-skip' }, { status: 200 })
+    }
+
+    if (!user) {
+      return NextResponse.json({ error: '인증이 필요해요' }, { status: 401 })
+    }
+
+    if (profile?.role !== 'parent') {
+      return NextResponse.json({ error: '부모 계정만 이용할 수 있어요' }, { status: 403 })
+    }
+
+    /** 주소창에서 온 childId — 없거나 깨졌으면 아래에서 첫 연결 자녀로 채움 */
+    let childId = normalizeUuidParam(childIdParam)
+
+    if (!childId) {
+      /** React `cache` — 같은 요청 안에서 자녀 레이아웃과 중복 조회를 합칩니다 */
+      const links = await getCachedFamilyLinksForParent(user.id)
+      const first = links[0]?.child_id
+      childId = normalizeUuidParam(first ?? null)
+    }
+
+    /** 자녀가 아예 없으면 쿠키 없이 부모 홈으로 — 온보딩 유도 */
+    if (!childId) {
+      return NextResponse.redirect(new URL('/parent/home', req.nextUrl.origin))
+    }
+
+    /** 자녀 기준으로 이미 캐시된 링크 행에서 부모 일치 여부만 확인 (별도 round-trip 제거) */
+    const familyRows = await getCachedFamilyLinksForChild(childId)
+    const linked = familyRows.some((row) => row.parent_id === user.id)
+    if (!linked) {
+      return NextResponse.json({ error: '연결된 자녀가 아니에요' }, { status: 403 })
+    }
+
+    const url = new URL('/home', req.nextUrl.origin)
+    const res = NextResponse.redirect(url)
+    res.cookies.set(PARENT_AS_CHILD_COOKIE, childId, {
+      httpOnly: true,
+      sameSite: 'lax',
+      path: '/',
+      maxAge: PARENT_AS_CHILD_COOKIE_MAX_AGE,
     })
+    return res
+  } catch (error) {
+    console.error('[api/parent/enter-child-ui] unexpected error:', error)
+    return NextResponse.json(
+      { error: '서버 오류가 발생했어요. 다시 시도해주세요.' },
+      { status: 500 },
+    )
   }
-
-  if (req.nextUrl.searchParams.has('_rsc')) {
-    return NextResponse.json({ ok: true, noop: true, reason: 'next-rsc-prefetch-skip' }, { status: 200 })
-  }
-
-  if (!user) {
-    return NextResponse.json({ error: '인증이 필요해요' }, { status: 401 })
-  }
-
-  if (profile?.role !== 'parent') {
-    return NextResponse.json({ error: '부모 계정만 이용할 수 있어요' }, { status: 403 })
-  }
-
-  /** 주소창에서 온 childId — 없거나 깨졌으면 아래에서 첫 연결 자녀로 채움 */
-  let childId = normalizeUuidParam(childIdParam)
-
-  if (!childId) {
-    /** React `cache` — 같은 요청 안에서 자녀 레이아웃과 중복 조회를 합칩니다 */
-    const links = await getCachedFamilyLinksForParent(user.id)
-    const first = links[0]?.child_id
-    childId = normalizeUuidParam(first ?? null)
-  }
-
-  /** 자녀가 아예 없으면 쿠키 없이 부모 홈으로 — 온보딩 유도 */
-  if (!childId) {
-    return NextResponse.redirect(new URL('/parent/home', req.nextUrl.origin))
-  }
-
-  /** 자녀 기준으로 이미 캐시된 링크 행에서 부모 일치 여부만 확인 (별도 round-trip 제거) */
-  const familyRows = await getCachedFamilyLinksForChild(childId)
-  const linked = familyRows.some((row) => row.parent_id === user.id)
-  if (!linked) {
-    return NextResponse.json({ error: '연결된 자녀가 아니에요' }, { status: 403 })
-  }
-
-  const url = new URL('/home', req.nextUrl.origin)
-  const res = NextResponse.redirect(url)
-  res.cookies.set(PARENT_AS_CHILD_COOKIE, childId, {
-    httpOnly: true,
-    sameSite: 'lax',
-    path: '/',
-    maxAge: PARENT_AS_CHILD_COOKIE_MAX_AGE,
-  })
-  return res
 }

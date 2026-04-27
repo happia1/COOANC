@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react'
 import Image from 'next/image'
 import { AUTH_LOGO_SRC } from '@/constants/branding'
+import { BetaVersionMark } from '@/components/common/BetaVersionMark'
 import { createClient } from '@/lib/supabase/client'
 import { birthDateInputBounds, getAgeFromBirthDateIso } from '@/lib/ageFromBirthDate'
 import { parseJsonFromResponse } from '@/lib/parseJsonResponse'
@@ -94,7 +95,9 @@ export default function OnboardingPage() {
     return (
       <div className="min-h-screen bg-gradient-to-b from-sky-100 via-white to-green-50 flex flex-col items-center px-4 py-6 sm:px-6 sm:py-8">
         <div className="flex w-full max-w-sm flex-col items-center gap-1.5 mb-3 shrink-0">
-          <Image src={AUTH_LOGO_SRC} alt="COOANC" width={144} height={144} className="rounded-2xl max-h-24 w-auto" style={{ height: 'auto' }} />
+          <BetaVersionMark />
+          {/* 상단 마크: 자녀 등록 단계 대비 동일 비율로 절반 높이 */}
+          <Image src={AUTH_LOGO_SRC} alt="COOANC" width={72} height={72} className="rounded-2xl max-h-12 w-auto" style={{ height: 'auto' }} />
           <h1 className="text-base font-black text-brand-blue text-center">초기 루틴 설정</h1>
         </div>
         <RoutineOnboarding linkedChildId={createdChildId} onComplete={() => { window.location.href = '/parent' }} />
@@ -114,7 +117,9 @@ export default function OnboardingPage() {
     <div className="min-h-screen bg-gradient-to-b from-sky-100 via-white to-green-50 flex flex-col items-center justify-center px-6 py-10">
 
       <div className="flex flex-col items-center gap-3 mb-7">
-        <Image src={AUTH_LOGO_SRC} alt="COOANC" width={180} height={180} className="rounded-2xl" style={{ height: 'auto' }} />
+        <BetaVersionMark />
+        {/* 로그인 화면과 맞춰 표시 크기 절반 */}
+        <Image src={AUTH_LOGO_SRC} alt="COOANC" width={90} height={90} className="rounded-2xl" style={{ height: 'auto' }} />
         <div className="text-center">
           <h1 className="text-xl font-black text-brand-blue">첫 번째 자녀를 등록해요</h1>
           <p className="text-sm text-gray-400 mt-1">자녀 프로필을 만들면 미션을 시작할 수 있어요</p>

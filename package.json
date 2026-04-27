@@ -1,7 +1,7 @@
 {
   "name": "cooanc",
   "version": "1.0.0",
-  "description": "자녀의 경제 성장의 닻을 내리다, COO-ANC (쿠앵크).",
+  "description": "자녀 성장의 닻을 내리다, COO-ANC (쿠앵크).",
   "main": "index.js",
   "directories": {
     "doc": "docs"

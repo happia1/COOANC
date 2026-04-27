@@ -14,6 +14,7 @@ import {
   type RoutineAlarmPrefsLoaded,
   type RoutineCustomAlarmStored,
 } from '@/lib/routineAlarmLocalPrefs'
+import { AUDIO } from '@/constants/audio'
 import { playAudio, CHILD_AUDIO } from '@/lib/childAudio'
 
 type Props = {
@@ -224,8 +225,9 @@ export default function ChildAlarmClockPopup({ open, onClose }: Props) {
 
   /**
    * 뽀모도로 카운트다운(1초 단위)
-   * - 남은 시간이 10초~1초가 되는 매 초 tick-tock 효과음
-   * - 0초(완료) 시 짧은 완료 느낌의 `goodMorning` 효과음(기존 음원 재사용)
+   * - 10~1초: 매 초 `tickTock` 틱톡 효과음(집중 마무리)
+   * - 0초(끝): `public/assets/audio/countdown/...` 카운트다운 완료 알람(ASCII 경로 → 브라우저 404/무음 방지.
+   *   예전 `goodMorning`은 한글 파일명 URL 문제로 조용히 실패할 수 있음)
    */
   useEffect(() => {
     if (!open || !running) return
@@ -234,7 +236,8 @@ export default function ChildAlarmClockPopup({ open, onClose }: Props) {
         if (prev <= 1) {
           setRunning(false)
           if (prev === 1) {
-            playAudio(CHILD_AUDIO.goodMorning, 0.8)
+            // 뽀모도로 끝남 — 아이들용 카운트다운 완료 알람 (AUDIO 상수 = 웹 루트 기준 절대 경로)
+            playAudio(AUDIO.COUNTDOWN.HAPPY_COUNTDOWN, 0.85)
           }
           return 0
         }

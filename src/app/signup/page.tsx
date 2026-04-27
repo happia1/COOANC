@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Image from 'next/image'
 import { AUTH_LOGO_SRC } from '@/constants/branding'
+import { BetaVersionMark } from '@/components/common/BetaVersionMark'
 import Link from 'next/link'
 import { getSignupCatchMessage } from '@/lib/getSignupCatchMessage'
 import { parseJsonFromResponse } from '@/lib/parseJsonResponse'
@@ -77,15 +78,17 @@ export default function SignupPage() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-sky-100 via-white to-green-50 flex flex-col items-center justify-center px-6 py-10">
       <div className="flex flex-col items-center gap-3 mb-7">
+        <BetaVersionMark />
+        {/* 로그인 화면과 동일 비율·로그인 대비 이전 960 기준 너비의 절반 이하 */}
         <Image
           src={AUTH_LOGO_SRC}
           alt="COOANC"
-          width={960}
-          height={960}
-          className="rounded-2xl max-w-[min(960px,calc(100vw-3rem))] w-full h-auto"
+          width={240}
+          height={240}
+          className="rounded-2xl max-w-[min(240px,calc(100vw-3rem))] w-full h-auto"
           priority
         />
-        <p className="text-sm text-gray-400">자녀 경제 성장의 닻을 내리다</p>
+        <p className="text-sm text-gray-400">자녀 성장의 닻을 내리다</p>
       </div>
 
       <form

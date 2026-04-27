@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import Image from 'next/image'
 import { AUTH_LOGO_SRC } from '@/constants/branding'
+import { BetaVersionMark } from '@/components/common/BetaVersionMark'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
@@ -83,15 +84,17 @@ export default function LoginPage() {
     <div className="min-h-screen bg-gradient-to-b from-sky-100 via-white to-green-50 flex flex-col items-center justify-center px-6">
 
       <div className="flex flex-col items-center gap-3 mb-8">
+        <BetaVersionMark />
+        {/* 로고 표시 크기: 기존 대비 가로·세로 절반(Next Image intrinsic 비율 유지) */}
         <Image
           src={AUTH_LOGO_SRC}
           alt="COOANC"
-          width={480}
-          height={480}
-          className="rounded-2xl max-w-[min(480px,calc(100vw-3rem))] w-full h-auto"
+          width={240}
+          height={240}
+          className="rounded-2xl max-w-[min(240px,calc(100vw-3rem))] w-full h-auto"
           priority
         />
-        <p className="text-sm text-gray-400">자녀 경제 성장의 닻을 내리다</p>
+        <p className="text-sm text-gray-400">자녀 성장의 닻을 내리다</p>
       </div>
 
       <form
