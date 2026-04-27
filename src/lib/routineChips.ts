@@ -3,7 +3,7 @@
  */
 
 import type { Mission } from '@/types/database'
-import { isRoutineSectionMission } from '@/lib/specialMissionChips'
+import { isRoutineSectionMission, isSpecialSectionMission } from '@/lib/specialMissionChips'
 
 export type ApiBlock = 'morning' | 'afternoon' | 'evening' | 'bedtime'
 export type ChipType = 'fixed' | 'recommended' | 'optional'
@@ -67,7 +67,9 @@ function minutesFromHHMMSafe(t: string | null | undefined): number {
  */
 const MISSION_TITLE_ALIASES: Record<string, string> = {
   '일어나기': '기상',
-  '양치하기':  '양치',
+  '양치하기': '양치',
+  /** 구 DB/시드 — 칩·정렬 키는 "세수하기" 로 통일 */
+  세수: '세수하기',
 }
 
 /**
@@ -117,6 +119,8 @@ export const ROUTINE_KEYWORD_CHIP_TITLES: string[] = [...AM_CHIPS, ...PM_CHIPS].
  */
 const RETIRED_ROUTINE_MISSION_TITLES = new Set<string>([
   '간식먹기',
+  /** `세수하기`로 통일 — 구 템플릿 제목은 카드에서 숨김(065 마이그레이션·DB 삭제과 병행) */
+  '세수',
 ])
 
 /** 입력 제목이 폐지된 일상 미션인지 확인합니다. */
@@ -124,6 +128,60 @@ export function isRetiredRoutineMissionTitle(title: string | null | undefined): 
   const normalized = (title ?? '').trim()
   if (!normalized) return false
   return RETIRED_ROUTINE_MISSION_TITLES.has(normalized)
+}
+
+/**
+ * 일상(루틴) `daily_missions` 행만: 제목이 별칭으로 같은 뜻이거나(세수/세수하기),
+ * DB 에 제목이 둘 다 `세수하기`로 겹쳐 생긴 중복이면 **한 건만** 남깁니다.
+ * 스페셜 미션은 건드리지 않습니다.
+ */
+export function dedupeDailyRoutineMissionsByCanonicalKey<
+  T extends {
+    missions: Pick<Mission, 'title' | 'block' | 'repeat_type' | 'difficulty'> | null
+  },
+>(routineRowsInSortOrder: T[]): T[] {
+  const seen = new Set<string>()
+  const out: T[] = []
+  for (const row of routineRowsInSortOrder) {
+    const m = row.missions
+    if (!m) {
+      out.push(row)
+      continue
+    }
+    if (isSpecialSectionMission(m)) {
+      out.push(row)
+      continue
+    }
+    const raw = m.title.trim()
+    const canon = MISSION_TITLE_ALIASES[raw] ?? raw
+    const key = `${canon}\u0000${m.block ?? ''}\u0000${m.repeat_type}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(row)
+  }
+  return out
+}
+
+/**
+ * 부모 루틴 탭 `missions` 배열: 자녀 연결 루틴에서 같은 (정규화 제목·block·repeat_type) 이 두 번 이상이면
+ * 정렬된 순서에서 앞선 행만 남깁니다(세수/세수하기·이중 `세수하기` 템플릿 정리).
+ */
+export function dedupeLinkedRoutineMissionsByCanonicalKey(missions: Mission[]): Mission[] {
+  const seen = new Set<string>()
+  const out: Mission[] = []
+  for (const m of missions) {
+    if (!isRoutineSectionMission(m)) {
+      out.push(m)
+      continue
+    }
+    const raw = m.title.trim()
+    const canon = MISSION_TITLE_ALIASES[raw] ?? raw
+    const key = `${canon}\u0000${m.block ?? ''}\u0000${m.repeat_type}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(m)
+  }
+  return out
 }
 
 export function defaultSelectedIds(pool: ChipDef[], forSchool: boolean): string[] {
@@ -460,5 +518,23 @@ export async function postRoutineKeywordMissions(
       [],
       ctx,
     )
+  }
+
+  /**
+   * 주말 `daily_missions` 백필 — `custom` + 휴일 weekly 0개 일 때 daily 로 잘못 붙는 문제를 막기 위해
+   * `profiles.holiday_routine_mode` 에 의도(평일 동일 / 휴일만 따로)를 남깁니다.
+   * 실패해도 키워드 루틴은 이미 반영되었으므로 경고만 합니다.
+   */
+  const modeRes = await fetchApi('/api/child/update-profile', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      childId: input.linkedChildId,
+      holidayRoutineMode: input.holidayMode,
+    }),
+  })
+  if (!modeRes.ok) {
+    const t = await modeRes.text().catch(() => '')
+    console.warn('[postRoutineKeywordMissions] holiday_routine_mode 저장 실패', t)
   }
 }

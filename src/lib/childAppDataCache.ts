@@ -12,6 +12,11 @@ export type CachedChildProfileRow = {
   name: string | null
   role: string | null
   avatar_url?: string | null
+  /**
+   * 064 `profiles.holiday_routine_mode` — 주말 백필에서 daily 를 쓸지(`as_weekday`) weekly 만 쓸지(`custom`) 구분
+   * 없으면(null) weekly 템플릿 수로만 추론(구버전 DB/미저장)
+   */
+  holiday_routine_mode?: 'as_weekday' | 'custom' | null
 }
 
 /**
@@ -19,11 +24,21 @@ export type CachedChildProfileRow = {
  */
 export const getCachedProfileRowById = cache(async (id: string): Promise<CachedChildProfileRow | null> => {
   const supabase = await createClient()
-  const res = await supabase.from('profiles').select('name, role, avatar_url').eq('id', id).maybeSingle()
+  const res = await supabase
+    .from('profiles')
+    .select('name, role, avatar_url, holiday_routine_mode')
+    .eq('id', id)
+    .maybeSingle()
   if (res.data) return res.data as CachedChildProfileRow
-  if (res.error && isRetriableMissingColumnError(res.error)) {
-    const fb = await supabase.from('profiles').select('name, role').eq('id', id).maybeSingle()
-    return (fb.data as CachedChildProfileRow | null) ?? null
+  if (res.error) {
+    if (!isRetriableMissingColumnError(res.error)) return null
+    const fb = await supabase.from('profiles').select('name, role, avatar_url').eq('id', id).maybeSingle()
+    if (fb.data) return fb.data as CachedChildProfileRow
+    if (fb.error) {
+      if (!isRetriableMissingColumnError(fb.error)) return null
+      const fb2 = await supabase.from('profiles').select('name, role').eq('id', id).maybeSingle()
+      return (fb2.data as CachedChildProfileRow | null) ?? null
+    }
   }
   return null
 })

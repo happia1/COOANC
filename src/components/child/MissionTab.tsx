@@ -16,7 +16,7 @@ import { isRetiredSpecialMissionTitle, isSpecialSectionMission } from '@/lib/spe
 import { compareRoutineFlowSortable, type RoutineFlowSortable } from '@/lib/routineChips'
 import { parseAlarmFromMissionDescription } from '@/lib/missionAlarmDescription'
 import { scaledMissionRewards, type RewardMultiplier } from '@/lib/missionRewardMultiplier'
-import { isRetiredRoutineMissionTitle } from '@/lib/routineChips'
+import { dedupeDailyRoutineMissionsByCanonicalKey, isRetiredRoutineMissionTitle } from '@/lib/routineChips'
 import MissionSleepMorningLayer from '@/components/child/MissionSleepMorningLayer'
 import SpriteImage from '@/components/common/SpriteImage'
 import { BANNERS, ICONS } from '@/constants/sprites'
@@ -71,6 +71,7 @@ import { completionRateToHearts } from '@/lib/missionHeartCount'
 import { fireMissionCardConfetti } from '@/lib/missionCardConfetti'
 import { tryApplyCompletePayload } from '@/lib/applyDailyMissionCompleteStats'
 import { isAfternoonMission } from '@/lib/missionAmPm'
+import { MissionRewardIconTriple } from '@/components/mission/MissionRewardIconTriple'
 
 type Props = {
   childId: string
@@ -111,12 +112,14 @@ function orderedMissionsForSlider(list: DailyMissionWithTemplate[]): DailyMissio
   const routineRows = list.filter((dm) => dm.missions && !isSpecialSectionMission(dm.missions))
   const specialRows = list.filter((dm) => dm.missions && isSpecialSectionMission(dm.missions))
 
-  const sortedRoutine = [...routineRows].sort((a, b) => {
-    const sa = dailyMissionToRoutineFlowSortable(a)
-    const sb = dailyMissionToRoutineFlowSortable(b)
-    if (!sa || !sb) return 0
-    return compareRoutineFlowSortable(sa, sb)
-  })
+  const sortedRoutine = dedupeDailyRoutineMissionsByCanonicalKey(
+    [...routineRows].sort((a, b) => {
+      const sa = dailyMissionToRoutineFlowSortable(a)
+      const sb = dailyMissionToRoutineFlowSortable(b)
+      if (!sa || !sb) return 0
+      return compareRoutineFlowSortable(sa, sb)
+    }),
+  )
 
   const sortedSpecial = [...specialRows].sort((a, b) => {
     const ta = a.scheduled_time
@@ -645,10 +648,7 @@ export default function MissionTab({
                   </div>
                 </div>
 
-                {/**
-                 * 보상 줄: [크레딧] [애정 하트(부모·자녀 child_stats.hearts에 더해짐)] [EXP는 별 아이콘].
-                 * (이전에는 EXP를 하트 아이콘으로만 보여 “하트” 통계와 숫자가 어긋난 것처럼 보였습니다.)
-                 */}
+                {/** 루틴·홈·부모 `RoutineTab` 과 동일 — `missionRewardMultiplier` + `MissionRewardIconTriple` */}
                 <div className={MISSION_CARD_REWARD_ROW_CLASSNAME}>
                   <div
                     className={[
@@ -656,45 +656,16 @@ export default function MissionTab({
                       'max-w-full flex-wrap gap-x-1 gap-y-0.5',
                       special ? 'bg-amber-100/90' : 'bg-stone-100/95',
                     ].join(' ')}
-                    role="group"
-                    aria-label={`미션 보상: 크레딧 ${rewards.credit}, 애정 하트 ${rewards.heart}, 경험치 ${rewards.exp}`}
                   >
-                    {/** 획득 크레딧(총액·잔디 — 완료 API와 동일) */}
-                    <span className="inline-flex items-center gap-[1px]">
-                      <SpriteImage
-                        sheet={ICONS}
-                        frame="credit"
-                        width={MISSION_CARD_REWARD_ICON_WIDTH_PX}
-                        clipRotated={false}
-                        className="shrink-0 select-none"
-                      />
-                      <span>{rewards.credit}</span>
-                    </span>
-                    {/** 애정 하트(부모앱·상단 child_stats 하트와 동일 의미) */}
-                    <span className="inline-flex items-center gap-[1px]" title="애정 하트">
-                      <SpriteImage
-                        sheet={ICONS}
-                        frame="heart"
-                        width={MISSION_CARD_REWARD_ICON_WIDTH_PX}
-                        className="shrink-0 select-none"
-                      />
-                      <span>{rewards.heart}</span>
-                    </span>
-                    {/** 경험치(EXP) — 레벨 바에 쌓이는 수치 */}
-                    <span className="inline-flex items-center gap-[1px]" title="경험치(EXP)">
-                      <SpriteImage
-                        sheet={ICONS}
-                        frame="star"
-                        width={MISSION_CARD_REWARD_ICON_WIDTH_PX - 1}
-                        clipRotated={false}
-                        className="shrink-0 select-none"
-                      />
-                      <span>{rewards.exp}</span>
-                    </span>
+                    <MissionRewardIconTriple
+                      reward={rewards}
+                      iconSize={MISSION_CARD_REWARD_ICON_WIDTH_PX}
+                      className="flex flex-wrap items-center justify-center gap-x-1 gap-y-0.5"
+                    />
                   </div>
                 </div>
                 {/**
-                 * 위 알약에 배율이 곱해진 보상이 나옵니다. 「보상 N배」 중복 문구는 넣지 않습니다.
+                 * 위 알약: 배율이 곱해진 보상(자녀 완료 API·부모 루틴 카드와 동일).
                  */}
               </button>
             )
@@ -733,7 +704,7 @@ export default function MissionTab({
         <p className="mt-2 text-center text-sm font-bold text-amber-800">{specialPopup.missionTitle}</p>
         {/**
          * 보너스(2·3배)일 때 분홍 뾰족 배지 위에 xN배 텍스트를 얹어 보여 줍니다.
-         * 미션 카드와 동일: 크레딧 · 애정 하트 · EXP(별).
+         * 보상 알약: 크레딧·애정 하트(EXP 별은 비표시).
          */}
         <div className="mt-4 flex items-center justify-center px-1">
           {/**
@@ -743,31 +714,22 @@ export default function MissionTab({
           <div className="relative inline-block">
             <div
               className="inline-flex max-w-full flex-wrap items-center justify-center gap-x-2 gap-y-1 rounded-full px-3 py-2 text-sm font-black tabular-nums tracking-tight text-gray-800 shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] ring-1 ring-black/[0.06] bg-amber-100/90"
-              role="group"
-              aria-label={
-                specialPopup.rewardMultiplier > 1
-                  ? `보너스 ${specialPopup.rewardMultiplier}배, 크레딧 ${specialPopup.creditReward}, 애정 하트 ${specialPopup.heartReward}, 경험치 ${specialPopup.expReward}`
-                  : `미션 보상: 크레딧 ${specialPopup.creditReward}, 애정 하트 ${specialPopup.heartReward}, 경험치 ${specialPopup.expReward}`
-              }
             >
-              <span className="inline-flex items-center gap-1">
-                <SpriteImage
-                  sheet={ICONS}
-                  frame="credit"
-                  width={18}
-                  clipRotated={false}
-                  className="shrink-0 select-none"
-                />
-                <span>{specialPopup.creditReward}</span>
-              </span>
-              <span className="inline-flex items-center gap-1" title="애정 하트">
-                <SpriteImage sheet={ICONS} frame="heart" width={18} className="shrink-0 select-none" />
-                <span>{specialPopup.heartReward}</span>
-              </span>
-              <span className="inline-flex items-center gap-1" title="경험치(EXP)">
-                <SpriteImage sheet={ICONS} frame="star" width={17} clipRotated={false} className="shrink-0 select-none" />
-                <span>{specialPopup.expReward}</span>
-              </span>
+              <MissionRewardIconTriple
+                reward={{
+                  credit: specialPopup.creditReward,
+                  heart: specialPopup.heartReward,
+                  exp: specialPopup.expReward,
+                  mult: specialPopup.rewardMultiplier,
+                }}
+                iconSize={18}
+                ariaLabel={
+                  specialPopup.rewardMultiplier > 1
+                    ? `보너스 ${specialPopup.rewardMultiplier}배, 획득 크레딧 ${specialPopup.creditReward}, 애정 하트 ${specialPopup.heartReward}`
+                    : `획득 보상: 크레딧 ${specialPopup.creditReward}, 애정 하트 ${specialPopup.heartReward}`
+                }
+                className="flex flex-wrap items-center justify-center gap-x-1.5 gap-y-0.5"
+              />
             </div>
             {specialPopup.rewardMultiplier > 1 ? (
               <div className="pointer-events-none absolute -right-10 -top-4 z-[2] h-12 w-12">

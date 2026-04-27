@@ -11,9 +11,9 @@
 
 import { useRef } from 'react'
 import SpriteImage from '@/components/common/SpriteImage'
-import { ICONS } from '@/constants/sprites'
 import { MISSION_ROUTINES_ATLAS } from '@/constants/missionRoutineAtlas'
 import { scaledMissionRewards } from '@/lib/missionRewardMultiplier'
+import { MissionRewardIconTriple } from '@/components/mission/MissionRewardIconTriple'
 import { missionRoutineIconFrame } from '@/lib/missionRoutineIconFrame'
 import { resolveRoutineMissionPngUrl } from '@/lib/routineMissionThumbnail'
 import { isAfternoonMission } from '@/lib/missionAmPm'
@@ -129,33 +129,18 @@ export default function ChildMissionCard({ mission, onComplete }: Props) {
         {/* ── 미션명 (한 줄 고정) ── */}
         <p className="w-full text-center text-sm font-bold leading-snug text-gray-800 line-clamp-1">{m.title}</p>
 
-        {/* ── 보상 알약 (스프라이트 아이콘 + 숫자) ── */}
+        {/** 부모 루틴·미션 탭과 동일: 크레딧·애정 하트(경험치 별은 카드에 비표시) — `scaledMissionRewards` */}
         <div
           className={[
-            'inline-flex max-w-full flex-nowrap items-center justify-center gap-x-1.5 rounded-full px-2.5 py-1 text-[11px] font-black tabular-nums tracking-tight text-[#888888] shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] ring-1 ring-black/[0.06]',
+            'inline-flex max-w-full flex-wrap items-center justify-center gap-x-1 gap-y-0.5 rounded-full px-2.5 py-1 text-[11px] font-black tabular-nums tracking-tight text-[#888888] shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] ring-1 ring-black/[0.06]',
             special ? 'bg-amber-100/90' : 'bg-stone-100/95',
           ].join(' ')}
         >
-          <span className="inline-flex items-center gap-[3px]">
-            <SpriteImage
-              sheet={ICONS}
-              frame="credit"
-              width={13}
-              clipRotated={false}
-              className="shrink-0 select-none"
-            />
-            <span>{rewards.credit}</span>
-          </span>
-          {/** 루트 `child_stats.hearts` 에 더해지는 수(부모 앱·상단과 동일 의미) */}
-          <span className="inline-flex items-center gap-[3px]" title="애정 하트">
-            <SpriteImage
-              sheet={ICONS}
-              frame="heart"
-              width={13}
-              className="shrink-0 select-none"
-            />
-            <span>{rewards.heart}</span>
-          </span>
+          <MissionRewardIconTriple
+            reward={rewards}
+            iconSize={13}
+            className="flex flex-wrap items-center justify-center gap-x-1 gap-y-0.5"
+          />
         </div>
       </button>
     </div>

@@ -110,6 +110,12 @@ export async function POST(req: NextRequest) {
   let nextCredits: number
   let nextWallet: number
 
+  /**
+   * 단일 버킷(어린 연령): 총 코인 `credits`만 차감.
+   * 3버킷(지갑+돈바구니+저금통): `credits`·`credits_wallet`를 함께 맞춤(지갑에서 결제).
+   * 아래 if/else는 “어디서 얼마를 빼느냐”만 다르고, 그 다음 `purchase_requests` INSERT는
+   * 두 모드 모두에서 한 번씩만 실행됩니다(부모 승인 대기 행).
+   */
   if (singleBucket) {
     if (totalCredits < effectivePrice) {
       return NextResponse.json(
@@ -153,7 +159,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // 구매 요청 생성
+  // 차감이 끝난 뒤, 단일/3버킷 구분 없이 동일한 구매 요청(pending) 레코드를 남깁니다.
   const { data: request, error: insertErr } = await supabase
     .from('purchase_requests')
     .insert({

@@ -10,8 +10,8 @@
  *   그릴 때 반대로 회전해 원래 모습으로 되돌립니다.
  * - 프레임은 한 장씩만 그립니다. 두 장을 반투명으로 겹치면(크로스페이드) 가장자리가 매 프레임 섞이며 “반짝”이는 경우가 많아 제거했습니다.
  * - 캔버스는 매 프레임 투명으로 비워 부모(`ASSETS.layouts.sharedAppBackground` 등) 배경이 비치게 하고, 그릴 위치는 픽셀 정수로 맞춥니다.
- * - 토끼 아래에는 가로 로딩 막대만 둡니다(문구 없음). `progressPercent`를 주면 그 값(0~100)을 쓰고,
- *   없으면 에셋 로드 전·후 경과로 추정해 “진행 중” 느낌을 줍니다.
+ * - 토끼 아래에는 기존과 같이 가로 로딩 막대만 두고, 선택 문구(`statusMessage`)는 막대 **아래**에 둡니다.
+ *   `progressPercent`를 주면 그 값(0~100)을 쓰고, 없으면 에셋 로드 전·후 경과로 추정해 “진행 중” 느낌을 줍니다.
  * - `role="status"`·막대의 `role="progressbar"`로 보조 기기에 로딩 중임을 알립니다.
  */
 
@@ -52,6 +52,11 @@ type Props = {
    * 로드 후에도 앱 준비가 끝날 때까지 천천히 올라가되 100%에는 고정하지 않음).
    */
   progressPercent?: number
+  /**
+   * 진행 막대 **아래**에 보여 줄 짧은 안내 문구입니다.
+   * 예: 부모 앱에서 자녀 화면으로 넘어갈 때 「무엇을 기다리는지」를 알려 줍니다.
+   */
+  statusMessage?: string
 }
 
 /**
@@ -154,6 +159,7 @@ function drawFrame(
 export default function BunnyRunLoader({
   className = '',
   progressPercent: progressPercentProp,
+  statusMessage,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   /** 이미지·JSON이 모두 준비되면 true — 그 전에는 캔버스 영역을 비워 두고 투명하게 둡니다. */
@@ -300,39 +306,66 @@ export default function BunnyRunLoader({
     return () => cancelAnimationFrame(raf)
   }, [ready, loadError])
 
+  /** 스크린 리더용: 문구가 있으면 그걸 우선 읽고, 없으면 일반 「로딩 중」 라벨을 씁니다. */
+  const statusAriaLabel = statusMessage?.trim() ? statusMessage.trim() : '로딩 중'
+
   return (
     <div
       className={`flex flex-col items-center gap-3 ${className}`.trim()}
       role="status"
       aria-live="polite"
       aria-busy={!loadError}
-      aria-label="로딩 중"
+      aria-label={statusAriaLabel}
     >
       {loadError ? (
-        <div
-          className="flex items-center justify-center text-5xl"
-          style={{ width: DISPLAY_CSS_W, height: DISPLAY_CSS_H }}
-        >
-          <span className="animate-bounce" aria-hidden>
-            🌱
-          </span>
-        </div>
-      ) : (
         <>
-          {/* 캔버스: 스프라이트 시트에서 현재 프레임만 잘라 보여 줍니다. 고정 박스로 레이아웃 흔들림을 줄입니다. */}
           <div
-            className={`flex items-center justify-center ${ready ? 'opacity-100' : 'opacity-0'}`.trim()}
+            className="flex items-center justify-center text-5xl"
             style={{ width: DISPLAY_CSS_W, height: DISPLAY_CSS_H }}
           >
-            {/* translateZ(0): 일부 브라우저에서 캔버스를 별도 합성 레이어로 올려 깜빡임을 줄일 수 있습니다. */}
-            <canvas
-              ref={canvasRef}
-              className="block max-h-full max-w-full"
-              style={{ transform: 'translateZ(0)' }}
-              aria-hidden
-            />
+            <span className="animate-bounce" aria-hidden>
+              🌱
+            </span>
           </div>
+          {/** PNG/JSON 실패 시에는 막대 대신 이모지만 쓰므로, 문구는 그 아래에 둡니다. */}
+          {statusMessage?.trim() ? (
+            <p className="max-w-[min(20rem,calc(100vw-2rem))] px-2 text-center text-sm font-semibold text-gray-800 drop-shadow-sm">
+              {statusMessage.trim()}
+            </p>
+          ) : null}
+        </>
+      ) : (
+        <>
+          {/**
+           * 스프라이트 PNG·JSON을 받기 전: 옛날에는 이 구간 전체를 투명(opacity-0) 처리해
+           * 로딩이 짧으면 토끼만 안 보이고 막대만 보이는 일이 있었습니다.
+           * 같은 크기 박스 안에 짧은 토끼 플레이스홀더를 두고, 준비되면 캔버스로 갈아탑니다.
+           */}
+          <div
+            className="flex items-center justify-center"
+            style={{ width: DISPLAY_CSS_W, height: DISPLAY_CSS_H }}
+          >
+            {!ready ? (
+              <span className="text-3xl animate-bounce select-none" aria-hidden>
+                🐰
+              </span>
+            ) : (
+              <canvas
+                ref={canvasRef}
+                className="block max-h-full max-w-full"
+                style={{ transform: 'translateZ(0)' }}
+                aria-hidden
+              />
+            )}
+          </div>
+          {/** 기존과 동일: 토끼 바로 아래 가로 진행 막대(스타일·동작 변경 없음). */}
           <LoadingProgressBar percent={shownProgressPercent} />
+          {/** 막대 아래에만 안내 문구를 추가합니다. */}
+          {statusMessage?.trim() ? (
+            <p className="max-w-[min(20rem,calc(100vw-2rem))] px-2 text-center text-sm font-semibold text-gray-800 drop-shadow-sm">
+              {statusMessage.trim()}
+            </p>
+          ) : null}
         </>
       )}
     </div>

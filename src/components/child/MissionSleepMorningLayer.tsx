@@ -12,6 +12,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getSeoulDateString, getSeoulTimeHHMM, getSeoulWeekdayShort } from '@/lib/koreaDate'
 import { readRoutineAlarmPrefs, readRoutineHasSchoolFromStorage } from '@/lib/routineAlarmLocalPrefs'
+import { resolveRoutineAlarmSoundUrl } from '@/lib/routineAlarmSounds'
 
 /** TexturePacker `mode.json` 과 맞춘 아틀라스 크기·프레임 (이미지 파일: `public/assets/img/common/ui/mode.png`) */
 const MODE_ATLAS = {
@@ -227,7 +228,8 @@ export default function MissionSleepMorningLayer({
       const picked = notShownYet.sort((a, b) => b.time.localeCompare(a.time))[0]
       localStorage.setItem(`cooanc_routine_alarm_popup_${picked.kind}_${childId}_${today}`, '1')
 
-      const url = `/assets/audio/alarm/${encodeURIComponent(picked.sound)}`
+      // 저장값은 id(예: morning_greet) 또는 예전 파일명일 수 있어 공통 해석 함수로 URL 을 만듭니다.
+      const url = resolveRoutineAlarmSoundUrl(picked.sound)
       const a = new Audio(url)
       a.loop = true
       audioRef.current = a

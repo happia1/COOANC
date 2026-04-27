@@ -4,6 +4,8 @@
  * - 시각·소리·주말 울림·추가 일정: cooanc_alarm_prefs JSON
  */
 
+import { DEFAULT_ROUTINE_ALARM_SOUND_IDS } from '@/lib/routineAlarmSounds'
+
 export type RoutineCustomAlarmStored = {
   id: string
   label: string
@@ -104,25 +106,29 @@ export function readRoutineAlarmPrefs(): RoutineAlarmPrefsLoaded {
     wakeTime: DEFAULTS.wakeTime,
     returnHomeTime: DEFAULTS.returnHomeTime,
     sleepTime: DEFAULTS.sleepTime,
-    soundWake: '',
-    soundReturn: '',
-    soundSleep: '',
+    soundWake: DEFAULT_ROUTINE_ALARM_SOUND_IDS.wake,
+    soundReturn: DEFAULT_ROUTINE_ALARM_SOUND_IDS.returnHome,
+    soundSleep: DEFAULT_ROUTINE_ALARM_SOUND_IDS.sleep,
     customAlarms: [],
     wakeOnWeekend: true,
     returnOnWeekend: true,
     sleepOnWeekend: true,
     sleepReadyTime: DEFAULTS.sleepReadyTime,
-    soundSleepReady: '',
+    soundSleepReady: DEFAULT_ROUTINE_ALARM_SOUND_IDS.sleepReady,
     sleepReadyEnabled: true,
     sleepReadyWeekday: true,
     sleepReadyWeekend: true,
     schoolTime: DEFAULTS.schoolTime,
-    soundSchool: '',
+    soundSchool: DEFAULT_ROUTINE_ALARM_SOUND_IDS.school,
     schoolEnabled: true,
     schoolWeekday: true,
     schoolWeekend: true,
   }
   if (typeof window === 'undefined') return empty
+
+  /** JSON 에 소리 id 가 비어 있으면 항목별 기본 id 로 채웁니다(첫 설치·구버전 호환). */
+  const coalesceSound = (raw: unknown, fallback: string) =>
+    typeof raw === 'string' && raw.trim() ? raw.trim() : fallback
 
   const nw = localStorage.getItem('cooanc_notify_wake')
   const nr = localStorage.getItem('cooanc_notify_return')
@@ -167,9 +173,9 @@ export function readRoutineAlarmPrefs(): RoutineAlarmPrefsLoaded {
     wakeTime,
     returnHomeTime,
     sleepTime,
-    soundWake: typeof j.wake === 'string' ? j.wake : '',
-    soundReturn: typeof j.return === 'string' ? j.return : '',
-    soundSleep: typeof j.sleep === 'string' ? j.sleep : '',
+    soundWake: coalesceSound(j.wake, DEFAULT_ROUTINE_ALARM_SOUND_IDS.wake),
+    soundReturn: coalesceSound(j.return, DEFAULT_ROUTINE_ALARM_SOUND_IDS.returnHome),
+    soundSleep: coalesceSound(j.sleep, DEFAULT_ROUTINE_ALARM_SOUND_IDS.sleep),
     customAlarms: Array.isArray(j.custom)
       ? j.custom.map((raw) => {
           const c = raw as RoutineCustomAlarmStored
@@ -183,12 +189,12 @@ export function readRoutineAlarmPrefs(): RoutineAlarmPrefsLoaded {
     returnOnWeekend: typeof j.returnOnWeekend === 'boolean' ? j.returnOnWeekend : true,
     sleepOnWeekend: typeof j.sleepOnWeekend === 'boolean' ? j.sleepOnWeekend : true,
     sleepReadyTime,
-    soundSleepReady: typeof j.soundSleepReady === 'string' ? j.soundSleepReady : '',
+    soundSleepReady: coalesceSound(j.soundSleepReady, DEFAULT_ROUTINE_ALARM_SOUND_IDS.sleepReady),
     sleepReadyWeekday,
     sleepReadyWeekend,
     sleepReadyEnabled: sleepReadyWeekday || sleepReadyWeekend,
     schoolTime,
-    soundSchool: typeof j.school === 'string' ? j.school : '',
+    soundSchool: coalesceSound(j.school, DEFAULT_ROUTINE_ALARM_SOUND_IDS.school),
     schoolWeekday,
     schoolWeekend,
     schoolEnabled: schoolWeekday || schoolWeekend,

@@ -49,12 +49,20 @@ function getTodayRoutineType(
   return dow === 0 || dow === 6 ? 'weekend' : 'weekday'
 }
 
-/** 오늘 routine_type 에 맞는 이 자녀 전용 템플릿 풀 (event 템플릿 제외 — 오늘 카드는 수동 배정만) */
+/**
+ * 오늘 routine_type 에 맞는 이 자녀 전용 템플릿 풀 (event 템플릿 제외 — 오늘 카드는 수동 배정만)
+ *
+ * - `holiday_routine_mode === 'custom'` 이고 그날이 주말( routineType === 'weekend' )이면
+ *   weekly(휴일) 템플릿만 풀에 넣고, 0개여도 **daily(평일)로 폴백하지 않습니다.**
+ *   (휴일 칩이 비어 있으면 `pool` 이 비어 "오늘은 미션이 없어요" 쪽으로 갑니다.)
+ * - `as_weekday`·null(구 DB) 은 이전과 같이 weekly 가 없을 때 daily 로 채웁니다.
+ */
 function templatePoolForToday(
   templates: Mission[],
   childId: string,
   level: number,
   routineType: RoutineType,
+  holidayRoutineMode: 'as_weekday' | 'custom' | null,
 ): Mission[] {
   if (routineType === 'holiday') return []
 
@@ -71,6 +79,11 @@ function templatePoolForToday(
   if (routineType === 'weekday') {
     return dailyOrWeekly.filter((m) => m.repeat_type === 'daily')
   }
+
+  if (routineType === 'weekend' && holidayRoutineMode === 'custom') {
+    return dailyOrWeekly.filter((m) => m.repeat_type === 'weekly')
+  }
+
   const weekly = dailyOrWeekly.filter((m) => m.repeat_type === 'weekly')
   return weekly.length > 0 ? weekly : dailyOrWeekly.filter((m) => m.repeat_type === 'daily')
 }
@@ -127,6 +140,8 @@ export default async function MissionPage() {
   const level = initialStats?.current_level ?? 0
 
   const childName = (profileRow?.name ?? '').trim() || '쿠앵이'
+  /** `064` — 없으면 null (구 DB·미적용) → weekly 유무에 따른 기존 폴백 유지 */
+  const holidayRoutineMode: 'as_weekday' | 'custom' | null = profileRow?.holiday_routine_mode ?? null
   const initialPraiseGrants = (grantsRes.data ?? []) as PraiseStickerGrant[]
   const initialPraisePlacements = (placementsRes.data ?? []) as PraiseStickerPlacement[]
 
@@ -161,7 +176,13 @@ export default async function MissionPage() {
     console.error('[child/mission] missions select', templatesRes.error.message)
   }
 
-  const pool = templatePoolForToday((templatesRes.data ?? []) as Mission[], childId, level, routineType)
+  const pool = templatePoolForToday(
+    (templatesRes.data ?? []) as Mission[],
+    childId,
+    level,
+    routineType,
+    holidayRoutineMode,
+  )
 
   /**
    * 오늘 일일 미션을 한 번 읽은 뒤, 행이 없고 휴일이 아니며 넣을 템플릿이 있을 때만 백필합니다.

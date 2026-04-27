@@ -10,6 +10,7 @@
  */
 
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
+import { DEFAULT_ROUTINE_ALARM_SOUND_IDS } from '@/lib/routineAlarmSounds'
 
 // ── 미션 API가 받는 블록 타입 (DB 정렬·아이콘 매칭용, 화면은 오전/오후 두 덩어리만 노출)
 type ApiBlock = 'morning' | 'afternoon' | 'evening' | 'bedtime'
@@ -30,7 +31,7 @@ type ChipDef = {
  */
 const AM_CHIPS: ChipDef[] = [
   { id: 'am-wake', title: '기상', emoji: '', type: 'fixed', apiBlock: 'morning' },
-  { id: 'am-wash', title: '세수', emoji: '', type: 'recommended', apiBlock: 'morning' },
+  { id: 'am-wash', title: '세수하기', emoji: '', type: 'recommended', apiBlock: 'morning' },
   { id: 'am-brush', title: '양치', emoji: '', type: 'recommended', apiBlock: 'morning' },
   { id: 'am-meal', title: '아침식사', emoji: '', type: 'recommended', apiBlock: 'morning' },
   { id: 'am-water', title: '물마시기', emoji: '', type: 'recommended', apiBlock: 'morning' },
@@ -230,9 +231,9 @@ export default function RoutineOnboarding({ onComplete, linkedChildId }: Props) 
         const list = Array.isArray(j.sounds) ? j.sounds : []
         setAlarmSounds(list)
         const first = list[0]?.id ?? ''
-        setSoundWake((p) => p || first)
-        setSoundReturn((p) => p || first)
-        setSoundSleep((p) => p || first)
+        setSoundWake((p) => p || DEFAULT_ROUTINE_ALARM_SOUND_IDS.wake || first)
+        setSoundReturn((p) => p || DEFAULT_ROUTINE_ALARM_SOUND_IDS.returnHome || first)
+        setSoundSleep((p) => p || DEFAULT_ROUTINE_ALARM_SOUND_IDS.sleep || first)
         setSheetSound((p) => p || first)
         setPickerSound((p) => p || first)
       })
@@ -562,6 +563,8 @@ export default function RoutineOnboarding({ onComplete, linkedChildId }: Props) 
             childId: linkedChildId,
             ageGroup,
             institutionType,
+            /** 휴일 루틴: 주말 백필이 daily 가 아닌 weekly/빈 풀을 쓰도록 `profiles` 에도 기록 */
+            holidayRoutineMode: mode === 'withCustomHoliday' ? 'custom' : 'as_weekday',
           }),
         })
         const j = await res.json().catch(() => ({}))

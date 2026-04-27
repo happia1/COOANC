@@ -35,7 +35,11 @@ import {
   isRoutineSectionMission,
   isSpecialSectionMission,
 } from '@/lib/specialMissionChips'
-import { isRetiredRoutineMissionTitle, sortMissionsByRoutineFlow } from '@/lib/routineChips'
+import {
+  dedupeLinkedRoutineMissionsByCanonicalKey,
+  isRetiredRoutineMissionTitle,
+  sortMissionsByRoutineFlow,
+} from '@/lib/routineChips'
 import SpriteImage from '@/components/common/SpriteImage'
 import { ICONS } from '@/constants/sprites'
 import { TOPBAR_LOGO_SRC } from '@/constants/branding'
@@ -43,6 +47,8 @@ import { MISSION_ROUTINES_ATLAS } from '@/constants/missionRoutineAtlas'
 import { missionRoutineIconFrame } from '@/lib/missionRoutineIconFrame'
 import { PARENT_NEUTRAL_CARD_CLASSNAME, PARENT_NEUTRAL_CARD_OVERFLOW_X_CLASSNAME } from '@/lib/parentNeutralBlockStyle'
 import { resolveRoutineMissionPngUrl } from '@/lib/routineMissionThumbnail'
+import { scaledMissionRewards } from '@/lib/missionRewardMultiplier'
+import { MissionRewardIconTriple } from '@/components/mission/MissionRewardIconTriple'
 
 /**
  * 루틴·스페셜 카드 상단 그림을 그립니다.
@@ -75,44 +81,8 @@ function MissionIconThumb({ mission, size = 36 }: { mission: Mission; size?: num
   )
 }
 
-/** 카드 보상 한 줄: 동전+숫자 / 하트+숫자 두 묶음, 묶음 사이는 gap-x-px 로 최소 간격. */
+/** 자녀 앱 `MissionRewardIconTriple` 과 동일: 배율이 곱해진 `scaledMissionRewards` 를 표시합니다. */
 const ROUTINE_CARD_REWARD_ICON_PX = 12
-
-function RoutineMissionRewardIcons({
-  credit,
-  exp,
-  textClassName,
-  marginClassName,
-}: {
-  credit: number
-  exp: number
-  textClassName: string
-  marginClassName: string
-}) {
-  return (
-    <div
-      className={`${marginClassName} flex flex-wrap items-center justify-center gap-x-px gap-y-0.5 text-[9px] font-black tabular-nums ${textClassName}`}
-      role="group"
-      aria-label={`크레딧 ${credit}, 경험치 ${exp}`}
-    >
-      {/* gap-0 에 더해 숫자를 살짝 당겨 아이콘과 시각적으로 더 밀착 */}
-      <span className="inline-flex items-center gap-0">
-        <SpriteImage
-          sheet={ICONS}
-          frame="credit"
-          width={ROUTINE_CARD_REWARD_ICON_PX}
-          clipRotated={false}
-          className="shrink-0 select-none"
-        />
-        <span className="-ml-0.2 leading-none">{credit}</span>
-      </span>
-      <span className="inline-flex items-center gap-0" title="경험치(EXP)">
-        <SpriteImage sheet={ICONS} frame="heart" width={ROUTINE_CARD_REWARD_ICON_PX} className="shrink-0 select-none" />
-        <span className="-ml-0.2 leading-none">{exp}</span>
-      </span>
-    </div>
-  )
-}
 
 function sortByTime(missions: Mission[]): Mission[] {
   return [...missions].sort((a, b) => {
@@ -174,7 +144,7 @@ function RoutineMissionSlideCard({ mission: m, onOpenRewardEditor }: { mission: 
     <button
       type="button"
       onClick={() => onOpenRewardEditor(m)}
-      aria-label={`${m.title} 보상(크레딧, 경험치) 수정`}
+      aria-label={`${m.title} 보상(크레딧·애정 하트) 수정`}
       className={`flex h-full w-full min-h-[4.25rem] flex-col items-center justify-center gap-1.5 rounded-xl bg-white px-1.5 py-2 text-center shadow-sm ring-1 ${
         m.is_active ? 'ring-gray-200' : 'ring-gray-100 opacity-80'
       }`}
@@ -188,11 +158,11 @@ function RoutineMissionSlideCard({ mission: m, onOpenRewardEditor }: { mission: 
       </span>
       <div className="w-full min-w-0 px-0.5">
         <p className="line-clamp-2 text-[9px] font-bold leading-snug text-gray-800">{m.title}</p>
-        <RoutineMissionRewardIcons
-          credit={m.credit_reward}
-          exp={m.exp_reward}
-          textClassName="text-brand-blue"
-          marginClassName="mt-0.5"
+        {/** 루틴·자녀 오늘의 미션과 동일: 크레딧·애정 하트(카드에는 EXP 별 비표시, 편집 시트에서만 EXP 조정) */}
+        <MissionRewardIconTriple
+          reward={scaledMissionRewards(m)}
+          iconSize={ROUTINE_CARD_REWARD_ICON_PX}
+          className={`mt-0.5 flex flex-wrap items-center justify-center gap-x-0.5 gap-y-0.5 text-[9px] font-black text-brand-blue`}
         />
       </div>
     </button>
@@ -330,7 +300,7 @@ function SpecialDailyEventBlock({
   onStartEventAssignWithBonus: (m: Mission) => void
   /** 매일(daily) 스페셜 — 보너스 배율만 설정(오늘 배정 API는 호출하지 않음) */
   onOpenDailyBonusSettings: (m: Mission) => void
-  /** 카드 탭으로 보상(크레딧·EXP) 편집 팝업을 엽니다. */
+  /** 카드 탭으로 보상(크레딧·애정 하트·EXP) 편집 팝업을 엽니다. */
   onOpenRewardEditor: (m: Mission) => void
 }) {
   const renderHorizontalCards = (list: Mission[], isEventList: boolean) => (
@@ -483,7 +453,7 @@ export default function RoutineTab({
   /** 오늘 일정에서 이미 완료된 미션에 보너스·일정 추가 시 */
   const [alreadyCompletedModalOpen, setAlreadyCompletedModalOpen] = useState(false)
   const [assigningId, setAssigningId] = useState<string | null>(null)
-  /** 카드 클릭 시 열리는 보상(크레딧·EXP) 편집 팝업 대상 미션 */
+  /** 카드 클릭 시 열리는 보상(크레딧·애정 하트·EXP) 편집 팝업 대상 미션 */
   const [rewardEditMission, setRewardEditMission] = useState<Mission | null>(null)
 
   /** 오전/오후 접기 — 기본 접힘 */
@@ -576,7 +546,10 @@ export default function RoutineTab({
   )
 
   const filteredRoutine = useMemo(
-    () => sortMissionsByRoutineFlow(routineOnly.filter((m) => m.level_required <= childLevel)),
+    () =>
+      dedupeLinkedRoutineMissionsByCanonicalKey(
+        sortMissionsByRoutineFlow(routineOnly.filter((m) => m.level_required <= childLevel)),
+      ),
     [routineOnly, childLevel],
   )
   const activeRoutine = filteredRoutine.filter((m) => m.is_active)
@@ -1064,7 +1037,7 @@ function SpecialMissionRow({
           onOpenRewardEditor()
         }
       }}
-      aria-label={`${m.title} 보상(크레딧, 경험치) 수정`}
+      aria-label={`${m.title} 보상(크레딧·애정 하트) 수정`}
       className={`flex min-h-[5.5rem] w-full flex-col items-center justify-center gap-1.5 rounded-xl bg-white px-1 py-1 text-center shadow-sm ring-1 ${
         m.is_active ? 'ring-violet-100' : 'ring-gray-100 opacity-80'
       }`}
@@ -1077,11 +1050,10 @@ function SpecialMissionRow({
       </span>
       <div className="w-full min-w-0 px-0.5">
         <p className="line-clamp-2 text-[9px] font-bold leading-snug text-gray-800">{titleShort}</p>
-        <RoutineMissionRewardIcons
-          credit={m.credit_reward}
-          exp={m.exp_reward}
-          textClassName="text-violet-700"
-          marginClassName="mt-px"
+        <MissionRewardIconTriple
+          reward={scaledMissionRewards(m)}
+          iconSize={ROUTINE_CARD_REWARD_ICON_PX}
+          className="mt-px flex flex-wrap items-center justify-center gap-x-0.5 gap-y-0.5 text-[9px] font-black text-violet-700"
         />
       </div>
       <div className="mt-px flex w-full flex-col gap-0.5">

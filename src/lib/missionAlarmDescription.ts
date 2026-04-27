@@ -1,6 +1,6 @@
 /**
  * 온보딩(RoutineOnboarding)에서 미션 description 에 넣는 알람 메타 JSON 과 동일 형식입니다.
- * v1: { v: 1, alarmFile: "파일명" } — 재생 시 `/assets/audio/alarm/` 경로와 조합
+ * v1: { v: 1, alarmFile: "소리 id 또는 파일명" } — 재생 시 `resolveRoutineAlarmSoundUrl` 로 URL 확정
  */
 
 export type AlarmDescriptionV1 = { v: 1; alarmFile: string }

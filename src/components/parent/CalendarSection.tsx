@@ -7,7 +7,7 @@
  * - 공휴일·방학·기념일·기타 범례 칩은 한 줄 가로 스크롤; **탭하면 해당 유형만** 필터(같은 칩 다시 탭하면 해제). 선택 칩은 **색만 진하게**(테두리 링 없음).
  * - 날짜 탭: 해당 날 일정이 있으면 상세 슬라이드, 없으면 빈 상태 시트 +「일정등록하기」(헤더 +와 동일 EventSheet, 클릭한 날짜로 시작·종료일 채움)
  * - 일정 상세 시트 헤더 오른쪽 + : 헤더와 같은 EventSheet(일정 추가)를 연 뒤 상세는 닫음
- * - 「이번 달 일정」은 **항상** 같은 줄에 표시(일정 0건이어도 숨기지 않음). 펼치면 목록 또는 빈 안내.
+ * - 「이번 달 일정」은 **항상** 표시(0건이어도). 블록 아무 곳(제목·빈 안내)이나 탭/스페이스로 펼침/접힘; 일정 행만 누르면 상세 시트.
  * - 흰 카드는 `pb-4`(작은 하단 여백)만 둠.
  * - 시트 z-index는 하단 독바(z-50)보다 위로 두어 저장 버튼이 가리지 않게 함
  */
@@ -129,7 +129,7 @@ export default function CalendarSection({ childId, focusDate = null }: Props) {
   const [detailEvents, setDetailEvents] = useState<LocalCalendarEvent[] | null>(null)
   /** 일정이 없는 날을 눌렀을 때만 값이 있음(빈 날 시트 표시) */
   const [emptyDayKey, setEmptyDayKey] = useState<string | null>(null)
-  /** 이번 달 일정 목록: 처음엔 접어 두고, 같은 줄 오른쪽 화살표로 펼침 */
+  /** 이번 달 일정: 블록(제목·빈 안내) 클릭으로 펼침/접힘, 일정 행은 상세만 */
   const [monthScheduleOpen, setMonthScheduleOpen] = useState(false)
   /** 상단 범례(유형 칩) 선택 시: null 이면 전체, 값이면 그 eventType 만 달력·목록에 표시 */
   const [legendFilter, setLegendFilter] = useState<LocalCalendarEvent['eventType'] | null>(null)
@@ -497,31 +497,44 @@ export default function CalendarSection({ childId, focusDate = null }: Props) {
       </div>
 
       {/*
-        이번 달 일정: 일정이 0건이어도 헤더·토글은 항상 보이게(이전에는 monthEvents.length > 0 일 때만 렌더되어 사라짐).
+        이번 달 일정: 0건이어도 이 블록은 항상 보임.
+        블록 전체(제목·쉐브론·빈 안내 문구)를 누르면 펼침/접힘. 일정 행만 전파를 끊어「상세」만 열림.
       */}
-      <div className="mt-3">
-        <div className="flex items-center justify-between gap-2">
+      <div
+        className="mt-3 cursor-pointer rounded-lg px-0.5 py-0.5 transition-[background-color] active:bg-gray-100/50"
+        onClick={() => setMonthScheduleOpen((o) => !o)}
+        onKeyDown={(e) => {
+          if (e.key !== 'Enter' && e.key !== ' ') return
+          // 키보드 포커스가 상세 `button`에 있을 때는 행의 기본 동작(상세)에 맡김
+          if ((e.target as HTMLElement).closest('button')) return
+          e.preventDefault()
+          setMonthScheduleOpen((o) => !o)
+        }}
+        tabIndex={0}
+        role="group"
+        aria-expanded={monthScheduleOpen}
+        aria-label={monthScheduleOpen ? '이번 달 일정, 접기' : '이번 달 일정, 펼치기'}
+      >
+        <div className="flex min-h-9 items-center justify-between gap-2">
           <p className="text-[11px] font-bold text-gray-400">이번 달 일정</p>
-          <button
-            type="button"
-            onClick={() => setMonthScheduleOpen((o) => !o)}
-            className="flex min-h-9 min-w-9 shrink-0 items-center justify-center rounded-lg text-gray-400 transition-colors active:bg-gray-100"
-            aria-expanded={monthScheduleOpen}
-            aria-label={monthScheduleOpen ? '이번 달 일정 접기' : '이번 달 일정 펼치기'}
+          <span
+            className={`flex h-5 w-5 shrink-0 items-center justify-center text-gray-400 transition-transform duration-200 ${
+              monthScheduleOpen ? 'rotate-180' : ''
+            }`}
+            aria-hidden
           >
             <svg
-              className={`h-5 w-5 transition-transform duration-200 ${monthScheduleOpen ? 'rotate-180' : ''}`}
+              className="h-5 w-5"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
               strokeWidth="2"
               strokeLinecap="round"
               strokeLinejoin="round"
-              aria-hidden
             >
               <path d="M6 9l6 6 6-6" />
             </svg>
-          </button>
+          </span>
         </div>
         {monthScheduleOpen ? (
           <div className="mt-2 flex flex-col gap-2">
@@ -538,7 +551,10 @@ export default function CalendarSection({ childId, focusDate = null }: Props) {
                 <button
                   key={ev.id}
                   type="button"
-                  onClick={() => setDetailEvents([ev])}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setDetailEvents([ev])
+                  }}
                   className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left ${EVENT_COLORS[ev.eventType].bg}`}
                 >
                   <div className="min-w-0">

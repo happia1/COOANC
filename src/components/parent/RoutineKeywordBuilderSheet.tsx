@@ -18,6 +18,7 @@ import {
   type ChipDef,
 } from '@/lib/routineChips'
 import { readRoutineAlarmPrefs } from '@/lib/routineAlarmLocalPrefs'
+import { DEFAULT_ROUTINE_ALARM_SOUND_IDS } from '@/lib/routineAlarmSounds'
 
 /** 루틴 도우미 패널 안 「주간 루틴」탭 전용 단계 — 부모가 뒤로가기와 동기화합니다 */
 export type RoutinePanelWizardStep = 'route' | 'weekday' | 'weekend' | 'holiday' | 'holiday_direct' | 'done'
@@ -105,10 +106,6 @@ export default function RoutineKeywordBuilderSheet({
         return
       }
       const prefs = readRoutineAlarmPrefs()
-      const soundRes = await fetch('/api/assets/alarm-sounds')
-      const soundJson = await soundRes.json().catch(() => ({}))
-      const list = Array.isArray(soundJson.sounds) ? soundJson.sounds : []
-      const firstSound = (list[0] as { id?: string } | undefined)?.id ?? ''
       const mode = opts.holidayMode
       const hAm = mode === 'custom' ? (opts.holidayAmOverride ?? holidayAm) : []
       const hPm = mode === 'custom' ? (opts.holidayPmOverride ?? holidayPm) : []
@@ -127,9 +124,9 @@ export default function RoutineKeywordBuilderSheet({
         notifyWake: prefs.notifyWake,
         notifyReturn: prefs.notifyReturn,
         notifySleep: prefs.notifySleep,
-        soundWake: prefs.soundWake || firstSound,
-        soundReturn: prefs.soundReturn || firstSound,
-        soundSleep: prefs.soundSleep || firstSound,
+        soundWake: prefs.soundWake || DEFAULT_ROUTINE_ALARM_SOUND_IDS.wake,
+        soundReturn: prefs.soundReturn || DEFAULT_ROUTINE_ALARM_SOUND_IDS.returnHome,
+        soundSleep: prefs.soundSleep || DEFAULT_ROUTINE_ALARM_SOUND_IDS.sleep,
         customAlarms: prefs.customAlarms,
       })
       await router.refresh()

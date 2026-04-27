@@ -22,6 +22,11 @@ export async function POST(req: NextRequest) {
   let institutionType: string | undefined
   /** 루틴 온보딩 등에서만 넘깁니다 — profiles.age_group 갱신 */
   let ageGroup: string | undefined
+  /**
+   * 휴일 루틴: 평일과 동일(as_weekday) / 휴일만 따로(custom).
+   * `custom` 인데 weekly 미션이 0개여도(휴일 칩 비움) 주말에 daily 를 백필하지 않도록 저장합니다.
+   */
+  let holidayRoutineMode: 'as_weekday' | 'custom' | undefined
   /** undefined = 안 바꿈, null = 사진 제거(DB null), 문자열 = 허용된 경로만 */
   let avatarUrlPatch: string | null | undefined
   try {
@@ -31,6 +36,13 @@ export async function POST(req: NextRequest) {
     birthDate = typeof body?.birthDate === 'string' ? body.birthDate.trim() : undefined
     institutionType = typeof body?.institutionType === 'string' ? body.institutionType.trim() : undefined
     ageGroup = typeof body?.ageGroup === 'string' ? body.ageGroup.trim() : undefined
+    if (Object.prototype.hasOwnProperty.call(body ?? {}, 'holidayRoutineMode')) {
+      const h = (body as { holidayRoutineMode?: unknown }).holidayRoutineMode
+      if (h === 'as_weekday' || h === 'custom') holidayRoutineMode = h
+      else if (h !== undefined && h !== null) {
+        return NextResponse.json({ error: '휴일 루틴 모드 값이 올바르지 않아요.' }, { status: 400 })
+      }
+    }
     if (Object.prototype.hasOwnProperty.call(body ?? {}, 'avatarUrl')) {
       const raw = (body as { avatarUrl?: unknown }).avatarUrl
       if (raw === null || raw === '') {
@@ -58,6 +70,7 @@ export async function POST(req: NextRequest) {
     birthDate === undefined &&
     institutionType === undefined &&
     ageGroup === undefined &&
+    holidayRoutineMode === undefined &&
     avatarUrlPatch === undefined
   ) {
     return NextResponse.json({ error: '수정할 항목이 없어요.' }, { status: 400 })
@@ -143,6 +156,7 @@ export async function POST(req: NextRequest) {
   }
   if (institutionType !== undefined) patch.institution_type = institutionType
   if (ageGroup !== undefined) patch.age_group = ageGroup
+  if (holidayRoutineMode !== undefined) patch.holiday_routine_mode = holidayRoutineMode
   if (avatarUrlPatch !== undefined) patch.avatar_url = avatarUrlPatch
 
   const { error: upErr } = await admin.from('profiles').update(patch).eq('id', childId)

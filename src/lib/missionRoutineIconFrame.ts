@@ -22,7 +22,8 @@ export function missionRoutineIconFrame(title: string, description?: string | nu
 
   if (/기상|일어나|깨우|wake|alarm/i.test(ko) || /\bwake\b/i.test(t)) return tryPick('alarm')
   if (/양치|칫솔|brushing|brush\s*teeth/i.test(ko)) return tryPick('brush_teeth')
-  if (/세수|세안|wash\s*face|face\s*wash/i.test(ko)) return tryPick('wash_hand')
+  // "세수하기"·"세수"·세안 — 썸네일 `wash_face.png`, 아틀라스 `wash_hand` 프레임
+  if (/세수하기|세수|세안|wash\s*face|face\s*wash/i.test(ko)) return tryPick('wash_hand')
   if (/손\s*씻|손씻|hand\s*wash/i.test(ko)) return tryPick('wash_hand')
   if (/샤워/i.test(ko) || /\bshower\b/i.test(t)) return tryPick('shower')
   if (/목욕|반신욕|bath/i.test(ko)) return tryPick('bath')
