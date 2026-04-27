@@ -69,6 +69,34 @@ import { readRoutineAlarmPrefs } from '@/lib/routineAlarmLocalPrefs'
 import { resolveRoutineAlarmSoundUrl } from '@/lib/routineAlarmSounds'
 import { toYyyyMmDdDbValue, dbValueMeansIncomplete } from '@/lib/koreaDate'
 
+/**
+ * 상단 레벨 카드 반응형 배율 (최대 1.7배) — 실측 너비 기준.
+ *
+ * 비개발자 설명:
+ * - 예전에는 브라우저 전체 너비(100vw)만 보았는데, 일반 폰(~390px)에서는 확대폭이 3% 미만이라
+ *   육안으로 거의 안 보였습니다.
+ * - 지금은 자녀 홈 화면을 감싼 실제 박스 너비(전체 화면 컨테이너, ResizeObserver)로 계산합니다.
+ * - 세로 모드처럼 가로가 좁으면 1배를 유지하고, 가로가 넓어질수록 최대 1.7배까지 부드럽게 커집니다.
+ *
+ * 배율 구간:
+ * - BASE_W 이하 → 1배
+ * - FULL_W 이상 → 1.7배
+ * - 그 사이 → 선형 보간
+ */
+const LEVEL_BLOCK_SCALE_BASE_W = 400
+const LEVEL_BLOCK_SCALE_FULL_W = 820
+const LEVEL_BLOCK_SCALE_MAX = 1.7
+
+function scaleForLevelBlock(containerWidthPx: number): number {
+  if (!(containerWidthPx > 0)) return 1
+  const span = LEVEL_BLOCK_SCALE_FULL_W - LEVEL_BLOCK_SCALE_BASE_W
+  if (span <= 0) return 1
+  if (containerWidthPx <= LEVEL_BLOCK_SCALE_BASE_W) return 1
+  if (containerWidthPx >= LEVEL_BLOCK_SCALE_FULL_W) return LEVEL_BLOCK_SCALE_MAX
+  const t = (containerWidthPx - LEVEL_BLOCK_SCALE_BASE_W) / span
+  return 1 + t * (LEVEL_BLOCK_SCALE_MAX - 1)
+}
+
 // ─── 파티클 타입 정의 ────────────────────────────────────────────────────────
 
 /**
@@ -246,7 +274,8 @@ export default function ChildScreen({
 }: Props) {
   /** 전체 화면을 감싸는 컨테이너 ref — 캐릭터 높이 + 파티클 좌표 기준 계산에 사용 */
   const containerRef = useRef<HTMLDivElement>(null)
-  const { height: containerH } = useContainerSize(containerRef)
+  /** 레벨 카드 배율에 가로·캐릭터 높이에 세로 — 같은 전체 화면 컨테이너 실측값 사용 */
+  const { width: containerW, height: containerH } = useContainerSize(containerRef)
 
   /** 크레딧 배지 ref — 동전 파티클이 날아가는 목적지(숫자·아이콘 줄) */
   const creditBadgeRef = useRef<HTMLDivElement>(null)
@@ -1103,6 +1132,9 @@ export default function ChildScreen({
       ? Math.round(containerH * anchor.characterScale * homeCharacterSizeMultiplier)
       : 0
 
+  /** 왼쪽 상단 레벨 박스 — 컨테이너 가로가 넓어질수록 최대 1.7배(글자·아이콘 동일 비율) */
+  const levelBlockScale = useMemo(() => scaleForLevelBlock(containerW), [containerW])
+
   // ─────────────────────────────────────────────────────────────────────────
   // 렌더링
   // ─────────────────────────────────────────────────────────────────────────
@@ -1172,13 +1204,21 @@ export default function ChildScreen({
             */}
             <div className="pointer-events-none min-w-0 flex flex-col items-start gap-2">
               {stats && (
-                <ChildLevelStatsCard
-                  ref={missionHeartsRef}
-                  stats={stats}
-                  filledHearts={filledHearts}
-                  creditRef={creditBadgeRef}
-                  shine={badgeShine}
-                />
+                <div
+                  className="pointer-events-none"
+                  style={{
+                    transformOrigin: 'top left',
+                    transform: `scale(${levelBlockScale})`,
+                  }}
+                >
+                  <ChildLevelStatsCard
+                    ref={missionHeartsRef}
+                    stats={stats}
+                    filledHearts={filledHearts}
+                    creditRef={creditBadgeRef}
+                    shine={badgeShine}
+                  />
+                </div>
               )}
               {/* 별 이펙트 — 크레딧 행 주변(고정 위치)에만 그려짐, 레이아웃 높이 없음 */}
               {badgeShine && creditBadgeRef.current && (

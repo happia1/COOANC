@@ -184,9 +184,10 @@ export default function HomeTab({ childrenData, upcomingEvents, daysWithDataByCh
   const [calendarEventSheetOpen, setCalendarEventSheetOpen] = useState(false)
   /**
    * 원인 보정:
-   * - 캘린더 탭 등록은 현재 localStorage(`cooanc_calendar_events_v1`) 기반인데,
-   * - 홈 브리핑은 서버 `calendar_events` 조회값을 기본으로 써서 즉시 반영이 누락될 수 있습니다.
-   * => 홈에서도 localStorage 일정을 읽어 7일 브리핑 계산에 함께 반영합니다.
+   * - 캘린더 탭 등록은 localStorage(`cooanc_calendar_events_v1`) 기반이며,
+   *   **브라우저·도메인(호스트)마다 저장소가 완전히 다릅니다.** (localhost ≠ Vercel 주소)
+   * - 홈 브리핑은 서버 `calendar_events`도 쓰므로, 이 둘을 **병합**해 한쪽만 쓰면 생기는 괴리를 줄입니다.
+   * - 다른 PC/배포 URL에서까지 동일 일정을 보려면 DB에도 쌓이게 하는 별도 동기화가 필요합니다.
    */
   const [localUpcomingEvents, setLocalUpcomingEvents] = useState<
     {
@@ -228,8 +229,8 @@ export default function HomeTab({ childrenData, upcomingEvents, daysWithDataByCh
               title: r.title ?? null,
             }
           })
-          // 현재 선택 자녀 또는 전체(childId=null) 일정만 홈 브리핑에 반영
-          .filter((r) => !r.childId || r.childId === child?.id)
+          // 현재 자녀 일정 + `travel` 은 타 자녀 id로만 저장된 가족 일정이 있을 수 있어 캘린더와 동일 예외
+          .filter((r) => !r.childId || r.childId === child?.id || r.eventType === 'travel')
           // [오늘~+7일]과 겹치는 일정만 반영
           .filter((r) => r.endDate >= today && r.startDate <= sevenDaysLater)
           .sort((a, b) => a.startDate.localeCompare(b.startDate))
@@ -309,11 +310,58 @@ export default function HomeTab({ childrenData, upcomingEvents, daysWithDataByCh
     ? Math.round((child.todayCompleted / child.totalMissions) * 100)
     : 0
 
+  /**
+   * 서버 `calendar_events`와 기기 localStorage 일정을 합칩니다(동일 일정은 id·날짜+제목 키로 1개만).
+   * 예전: local 이 1건만 있어도 서버 쪽이 전부 버려져, Vercel(로컬 스토리지 비어 있음)과 본의 아니게 달랐습니다.
+   */
   const effectiveUpcomingEvents = useMemo(() => {
-    // localStorage 일정이 있으면 우선 사용(캘린더 등록 직후 즉시 반영 목적)
-    if (localUpcomingEvents.length > 0) return localUpcomingEvents
-    return upcomingEvents ?? []
+    type Ev = (typeof localUpcomingEvents)[number]
+    const server = (upcomingEvents ?? []) as Ev[]
+    const local = localUpcomingEvents
+    const keyOf = (e: { id?: string; start_date: string; end_date: string; title?: string | null }) => {
+      if (e.id && String(e.id).length >= 8 && !String(e.id).startsWith('__')) return `id:${e.id}`
+      const t = (e.title ?? '').trim()
+      return `r:${e.start_date}|${e.end_date}|${t}`
+    }
+    const map = new Map<string, Ev>()
+    for (const e of server) {
+      map.set(keyOf(e), e)
+    }
+    for (const e of local) {
+      map.set(keyOf(e), e)
+    }
+    return [...map.values()]
+      .sort((a, b) => a.start_date.localeCompare(b.start_date))
+      .slice(0, 5)
   }, [localUpcomingEvents, upcomingEvents])
+
+  // #region agent log
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '68797e' },
+      body: JSON.stringify({
+        sessionId: '68797e',
+        location: 'HomeTab.tsx:briefingDebug',
+        message: 'calendar_briefing_counts',
+        hypothesisId: 'H1',
+        data: {
+          host: window.location.hostname,
+          serverUpcoming: upcomingEvents?.length ?? 0,
+          localUpcoming: localUpcomingEvents.length,
+          merged: effectiveUpcomingEvents.length,
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {})
+  }, [
+    upcomingEvents?.length,
+    localUpcomingEvents.length,
+    effectiveUpcomingEvents.length,
+    child?.id,
+  ])
+  // #endregion
 
   function formatEventDate(dateStr: string): string {
     const parts = dateStr.split('-')

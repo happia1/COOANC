@@ -63,8 +63,9 @@ export default function ChildMissionCard({ mission, onComplete, tapResetKey = 0 
    * 뷰포트 너비 — 스프라이트·아이콘 픽셀 보간용.
    * SSR 과 첫 클라이언트 페인트는 **같은 값**이어야 하므로 `window` 를 읽지 않고 `minPx` 로 시작한 뒤
    * `useLayoutEffect`에서 실제 너비로 맞춥니다(없으면 하이드레이션 경고 + SpriteImage 스타일 불일치).
+   * `CHILD_HOME_MISSION_FLUID_VW`는 `as const`라 `minPx`가 리터럴 360이므로, 그대로 `useState(minPx)`만 쓰면
+   * `setVw(window.innerWidth)`에 `number`를 넣을 수 없다는 타입 오류가 납니다 — 초깃값을 `number`로 한 번 맞춥니다.
    */
-  // minPx는 `as const` 리터럴(360)이라 그대로 두면 state 타입이 360만 허용됨 → resize 시 number를 넣을 수 없음
   const [vw, setVw] = useState<number>(CHILD_HOME_MISSION_FLUID_VW.minPx)
   useLayoutEffect(() => {
     const onResize = () => setVw(window.innerWidth)

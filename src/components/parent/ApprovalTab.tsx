@@ -4,8 +4,8 @@
  * 부모 앱 — 승인 탭
  * - 상단은 루틴 탭과 같은 자녀 프로필 카드 + 다자녀 전환(스토어 selectedChildId 공유); 프로필 카드 탭 시 자녀 앱 화면으로 진입(홈과 동일 API).
  * - 구매 요청·미션 롤백은 선택 중인 자녀 기준으로만 표시합니다.
- * - 구매 요청: 대기·외부구매 중 — 파란 「승인」으로 도착 완료 처리(반려 없음). 「최근 승인 내역」버튼으로 하단 시트에서 과거 건 확인.
- * - 최근 승인 내역: 오늘 완료 미션과 같은 하단 슬라이드 시트 — 최근 3건 먼저, 「더보기」로 전체.
+ * - 구매 요청: 대기·외부구매 중 — 파란 「승인」으로 도착 완료 처리(반려 없음). 구매 블록 바로 위 오른쪽 「최근구매내역」링크로 하단 시트에서 과거 건 확인.
+ * - 최근 구매(승인) 내역: 오늘 완료 미션과 같은 하단 슬라이드 시트 — 최근 3건 먼저, 「더보기」로 전체.
  * - 미션 롤백: 카드 탭 시 하단 시트(스크롤, 10건까지 + 더보기). 「다시하기」는 API 롤백 후 자녀 앱이 daily_missions Realtime 으로 팝업·카드를 맞춥니다.
  * - 미션 롤백 아래: 자녀 마켓 메뉴 제어(상품 표시/숨김, 가족 전용 상품 추가).
  */
@@ -223,7 +223,7 @@ export default function ApprovalTab({
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null)
   const [rollbackSheetOpen, setRollbackSheetOpen] = useState(false)
   const [rollbackSheetShowAll, setRollbackSheetShowAll] = useState(false)
-  /** 「최근 승인 내역」— 오늘 완료 미션과 동일한 하단 슬라이드(바텀시트) 열림 여부 */
+  /** 「최근구매내역」링크 — 오늘 완료 미션과 동일한 하단 슬라이드(바텀시트) 열림 여부 */
   const [purchaseHistorySheetOpen, setPurchaseHistorySheetOpen] = useState(false)
 
   /**
@@ -665,11 +665,11 @@ export default function ApprovalTab({
 
       {/* ── 2컬럼 그리드 ────────────────────────────────────────────────────────
           모바일(grid-cols-1): 좌 컬럼 → 우 컬럼 순 스택
-          md+(grid-cols-2):   좌=프로필+구매요청+최근승인내역+완료미션, 우=스티커+마켓제어
+          md+(grid-cols-2):   좌=프로필+구매요청(상단 링크로 최근내역 시트)+완료미션, 우=스티커+마켓제어
       ──────────────────────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 gap-6 w-full items-start md:grid-cols-2">
 
-      {/* ── 좌 컬럼: 프로필 + 구매 요청 + 최근 승인 내역 + 오늘 완료 미션 ── */}
+      {/* ── 좌 컬럼: 프로필 + 구매 요청(+최근구매내역 링크) + 오늘 완료 미션 ── */}
       <div className="flex flex-col gap-5">
 
         {/* 통합 프로필 바 — RoutineTab과 동일 */}
@@ -703,6 +703,25 @@ export default function ApprovalTab({
         <div className="md:hidden">
           <PraiseStickerPanel childId={currentId} childName={currentChild?.name ?? '자녀'} />
         </div>
+
+        {/**
+         * 구매 요청 블록과 한 덩어리로 보이게 묶음
+         * - 위쪽 한 줄: 오른쪽 끝 「최근구매내역」— 누르면 아래와 같은 바텀시트로 승인·반려·도착 이력 표시
+         */}
+        <div className="flex flex-col gap-1.5">
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={() => {
+                setRollbackSheetOpen(false)
+                setPurchaseHistoryShowAll(false)
+                setPurchaseHistorySheetOpen(true)
+              }}
+              className="rounded text-xs font-bold text-brand-blue underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4A90E2] focus-visible:ring-offset-2"
+            >
+              최근구매내역
+            </button>
+          </div>
 
         {/* 구매 요청 */}
         <section id="parent-purchase-requests">
@@ -801,30 +820,7 @@ export default function ApprovalTab({
           </div>
         </section>
 
-        {/* 최근 승인 내역 — 탭 시 하단 시트(오늘 완료 미션과 동일), 시트 안에서 최근 3건 + 더보기 */}
-        <section>
-          <button
-            type="button"
-            onClick={() => {
-              setRollbackSheetOpen(false)
-              setPurchaseHistoryShowAll(false)
-              setPurchaseHistorySheetOpen(true)
-            }}
-            className="w-full rounded-2xl bg-white px-4 py-2.5 text-left shadow-sm ring-1 ring-gray-100 transition-all active:scale-[0.99]"
-          >
-            <div className="flex items-center gap-3">
-              <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <span className="text-sm font-black text-brand-text">최근 승인 내역</span>
-                {/** 힌트 문구: 위 「오늘 완료 미션」행과 톤을 맞춤 */}
-                <span className="text-[11px] text-gray-400">탭하여 전체 · 상세 보기</span>
-              </div>
-              <span className="shrink-0 rounded-full bg-brand-blue/10 px-2.5 py-1 text-xs font-black tabular-nums text-brand-blue">
-                {historyForChild.length}건
-              </span>
-              <span className="shrink-0 text-lg font-bold text-gray-300" aria-hidden>›</span>
-            </div>
-          </button>
-
+          {/** 최근 구매(승인) 내역 바텀시트 — 「최근구매내역」버튼으로만 열림, 카드형 진입 UI는 제거됨 */}
           {purchaseHistorySheetOpen && (
             <div className="fixed inset-0 z-[100] flex flex-col justify-end">
               {/** 딤: 탭 시 시트 닫기 */}
@@ -900,7 +896,7 @@ export default function ApprovalTab({
               </div>
             </div>
           )}
-        </section>
+        </div>
 
         {/* 오늘 완료 미션 — 버튼 → 하단 시트 (모바일·태블릿 공통) */}
         <section>

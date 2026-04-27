@@ -2,10 +2,12 @@
 
 /**
  * 부모 루틴 탭 — 캘린더
- * - localStorage(cooanc_calendar_events_v1) 저장
+ * - 기기 `localStorage(cooanc_calendar_events_v1)` + 서버 `calendar_events` 를 **같이** 불러와 병합
+ *   (홈 일정 브리핑과 동일 데이터를 캘린더에서도 보려는 목적)
  * - 「캘린더」제목·+ 버튼은 스페셜 미션처럼 흰 카드 밖 상단 한 줄(+는 오른쪽 끝) — + 로 일정 추가 바텀시트(EventSheet) 열기
- * - 공휴일·방학·기념일·기타 범례 칩은 한 줄 가로 스크롤; **탭하면 해당 유형만** 필터(같은 칩 다시 탭하면 해제). 선택 칩은 **색만 진하게**(테두리 링 없음).
- * - 날짜 탭: 해당 날 일정이 있으면 상세 슬라이드, 없으면 빈 상태 시트 +「일정등록하기」(헤더 +와 동일 EventSheet, 클릭한 날짜로 시작·종료일 채움)
+ * - 범례 칩: **달 점·이번 달 목록**은 선택 유형에 맞춤. **칸 안 빨간 공휴일 이름**도 범례가 공휴일(또는 전체)일 때만 표시 —「여행만」이면 도트와 같이 공휴일 글자도 숨김.
+ * - **날짜 상세**: 그날 저장·서버 일정 전부 + 법정 공휴일. `travel` 은 DB에 특정 `child_id`만 있어도 가족 여행으로 보고 **탭 자녀와 달라도** 표시(제주 등).
+ * - 날짜 탭: 해당 날 일정이 있으면 상세 슬라이드, 없으면 빈 상태 시트 +「일정등록하기」. `?calendarDate=` 딥링크는 **서버·로컬 병합이 끝난 뒤**(`calendarDataRevision`)에만 자동 열어, 비어 있는 팝업이 먼저 뜨는 레이스를 막음.
  * - 일정 상세 시트 헤더 오른쪽 + : 헤더와 같은 EventSheet(일정 추가)를 연 뒤 상세는 닫음
  * - 「이번 달 일정」은 **항상** 표시(0건이어도). 블록 아무 곳(제목·빈 안내)이나 탭/스페이스로 펼침/접힘; 일정 행만 누르면 상세 시트.
  * - 흰 카드는 `pb-4`(작은 하단 여백)만 둠.
@@ -19,6 +21,10 @@ import { getSeoulDateString } from '@/lib/koreaDate'
 import { COOANC_CALENDAR_EVENTS_STORAGE_KEY } from '@/lib/localStorageChildScope'
 import { COOANC_CALENDAR_STORAGE_UPDATE_EVENT } from '@/lib/syncAgentEventToLocalCalendar'
 import { createClient } from '@/lib/supabase/client'
+import {
+  fetchParentCalendarEventsFromServer,
+  mergeServerAndLocalCalendar,
+} from '@/lib/mergeParentCalendarEvents'
 
 const STORAGE_KEY = COOANC_CALENDAR_EVENTS_STORAGE_KEY
 
@@ -141,7 +147,10 @@ export default function CalendarSection({ childId, focusDate = null }: Props) {
   const [emptyDayKey, setEmptyDayKey] = useState<string | null>(null)
   /** 이번 달 일정: 블록(제목·빈 안내) 클릭으로 펼침/접힘, 일정 행은 상세만 */
   const [monthScheduleOpen, setMonthScheduleOpen] = useState(false)
-  /** 상단 범례(유형 칩) 선택 시: null 이면 전체, 값이면 그 eventType 만 달력·목록에 표시 */
+  /**
+   * 상단 범례(유형 칩): null 이면 전체, 값이면 **격자·이번 달 일정 목록**만 해당 유형으로 쌓기.
+   * 날짜 **상세 시트**는 `events`에서 그날 전체를 따로 뽑아 범례를 적용하지 않음.
+   */
   const [legendFilter, setLegendFilter] = useState<LocalCalendarEvent['eventType'] | null>(null)
   /** `public_holidays` 에서 읽은 법정 공휴일 이름 — 날짜 키(YYYY-MM-DD) → 표시명 */
   const [holidayNamesByDate, setHolidayNamesByDate] = useState<Record<string, string>>({})
@@ -150,15 +159,72 @@ export default function CalendarSection({ childId, focusDate = null }: Props) {
    * 비개발자 설명: 링크로 열렸을 때 달력 월이 다르면 먼저 월을 맞춘 뒤, 그 날짜를 자동으로 눌러 줍니다.
    */
   const [pendingFocusDate, setPendingFocusDate] = useState<string | null>(null)
+  /**
+   * `refreshMergedEvents`가 끝날 때마다 1씩 올라갑니다(성공/실패 모두).
+   * 브리핑 `calendarDate` 딥링크로 **월만 맞춘 뒤** 곧바로 `handleDayClick`을 열면
+   * 아직 `events`가 `[]`인 레이스가 있어, 병합이 반영된 뒤에만 자동 열기 하기 위한 신호로 씁니다.
+   */
+  const [calendarDataRevision, setCalendarDataRevision] = useState(0)
+
+  /**
+   * localStorage + 서버 `calendar_events` 를 합쳐 `events` 를 맞춥니다.
+   * 브리핑 링크(`/parent/routine?calendarDate=`)로 들어와도 해당 날짜에 서버 일정이 보이게 합니다.
+   */
+  const refreshMergedEvents = useCallback(async () => {
+    let local: LocalCalendarEvent[] = []
+    let server: LocalCalendarEvent[] = []
+    let merged: LocalCalendarEvent[] = []
+    try {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY)
+        if (raw) local = JSON.parse(raw) as LocalCalendarEvent[]
+      } catch {
+        local = []
+      }
+      server = await fetchParentCalendarEventsFromServer(childId)
+      merged = mergeServerAndLocalCalendar(server, local, childId)
+      setEvents(merged)
+    } catch {
+      setEvents([])
+    } finally {
+      setCalendarDataRevision((n) => n + 1)
+    }
+    // #region agent log
+    if (typeof window !== 'undefined') {
+      const typeCounts = merged.reduce<Record<string, number>>((acc, e) => {
+        acc[e.eventType] = (acc[e.eventType] ?? 0) + 1
+        return acc
+      }, {})
+      fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '68797e' },
+        body: JSON.stringify({
+          sessionId: '68797e',
+          location: 'CalendarSection.tsx:refreshMergedEvents',
+          message: 'calendar_merge',
+          data: {
+            serverCount: server.length,
+            localCount: local.length,
+            mergedCount: merged.length,
+            hasChildId: Boolean(childId),
+            /** 홈과 동일: 부모의 모든 family_link 기준 서버 조회(형제 링크 일정 포함 여부 확인용) */
+            fetchScope: 'all_parent_family_links',
+            typeCounts,
+            serverTravelCount: server.filter((e) => e.eventType === 'travel').length,
+            localTravelCount: local.filter((e) => e.eventType === 'travel').length,
+            mergedTravelCount: typeCounts.travel ?? 0,
+          },
+          timestamp: Date.now(),
+          hypothesisId: 'H-data-provenance',
+        }),
+      }).catch(() => {})
+    }
+    // #endregion
+  }, [childId])
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY)
-      if (raw) setEvents(JSON.parse(raw))
-    } catch {
-      /* ignore */
-    }
-  }, [])
+    void refreshMergedEvents()
+  }, [refreshMergedEvents, focusDate])
 
   useEffect(() => {
     // 잘못된 쿼리 값은 무시해 앱 동작을 안전하게 유지합니다.
@@ -174,23 +240,18 @@ export default function CalendarSection({ childId, focusDate = null }: Props) {
     setMonth(m - 1)
   }, [focusDate])
 
-  /** 루틴 도우미 등이 `localStorage` 를 갱신하면 같은 탭에서도 목록을 다시 읽습니다 */
+  /** localStorage 가 바뀌면 서버 일정과 다시 합칩니다(다른 탭·에이전트 동기화 포함). */
   useEffect(() => {
-    const reloadFromStorage = () => {
-      try {
-        const raw = localStorage.getItem(STORAGE_KEY)
-        if (raw) setEvents(JSON.parse(raw))
-      } catch {
-        /* ignore */
-      }
+    const onStorage = () => {
+      void refreshMergedEvents()
     }
-    window.addEventListener(COOANC_CALENDAR_STORAGE_UPDATE_EVENT, reloadFromStorage)
-    window.addEventListener('storage', reloadFromStorage)
+    window.addEventListener(COOANC_CALENDAR_STORAGE_UPDATE_EVENT, onStorage)
+    window.addEventListener('storage', onStorage)
     return () => {
-      window.removeEventListener(COOANC_CALENDAR_STORAGE_UPDATE_EVENT, reloadFromStorage)
-      window.removeEventListener('storage', reloadFromStorage)
+      window.removeEventListener(COOANC_CALENDAR_STORAGE_UPDATE_EVENT, onStorage)
+      window.removeEventListener('storage', onStorage)
     }
-  }, [])
+  }, [refreshMergedEvents])
 
   /** Supabase `public_holidays` — 이번 달 법정 공휴일만 읽어 달력에 빨간 이름으로 표시 */
   useEffect(() => {
@@ -240,19 +301,36 @@ export default function CalendarSection({ childId, focusDate = null }: Props) {
 
   const todayStr = getSeoulDateString()
 
-  /** 이번 달·현재 아이에 해당하는 일정(필터 적용 전) */
+  /**
+   * 이 자녀 탭에 보여 줄 일정인지(다른 자녀 전용 제외).
+   * `travel` 은 한 자녀 id로만 저장된 가족 여행이 있어, **항상 보이게** 예외 처리합니다.
+   */
+  function eventVisibleForSelectedChild(ev: LocalCalendarEvent): boolean {
+    if (!childId) return true
+    if (!ev.childId || ev.childId === childId) return true
+    if (ev.eventType === 'travel') return true
+    return false
+  }
+
+  /**
+   * 이번 달에 걸리는 일정(범례 적용 전).
+   */
   const monthEventsAll = events.filter((ev) => {
-    if (ev.childId && ev.childId !== childId) return false
+    if (!eventVisibleForSelectedChild(ev)) return false
     return datesInRange(ev.startDate, ev.endDate).some((d) => {
       const [y, m] = d.split('-').map(Number)
       return y === year && m - 1 === month
     })
   })
-  /** 범례에서 한 유형만 골랐을 때: 달력 점·날짜 탭 상세·「이번 달 일정」목록 모두 이 목록 기준 */
+  /** 범례가 있으면 격자·이번 달 일정 **목록**에만 `eventType` 일치 일정(공휴일만·여행만 등) */
   const monthEvents = legendFilter
     ? monthEventsAll.filter((ev) => ev.eventType === legendFilter)
     : monthEventsAll
 
+  /**
+   * 날짜 → 일정 배열(격자 도트·칸에 쓰는 맵) — `monthEvents` = 범례 반영본이라 칩을 바꾸면 점이 바뀜.
+   * (날짜 **상세**는 이 맵이 아니라 `events`에서 그날 전체를 별도로 씀.)
+   */
   const dateEventMap: Record<string, LocalCalendarEvent[]> = {}
   for (const ev of monthEvents) {
     for (const d of datesInRange(ev.startDate, ev.endDate)) {
@@ -261,9 +339,8 @@ export default function CalendarSection({ childId, focusDate = null }: Props) {
     }
   }
   /**
-   * 법정 공휴일(`public_holidays`)은 별도 localStorage 행 없이도 **공휴일(빨간) 점**이 찍히게 합니다.
-   * id 는 `__public_holiday__:` 로 시작해 일반 일정과 구분합니다(일정 상세에서는 읽기 전용으로 표시).
-   * 다른 유형만 필터한 상태에서는 범례와 맞추기 위해 공휴일 점은 넣지 않습니다.
+   * 법정 공휴일(`public_holidays`)은 **격자**에만 합성 행을 넣고, "여행만" 등 필터일 땐 점이 범례와 맞게 빠질 수 있음(상세에는 DB 이름으로만 여전히 표시 가능).
+   * id 는 `__public_holiday__:` 로 시작.
    */
   const showPublicHolidayDots = legendFilter == null || legendFilter === 'holiday'
   if (showPublicHolidayDots) {
@@ -295,13 +372,22 @@ export default function CalendarSection({ childId, focusDate = null }: Props) {
   const cells: (number | null)[] = [...Array(firstDay).fill(null), ...Array.from({ length: daysCount }, (_, i) => i + 1)]
   while (cells.length % 7 !== 0) cells.push(null)
 
+  /**
+   * 날짜 상세에 쓰는 "사용자+서버" 일정(법정 공휴일 합성 행은 제외).
+   * 범례와 무관; `eventVisibleForSelectedChild` + 날짜 겹침.
+   */
+  function userEventsOverlappingDay(dk: string): LocalCalendarEvent[] {
+    return events.filter(
+      (ev) => eventVisibleForSelectedChild(ev) && datesInRange(ev.startDate, ev.endDate).includes(dk),
+    )
+  }
+
   function handleDayClick(dk: string) {
     const raw = dateEventMap[dk] ?? []
-    /** 사용자가 등록한 일정만(법정 공휴일 가짜 행은 아래에서 따로 붙임) */
-    const userOnly = raw.filter((e) => !e.id.startsWith('__public_holiday__:'))
+    /** 격자용 맵에서 온 합성 공휴일 — 상세는 아래 `phName` + `userAll`이 기준 */
     const fromMap = raw.find((e) => e.id.startsWith('__public_holiday__:'))
     const phName = holidayNamesByDate[dk]?.trim()
-    /** 범례에서 공휴일 점을 뺀 달에도, DB 에 이름이 있으면 세부 시트에 표시 */
+    /** `public_holidays` DB 에 이름이 있으면(노동절 등) 범례와 관계없이 상세에 표시 */
     const publicHolidayEv: LocalCalendarEvent | null =
       fromMap ??
       (phName
@@ -315,9 +401,35 @@ export default function CalendarSection({ childId, focusDate = null }: Props) {
             routineOverride: 'none',
           }
         : null)
-
-    const byId = new Map(userOnly.map((e) => [e.id, e]))
+    const userAll = userEventsOverlappingDay(dk)
+    const byId = new Map(userAll.map((e) => [e.id, e]))
     const uniqUser = [...byId.values()]
+    // #region agent log
+    if (typeof window !== 'undefined') {
+      fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '68797e' },
+        body: JSON.stringify({
+          sessionId: '68797e',
+          location: 'CalendarSection.tsx:handleDayClick',
+          message: 'day_detail_unscoped_user_events',
+          data: {
+            dk,
+            legendFilter,
+            mapFilteredTotal: raw.length,
+            unscopedUserCount: userAll.length,
+            travelCountInDetail: userAll.filter((e) => e.eventType === 'travel').length,
+            eventsTotal: events.length,
+            hasPh: Boolean(publicHolidayEv),
+            hasChildId: Boolean(childId),
+            monthAllCount: monthEventsAll.length,
+          },
+          timestamp: Date.now(),
+          hypothesisId: 'H-legend-or-child',
+        }),
+      }).catch(() => {})
+    }
+    // #endregion
     const detailList: LocalCalendarEvent[] = publicHolidayEv ? [publicHolidayEv, ...uniqUser] : uniqUser
 
     if (detailList.length > 0) {
@@ -331,13 +443,35 @@ export default function CalendarSection({ childId, focusDate = null }: Props) {
 
   useEffect(() => {
     if (!pendingFocusDate) return
-    const [y, m] = pendingFocusDate.split('-').map(Number)
-    // 월 이동이 끝나면 날짜 상세(또는 빈 상태 시트)를 자동으로 열어 줍니다.
-    if (y === year && m - 1 === month) {
-      handleDayClick(pendingFocusDate)
-      setPendingFocusDate(null)
+    const toOpen = pendingFocusDate
+    const [y, m] = toOpen.split('-').map(Number)
+    if (y !== year || m - 1 !== month) return
+    if (calendarDataRevision === 0) return
+    handleDayClick(toOpen)
+    setPendingFocusDate(null)
+    // #region agent log
+    if (typeof window !== 'undefined') {
+      fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '68797e' },
+        body: JSON.stringify({
+          sessionId: '68797e',
+          location: 'CalendarSection.tsx:autoOpenAfterMerge',
+          message: 'focus_link_after_merge',
+          data: {
+            dk: toOpen,
+            calendarDataRevision,
+            eventsLenAfterRender: events.length,
+          },
+          timestamp: Date.now(),
+          hypothesisId: 'H-focus-race',
+        }),
+      }).catch(() => {})
     }
-  }, [pendingFocusDate, year, month])
+    // #endregion
+    // `calendarDataRevision`이 올라간 뒤(병합 flush 후) handleDayClick을 호출해, 빈 `events`로 ‘일정 없음’이 뜨는 레이스를 막습니다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- toOpen/열기 1회만; handleDayClick·events는 이 시점의 렌더 기준
+  }, [pendingFocusDate, year, month, calendarDataRevision])
 
   /** 헤더 + 버튼: 오늘 날짜로 일정 추가 시트(날짜는 시트 안에서 바꿀 수 있음) */
   function openAddSheet() {
@@ -388,7 +522,7 @@ export default function CalendarSection({ childId, focusDate = null }: Props) {
       <div
         className="mb-3 flex snap-x snap-proximity touch-pan-x gap-2 overflow-x-auto overscroll-x-contain pb-0.5 [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
         role="list"
-        aria-label="일정 유형 범례 — 칩을 누르면 해당 유형만 표시"
+        aria-label="일정 유형 범례 — 칩을 누르면 달의 점과 아래 이번 달 일정 목록이 해당 유형으로 좁혀짐(날짜 상세는 항상 그날 전체)"
       >
         {EVENT_TYPES_ORDER.map((type) => {
           const selected = legendFilter === type
@@ -401,8 +535,8 @@ export default function CalendarSection({ childId, focusDate = null }: Props) {
               aria-pressed={selected}
               aria-label={
                 selected
-                  ? `${EVENT_TYPE_LABELS[type]} 필터 해제하고 전체 보기`
-                  : `${EVENT_TYPE_LABELS[type]}만 달력에 표시`
+                  ? `${EVENT_TYPE_LABELS[type]} 필터 해제, 달과 목록을 전체 유형으로`
+                  : `${EVENT_TYPE_LABELS[type]}만 달 점·이번 달 일정에 표시`
               }
               onClick={() => toggleLegendFilter(type)}
               className={[
@@ -460,7 +594,9 @@ export default function CalendarSection({ childId, focusDate = null }: Props) {
           const isToday = dk === todayStr
           const isSun = idx % 7 === 0
           const isSat = idx % 7 === 6
-          const publicHolidayName = holidayNamesByDate[dk]
+          /** 공휴일 칸 글자는 범례가「전체」또는「공휴일」일 때만 —「여행만」이면 도트와 같이 숨김 */
+          const showPublicHolidayCellText = legendFilter == null || legendFilter === 'holiday'
+          const publicHolidayName = showPublicHolidayCellText ? holidayNamesByDate[dk] : undefined
           /** 같은 날 중복 id 제거 후 최대 3개만 점으로 표시 */
           const dotEvents = [...new Map(evHere.map((e) => [e.id, e])).values()].slice(0, 3)
           return (
