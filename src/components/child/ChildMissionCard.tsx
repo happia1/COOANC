@@ -32,6 +32,11 @@ import type { DailyMissionWithTemplate } from '@/types/database'
 type Props = {
   mission: DailyMissionWithTemplate
   /**
+   * 상위가 올리면(0보다 크면) 탭 1회 잠금을 풉니다.
+   * 비개발자: 연속 탭 팝업에서 「미안」 누른 뒤, 같은 카드를 다시 누를 수 있게 할 때 씁니다.
+   */
+  tapResetKey?: number
+  /**
    * 완료 버튼을 눌렀을 때 호출 — 상위에서 API 호출 및 상태 관리를 담당합니다.
    * cardRect: 카드의 화면 위치 (파티클 출발 좌표 계산용)
    * creditReward / heartReward: 파티클 개수 결정용
@@ -53,14 +58,13 @@ type Props = {
  * - 각 미션이 한 장의 카드로 표시됩니다.
  * - 카드를 한 번 탭하면 부모가 처리하는 동안 같은 그림이 잠깐 보이다가 사라집니다(별도 “완료 팝업” 없음).
  */
-export default function ChildMissionCard({ mission, onComplete }: Props) {
-  /** 뷰포트 너비 — 스프라이트·아이콘은 픽셀 지정이 필요해 `clamp` 와 같은 360~900 구간으로 맞춥니다 */
-  const [vw, setVw] = useState(
-    () =>
-      typeof window !== 'undefined' && Number.isFinite(window.innerWidth)
-        ? window.innerWidth
-        : CHILD_HOME_MISSION_FLUID_VW.minPx,
-  )
+export default function ChildMissionCard({ mission, onComplete, tapResetKey = 0 }: Props) {
+  /**
+   * 뷰포트 너비 — 스프라이트·아이콘 픽셀 보간용.
+   * SSR 과 첫 클라이언트 페인트는 **같은 값**이어야 하므로 `window` 를 읽지 않고 `minPx` 로 시작한 뒤
+   * `useLayoutEffect`에서 실제 너비로 맞춥니다(없으면 하이드레이션 경고 + SpriteImage 스타일 불일치).
+   */
+  const [vw, setVw] = useState(CHILD_HOME_MISSION_FLUID_VW.minPx)
   useLayoutEffect(() => {
     const onResize = () => setVw(window.innerWidth)
     onResize()
@@ -70,6 +74,15 @@ export default function ChildMissionCard({ mission, onComplete }: Props) {
 
   /** 한 카드에 대해 완료 요청을 한 번만 보내기 위한 잠금(연속 탭·중복 호출 방지) */
   const firedRef = useRef(false)
+  /**
+   * 연속 탭 취소 등으로 상위가 tapResetKey 를 올리면 잠금을 풀어 같은 카드를 다시 탭할 수 있게 합니다.
+   * 비개발자: 숫자가 바뀌면 "이 카드, 다시 한 번 눌러도 돼" 신호로 받아들이면 됩니다.
+   */
+  useLayoutEffect(() => {
+    if (tapResetKey > 0) {
+      firedRef.current = false
+    }
+  }, [tapResetKey])
   /** 카드 DOM 참조 — 파티클·컨페티 출발 좌표(getBoundingClientRect) 계산에 사용 */
   const cardRef = useRef<HTMLButtonElement>(null)
 
@@ -89,7 +102,12 @@ export default function ChildMissionCard({ mission, onComplete }: Props) {
   const routineImagePath = resolveRoutineMissionPngUrl({ title: m.title, iconEmoji: m.icon_emoji })
 
   function handleTap() {
-    if (firedRef.current) return
+    if (firedRef.current) {
+      // #region agent log
+      fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'68797e'},body:JSON.stringify({sessionId:'68797e',location:'ChildMissionCard.tsx:handleTap',message:'ignored_second_tap',data:{dmId:mission.id},timestamp:Date.now(),hypothesisId:'H5'})}).catch(()=>{})
+      // #endregion
+      return
+    }
     firedRef.current = true
 
     /** 카드 위치를 부모로 전달해 파티클·컨페티 출발 좌표를 계산합니다 */
@@ -108,9 +126,6 @@ export default function ChildMissionCard({ mission, onComplete }: Props) {
     ? 'border-amber-300 bg-gradient-to-b from-amber-50/80 via-amber-100/80 to-yellow-200/80 ring-2 ring-amber-200/60'
     : 'border-[#ede9e0] bg-white/80 backdrop-blur-sm'
 
-  /** 이미지 컨테이너 배경 — 특별 미션은 amber 계열, 일반은 연살구색 */
-  const imgBg = special ? 'bg-amber-100' : 'bg-[#FFF0E8]'
-
   return (
     <div className="relative snap-start shrink-0">
       <button
@@ -119,15 +134,23 @@ export default function ChildMissionCard({ mission, onComplete }: Props) {
         onClick={handleTap}
         aria-label={`${m.title} 미션 완료하기`}
         className={[
-          // 모바일 기준 너비 + 뷰포트가 넓어질수록 최대 2배( missionTodayLayoutSpec 의 clamp )
+          // 모바일 기준 너비 + 뷰포트가 넓어질수록 최대 1.3배( missionTodayLayoutSpec 의 clamp )
           'flex flex-col items-center gap-[clamp(0.75rem,calc(0.55rem+0.55vw),1.125rem)] rounded-2xl border px-3 pt-4 pb-3 transition-all duration-300 focus:outline-none active:scale-[0.97]',
           CHILD_HOME_MISSION_CARD_WIDTH_CLAMP_CLASS,
           timeShadow,
           cardBg,
         ].join(' ')}
       >
-        {/* ── 이미지 컨테이너 — 116px 기준에서 뷰포트에 따라 최대 232px(2×) ── */}
-        <div className={['flex shrink-0 items-center justify-center rounded-2xl overflow-hidden', CHILD_HOME_MISSION_CARD_IMAGE_BOX_CLAMP_CLASS, imgBg].join(' ')}>
+        {/**
+         * 이미지 컨테이너 — 치수만 잡고 배경색은 두지 않음(카드 본문 배경이 그대로 비침).
+         * 비개발자: 예전 연한 주황/노란 “액자” 칠을 없애고 일러스트만 떠 있게 한 것입니다.
+         */}
+        <div
+          className={[
+            'flex shrink-0 items-center justify-center overflow-hidden rounded-2xl',
+            CHILD_HOME_MISSION_CARD_IMAGE_BOX_CLAMP_CLASS,
+          ].join(' ')}
+        >
           {routineImagePath ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -152,17 +175,20 @@ export default function ChildMissionCard({ mission, onComplete }: Props) {
           {m.title}
         </p>
 
-        {/** 부모 루틴·미션 탭과 동일: 크레딧·애정 하트(경험치 별은 카드에 비표시) — `scaledMissionRewards` */}
+        {/**
+         * 크레딧·하트 알약 — 숫자·아이콘을 살짝 키워 가독성만 보강(카드 전체 비율은 유지).
+         * `-mt-1`: flex gap 만으로는 제목과 칩 사이가 넓어 보여서, 칩만 아주 조금 위로 당깁니다.
+         */}
         <div
           className={[
-            'inline-flex max-w-full flex-wrap items-center justify-center gap-x-1 gap-y-0.5 rounded-full px-2.5 py-1 font-black tabular-nums tracking-tight text-[#888888] shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] ring-1 ring-black/[0.06] text-[clamp(0.6875rem,calc(0.65rem+0.1vw),0.8125rem)]',
+            '-mt-1 inline-flex max-w-full flex-wrap items-center justify-center gap-x-1.5 gap-y-0.5 rounded-full px-3 py-1.5 font-black tabular-nums tracking-tight text-[#888888] shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] ring-1 ring-black/[0.06] text-[clamp(0.75rem,calc(0.7rem+0.12vw),0.875rem)]',
             special ? 'bg-amber-100/90' : 'bg-stone-100/95',
           ].join(' ')}
         >
           <MissionRewardIconTriple
             reward={rewards}
             iconSize={rewardIconPx}
-            className="flex flex-wrap items-center justify-center gap-x-1 gap-y-0.5"
+            className="flex flex-wrap items-center justify-center gap-x-1.5 gap-y-0.5"
           />
         </div>
       </button>

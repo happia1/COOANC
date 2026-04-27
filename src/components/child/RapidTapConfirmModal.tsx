@@ -54,6 +54,9 @@ export default function RapidTapConfirmModal({ open, onConfirm, onDeny }: Props)
   }, [open])
 
   if (!open) return null
+  // #region agent log
+  fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'68797e'},body:JSON.stringify({sessionId:'68797e',location:'RapidTapConfirmModal.tsx:render',message:'open_branch',data:{open,hasWindow:typeof window!=='undefined'},timestamp:Date.now(),hypothesisId:'H1'})}).catch(()=>{})
+  // #endregion
   if (typeof window === 'undefined') return null
 
   const modal = (

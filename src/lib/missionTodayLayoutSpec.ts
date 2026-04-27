@@ -94,39 +94,42 @@ export const MISSION_CARD_SCROLLER_CLASSNAME =
   'flex min-h-0 min-w-0 w-full flex-none snap-x snap-mandatory items-start gap-0.5 overflow-x-auto py-0 pl-2 pr-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden' as const
 
 /**
- * ━━ 자녀 홈(캐릭터) 하단 「오늘의 미션」카드 — 뷰포트가 모바일→태블릿으로 커질수록 **최대 2배**까지 유동 확대
+ * ━━ 자녀 홈(캐릭터) 하단 「오늘의 미션」카드 — 뷰포트가 모바일→태블릿으로 커질수록 **최대 1.3배**까지 유동 확대
  * - 360px(22.5rem) 이하: 기준(150×116 카드) — 1.0
- * - 900px(56.25rem) 이상: 300×232 — 2.0
+ * - 900px(56.25rem) 이상: 기준 대비 1.3배(태블릿에서 잘림 여유)
  * - 그 사이: 선형 보간. `100vw-22.5rem`이 음수면 max(0,…)로 360 이하에서 흔들리지 않음
  */
 export const CHILD_HOME_MISSION_FLUID_VW = { minPx: 360, maxPx: 900 } as const
 
-/** 9.375→18.75rem: (18.75-9.375)/33.75 = 5/18 */
+/** 9.375→12.1875rem(×1.3): (12.1875-9.375)/33.75 = 1/12 */
 export const CHILD_HOME_MISSION_CARD_WIDTH_CLAMP_CLASS =
-  'w-[clamp(9.375rem,calc(9.375rem+max(0px,100vw-22.5rem)*0.2777777778),18.75rem)]' as const
+  'w-[clamp(9.375rem,calc(9.375rem+max(0px,100vw-22.5rem)*0.0833333333),12.1875rem)]' as const
 
-/** 7.25→14.5rem: 7.25/33.75 */
+/** 7.25→9.425rem(×1.3): (9.425-7.25)/33.75 */
 export const CHILD_HOME_MISSION_CARD_IMAGE_BOX_CLAMP_CLASS =
-  'h-[clamp(7.25rem,calc(7.25rem+max(0px,100vw-22.5rem)*0.2148148148),14.5rem)] w-[clamp(7.25rem,calc(7.25rem+max(0px,100vw-22.5rem)*0.2148148148),14.5rem)]' as const
+  'h-[clamp(7.25rem,calc(7.25rem+max(0px,100vw-22.5rem)*0.0644444444),9.425rem)] w-[clamp(7.25rem,calc(7.25rem+max(0px,100vw-22.5rem)*0.0644444444),9.425rem)]' as const
 
 /**
  * 스프라이트(PNG)는 `clamp`만으로는 픽셀 width 를 정해야 해서, 카드와 같은 구간(360→900)으로 보간합니다.
- * (최소 108px, 최대 216px = 2×)
+ * (최소 108px, 최대 140px ≈ 108×1.3 — 카드 최대 배율과 맞춤)
  */
 export function childHomeMissionSpriteWidthPx(viewportWidth: number): number {
   const { minPx, maxPx } = CHILD_HOME_MISSION_FLUID_VW
   const minS = 108
-  const maxS = 216
+  const maxS = 140
   if (viewportWidth <= minPx) return minS
   if (viewportWidth >= maxPx) return maxS
   return Math.round(minS + ((maxS - minS) * (viewportWidth - minPx)) / (maxPx - minPx))
 }
 
-/** 보상 아이콘 — 카드가 커질수록 키움(13→26, 2×) */
+/**
+ * 보상 아이콘 — 카드가 커질수록 키움(15→20, 카드 본체 1.3× 스케일보다 알약만 한 단계 더 키운 값).
+ * 비개발자: 동전·하트 그림이 조금 더 잘 보이게 픽셀만 살짝 올린 것입니다.
+ */
 export function childHomeMissionRewardIconSizePx(viewportWidth: number): number {
   const { minPx, maxPx } = CHILD_HOME_MISSION_FLUID_VW
-  const minI = 13
-  const maxI = 26
+  const minI = 15
+  const maxI = 20
   if (viewportWidth <= minPx) return minI
   if (viewportWidth >= maxPx) return maxI
   return Math.round(minI + ((maxI - minI) * (viewportWidth - minPx)) / (maxPx - minPx))

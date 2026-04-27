@@ -324,6 +324,12 @@ export default function ChildScreen({
   const recentTapTimestamps = useRef<number[]>([])
 
   /**
+   * 3초 이내 연속 탭으로 "완료 처리"에 실제로 들어간 daily_mission id(최대 4개).
+   * 5번째 탭이 팝업을 뜨기 직전까지 쌓인 것으로, 「미안.. 다시 할게」시 서버/화면에 함께 롤백합니다.
+   */
+  const rapidBurstCommittedIdsRef = useRef<string[]>([])
+
+  /**
    * 팝업이 열려있는 동안 처리를 보류한 미션 정보.
    * 확인/취소 후 이 정보를 기반으로 완료 또는 취소를 결정합니다.
    */
@@ -336,6 +342,12 @@ export default function ChildScreen({
 
   /** 연속 탭 확인 팝업 표시 여부 */
   const [rapidTapModalOpen, setRapidTapModalOpen] = useState(false)
+
+  /**
+   * 연속 탭 취소 시 5번째(팝업 직전) 카드에만 `ChildMissionCard`의 탭 잠금(fired)을 풀기 위한 키.
+   * 비개발자: "미안" 누른 뒤에도 그 카드가 다시 눌리게 숫자를 올려 카드를 살짝 "새로 알려줍니다."
+   */
+  const [missionTapUnblock, setMissionTapUnblock] = useState<Record<string, number>>({})
 
   /**
    * 부모가 완료 미션을 「다시하기」로 롤백했을 때만 뜨는 안내(소리 없음).
@@ -473,6 +485,9 @@ export default function ChildScreen({
     }
 
     function finishRollbackUi(dmId: string, snapshot: DailyMissionWithTemplate) {
+      // #region agent log
+      fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'68797e'},body:JSON.stringify({sessionId:'68797e',location:'ChildScreen.tsx:finishRollbackUi',message:'realtime_rollback',data:{dmId,isCompletedSnap:snapshot.is_completed},timestamp:Date.now(),hypothesisId:'H4'})}).catch(()=>{})
+      // #endregion
       setDone((prevDone) => {
         const wasDone = prevDone.has(dmId)
         const wasCompletedOnRow = snapshot.is_completed
@@ -883,6 +898,9 @@ export default function ChildScreen({
           } catch {
             /* 응답이 JSON이 아니면 stats 동기화 생략 */
           }
+          // #region agent log
+          fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'68797e'},body:JSON.stringify({sessionId:'68797e',location:'ChildScreen.tsx:commitMissionComplete',message:'complete_api_res',data:{dmId:dm.id,status:res.status,ok:res.ok},timestamp:Date.now(),hypothesisId:'H3'})}).catch(()=>{})
+          // #endregion
           if (res.ok) {
             setStats((prev) => tryApplyCompletePayload(prev, json) ?? prev)
           } else {
@@ -925,7 +943,12 @@ export default function ChildScreen({
       creditReward: number,
       heartReward: number,
     ) => {
-      if (done.has(dm.id)) return
+      if (done.has(dm.id)) {
+        // #region agent log
+        fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'68797e'},body:JSON.stringify({sessionId:'68797e',location:'ChildScreen.tsx:handleMissionComplete',message:'skip_done',data:{dmId:dm.id},timestamp:Date.now(),hypothesisId:'H2'})}).catch(()=>{})
+        // #endregion
+        return
+      }
 
       const now = Date.now()
 
@@ -933,14 +956,23 @@ export default function ChildScreen({
        * 연속 탭 감지: 3초 이내 탭 타임스탬프만 남기고,
        * 5개 이상 쌓이면 확인 팝업을 띄웁니다.
        */
-      recentTapTimestamps.current = [
-        ...recentTapTimestamps.current.filter((t) => now - t < 3000),
-        now,
-      ]
+      const filtered = recentTapTimestamps.current.filter((t) => now - t < 3000)
+      /** 한참 쉬었다가 다시 탭하면 이전 버스트와 섞이지 않도록 id 목록도 비웁니다 */
+      if (filtered.length === 0) {
+        rapidBurstCommittedIdsRef.current = []
+      }
+      recentTapTimestamps.current = [...filtered, now]
+
+      // #region agent log
+      fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'68797e'},body:JSON.stringify({sessionId:'68797e',location:'ChildScreen.tsx:handleMissionComplete',message:'rapid_tap_tick',data:{dmId:dm.id,tapLen:recentTapTimestamps.current.length,doneHas:done.has(dm.id),willModal:recentTapTimestamps.current.length>=5},timestamp:Date.now(),hypothesisId:'H2'})}).catch(()=>{})
+      // #endregion
 
       if (recentTapTimestamps.current.length >= 5) {
         /** 팝업 대기 중인 미션 정보를 저장하고 팝업을 엽니다 */
         pendingMissionRef.current = { dm, cardRect, creditReward, heartReward }
+        // #region agent log
+        fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'68797e'},body:JSON.stringify({sessionId:'68797e',location:'ChildScreen.tsx:handleMissionComplete',message:'open_rapid_modal',data:{dmId:dm.id},timestamp:Date.now(),hypothesisId:'H1'})}).catch(()=>{})
+        // #endregion
         setRapidTapModalOpen(true)
 
         /** 부모에게 연속 탭 알림을 백그라운드로 전송합니다 */
@@ -952,6 +984,12 @@ export default function ChildScreen({
 
         return
       }
+
+      /**
+       * 완료 API에 넣기 직전 id 를 기록합니다(최대 4).
+       * 5번째는 위에서 return 되므로 여기까지 오지 않습니다.
+       */
+      rapidBurstCommittedIdsRef.current = [...rapidBurstCommittedIdsRef.current, dm.id].slice(-4)
 
       /** 연속 탭 감지 통과 — 정상 완료 처리를 진행합니다 */
       commitMissionComplete(dm, cardRect, creditReward, heartReward)
@@ -971,18 +1009,108 @@ export default function ChildScreen({
     }
     pendingMissionRef.current = null
     recentTapTimestamps.current = []
+    /** 확인이면 버스트 구간이 끝난 것으로 보고, 다음 연속탭은 새로 셉니다 */
+    rapidBurstCommittedIdsRef.current = []
     setRapidTapModalOpen(false)
   }, [done, commitMissionComplete])
 
   /**
    * 연속 탭 확인 팝업: "미안.. 다시 할게" 버튼 처리
-   * - 보류된 미션을 완료하지 않고 팝업만 닫습니다.
+   * - 이미 완료 처리된(최대 4) 미션은 DB·화면에서 되돌리고, 5번째 카드만 탭 잠금을 풉니다.
    */
   const handleRapidTapDeny = useCallback(() => {
+    const pending = pendingMissionRef.current
+    const toUndo = [...rapidBurstCommittedIdsRef.current]
     pendingMissionRef.current = null
     recentTapTimestamps.current = []
+    rapidBurstCommittedIdsRef.current = []
     setRapidTapModalOpen(false)
-  }, [])
+
+    // 5번째(팝업을 연) 카드는 완료 처리가 없었지만 탭 잠금만 켜져 있으므로, 키를 올려 다시 탭 가능하게 합니다
+    if (pending) {
+      setMissionTapUnblock((prev) => ({
+        ...prev,
+        [pending.dm.id]: (prev[pending.dm.id] ?? 0) + 1,
+      }))
+    }
+
+    // #region agent log
+    fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '68797e' },
+      body: JSON.stringify({
+        sessionId: '68797e',
+        location: 'ChildScreen.tsx:handleRapidTapDeny',
+        message: 'deny_rollback',
+        data: { toUndoCount: toUndo.length, toUndo, pendingDm: pending?.dm.id },
+        timestamp: Date.now(),
+        hypothesisId: 'H-deny',
+      }),
+    }).catch(() => {})
+    // #endregion
+
+    if (toUndo.length === 0) return
+
+    const idSet = new Set(toUndo)
+    /**
+     * 즉시 로컬에서 카드·완료 집합을 되돌려 눈에 보이는 지연을 줄입니다.
+     * 이후 API·refresh 로 서버 값과 맞춥니다.
+     */
+    setMissionList((prev) => {
+      let creditSub = 0
+      for (const id of toUndo) {
+        const row = prev.find((m) => m.id === id)
+        if (row?.missions) creditSub += scaledMissionRewards(row.missions).credit
+      }
+      if (creditSub > 0) {
+        queueMicrotask(() => {
+          setTodayEarnedCredits((p) => Math.max(0, p - creditSub))
+        })
+      }
+      return prev.map((m) =>
+        idSet.has(m.id) ? { ...m, is_completed: false, completed_at: null } : m,
+      )
+    })
+    setDone((prev) => {
+      const next = new Set(prev)
+      for (const id of toUndo) next.delete(id)
+      return next
+    })
+    setShowCelebration(false)
+    celebrationShownRef.current = false
+    if (celebrationShowTimerRef.current != null) {
+      clearTimeout(celebrationShowTimerRef.current)
+      celebrationShowTimerRef.current = null
+    }
+
+    void (async () => {
+      try {
+        const res = await fetch('/api/daily-mission/undo-burst', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ dailyMissionIds: toUndo, childId }),
+        })
+        // #region agent log
+        fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '68797e' },
+          body: JSON.stringify({
+            sessionId: '68797e',
+            location: 'ChildScreen.tsx:handleRapidTapDeny:api',
+            message: 'undo_burst_res',
+            data: { status: res.status, ok: res.ok },
+            timestamp: Date.now(),
+            hypothesisId: 'H-deny',
+          }),
+        }).catch(() => {})
+        // #endregion
+        /** 성공/실패 모두 refresh 로 서버 기준 child_stats·daily_missions 와 맞춥니다 */
+        router.refresh()
+      } catch {
+        router.refresh()
+      }
+    })()
+  }, [childId, router])
 
   // ── 스티커 상태 ────────────────────────────────────────────────────────────
 
@@ -1285,6 +1413,7 @@ export default function ChildScreen({
                   <ChildMissionCard
                     key={mission.id}
                     mission={mission}
+                    tapResetKey={missionTapUnblock[mission.id] ?? 0}
                     onComplete={handleMissionComplete}
                   />
                 ))}
