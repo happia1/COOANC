@@ -10,6 +10,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
+import { getAuthUserWithRetry } from '@/lib/supabaseGetUserRetry'
 import {
   pruneAcknowledgedToCurrentPending,
   readAcknowledgedPurchaseRequestIds,
@@ -52,13 +53,16 @@ export default function ParentRoutineAlarmButton({ initialPendingApprovalCount }
     setAcknowledgedIds(readAcknowledgedPurchaseRequestIds())
   }, [])
 
-  const refreshPendingPurchaseRows = useCallback(async () => {
+  /**
+   * `getUser` + `family_links` 를 **한 번만** 쓰고, 구매 대기 + 연속 탭 알림을 같이 갱신합니다.
+   * (동시에 `getUser` 두 번 호출 시 Auth storage 락 충돌로 런타임 오류가 나던 이슈 완화)
+   */
+  const refreshBellHubData = useCallback(async () => {
     const supabase = createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    const user = await getAuthUserWithRetry(supabase)
     if (!user) {
       setPendingRequestIds([])
+      setRapidTapAlerts([])
       setFetchDone(true)
       return
     }
@@ -66,61 +70,45 @@ export default function ParentRoutineAlarmButton({ initialPendingApprovalCount }
     const childIds = (links ?? []).map((r: { child_id: string }) => r.child_id)
     if (childIds.length === 0) {
       setPendingRequestIds([])
+      setRapidTapAlerts([])
       setFetchDone(true)
       return
     }
-    const { data, error } = await supabase
-      .from('purchase_requests')
-      .select('id')
-      .in('child_id', childIds)
-      .in('status', ['pending', 'parent_buying'])
-    if (error) {
-      console.warn('[parent bell hub] pending rows:', error.message)
-      setFetchDone(true)
-      return
-    }
-    const ids = (data ?? []).map((r: { id: string }) => r.id)
-    setPendingRequestIds(ids)
-    setAcknowledgedIds((prev) => {
-      const pruned = pruneAcknowledgedToCurrentPending(prev, ids)
-      if (pruned.size !== prev.size) writeAcknowledgedPurchaseRequestIds(pruned)
-      return pruned
-    })
-    setFetchDone(true)
-  }, [])
-
-  /**
-   * 최근 10분 이내 미확인 연속 탭 알림을 조회합니다.
-   * purchase_requests 폴링과 동일한 주기(30초)로 실행합니다.
-   */
-  const refreshRapidTapAlerts = useCallback(async () => {
-    const supabase = createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) return
-
-    const { data: links } = await supabase
-      .from('family_links')
-      .select('child_id')
-      .eq('parent_id', user.id)
-    const childIds = (links ?? []).map((r: { child_id: string }) => r.child_id)
-    if (childIds.length === 0) return
-
-    /** 10분 이내 미확인 알림만 조회합니다 */
     const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString()
-    const { data } = await supabase
-      .from('rapid_tap_alerts')
-      .select('id, child_id, detected_at, mission_count')
-      .in('child_id', childIds)
-      .eq('acknowledged', false)
-      .gte('detected_at', tenMinutesAgo)
-      .order('detected_at', { ascending: false })
-      .limit(5)
-
-    setRapidTapAlerts(
-      (data ?? []) as { id: string; child_id: string; detected_at: string; mission_count: number }[],
-    )
+    const [purchaseRes, rapidRes] = await Promise.all([
+      supabase
+        .from('purchase_requests')
+        .select('id')
+        .in('child_id', childIds)
+        .in('status', ['pending', 'parent_buying']),
+      supabase
+        .from('rapid_tap_alerts')
+        .select('id, child_id, detected_at, mission_count')
+        .in('child_id', childIds)
+        .eq('acknowledged', false)
+        .gte('detected_at', tenMinutesAgo)
+        .order('detected_at', { ascending: false })
+        .limit(5),
+    ])
+    if (purchaseRes.error) {
+      console.warn('[parent bell hub] pending rows:', purchaseRes.error.message)
+    } else {
+      const ids = (purchaseRes.data ?? []).map((r: { id: string }) => r.id)
+      setPendingRequestIds(ids)
+      setAcknowledgedIds((prev) => {
+        const pruned = pruneAcknowledgedToCurrentPending(prev, ids)
+        if (pruned.size !== prev.size) writeAcknowledgedPurchaseRequestIds(pruned)
+        return pruned
+      })
+    }
+    if (rapidRes.error) {
+      console.warn('[parent bell hub] rapid_tap_alerts:', rapidRes.error.message)
+    } else {
+      setRapidTapAlerts(
+        (rapidRes.data ?? []) as { id: string; child_id: string; detected_at: string; mission_count: number }[],
+      )
+    }
+    setFetchDone(true)
   }, [])
 
   /** 연속 탭 알림을 확인 처리합니다(acknowledged = true). */
@@ -136,16 +124,13 @@ export default function ParentRoutineAlarmButton({ initialPendingApprovalCount }
   }, [rapidTapAlerts])
 
   useEffect(() => {
-    void refreshPendingPurchaseRows()
-    void refreshRapidTapAlerts()
+    void refreshBellHubData()
     const interval = window.setInterval(() => {
-      void refreshPendingPurchaseRows()
-      void refreshRapidTapAlerts()
+      void refreshBellHubData()
     }, 30000)
     const onVisible = () => {
       if (document.visibilityState === 'visible') {
-        void refreshPendingPurchaseRows()
-        void refreshRapidTapAlerts()
+        void refreshBellHubData()
       }
     }
     window.addEventListener('focus', onVisible)
@@ -155,7 +140,7 @@ export default function ParentRoutineAlarmButton({ initialPendingApprovalCount }
       window.removeEventListener('focus', onVisible)
       document.removeEventListener('visibilitychange', onVisible)
     }
-  }, [refreshPendingPurchaseRows, refreshRapidTapAlerts])
+  }, [refreshBellHubData])
 
   /** 아직 시트에서 확인하지 않은 대기 요청만 */
   const unreadPendingIds = useMemo(

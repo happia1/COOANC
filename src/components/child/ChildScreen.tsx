@@ -1245,7 +1245,7 @@ export default function ChildScreen({
             style={{ paddingBottom: 'max(20px, env(safe-area-inset-bottom))' }}
           >
             {/* 미션 헤더 — 우측 하트는 상단 배지와 중복되므로 완료 카운트만 표시 */}
-            <div className="mb-2 flex shrink-0 items-center justify-between px-5">
+            <div className="mb-2 flex shrink-0 items-center justify-between px-5 min-[400px]:px-6">
               <p className="text-[clamp(0.875rem,calc(0.8rem+0.2vw),1.125rem)] font-black text-white drop-shadow">
                 오늘의 미션
               </p>
@@ -1258,7 +1258,7 @@ export default function ChildScreen({
 
             {/* 미션 카드 가로 스크롤 */}
             {visibleMissions.length === 0 ? (
-              <div className="px-5">
+              <div className="px-5 min-[400px]:px-6">
                 <div className="bg-white/80 backdrop-blur-sm rounded-2xl px-4 py-5 text-center">
                   <p className="font-bold text-gray-600 text-sm">아직 미션이 없어요</p>
                   <p className="text-xs text-gray-400 mt-1">부모님이 미션을 만들어주실 거예요!</p>
@@ -1266,10 +1266,10 @@ export default function ChildScreen({
               </div>
             ) : incompleteOrdered.length === 0 ? (
               // 전부 완료 시 인라인 배너는 쓰지 않음 — 축하는 AllMissionCompleteOverlay 한 곳에서만 처리
-              <div className="px-5 shrink-0" aria-hidden />
+              <div className="shrink-0 px-5 min-[400px]:px-6" aria-hidden />
             ) : (
               <div
-                className="flex snap-x snap-mandatory flex-row overflow-x-auto px-5 pb-3 pt-1 [scrollbar-width:none] [gap:clamp(0.75rem,calc(0.5rem+0.9vw),1.25rem)] [&::-webkit-scrollbar]:hidden"
+                className="flex snap-x snap-mandatory flex-row overflow-x-auto px-5 pb-3 pt-1 min-[400px]:px-6 [scrollbar-width:none] [scroll-padding-left:1.25rem] [scroll-padding-right:1.25rem] min-[400px]:[scroll-padding-left:1.5rem] min-[400px]:[scroll-padding-right:1.5rem] [gap:clamp(0.75rem,calc(0.5rem+0.9vw),1.25rem)] [&::-webkit-scrollbar]:hidden"
                 style={{ WebkitOverflowScrolling: 'touch' }}
               >
                 {incompleteOrdered.map((mission) => (
