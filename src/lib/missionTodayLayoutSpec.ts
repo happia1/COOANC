@@ -94,6 +94,45 @@ export const MISSION_CARD_SCROLLER_CLASSNAME =
   'flex min-h-0 min-w-0 w-full flex-none snap-x snap-mandatory items-start gap-0.5 overflow-x-auto py-0 pl-2 pr-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden' as const
 
 /**
+ * ━━ 자녀 홈(캐릭터) 하단 「오늘의 미션」카드 — 뷰포트가 모바일→태블릿으로 커질수록 **최대 2배**까지 유동 확대
+ * - 360px(22.5rem) 이하: 기준(150×116 카드) — 1.0
+ * - 900px(56.25rem) 이상: 300×232 — 2.0
+ * - 그 사이: 선형 보간. `100vw-22.5rem`이 음수면 max(0,…)로 360 이하에서 흔들리지 않음
+ */
+export const CHILD_HOME_MISSION_FLUID_VW = { minPx: 360, maxPx: 900 } as const
+
+/** 9.375→18.75rem: (18.75-9.375)/33.75 = 5/18 */
+export const CHILD_HOME_MISSION_CARD_WIDTH_CLAMP_CLASS =
+  'w-[clamp(9.375rem,calc(9.375rem+max(0px,100vw-22.5rem)*0.2777777778),18.75rem)]' as const
+
+/** 7.25→14.5rem: 7.25/33.75 */
+export const CHILD_HOME_MISSION_CARD_IMAGE_BOX_CLAMP_CLASS =
+  'h-[clamp(7.25rem,calc(7.25rem+max(0px,100vw-22.5rem)*0.2148148148),14.5rem)] w-[clamp(7.25rem,calc(7.25rem+max(0px,100vw-22.5rem)*0.2148148148),14.5rem)]' as const
+
+/**
+ * 스프라이트(PNG)는 `clamp`만으로는 픽셀 width 를 정해야 해서, 카드와 같은 구간(360→900)으로 보간합니다.
+ * (최소 108px, 최대 216px = 2×)
+ */
+export function childHomeMissionSpriteWidthPx(viewportWidth: number): number {
+  const { minPx, maxPx } = CHILD_HOME_MISSION_FLUID_VW
+  const minS = 108
+  const maxS = 216
+  if (viewportWidth <= minPx) return minS
+  if (viewportWidth >= maxPx) return maxS
+  return Math.round(minS + ((maxS - minS) * (viewportWidth - minPx)) / (maxPx - minPx))
+}
+
+/** 보상 아이콘 — 카드가 커질수록 키움(13→26, 2×) */
+export function childHomeMissionRewardIconSizePx(viewportWidth: number): number {
+  const { minPx, maxPx } = CHILD_HOME_MISSION_FLUID_VW
+  const minI = 13
+  const maxI = 26
+  if (viewportWidth <= minPx) return minI
+  if (viewportWidth >= maxPx) return maxI
+  return Math.round(minI + ((maxI - minI) * (viewportWidth - minPx)) / (maxPx - minPx))
+}
+
+/**
  * 자녀 앱 「오늘의 미션」 카드 — 오전 루틴: 연한 노란 그림자 / 오후 루틴: 연한 파란 그림자.
  * (`isAfternoonMission` 과 함께 쓰며, 부모 앱 루틴 편집 UI에는 사용하지 않습니다.)
  */

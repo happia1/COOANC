@@ -1245,10 +1245,12 @@ export default function ChildScreen({
             style={{ paddingBottom: 'max(20px, env(safe-area-inset-bottom))' }}
           >
             {/* 미션 헤더 — 우측 하트는 상단 배지와 중복되므로 완료 카운트만 표시 */}
-            <div className="flex items-center justify-between px-5 mb-2 shrink-0">
-              <p className="text-white font-black text-sm drop-shadow">오늘의 미션</p>
+            <div className="mb-2 flex shrink-0 items-center justify-between px-5">
+              <p className="text-[clamp(0.875rem,calc(0.8rem+0.2vw),1.125rem)] font-black text-white drop-shadow">
+                오늘의 미션
+              </p>
               {visibleMissions.length > 0 && (
-                <span className="text-white/80 text-xs font-bold drop-shadow">
+                <span className="text-[clamp(0.7rem,calc(0.65rem+0.12vw),0.85rem)] font-bold text-white/80 drop-shadow">
                   {visibleMissions.filter((dm) => done.has(dm.id)).length}/{visibleMissions.length}
                 </span>
               )}
@@ -1267,7 +1269,7 @@ export default function ChildScreen({
               <div className="px-5 shrink-0" aria-hidden />
             ) : (
               <div
-                className="flex flex-row gap-3 overflow-x-auto px-5 pb-3 pt-1 snap-x snap-mandatory [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                className="flex snap-x snap-mandatory flex-row overflow-x-auto px-5 pb-3 pt-1 [scrollbar-width:none] [gap:clamp(0.75rem,calc(0.5rem+0.9vw),1.25rem)] [&::-webkit-scrollbar]:hidden"
                 style={{ WebkitOverflowScrolling: 'touch' }}
               >
                 {incompleteOrdered.map((mission) => (

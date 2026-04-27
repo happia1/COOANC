@@ -9,7 +9,7 @@
  *   상위(ChildScreen)에서 컨페티·코인 파티클로 축하합니다.
  */
 
-import { useRef } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import SpriteImage from '@/components/common/SpriteImage'
 import { MISSION_ROUTINES_ATLAS } from '@/constants/missionRoutineAtlas'
 import { scaledMissionRewards } from '@/lib/missionRewardMultiplier'
@@ -18,6 +18,11 @@ import { missionRoutineIconFrame } from '@/lib/missionRoutineIconFrame'
 import { resolveRoutineMissionPngUrl } from '@/lib/routineMissionThumbnail'
 import { isAfternoonMission } from '@/lib/missionAmPm'
 import {
+  CHILD_HOME_MISSION_CARD_IMAGE_BOX_CLAMP_CLASS,
+  CHILD_HOME_MISSION_CARD_WIDTH_CLAMP_CLASS,
+  CHILD_HOME_MISSION_FLUID_VW,
+  childHomeMissionRewardIconSizePx,
+  childHomeMissionSpriteWidthPx,
   CHILD_TODAY_MISSION_CARD_AM_SHADOW_CLASSNAME,
   CHILD_TODAY_MISSION_CARD_PM_SHADOW_CLASSNAME,
 } from '@/lib/missionTodayLayoutSpec'
@@ -49,10 +54,27 @@ type Props = {
  * - 카드를 한 번 탭하면 부모가 처리하는 동안 같은 그림이 잠깐 보이다가 사라집니다(별도 “완료 팝업” 없음).
  */
 export default function ChildMissionCard({ mission, onComplete }: Props) {
+  /** 뷰포트 너비 — 스프라이트·아이콘은 픽셀 지정이 필요해 `clamp` 와 같은 360~900 구간으로 맞춥니다 */
+  const [vw, setVw] = useState(
+    () =>
+      typeof window !== 'undefined' && Number.isFinite(window.innerWidth)
+        ? window.innerWidth
+        : CHILD_HOME_MISSION_FLUID_VW.minPx,
+  )
+  useLayoutEffect(() => {
+    const onResize = () => setVw(window.innerWidth)
+    onResize()
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+
   /** 한 카드에 대해 완료 요청을 한 번만 보내기 위한 잠금(연속 탭·중복 호출 방지) */
   const firedRef = useRef(false)
   /** 카드 DOM 참조 — 파티클·컨페티 출발 좌표(getBoundingClientRect) 계산에 사용 */
   const cardRef = useRef<HTMLButtonElement>(null)
+
+  const spriteW = childHomeMissionSpriteWidthPx(vw)
+  const rewardIconPx = childHomeMissionRewardIconSizePx(vw)
 
   const m = mission.missions
   if (!m) return null
@@ -97,16 +119,15 @@ export default function ChildMissionCard({ mission, onComplete }: Props) {
         onClick={handleTap}
         aria-label={`${m.title} 미션 완료하기`}
         className={[
-          'flex w-[150px] flex-col items-center gap-3 rounded-2xl border px-3 pt-4 pb-3 transition-all duration-300 focus:outline-none active:scale-[0.97]',
+          // 모바일 기준 너비 + 뷰포트가 넓어질수록 최대 2배( missionTodayLayoutSpec 의 clamp )
+          'flex flex-col items-center gap-[clamp(0.75rem,calc(0.55rem+0.55vw),1.125rem)] rounded-2xl border px-3 pt-4 pb-3 transition-all duration-300 focus:outline-none active:scale-[0.97]',
+          CHILD_HOME_MISSION_CARD_WIDTH_CLAMP_CLASS,
           timeShadow,
           cardBg,
         ].join(' ')}
       >
-        {/* ── 이미지 컨테이너 116×116px ── */}
-        <div className={[
-          'flex h-[116px] w-[116px] shrink-0 items-center justify-center rounded-2xl overflow-hidden',
-          imgBg,
-        ].join(' ')}>
+        {/* ── 이미지 컨테이너 — 116px 기준에서 뷰포트에 따라 최대 232px(2×) ── */}
+        <div className={['flex shrink-0 items-center justify-center rounded-2xl overflow-hidden', CHILD_HOME_MISSION_CARD_IMAGE_BOX_CLAMP_CLASS, imgBg].join(' ')}>
           {routineImagePath ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -119,7 +140,7 @@ export default function ChildMissionCard({ mission, onComplete }: Props) {
             <SpriteImage
               sheet={MISSION_ROUTINES_ATLAS}
               frame={routineFrame}
-              width={108}
+              width={spriteW}
               clipRotated={false}
               className="select-none"
             />
@@ -127,18 +148,20 @@ export default function ChildMissionCard({ mission, onComplete }: Props) {
         </div>
 
         {/* ── 미션명 (한 줄 고정) ── */}
-        <p className="w-full text-center text-sm font-bold leading-snug text-gray-800 line-clamp-1">{m.title}</p>
+        <p className="w-full text-center font-bold leading-snug text-gray-800 line-clamp-1 text-[clamp(0.875rem,calc(0.8rem+0.15vw),1.0625rem)]">
+          {m.title}
+        </p>
 
         {/** 부모 루틴·미션 탭과 동일: 크레딧·애정 하트(경험치 별은 카드에 비표시) — `scaledMissionRewards` */}
         <div
           className={[
-            'inline-flex max-w-full flex-wrap items-center justify-center gap-x-1 gap-y-0.5 rounded-full px-2.5 py-1 text-[11px] font-black tabular-nums tracking-tight text-[#888888] shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] ring-1 ring-black/[0.06]',
+            'inline-flex max-w-full flex-wrap items-center justify-center gap-x-1 gap-y-0.5 rounded-full px-2.5 py-1 font-black tabular-nums tracking-tight text-[#888888] shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] ring-1 ring-black/[0.06] text-[clamp(0.6875rem,calc(0.65rem+0.1vw),0.8125rem)]',
             special ? 'bg-amber-100/90' : 'bg-stone-100/95',
           ].join(' ')}
         >
           <MissionRewardIconTriple
             reward={rewards}
-            iconSize={13}
+            iconSize={rewardIconPx}
             className="flex flex-wrap items-center justify-center gap-x-1 gap-y-0.5"
           />
         </div>
