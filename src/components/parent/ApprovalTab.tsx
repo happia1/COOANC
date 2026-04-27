@@ -4,7 +4,7 @@
  * 부모 앱 — 승인 탭
  * - 상단은 루틴 탭과 같은 자녀 프로필 카드 + 다자녀 전환(스토어 selectedChildId 공유); 프로필 카드 탭 시 자녀 앱 화면으로 진입(홈과 동일 API).
  * - 구매 요청·미션 롤백은 선택 중인 자녀 기준으로만 표시합니다.
- * - 구매 요청: 대기·외부구매 중 카드 아래에 승인 내역 진입 카드(탭 시 하단 시트, 최근 3건 + 더보기, 이미지 없음).
+ * - 구매 요청: 대기·외부구매 중 — 「받았어요 ✓」로 도착 완료 처리(반려 없음). 아래 승인 내역에서 과거 건 확인.
  * - 미션 롤백: 카드 탭 시 하단 시트(스크롤, 10건까지 + 더보기). 「다시하기」는 API 즉시 롤백 후 자녀에게 브로드캐스트 알림.
  * - 미션 롤백 아래: 자녀 마켓 메뉴 제어(상품 표시/숨김, 가족 전용 상품 추가).
  */
@@ -36,13 +36,6 @@ const MISSION_LOG_SELECT_FOR_LIST =
 
 /** 미션 롤백 시트에서 먼저 보여 줄 개수 — 그 이상은 「더보기」 */
 const ROLLBACK_SHEET_INITIAL = 10
-
-const REJECT_PRESETS = [
-  '아직은 너무 일러요',
-  '다음 기회에 사자',
-  '다른 걸 먼저 모아봐',
-  '엄마·아빠랑 같이 가서 고르자',
-]
 
 /** 부모 화면에 쌓는 승인 내역(처리 종료 요청) 상한 — 서버도 동일 개수로 내려줍니다 */
 const MAX_PARENT_REQUEST_HISTORY = 100
@@ -203,9 +196,7 @@ export default function ApprovalTab({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- 초기 맵은 JSON 키에 전부 직렬화됨
   }, [creditOverridesInitialKey])
 
-  const [rejectModal, setRejectModal] = useState<{ requestId: string; itemName: string } | null>(null)
-  const [rejectNote, setRejectNote] = useState('')
-  /** 「승인」클릭 시 — 바로 승인 vs 외부 쇼핑몰 안내(자녀 화면 별도 팝업) */
+  /** 「받았어요」클릭 시 — 바로 도착 완료 vs 외부 쇼핑몰 안내(자녀 화면 별도 팝업) */
   const [approveChoiceModal, setApproveChoiceModal] = useState<{ requestId: string; itemName: string } | null>(
     null,
   )
@@ -494,7 +485,7 @@ export default function ApprovalTab({
         prev.map((r) => (r.id === requestId ? { ...r, status: 'parent_buying' as const } : r)),
       )
       window.open(PARENT_EXTERNAL_SHOP_URL, '_blank', 'noopener,noreferrer')
-      showToast('쇼핑 페이지를 열었어요. 주문 후 「배달 승인」을 눌러 주세요.')
+      showToast('쇼핑 페이지를 열었어요. 주문 후 「받았어요 ✓」을 눌러 주세요.')
     } catch {
       showToast('네트워크 오류가 발생했어요', false)
     } finally {
@@ -523,56 +514,16 @@ export default function ApprovalTab({
         return prev.filter((r) => r.id !== requestId)
       })
       if (movedToHistory) {
+        const at = new Date().toISOString()
         setHistoryRequests((h) =>
           mergeParentRequestHistory(h, {
             ...movedToHistory,
-            status: 'approved',
-            approved_at: new Date().toISOString(),
+            status: 'delivered',
+            approved_at: at,
           }),
         )
       }
-      showToast('승인했어요. 자녀에게 전달됩니다.')
-    } catch {
-      showToast('네트워크 오류가 발생했어요', false)
-    } finally {
-      setLoading(null)
-    }
-  }
-
-  async function handleReject() {
-    if (!rejectModal) return
-    setLoading(rejectModal.requestId)
-    try {
-      const res = await fetch('/api/market/approve', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          requestId: rejectModal.requestId,
-          action: 'reject',
-          parentNote: rejectNote || null,
-        }),
-      })
-      const text = await res.text()
-      const json = text ? JSON.parse(text) : {}
-      if (!res.ok) {
-        showToast(json.error ?? '오류가 발생했어요', false)
-        return
-      }
-      const rid = rejectModal.requestId
-      const note = rejectNote || null
-      let rejectedRow: PurchaseRequest | undefined
-      setRequests((prev) => {
-        rejectedRow = prev.find((r) => r.id === rid)
-        return prev.filter((r) => r.id !== rid)
-      })
-      if (rejectedRow) {
-        setHistoryRequests((h) =>
-          mergeParentRequestHistory(h, { ...rejectedRow, status: 'rejected', parent_note: note }),
-        )
-      }
-      setRejectModal(null)
-      setRejectNote('')
-      showToast('반려 처리했어요.')
+      showToast('받음 처리했어요. 자녀 화면에 반영됩니다.')
     } catch {
       showToast('네트워크 오류가 발생했어요', false)
     } finally {
@@ -663,9 +614,9 @@ export default function ApprovalTab({
                   setApproveChoiceModal(null)
                   void handleApprove(id)
                 }}
-                className="w-full rounded-2xl bg-brand-blue py-3.5 text-sm font-black text-white shadow-md active:scale-[0.98] disabled:opacity-50"
+                className="w-full rounded-xl bg-green-500 px-4 py-2 text-sm font-bold text-white shadow-md active:scale-[0.98] disabled:opacity-50"
               >
-                네
+                받았어요 ✓
               </button>
               <button
                 type="button"
@@ -689,64 +640,6 @@ export default function ApprovalTab({
             </div>
           </div>
         </div>
-      )}
-
-      {rejectModal && (
-        <>
-          {/* 하단 독바보다 위(z-[100]) — 반려 시트가 가리지 않도록 */}
-          <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/40">
-            <div className="w-full max-w-md rounded-t-3xl bg-white p-6 shadow-2xl">
-              <p className="mb-1 text-base font-black text-brand-text">반려 사유 선택</p>
-              <p className="mb-4 text-xs text-gray-400">{rejectModal.itemName}</p>
-
-              <div className="mb-4 flex flex-col gap-2">
-                {REJECT_PRESETS.map((preset) => (
-                  <button
-                    key={preset}
-                    type="button"
-                    onClick={() => setRejectNote(preset)}
-                    className={`rounded-xl border px-4 py-2.5 text-left text-sm transition-all ${
-                      rejectNote === preset
-                        ? 'border-brand-blue bg-brand-blue/10 font-bold text-brand-blue'
-                        : 'border-gray-200 text-gray-600'
-                    }`}
-                  >
-                    {preset}
-                  </button>
-                ))}
-              </div>
-
-              <input
-                type="text"
-                placeholder="직접 입력하기"
-                value={rejectNote}
-                onChange={(e) => setRejectNote(e.target.value)}
-                className="mb-4 w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue/40"
-              />
-
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setRejectModal(null)
-                    setRejectNote('')
-                  }}
-                  className="flex-1 rounded-2xl border border-gray-200 py-3 text-sm font-bold text-gray-500"
-                >
-                  취소
-                </button>
-                <button
-                  type="button"
-                  onClick={handleReject}
-                  disabled={!!loading}
-                  className="flex-1 rounded-2xl bg-red-500 py-3 text-sm font-bold text-white shadow-md active:scale-95 disabled:opacity-50"
-                >
-                  반려하기
-                </button>
-              </div>
-            </div>
-          </div>
-        </>
       )}
 
       {/* ── 2컬럼 그리드 ────────────────────────────────────────────────────────
@@ -842,59 +735,41 @@ export default function ApprovalTab({
                           </p>
                           {isParentBuying && (
                             <p className="mt-1.5 text-[9px] font-bold leading-snug text-sky-700">
-                              외부에서 주문한 뒤 「배달 승인」으로 자녀에게 알려 주세요.
+                              외부에서 주문한 뒤 「받았어요 ✓」으로 자녀에게 알려 주세요.
                             </p>
                           )}
                         </div>
                       </div>
 
-                      {/* 승인·반려 버튼 */}
-                      <div className="flex w-[3.5rem] shrink-0 flex-col gap-1 self-center">
+                      {/* 받았어요(도착 완료) — 반려는 제거됨 */}
+                      <div className="flex shrink-0 flex-col gap-1 self-center">
                         {isParentBuying ? (
                           <>
                             <button
                               type="button"
                               onClick={(e) => { e.stopPropagation(); void handleApprove(req.id) }}
                               disabled={loading === req.id}
-                              className="w-full rounded-lg bg-brand-blue py-1 text-[9px] font-bold text-white shadow-sm transition-all active:scale-95 disabled:opacity-50"
+                              className="rounded-xl bg-green-500 px-4 py-2 text-[10px] font-bold text-white shadow-sm transition-all active:scale-95 disabled:opacity-50"
                             >
-                              {loading === req.id ? '…' : '배달 승인'}
+                              {loading === req.id ? '…' : '받았어요 ✓'}
                             </button>
                             <button
                               type="button"
                               onClick={(e) => { e.stopPropagation(); window.open(PARENT_EXTERNAL_SHOP_URL, '_blank', 'noopener,noreferrer') }}
-                              className="w-full rounded-lg bg-amber-500 py-1 text-[9px] font-bold text-white shadow-sm transition-all active:scale-95"
+                              className="rounded-xl bg-amber-500 px-4 py-2 text-[10px] font-bold text-white shadow-sm transition-all active:scale-95"
                             >
                               쿠팡 열기
                             </button>
-                            <button
-                              type="button"
-                              onClick={(e) => { e.stopPropagation(); setRejectModal({ requestId: req.id, itemName: req.item_name }) }}
-                              disabled={loading === req.id}
-                              className="w-full rounded-lg border border-red-200 py-1 text-[9px] font-bold text-red-500 transition-all active:scale-95 disabled:opacity-50"
-                            >
-                              반려
-                            </button>
                           </>
                         ) : (
-                          <>
-                            <button
-                              type="button"
-                              onClick={(e) => { e.stopPropagation(); setApproveChoiceModal({ requestId: req.id, itemName: req.item_name }) }}
-                              disabled={loading === req.id}
-                              className="w-full rounded-lg bg-brand-blue py-1 text-[9px] font-bold text-white shadow-sm transition-all active:scale-95 disabled:opacity-50"
-                            >
-                              승인
-                            </button>
-                            <button
-                              type="button"
-                              onClick={(e) => { e.stopPropagation(); setRejectModal({ requestId: req.id, itemName: req.item_name }) }}
-                              disabled={loading === req.id}
-                              className="w-full rounded-lg border border-red-200 py-1 text-[9px] font-bold text-red-500 transition-all active:scale-95 disabled:opacity-50"
-                            >
-                              반려
-                            </button>
-                          </>
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); setApproveChoiceModal({ requestId: req.id, itemName: req.item_name }) }}
+                            disabled={loading === req.id}
+                            className="rounded-xl bg-green-500 px-4 py-2 text-[10px] font-bold text-white shadow-sm transition-all active:scale-95 disabled:opacity-50"
+                          >
+                            받았어요 ✓
+                          </button>
                         )}
                       </div>
                     </div>
