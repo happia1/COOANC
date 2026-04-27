@@ -103,9 +103,6 @@ export default function ChildMissionCard({ mission, onComplete, tapResetKey = 0 
 
   function handleTap() {
     if (firedRef.current) {
-      // #region agent log
-      fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'68797e'},body:JSON.stringify({sessionId:'68797e',location:'ChildMissionCard.tsx:handleTap',message:'ignored_second_tap',data:{dmId:mission.id},timestamp:Date.now(),hypothesisId:'H5'})}).catch(()=>{})
-      // #endregion
       return
     }
     firedRef.current = true
@@ -125,6 +122,14 @@ export default function ChildMissionCard({ mission, onComplete, tapResetKey = 0 
   const cardBg = special
     ? 'border-amber-300 bg-gradient-to-b from-amber-50/80 via-amber-100/80 to-yellow-200/80 ring-2 ring-amber-200/60'
     : 'border-[#ede9e0] bg-white/80 backdrop-blur-sm'
+
+  /** 보상 알약·아이콘 행 클래스 — 한 곳에서만 조합해 스타일이 어긋나지 않게 함 */
+  const rewardPillClassName = [
+    '-mt-1.5 inline-flex max-w-full flex-wrap items-center justify-center gap-x-2 gap-y-0.5 rounded-full px-4 py-1 font-black tabular-nums tracking-tight text-[#888888] shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] ring-1 ring-black/[0.06] text-[clamp(0.8125rem,calc(0.75rem+0.14vw),1rem)]',
+    special ? 'bg-amber-100/90' : 'bg-stone-100/95',
+  ].join(' ')
+  const rewardTripleClassName =
+    'flex flex-wrap items-center justify-center gap-x-2 gap-y-0.5'
 
   return (
     <div className="relative snap-start shrink-0">
@@ -176,19 +181,14 @@ export default function ChildMissionCard({ mission, onComplete, tapResetKey = 0 
         </p>
 
         {/**
-         * 크레딧·하트 알약 — 숫자·아이콘을 살짝 키워 가독성만 보강(카드 전체 비율은 유지).
-         * `-mt-1`: flex gap 만으로는 제목과 칩 사이가 넓어 보여서, 칩만 아주 조금 위로 당깁니다.
+         * 크레딧·하트 알약 — 가로·글자·아이콘은 유지하고 세로는 `py-1` 로 더 낮춤.
+         * `-mt-1.5`: 제목과 알약 사이를 조금 더 좁혀 칩을 위로 당깁니다.
          */}
-        <div
-          className={[
-            '-mt-1 inline-flex max-w-full flex-wrap items-center justify-center gap-x-1.5 gap-y-0.5 rounded-full px-3 py-1.5 font-black tabular-nums tracking-tight text-[#888888] shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] ring-1 ring-black/[0.06] text-[clamp(0.75rem,calc(0.7rem+0.12vw),0.875rem)]',
-            special ? 'bg-amber-100/90' : 'bg-stone-100/95',
-          ].join(' ')}
-        >
+        <div className={rewardPillClassName}>
           <MissionRewardIconTriple
             reward={rewards}
             iconSize={rewardIconPx}
-            className="flex flex-wrap items-center justify-center gap-x-1.5 gap-y-0.5"
+            className={rewardTripleClassName}
           />
         </div>
       </button>

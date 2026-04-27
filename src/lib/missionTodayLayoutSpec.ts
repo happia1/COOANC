@@ -123,13 +123,13 @@ export function childHomeMissionSpriteWidthPx(viewportWidth: number): number {
 }
 
 /**
- * 보상 아이콘 — 카드가 커질수록 키움(15→20, 카드 본체 1.3× 스케일보다 알약만 한 단계 더 키운 값).
- * 비개발자: 동전·하트 그림이 조금 더 잘 보이게 픽셀만 살짝 올린 것입니다.
+ * 보상 아이콘 — 카드가 커질수록 키움(18→26, 알약·숫자와 함께 한 단계 더 크게).
+ * 비개발자: 오늘의 미션 카드 맨 아래 동전·하트 그림을 더 잘 보이게 한 것입니다.
  */
 export function childHomeMissionRewardIconSizePx(viewportWidth: number): number {
   const { minPx, maxPx } = CHILD_HOME_MISSION_FLUID_VW
-  const minI = 15
-  const maxI = 20
+  const minI = 18
+  const maxI = 26
   if (viewportWidth <= minPx) return minI
   if (viewportWidth >= maxPx) return maxI
   return Math.round(minI + ((maxI - minI) * (viewportWidth - minPx)) / (maxPx - minPx))

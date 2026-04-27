@@ -275,29 +275,6 @@ export default async function ChildHomePage() {
 
   const dailyMissions = existing
 
-  // #region agent log — 디버그: 롤백 후에도 자녀 홈 SSR이 내려주는 완료 수·조인 여부
-  {
-    fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '2793a5' },
-      body: JSON.stringify({
-        sessionId: '2793a5',
-        hypothesisId: 'R-SSR',
-        location: 'home/page.tsx:ChildHomePage',
-        message: 'child home daily_missions SSR snapshot',
-        data: {
-          routineType,
-          poolLen: pool.length,
-          totalDm: dailyMissions.length,
-          completedDm: dailyMissions.filter((dm) => dm.is_completed).length,
-          orphanJoin: dailyMissions.filter((dm) => !dm.missions).length,
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {})
-  }
-  // #endregion
-
   // ── 마켓 ─────────────────────────────────────────────────────────────────
 
   const familyLinkIds = new Set(familyRows.map((r) => r.id))

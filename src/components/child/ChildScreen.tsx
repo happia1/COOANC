@@ -415,28 +415,6 @@ export default function ChildScreen({
   useEffect(() => {
     setMissionList(dailyMissions)
     setDone(new Set(dailyMissions.filter((dm) => dm.is_completed).map((dm) => dm.id)))
-    // #region agent log — 디버그: 롤백 직후에도 props가 옛 완료 상태인지(새로고침 전 스테일) 확인
-    {
-      const completed = dailyMissions.filter((dm) => dm.is_completed).length
-      fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '2793a5' },
-        body: JSON.stringify({
-          sessionId: '2793a5',
-          hypothesisId: 'R-CLIENT',
-          location: 'ChildScreen.tsx:dailyMissionsSync',
-          message: 'ChildScreen props snapshot',
-          data: {
-            today,
-            totalDm: dailyMissions.length,
-            completedDm: completed,
-            orphanJoin: dailyMissions.filter((dm) => !dm.missions).length,
-          },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {})
-    }
-    // #endregion
   }, [dailyMissions, today])
 
   /** 날짜(오늘)이 바뀌면 축하·누적 코인 상태를 초기화합니다. */
@@ -485,9 +463,6 @@ export default function ChildScreen({
     }
 
     function finishRollbackUi(dmId: string, snapshot: DailyMissionWithTemplate) {
-      // #region agent log
-      fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'68797e'},body:JSON.stringify({sessionId:'68797e',location:'ChildScreen.tsx:finishRollbackUi',message:'realtime_rollback',data:{dmId,isCompletedSnap:snapshot.is_completed},timestamp:Date.now(),hypothesisId:'H4'})}).catch(()=>{})
-      // #endregion
       setDone((prevDone) => {
         const wasDone = prevDone.has(dmId)
         const wasCompletedOnRow = snapshot.is_completed
@@ -658,20 +633,6 @@ export default function ChildScreen({
       if (allowSleepReady && current === sleepReadyTimeHHMM && !sleepReadyShownRef.current) {
         sleepReadyShownRef.current = true
         setShowSleepReady(true)
-        // #region agent log
-        fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'c8e235' },
-          body: JSON.stringify({
-            sessionId: 'c8e235',
-            hypothesisId: 'H1',
-            location: 'ChildScreen.tsx:routineAlarmCheck',
-            message: 'sleep_ready popup triggered',
-            data: { current, isWeekend },
-            timestamp: Date.now(),
-          }),
-        }).catch(() => {})
-        // #endregion
       } else {
         const allowSchool =
           schoolTimeHHMM &&
@@ -680,20 +641,6 @@ export default function ChildScreen({
         if (allowSchool && current === schoolTimeHHMM && !schoolTimeShownRef.current) {
           schoolTimeShownRef.current = true
           setShowSchoolTime(true)
-          // #region agent log
-          fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'c8e235' },
-            body: JSON.stringify({
-              sessionId: 'c8e235',
-              hypothesisId: 'H2',
-              location: 'ChildScreen.tsx:routineAlarmCheck',
-              message: 'school_time popup triggered',
-              data: { current, isWeekend },
-              timestamp: Date.now(),
-            }),
-          }).catch(() => {})
-          // #endregion
         }
       }
     }
@@ -898,9 +845,6 @@ export default function ChildScreen({
           } catch {
             /* 응답이 JSON이 아니면 stats 동기화 생략 */
           }
-          // #region agent log
-          fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'68797e'},body:JSON.stringify({sessionId:'68797e',location:'ChildScreen.tsx:commitMissionComplete',message:'complete_api_res',data:{dmId:dm.id,status:res.status,ok:res.ok},timestamp:Date.now(),hypothesisId:'H3'})}).catch(()=>{})
-          // #endregion
           if (res.ok) {
             setStats((prev) => tryApplyCompletePayload(prev, json) ?? prev)
           } else {
@@ -944,9 +888,6 @@ export default function ChildScreen({
       heartReward: number,
     ) => {
       if (done.has(dm.id)) {
-        // #region agent log
-        fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'68797e'},body:JSON.stringify({sessionId:'68797e',location:'ChildScreen.tsx:handleMissionComplete',message:'skip_done',data:{dmId:dm.id},timestamp:Date.now(),hypothesisId:'H2'})}).catch(()=>{})
-        // #endregion
         return
       }
 
@@ -963,16 +904,9 @@ export default function ChildScreen({
       }
       recentTapTimestamps.current = [...filtered, now]
 
-      // #region agent log
-      fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'68797e'},body:JSON.stringify({sessionId:'68797e',location:'ChildScreen.tsx:handleMissionComplete',message:'rapid_tap_tick',data:{dmId:dm.id,tapLen:recentTapTimestamps.current.length,doneHas:done.has(dm.id),willModal:recentTapTimestamps.current.length>=5},timestamp:Date.now(),hypothesisId:'H2'})}).catch(()=>{})
-      // #endregion
-
       if (recentTapTimestamps.current.length >= 5) {
         /** 팝업 대기 중인 미션 정보를 저장하고 팝업을 엽니다 */
         pendingMissionRef.current = { dm, cardRect, creditReward, heartReward }
-        // #region agent log
-        fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'68797e'},body:JSON.stringify({sessionId:'68797e',location:'ChildScreen.tsx:handleMissionComplete',message:'open_rapid_modal',data:{dmId:dm.id},timestamp:Date.now(),hypothesisId:'H1'})}).catch(()=>{})
-        // #endregion
         setRapidTapModalOpen(true)
 
         /** 부모에게 연속 탭 알림을 백그라운드로 전송합니다 */
@@ -1034,27 +968,12 @@ export default function ChildScreen({
       }))
     }
 
-    // #region agent log
-    fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '68797e' },
-      body: JSON.stringify({
-        sessionId: '68797e',
-        location: 'ChildScreen.tsx:handleRapidTapDeny',
-        message: 'deny_rollback',
-        data: { toUndoCount: toUndo.length, toUndo, pendingDm: pending?.dm.id },
-        timestamp: Date.now(),
-        hypothesisId: 'H-deny',
-      }),
-    }).catch(() => {})
-    // #endregion
-
     if (toUndo.length === 0) return
 
     const idSet = new Set(toUndo)
     /**
      * 즉시 로컬에서 카드·완료 집합을 되돌려 눈에 보이는 지연을 줄입니다.
-     * 이후 API·refresh 로 서버 값과 맞춥니다.
+     * 이후 `/api/daily-mission/undo-burst` 로 DB를 맞춥니다(전부 실패 시에만 `router.refresh()`).
      */
     setMissionList((prev) => {
       let creditSub = 0
@@ -1090,21 +1009,24 @@ export default function ChildScreen({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ dailyMissionIds: toUndo, childId }),
         })
-        // #region agent log
-        fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '68797e' },
-          body: JSON.stringify({
-            sessionId: '68797e',
-            location: 'ChildScreen.tsx:handleRapidTapDeny:api',
-            message: 'undo_burst_res',
-            data: { status: res.status, ok: res.ok },
-            timestamp: Date.now(),
-            hypothesisId: 'H-deny',
-          }),
-        }).catch(() => {})
-        // #endregion
-        /** 성공/실패 모두 refresh 로 서버 기준 child_stats·daily_missions 와 맞춥니다 */
+        const raw = await res.text()
+        let body: { success?: boolean; failed?: { id: string; error: string }[] } = {}
+        try {
+          body = raw ? (JSON.parse(raw) as typeof body) : {}
+        } catch {
+          /* JSON 이 아니면 success 로 간주하지 않음 */
+        }
+        /**
+         * 전부 성공(`success: true`)일 때는 `router.refresh()`를 호출하지 않습니다.
+         * RSC/캐시가 잠시 스테일한 `daily_missions` 를 내려주면 useEffect( dailyMissions )가
+         * 방금 맞춘 `missionList`/`done` 을 `is_completed: true` 로 덮어써, 카드가 "잠깐 나왔다가 사라짐"처럼 보일 수 있기 때문입니다.
+         * 스탯은 기존 Realtime(child_stats) 구독이 서버 갱신을 따라갑니다.
+         */
+        const apiAllSucceeded = res.ok && body.success === true
+
+        if (apiAllSucceeded) {
+          return
+        }
         router.refresh()
       } catch {
         router.refresh()
