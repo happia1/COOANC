@@ -55,6 +55,7 @@ import MorningWakeScreen from '@/components/child/MorningWakeScreen'
 import SleepReadyPopup from '@/components/child/SleepReadyPopup'
 import SchoolTimePopup from '@/components/child/SchoolTimePopup'
 import { readRoutineAlarmPrefs } from '@/lib/routineAlarmLocalPrefs'
+import { resolveRoutineAlarmSoundUrl } from '@/lib/routineAlarmSounds'
 
 // ─── 파티클 타입 정의 ────────────────────────────────────────────────────────
 
@@ -1107,10 +1108,15 @@ export default function ChildScreen({
       />
 
       {showSchoolTime && !isSleeping && !showMorningWake ? (
-        <SchoolTimePopup childName={childName} onClose={() => setShowSchoolTime(false)} />
+        <SchoolTimePopup
+          childName={childName}
+          soundSrc={resolveRoutineAlarmSoundUrl(readRoutineAlarmPrefs().soundSchool)}
+          onClose={() => setShowSchoolTime(false)}
+        />
       ) : showSleepReady && !isSleeping && !showMorningWake ? (
         <SleepReadyPopup
           childName={childName}
+          soundSrc={resolveRoutineAlarmSoundUrl(readRoutineAlarmPrefs().soundSleepReady)}
           onGoMission={() => setShowSleepReady(false)}
           onClose={() => setShowSleepReady(false)}
         />

@@ -21,6 +21,30 @@ import { useParentStore } from '@/store/parentStore'
 
 type SoundItem = { id: string; label: string; url: string }
 
+/** 기본 루틴 알람 행 — 라벨·행 키·저장값이 없을 때 쓸 defaultSoundId (soundId = prefs ?? defaultSoundId) */
+type CoreRoutineRowKey = 'wake' | 'return' | 'sleep' | 'school' | 'sleepReady'
+
+const CORE_ROUTINE_ALARM_ITEMS: Array<{
+  row: CoreRoutineRowKey
+  label: string
+  defaultSoundId: string
+}> = [
+  { row: 'wake', label: '기상', defaultSoundId: 'morning_greet' },
+  { row: 'school', label: '등원', defaultSoundId: 'time_to_go' },
+  { row: 'return', label: '하원·귀가', defaultSoundId: 'good_morning' },
+  { row: 'sleepReady', label: '잘 준비', defaultSoundId: 'sleep_ready' },
+  { row: 'sleep', label: '취침', defaultSoundId: 'morning_alarm_birds' },
+]
+
+/** 행 키 → 기본 소리 id (API 목록 로드 후에도 prefs 가 비었을 때 폴백) */
+const CORE_DEFAULT_SOUND_BY_ROW: Record<CoreRoutineRowKey, string> = CORE_ROUTINE_ALARM_ITEMS.reduce(
+  (acc, item) => {
+    acc[item.row] = item.defaultSoundId
+    return acc
+  },
+  {} as Record<CoreRoutineRowKey, string>,
+)
+
 type SoundPickTarget =
   | { type: 'core'; row: 'wake' | 'return' | 'sleep' | 'school' | 'sleepReady' }
   | { type: 'custom'; index: number }
@@ -129,12 +153,11 @@ export default function RoutineAlarmSettingsSheet({ open, onClose }: Props) {
         if (cancelled) return
         const list = Array.isArray(j.sounds) ? j.sounds : []
         setAlarmSounds(list)
-        const first = list[0]?.id ?? ''
-        setSoundWake((prev) => prev || first)
-        setSoundReturn((prev) => prev || first)
-        setSoundSleep((prev) => prev || first)
-        setSoundSchool((prev) => prev || first)
-        setSoundSleepReady((prev) => prev || first)
+        setSoundWake((prev) => prev || CORE_DEFAULT_SOUND_BY_ROW.wake)
+        setSoundReturn((prev) => prev || CORE_DEFAULT_SOUND_BY_ROW.return)
+        setSoundSleep((prev) => prev || CORE_DEFAULT_SOUND_BY_ROW.sleep)
+        setSoundSchool((prev) => prev || CORE_DEFAULT_SOUND_BY_ROW.school)
+        setSoundSleepReady((prev) => prev || CORE_DEFAULT_SOUND_BY_ROW.sleepReady)
       })
       .catch(() => {})
     return () => {
@@ -184,14 +207,6 @@ export default function RoutineAlarmSettingsSheet({ open, onClose }: Props) {
     (id: string) => alarmSounds.find((s) => s.id === id)?.label ?? (id ? id : '소리'),
     [alarmSounds],
   )
-
-  const playPreview = useCallback((url: string) => {
-    try {
-      void new Audio(url).play()
-    } catch {
-      /* 무시 */
-    }
-  }, [])
 
   function openSoundPickerCore(row: 'wake' | 'return' | 'sleep' | 'school' | 'sleepReady') {
     const cur =
@@ -471,11 +486,7 @@ export default function RoutineAlarmSettingsSheet({ open, onClose }: Props) {
               <SoundToggleList
                 sounds={alarmSounds}
                 selectedId={pickerSound}
-                onSelect={(id) => {
-                  setPickerSound(id)
-                  const u = alarmSounds.find((s) => s.id === id)?.url
-                  if (u) playPreview(u)
-                }}
+                onSelect={(id) => setPickerSound(id)}
               />
               <div className="mt-4 flex gap-2">
                 <button
@@ -528,11 +539,7 @@ export default function RoutineAlarmSettingsSheet({ open, onClose }: Props) {
               <SoundToggleList
                 sounds={alarmSounds}
                 selectedId={addSound}
-                onSelect={(id) => {
-                  setAddSound(id)
-                  const u = alarmSounds.find((s) => s.id === id)?.url
-                  if (u) playPreview(u)
-                }}
+                onSelect={(id) => setAddSound(id)}
               />
               <div className="mt-4 flex gap-2">
                 <button
@@ -774,17 +781,37 @@ function SoundToggleList({
       {sounds.map((s) => {
         const on = selectedId === s.id
         return (
-          <button
+          <div
             key={s.id}
-            type="button"
-            onClick={() => onSelect(s.id)}
-            className={[
-              'rounded-full border px-2.5 py-1 text-[10px] font-bold transition-all',
-              on ? 'border-[#4A90E2] bg-[#4A90E2] text-white' : 'border-gray-200 bg-white text-gray-600 hover:border-[#4A90E2]/40',
-            ].join(' ')}
+            className="inline-flex max-w-full min-w-0 items-center gap-0.5 rounded-full border border-gray-200 bg-white pl-1 pr-0.5"
           >
-            {s.label}
-          </button>
+            <button
+              type="button"
+              onClick={() => onSelect(s.id)}
+              className={[
+                'min-w-0 max-w-[11rem] truncate rounded-full px-2 py-1 text-[10px] font-bold transition-all',
+                on ? 'bg-[#4A90E2] text-white' : 'text-gray-600 hover:bg-[#4A90E2]/10',
+              ].join(' ')}
+            >
+              {s.label}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                try {
+                  const audio = new Audio(s.url)
+                  audio.volume = 0.7
+                  void audio.play()
+                } catch {
+                  /* 미리듣기 실패 무시 */
+                }
+              }}
+              className="ml-auto shrink-0 p-1 text-gray-400 transition-colors active:text-blue-500"
+              aria-label="미리듣기"
+            >
+              ▶
+            </button>
+          </div>
         )
       })}
     </div>

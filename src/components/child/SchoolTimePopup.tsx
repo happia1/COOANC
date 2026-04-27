@@ -4,7 +4,7 @@
  * 등원 알람 팝업 — 부모가 지정한 시각에 자녀 화면에 표시
  *
  * 비개발자 설명: 학교·유치원 등 나가기 전, 가방 챙기고 출발하라는 알림이에요.
- *               화면이 뜨면서 「이제 나갈 시간」 안내 음원이 재생됩니다.
+ *               실제 재생 주소는 부모(ChildScreen)가 `soundSrc` 로 넘깁니다.
  */
 
 import { useEffect } from 'react'
@@ -13,15 +13,16 @@ import { playAudio, CHILD_AUDIO } from '@/lib/childAudio'
 interface Props {
   /** 자녀 이름 — 문구에 넣어 개인화 */
   childName: string
+  /** 부모 설정에서 풀어온 재생 URL(없으면 기본 나갈 시간 안내) */
+  soundSrc?: string
   /** 확인 버튼 — 팝업을 닫을 때 호출 */
   onClose: () => void
 }
 
-export default function SchoolTimePopup({ childName, onClose }: Props) {
-  // 마운트 직후 한 번만 등원 안내 음원 재생
+export default function SchoolTimePopup({ childName, soundSrc, onClose }: Props) {
   useEffect(() => {
-    playAudio(CHILD_AUDIO.timeToGo)
-  }, [])
+    playAudio(soundSrc ?? CHILD_AUDIO.timeToGo)
+  }, [soundSrc])
 
   return (
     <div
