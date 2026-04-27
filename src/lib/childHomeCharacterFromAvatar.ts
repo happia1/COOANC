@@ -75,6 +75,12 @@ const CHICK_HOME_STAGE_WIDTH = 98
 const CHICK_HOME_STAGE_HEIGHT = 152
 
 /**
+ * 홈 섬 `chics (1)` 스프라이트 — 아틀라스에서 왼쪽에 이웃 타일이 살짝 보이면 `ChildScreen`의 `clip-path`로 잘라냅니다(프로필 PNG/선택 UI는 건드리지 않음).
+ * (필요 시 px만 올리면 됨)
+ */
+export const CHICK_HOME_ISLAND_CLIP_LEFT_PX = 8
+
+/**
  * 수달 홈 무대 가로·세로:
  * - 기본 체급은 여우/토끼와 비슷하게 두되, 수달 시트 비율을 고려해 세로를 조금 줄여 답답하지 않게 보이게 합니다.
  */

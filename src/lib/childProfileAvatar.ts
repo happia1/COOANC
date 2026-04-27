@@ -1,7 +1,7 @@
 /**
  * 자녀 프로필 사진(캐릭터 얼굴) 경로를 한곳에서 관리합니다.
  *
- * - 실제 이미지 파일: `public/assets/img/characters/base` 아래, 파일 이름에 `_profile` 이 들어간 PNG
+ * - 실제 이미지 파일: `public/assets/img/characters/base` 아래 `*_profile.png` (선택 UI 는 4종, 곰·여우 URL 은 구계정 호환용으로만 검증 통과)
  * - 앱·브라우저에서는 `public` 이 루트가 되므로 URL 은 `/assets/img/characters/base/...` 형태입니다.
  * - DB `profiles.avatar_url` 에는 위 공개 URL 문자열만 넣고, API 에서 허용 목록과 일치하는지 검사해
  *   임의의 외부 주소가 저장되지 않도록 합니다.
@@ -11,23 +11,28 @@
 export const CHILD_PROFILE_CHARACTER_IMAGE_DIR = '/assets/img/characters/base' as const
 
 /**
- * `_profile` 규칙을 만족하는 파일 이름 목록
- * (폴더에 파일을 더 넣으면 여기에 한 줄 추가하면 선택 UI·서버 검증이 같이 따라갑니다)
+ * 프로필에서 **고를 수 있는** 캐릭터(4종). 곰·여우는 UI 에서 숨깁니다.
+ * (서버 `isAllowedChildProfileAvatarUrl` 은 아래 `LEGACY_*` 까지 포함해 기존 저장값을 허용합니다.)
  */
 export const CHILD_PROFILE_AVATAR_FILENAMES = [
-  'bear_profile.png',
   'bunny_profile.png',
   'chick_profile.png',
-  'fox_profile.png',
   'hamster_profile.png',
   'otter_profile.png',
 ] as const
 
-export type ChildProfileAvatarFilename = (typeof CHILD_PROFILE_AVATAR_FILENAMES)[number]
+/** 예전에 노출됐으나 제거 — DB 에 남은 주소는 계속 유효로 둡니다. */
+export const LEGACY_CHILD_PROFILE_AVATAR_FILENAMES = ['bear_profile.png', 'fox_profile.png'] as const
 
-/** 허용된 전체 URL 집합 — API 검증용 */
+export type ChildProfileAvatarFilename =
+  | (typeof CHILD_PROFILE_AVATAR_FILENAMES)[number]
+  | (typeof LEGACY_CHILD_PROFILE_AVATAR_FILENAMES)[number]
+
+/** 허용된 전체 URL 집합 — API 검증용(선택 4종 + 구버전 2종) */
 const ALLOWED_AVATAR_URLS = new Set<string>(
-  CHILD_PROFILE_AVATAR_FILENAMES.map((f) => `${CHILD_PROFILE_CHARACTER_IMAGE_DIR}/${f}`),
+  ([...CHILD_PROFILE_AVATAR_FILENAMES, ...LEGACY_CHILD_PROFILE_AVATAR_FILENAMES] as const).map(
+    (f) => `${CHILD_PROFILE_CHARACTER_IMAGE_DIR}/${f}`,
+  ),
 )
 
 /** 파일 이름 → 브라우저용 URL */
@@ -44,25 +49,20 @@ export function isAllowedChildProfileAvatarUrl(url: string | null | undefined): 
   return ALLOWED_AVATAR_URLS.has(url.trim())
 }
 
-/** 선택 UI 에 쓰는 옵션 — 짧은 한글 이름은 아이·부모가 고를 때 구분하기 쉽게 붙였습니다 */
+/** 선택 UI — 병아리, 토끼, 수달, 햄스터 만 */
 export const CHILD_PROFILE_AVATAR_OPTIONS: ReadonlyArray<{ url: string; label: string }> = [
-  { url: publicUrlForChildProfileAvatar('bear_profile.png'), label: '곰' },
-  { url: publicUrlForChildProfileAvatar('bunny_profile.png'), label: '토끼' },
   { url: publicUrlForChildProfileAvatar('chick_profile.png'), label: '병아리' },
-  { url: publicUrlForChildProfileAvatar('fox_profile.png'), label: '여우' },
-  { url: publicUrlForChildProfileAvatar('hamster_profile.png'), label: '햄스터' },
+  { url: publicUrlForChildProfileAvatar('bunny_profile.png'), label: '토끼' },
   { url: publicUrlForChildProfileAvatar('otter_profile.png'), label: '수달' },
+  { url: publicUrlForChildProfileAvatar('hamster_profile.png'), label: '햄스터' },
 ]
 
 /**
- * 온보딩 폼 하단 한 줄 나열 순서
- * — 이 순서대로 프로필 PNG 를 고르면 홈 섬 정면 캐릭터가 같은 종으로 맞춰집니다.
+ * 온보딩 폼 하단 한 줄 — 위와 동일 4종 순서
  */
 export const CHILD_PROFILE_AVATAR_OPTIONS_ONBOARDING_ROW: ReadonlyArray<{ url: string; label: string }> = [
-  { url: publicUrlForChildProfileAvatar('fox_profile.png'), label: '여우' },
+  { url: publicUrlForChildProfileAvatar('chick_profile.png'), label: '병아리' },
   { url: publicUrlForChildProfileAvatar('bunny_profile.png'), label: '토끼' },
-  { url: publicUrlForChildProfileAvatar('bear_profile.png'), label: '곰' },
   { url: publicUrlForChildProfileAvatar('otter_profile.png'), label: '수달' },
   { url: publicUrlForChildProfileAvatar('hamster_profile.png'), label: '햄스터' },
-  { url: publicUrlForChildProfileAvatar('chick_profile.png'), label: '병아리' },
 ]

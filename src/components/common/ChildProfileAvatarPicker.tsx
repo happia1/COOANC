@@ -2,14 +2,11 @@
 
 /**
  * 자녀 프로필용 캐릭터 얼굴(`*_profile.png`) 선택 UI
- * - `settings`: 캐릭터 6종 그리드(「기본」 없음 — DB 가 null 이면 카드에 레벨 이름 등 기존 규칙)
+ * - `settings`: 캐릭터 4종 그리드(「기본」 없음 — DB 가 null 이면 카드에 레벨 이름 등 기존 규칙)
  * - `onboarding`: 맨 아래 한 줄 — 카드 안 사각 영역에 캐릭터(홈 섬과 같은 종류) 표시
  */
 
-import {
-  CHILD_PROFILE_AVATAR_OPTIONS,
-  CHILD_PROFILE_AVATAR_OPTIONS_ONBOARDING_ROW,
-} from '@/lib/childProfileAvatar'
+import { CHILD_PROFILE_AVATAR_OPTIONS, CHILD_PROFILE_AVATAR_OPTIONS_ONBOARDING_ROW } from '@/lib/childProfileAvatar'
 
 export type ChildProfileAvatarPickerProps = {
   value: string | null
@@ -51,11 +48,7 @@ export function ChildProfileAvatarPicker({
                 {/* 카드 가로폭에 맞는 직사각 블록(둥근 모서리만) — 그림은 잘리지 않게 맞춤 */}
                 <div className="flex h-11 w-full items-center justify-center overflow-hidden rounded-lg bg-gray-50 sm:h-12">
                   {/* eslint-disable-next-line @next/next/no-img-element -- 로컬 public 정적 자산 */}
-                  <img
-                    src={url}
-                    alt=""
-                    className="h-full w-full object-contain object-center p-0.5"
-                  />
+                  <img src={url} alt="" className="h-full w-full object-contain object-center p-0.5" />
                 </div>
                 <span className="max-w-full truncate px-0.5 text-[8px] font-bold text-gray-600 sm:text-[9px]">
                   {label}
@@ -77,7 +70,7 @@ export function ChildProfileAvatarPicker({
       {/**
        * 설정「자녀 프로필 수정」: 동그라미 프레임 없이 둥근 사각만. 선택은 옅은 회색 배경. 썸네일은 작게(h-8).
        */}
-      <div className="grid grid-cols-3 gap-2 sm:grid-cols-6 sm:gap-2.5">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-2.5">
         {CHILD_PROFILE_AVATAR_OPTIONS.map(({ url, label }) => {
           const selected = value === url
           return (

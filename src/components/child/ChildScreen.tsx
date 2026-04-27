@@ -24,7 +24,11 @@ import RapidTapConfirmModal from '@/components/child/RapidTapConfirmModal'
 import ParentMissionRedoNoticeModal from '@/components/child/ParentMissionRedoNoticeModal'
 import SpriteImage from '@/components/common/SpriteImage'
 import { CharacterSprite } from '@/components/sprites/CharacterSprite'
-import { BUNNY_HOME_DISPLAY_SCALE, resolveHomeIslandStageSprite } from '@/lib/childHomeCharacterFromAvatar'
+import {
+  BUNNY_HOME_DISPLAY_SCALE,
+  CHICK_HOME_ISLAND_CLIP_LEFT_PX,
+  resolveHomeIslandStageSprite,
+} from '@/lib/childHomeCharacterFromAvatar'
 import { BACKGROUND_ANCHORS } from '@/constants/backgroundAnchors'
 import { getUnlockedFeatures } from '@/constants/childScreenFeatures'
 import { useContainerSize } from '@/hooks/useContainerSize'
@@ -1095,6 +1099,11 @@ export default function ChildScreen({
               width={Math.round(characterDisplayH * (characterSprite.width / characterSprite.height))}
               height={characterDisplayH}
               className="select-none"
+              style={
+                characterSprite.character === 'chicks'
+                  ? { clipPath: `inset(0 0 0 ${CHICK_HOME_ISLAND_CLIP_LEFT_PX}px)` }
+                  : undefined
+              }
             />
           </div>
         )}
