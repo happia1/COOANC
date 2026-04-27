@@ -24,6 +24,39 @@ export function getSeoulDateFromIsoTimestamp(iso: string): string | null {
 }
 
 /**
+ * DB·Supabase Realtime 이 넘기는 `date` / `timestamptz` 값을 서울 기준 YYYY-MM-DD 키로 맞춥니다.
+ * - `date` 컬럼이 "2026-04-27" 로 오면 그대로 사용
+ * - ISO 문자열이면 서울 달력 날짜로 변환(한국 자정 전후 오판 방지)
+ *
+ * 비개발자 설명: 데이터베이스에서 오는 「날짜」표현이 조금씩 달라도, 앱 안에서는 항상 같은 형식으로 비교해요.
+ */
+export function toYyyyMmDdDbValue(value: unknown): string | null {
+  if (value == null) return null
+  if (typeof value === 'string') {
+    const s = value.trim()
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s
+    if (s.length >= 10 && s[4] === '-' && s[7] === '-') {
+      const head = s.slice(0, 10)
+      if (/^\d{4}-\d{2}-\d{2}$/.test(head)) return head
+    }
+    return getSeoulDateFromIsoTimestamp(s)
+  }
+  return null
+}
+
+/** Postgres boolean 이 문자열 등으로 올 때도 「완료 아님」을 안전히 판별합니다. */
+export function dbValueMeansIncomplete(isCompleted: unknown): boolean {
+  if (isCompleted === false) return true
+  if (isCompleted === true) return false
+  if (typeof isCompleted === 'string') {
+    const s = isCompleted.toLowerCase()
+    if (s === 'false' || s === 'f' || s === '0' || s === '') return true
+    if (s === 'true' || s === 't' || s === '1') return false
+  }
+  return !isCompleted
+}
+
+/**
  * 서울 기준 현재 시각을 `HH:MM`(24시간)으로 돌려줍니다.
  * 루틴 알람(기상 시각)과 문자열 비교할 때 사용합니다.
  */

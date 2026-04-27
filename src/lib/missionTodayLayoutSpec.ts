@@ -5,7 +5,7 @@ import type { CSSProperties } from 'react'
  * 오늘의 미션(미션 탭 하단) — **픽스(확정) UI 스펙**
  *
  * 기획·디자인 합의 없이 아래에 해당하는 **클래스·픽셀·간격**을 바꾸지 마세요.
- * 코드 리뷰·AI 도구도 이 파일만 단일 출처로 보고, `MissionTab` 에 임의 Tailwind 를
+ * 코드 리뷰·AI 도구도 이 파일만 단일 출처로 보고, `ChildScreen`·`ChildMissionCard`에 임의 Tailwind 를
  * 추가하지 않도록 유지하세요.
  *
  * ── 바깥·패딩(겹침·클리핑과 연동) ──
@@ -50,7 +50,7 @@ export function missionTabLowerPanelFlexStyle(): CSSProperties {
   }
 }
 
-/** 「오늘의 미션」 하단 섹션 — 픽스 패딩. 세로 스크롤은 `MissionTab` 안 제목 **아래** 래퍼만 담당. */
+/** 「오늘의 미션」 하단 섹션 — 픽스 패딩. 세로 스크롤은 `ChildScreen` 내 제목 **아래** 래퍼만 담당. */
 export const MISSION_TODAY_BOTTOM_SECTION_CLASSNAME =
   'relative z-10 flex min-h-0 min-w-0 flex-1 flex-col gap-0.5 overflow-x-hidden overflow-y-hidden px-3 pb-2.5 pt-0.5' as const
 

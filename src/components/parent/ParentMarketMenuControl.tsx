@@ -104,7 +104,8 @@ export default function ParentMarketMenuControl({
   const [creditEditErr, setCreditEditErr] = useState<string | null>(null)
   /**
    * 구역마다 상품 타일 영역을 **접기/펼치기** 합니다.
-   * 디폴트는 **전부 접힘**(첫 줄도 숨김) — `true` 인 구역만 타일을 그립니다. 자녀 변경 시 전부 접힘으로 리셋합니다.
+   * 디폴트는 **전부 접힘** — 간식·장난감·이벤트(및 기타) **헤더 줄 전체**를 누르면 펼쳐지고, 오른쪽 ▼ 만 보입니다(펼치면 ▲ 방향으로 회전).
+   * 자녀 변경 시 전부 접힘으로 리셋합니다.
    */
   const [menuSectionExpanded, setMenuSectionExpanded] = useState<Record<string, boolean>>({})
 
@@ -445,8 +446,22 @@ export default function ParentMarketMenuControl({
 
             return (
               <div key={block.sectionKey}>
-                {/** 왼쪽: 구역명·개수 / 오른쪽: 펼치기·접기(항상 표시 — 접힘 시 타일 숨김) */}
-                <h3 className="mb-2 flex items-center gap-2 border-b border-gray-100 pb-2 text-xs font-black text-gray-800">
+                {/**
+                 * 구역 헤더 **전체**를 누르면 접기/펼침 — 오른쪽에는 ▼/▲ 만(문구 없음).
+                 * 스크린리더용으로 aria-label 은 유지합니다.
+                 */}
+                <button
+                  type="button"
+                  aria-expanded={expanded}
+                  aria-label={expanded ? `${block.title} 구역 접기` : `${block.title} 구역 펼치기`}
+                  onClick={() =>
+                    setMenuSectionExpanded((prev) => ({
+                      ...prev,
+                      [block.sectionKey]: !expanded,
+                    }))
+                  }
+                  className="mb-2 flex w-full items-center gap-2 border-b border-gray-100 pb-2 text-left text-xs font-black text-gray-800 transition-colors active:bg-gray-50/80"
+                >
                   <div className="flex min-w-0 flex-1 items-baseline gap-x-2">
                     <span className="min-w-0 truncate">{block.title}</span>
                     <span className="shrink-0 text-[9px] font-extralight tabular-nums tracking-tight text-gray-400">
@@ -459,23 +474,15 @@ export default function ParentMarketMenuControl({
                       </span>
                     )}
                   </div>
-                  <button
-                    type="button"
-                    aria-expanded={expanded}
-                    onClick={() =>
-                      setMenuSectionExpanded((prev) => ({
-                        ...prev,
-                        [block.sectionKey]: !expanded,
-                      }))
-                    }
-                    className="shrink-0 text-[10px] font-medium text-gray-500 underline-offset-2 transition-colors hover:text-gray-700 hover:underline active:opacity-80"
+                  <span
+                    aria-hidden
+                    className={`shrink-0 text-sm font-bold leading-none text-gray-400 transition-transform duration-200 ${
+                      expanded ? 'rotate-180' : ''
+                    }`}
                   >
-                    <span aria-hidden className="mr-0.5 inline-block align-middle text-[9px] leading-none">
-                      {expanded ? '▲' : '▼'}
-                    </span>
-                    {expanded ? '접기' : '펼치기'}
-                  </button>
-                </h3>
+                    ▼
+                  </span>
+                </button>
                 {/**
                  * 접힘: 첫 줄 포함 **아무 타일도 안 보임**. 펼침: 2개 이상이면 2줄 그리드 + 가로 스크롤.
                  */}

@@ -13,10 +13,12 @@ import { useChildAppProfile } from '@/context/ProfileContext'
  *
  * pendingHref: 탭을 누르면 라우터 완료를 기다리지 않고 즉시 활성 표시를 바꿉니다.
  */
+/**
+ * 자녀앱은 `/home` 단일 화면(ChildScreen) — 미션·마켓은 앱 내부 패널/카드.
+ * (현재 layout 에서는 이 바를 쓰지 않을 수 있으나, 링크가 남으면 404가 나지 않게 홈만 둡니다.)
+ */
 const TABS: readonly { href: string; label: string; icon: DockTabIconId }[] = [
   { href: '/home', label: '홈', icon: 'home' },
-  { href: '/mission', label: '미션', icon: 'smile' },
-  { href: '/market', label: '마켓', icon: 'market' },
 ] as const
 
 type Props = {

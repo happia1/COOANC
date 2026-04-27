@@ -51,7 +51,7 @@ export default async function RoutinePage() {
           .in('child_id', childIds)
       : Promise.resolve({ data: [], error: null }),
 
-    /** 템플릿 마스터만 60초 캐시 — 부모 id 로 키를 나눠 계정 간 데이터가 섞이지 않게 함 */
+    /** 로그인한 부모 세션(RLS)으로 미션 템플릿 전체 조회 — 매 요청(캐시 없음) */
     getMissionTemplatesForParentRoutinePage(auth.user.id),
 
     childIds.length > 0

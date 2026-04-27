@@ -10,7 +10,7 @@
  *
  * 비개발자 설명:
  * 아이가 미션 카드를 너무 빠르게 여러 번 탭하면 이 팝업이 나타납니다.
- * 캐릭터 이미지와 함께 "정말 다 했어?" 라고 물어보며, 아이가 직접 확인 또는 취소를 누릅니다.
+ * 캐릭터 이미지와 함께 "정말 한 거 맞아?" 한 줄만 보여 주고, 확인·취소 버튼으로 선택하게 합니다.
  */
 
 import { useEffect, useRef } from 'react'
@@ -81,16 +81,9 @@ export default function RapidTapConfirmModal({ open, onConfirm, onDeny }: Props)
           />
         </div>
 
-        {/* 메인 메시지 */}
-        <p className="mb-1 text-center text-2xl font-black text-gray-900">
+        {/* 메인 메시지 — 빠른 연속 탭 안내 문구는 넣지 않고 짧게만 확인합니다 */}
+        <p className="mb-6 text-center text-2xl font-black text-gray-900">
           정말 한 거 맞아?
-        </p>
-
-        {/* 서브 메시지 */}
-        <p className="mb-6 text-center text-sm font-medium leading-relaxed text-gray-500">
-          미션을 아주 빠르게 많이 눌렀어요.
-          <br />
-          정말 다 완료했는지 확인해 줘요!
         </p>
 
         {/* 버튼 2개 */}

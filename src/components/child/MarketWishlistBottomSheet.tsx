@@ -220,7 +220,7 @@ export default function MarketWishlistBottomSheet({
               </button>
             ) : (
               <Link
-                href="/mission"
+                href="/home"
                 onClick={onClose}
                 className="flex w-full items-center justify-center rounded-xl bg-yellow-400 py-3 text-sm font-black text-amber-950 shadow-md active:scale-[0.99]"
               >

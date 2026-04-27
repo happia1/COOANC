@@ -20,6 +20,7 @@ import { uuidStringsEqual } from '@/lib/normalizeUuid'
 import { applyStoreItemCreditOverrides } from '@/lib/applyStoreItemCreditOverrides'
 import { readChildStatInt } from '@/lib/childCreditsSplit'
 import { isCategoryExcludedFromMarket } from '@/lib/parentMarketMenuSections'
+import { fetchCalendarEventsForChildRoutine, resolveRoutineTypeFromCalEvents } from '@/lib/childRoutineCalendar'
 import ChildScreen from '@/components/child/ChildScreen'
 import type {
   ChildStats,
@@ -40,23 +41,17 @@ export const preferredRegion = 'hnd1'
 // ─── 미션 관련 헬퍼 (mission/page.tsx 에서 이동) ────────────────────────────
 
 type RoutineType = 'weekday' | 'weekend' | 'holiday' | 'vacation'
-type CalEventRow = { start_date: string; end_date: string; routine_override: string }
 
-/** 오늘이 평일/주말/휴일/방학 중 어느 타입인지 판단합니다 */
-function getTodayRoutineType(today: string, calendarEvents: CalEventRow[]): RoutineType {
-  const ev = calendarEvents.find((e) => today >= e.start_date && today <= e.end_date)
-  if (ev) return ev.routine_override === 'none' ? 'holiday' : 'vacation'
-  const [yy, mm, dd] = today.split('-').map(Number)
-  const dow = new Date(yy, mm - 1, dd).getDay()
-  return dow === 0 || dow === 6 ? 'weekend' : 'weekday'
-}
-
-/** 오늘 루틴 타입에 맞는 미션 템플릿 풀을 반환합니다 */
+/**
+ * 오늘 routine_type·휴일 루틴 모드에 맞는 이 자녀 전용 템플릿 풀 — `mission/page.tsx` 와 동일 규칙
+ * (주말 + `custom` 이면 weekly 만, 평일은 daily 만)
+ */
 function templatePoolForToday(
   templates: Mission[],
   childId: string,
   level: number,
   routineType: RoutineType,
+  holidayRoutineMode: 'as_weekday' | 'custom' | null,
 ): Mission[] {
   if (routineType === 'holiday') return []
 
@@ -67,11 +62,17 @@ function templatePoolForToday(
       uuidStringsEqual(m.linked_child_id, childId) &&
       m.repeat_type !== 'event',
   )
+
   const dailyOrWeekly = linked.filter((m) => m.repeat_type === 'daily' || m.repeat_type === 'weekly')
 
   if (routineType === 'weekday') {
     return dailyOrWeekly.filter((m) => m.repeat_type === 'daily')
   }
+
+  if (routineType === 'weekend' && holidayRoutineMode === 'custom') {
+    return dailyOrWeekly.filter((m) => m.repeat_type === 'weekly')
+  }
+
   const weekly = dailyOrWeekly.filter((m) => m.repeat_type === 'weekly')
   return weekly.length > 0 ? weekly : dailyOrWeekly.filter((m) => m.repeat_type === 'daily')
 }
@@ -109,7 +110,7 @@ export default async function ChildHomePage() {
   const missionDb = serviceRoleClient ?? supabase
 
   /**
-   * 미션 템플릿은 캐시(60초)로 읽어 자주 바뀌지 않는 데이터를 반복 조회하지 않습니다.
+   * 미션 템플릿은 캐시 없이 매 요청 조회합니다(루틴 저장 직후에도 최신 id 로 백필되게).
    */
   const templatesQuery =
     serviceRoleClient != null
@@ -183,6 +184,9 @@ export default async function ChildHomePage() {
   const childAvatarUrl =
     typeof profileRow?.avatar_url === 'string' ? profileRow.avatar_url.trim() || null : null
 
+  /** `064` 주말 백필 시 weekly 만 쓸지 — 미션 탭과 같은 컬럼 */
+  const holidayRoutineMode: 'as_weekday' | 'custom' | null = profileRow?.holiday_routine_mode ?? null
+
   /** 만 나이 계산 — profiles.age 또는 birth_date 사용 */
   const ageData = ageProfileRes.data as { age: number | null; birth_date: string | null } | null
   const ageYears = calcAgeYears(ageData?.age ?? null, ageData?.birth_date ?? null)
@@ -198,30 +202,28 @@ export default async function ChildHomePage() {
   // ── 미션 ─────────────────────────────────────────────────────────────────
 
   const parentId = familyRows[0]?.parent_id ?? null
+  /** 부모 홈과 동일하게 이 자녀의 `family_links.id` 로 캘린더를 좁힙니다(형제 일정 섞임 방지). */
+  const familyLinkId = familyRows[0]?.id ?? null
 
   /**
-   * 2단계: calendar_events (parentId 필요)와 오늘 daily_missions 를 병렬 조회
+   * 2단계: 오늘 맞는 calendar_events 와 오늘 daily_missions 를 병렬 조회
    */
-  const [calRes, dailyMissionsRes] = await Promise.all([
-    parentId != null
-      ? missionDb
-          .from('calendar_events')
-          .select('start_date, end_date, routine_override')
-          .eq('parent_id', parentId)
-          .lte('start_date', today)
-          .gte('end_date', today)
-          .limit(5)
-      : Promise.resolve({ data: [] as CalEventRow[], error: null }),
+  const [calEvents, dailyMissionsRes] = await Promise.all([
+    fetchCalendarEventsForChildRoutine(missionDb, {
+      today,
+      childId,
+      familyLinkId,
+      parentId,
+    }),
     missionDb
       .from('daily_missions')
-      .select(`*, missions(${missionJoin})`)
+      .select(`*, missions:mission_template_id(${missionJoin})`)
       .eq('child_id', childId)
       .eq('date', today)
       .order('scheduled_time', { ascending: true, nullsFirst: false }),
   ])
 
-  const calEvents = calRes.data ?? []
-  const routineType = getTodayRoutineType(today, calEvents)
+  const routineType: RoutineType = resolveRoutineTypeFromCalEvents(today, calEvents)
 
   if (templatesRes.error) {
     console.error('[child/home] missions select', templatesRes.error.message)
@@ -232,6 +234,7 @@ export default async function ChildHomePage() {
     childId,
     level,
     routineType,
+    holidayRoutineMode,
   )
 
   /**
@@ -241,7 +244,7 @@ export default async function ChildHomePage() {
   if (existingErr) console.error('[child/home] daily_missions select', existingErr.message)
 
   let existing = (existingRows ?? []) as DailyMissionWithTemplate[]
-  console.log('[home] today=', today, 'existing=', existing.length, 'pool=', pool.length)
+  console.log('[home] today=', today, 'routineType=', routineType, 'existing=', existing.length, 'pool=', pool.length)
 
   if (existing.length === 0 && pool.length > 0) {
     await Promise.all(
@@ -262,7 +265,7 @@ export default async function ChildHomePage() {
     )
     const refetch = await missionDb
       .from('daily_missions')
-      .select(`*, missions(${missionJoin})`)
+      .select(`*, missions:mission_template_id(${missionJoin})`)
       .eq('child_id', childId)
       .eq('date', today)
       .order('scheduled_time', { ascending: true, nullsFirst: false })
@@ -271,6 +274,29 @@ export default async function ChildHomePage() {
   }
 
   const dailyMissions = existing
+
+  // #region agent log — 디버그: 롤백 후에도 자녀 홈 SSR이 내려주는 완료 수·조인 여부
+  {
+    fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '2793a5' },
+      body: JSON.stringify({
+        sessionId: '2793a5',
+        hypothesisId: 'R-SSR',
+        location: 'home/page.tsx:ChildHomePage',
+        message: 'child home daily_missions SSR snapshot',
+        data: {
+          routineType,
+          poolLen: pool.length,
+          totalDm: dailyMissions.length,
+          completedDm: dailyMissions.filter((dm) => dm.is_completed).length,
+          orphanJoin: dailyMissions.filter((dm) => !dm.missions).length,
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {})
+  }
+  // #endregion
 
   // ── 마켓 ─────────────────────────────────────────────────────────────────
 
@@ -309,6 +335,10 @@ export default async function ChildHomePage() {
   const exitHref = ctx.isParentPreview ? '/api/parent/exit-child-ui' : '/parent/home'
 
   // ─────────────────────────────────────────────────────────────────────────
+  /**
+   * `ChildScreen` 하단 「오늘의 미션」가로 카드는 오직 여기서 만든 `dailyMissions` 로만 그려집니다.
+   * (데이터가 어긋나면 `home`을 새로고침해 보세요.)
+   */
 
   return (
     <ChildScreen

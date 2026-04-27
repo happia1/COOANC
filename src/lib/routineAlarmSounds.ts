@@ -22,13 +22,14 @@ export type RoutineAlarmSoundEntry = {
 /**
  * 기본으로 쓰는 알람 소리 id — localStorage 에 값이 없을 때 이 id가 들어갑니다.
  * (RoutineAlarmSettingsSheet 의 행별 defaultSoundId 와 맞춰 두었습니다.)
+ * - 기상: 아침인사, 등원: 이제 나갈시간이야, 하원·귀가: tick tock(째깍 타이머), 잘 준비: 잘 준비
  */
 export const DEFAULT_ROUTINE_ALARM_SOUND_IDS = {
-  wake: 'morning_greet',
-  school: 'time_to_go',
-  returnHome: 'good_morning',
-  sleepReady: 'sleep_ready',
-  sleep: 'morning_alarm_birds',
+  wake: 'morning_greet', // 아침인사
+  school: 'time_to_go', // 이제 나갈시간이야
+  returnHome: 'tick_tock_timer', // tick tock timer (째깍 타이머)
+  sleepReady: 'sleep_ready', // 잘 준비
+  sleep: 'morning_alarm_birds', // 취침 — 별도 지정이 없으면 기존 기본(아침 새소리) 유지
 } as const
 
 /**

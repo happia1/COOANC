@@ -21,6 +21,7 @@ import { useRef, useState, useCallback, useMemo, useEffect, memo } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import RapidTapConfirmModal from '@/components/child/RapidTapConfirmModal'
+import ParentMissionRedoNoticeModal from '@/components/child/ParentMissionRedoNoticeModal'
 import SpriteImage from '@/components/common/SpriteImage'
 import { CharacterSprite } from '@/components/sprites/CharacterSprite'
 import { BUNNY_HOME_DISPLAY_SCALE, resolveHomeIslandStageSprite } from '@/lib/childHomeCharacterFromAvatar'
@@ -32,9 +33,14 @@ import ChildPanelOverlay, { type PanelType } from '@/components/child/ChildPanel
 import ChildLevelStatsCard from '@/components/child/ChildLevelStatsCard'
 import { normalizeChildStatsCreditsSplit, mergeChildStatsPatch } from '@/lib/childCreditsSplit'
 import { completionRateToHearts } from '@/lib/missionHeartCount'
+import { scaledMissionRewards } from '@/lib/missionRewardMultiplier'
 import { isSpecialSectionMission, isRetiredSpecialMissionTitle } from '@/lib/specialMissionChips'
-import { isRetiredRoutineMissionTitle } from '@/lib/routineChips'
-import { compareRoutineFlowSortable, type RoutineFlowSortable } from '@/lib/routineChips'
+import {
+  compareRoutineFlowSortable,
+  dedupeDailyRoutineMissionsByCanonicalKey,
+  isRetiredRoutineMissionTitle,
+  type RoutineFlowSortable,
+} from '@/lib/routineChips'
 import { mergePraiseStickerGrantsFromServer } from '@/lib/mergePraiseStickerGrantsFromServer'
 import { ASSETS, CHILD_HOME_BACKGROUND_CACHE_BUST } from '@/constants/assets'
 import type {
@@ -56,6 +62,7 @@ import SleepReadyPopup from '@/components/child/SleepReadyPopup'
 import SchoolTimePopup from '@/components/child/SchoolTimePopup'
 import { readRoutineAlarmPrefs } from '@/lib/routineAlarmLocalPrefs'
 import { resolveRoutineAlarmSoundUrl } from '@/lib/routineAlarmSounds'
+import { toYyyyMmDdDbValue, dbValueMeansIncomplete } from '@/lib/koreaDate'
 
 // ─── 파티클 타입 정의 ────────────────────────────────────────────────────────
 
@@ -176,7 +183,7 @@ function BadgeStarBurst({ badgeRef }: { badgeRef: React.RefObject<HTMLDivElement
   )
 }
 
-// ─── 미션 정렬 헬퍼 (MissionTab 와 동일 로직) ──────────────────────────────
+// ─── 미션 정렬·중복 제거 (단일 ChildScreen 기준) ─────────────────────────
 
 function dmToSortable(dm: DailyMissionWithTemplate): RoutineFlowSortable | null {
   if (!dm.missions) return null
@@ -191,12 +198,15 @@ function orderedMissionsForSlider(list: DailyMissionWithTemplate[]): DailyMissio
   const routineRows = list.filter((dm) => dm.missions && !isSpecialSectionMission(dm.missions))
   const specialRows = list.filter((dm) => dm.missions && isSpecialSectionMission(dm.missions))
 
-  const sortedRoutine = [...routineRows].sort((a, b) => {
-    const sa = dmToSortable(a)
-    const sb = dmToSortable(b)
-    if (!sa || !sb) return 0
-    return compareRoutineFlowSortable(sa, sb)
-  })
+  /** 같은 키워드·중복 일일행이 있으면 가로 슬라이더에는 한 장만 남깁니다 */
+  const sortedRoutine = dedupeDailyRoutineMissionsByCanonicalKey(
+    [...routineRows].sort((a, b) => {
+      const sa = dmToSortable(a)
+      const sb = dmToSortable(b)
+      if (!sa || !sb) return 0
+      return compareRoutineFlowSortable(sa, sb)
+    }),
+  )
   const sortedSpecial = [...specialRows].sort((a, b) => {
     const ta = a.scheduled_time
     const tb = b.scheduled_time
@@ -324,6 +334,16 @@ export default function ChildScreen({
   const [rapidTapModalOpen, setRapidTapModalOpen] = useState(false)
 
   /**
+   * 부모가 완료 미션을 「다시하기」로 롤백했을 때만 뜨는 안내(소리 없음).
+   * 비개발자 설명: 엄마·아빠 화면에서 되돌리기를 누르면, 아이 태블릿에도 같은 내용이 실시간으로 반영되면서 이 창이 잠깐 떠요.
+   */
+  const [parentRedoModalMission, setParentRedoModalMission] = useState<DailyMissionWithTemplate | null>(null)
+
+  /** daily_missions·mission_logs·Strict Mode 이중 호출이 겹쳐도 팝업·done·코인 조정이 한 번만 실행되게 합니다 */
+  const parentRedoNoticeDedupeRef = useRef<string | null>(null)
+  const rollbackUiCooldownRef = useRef<Map<string, number>>(new Map())
+
+  /**
    * 알람·뽀모도로 시계 팝업(ChildAlarmClockPopup) 열림 여부
    * 비개발자 설명: 캐릭터 옆 시계를 누르면 true 가 되고, 닫기로 false 가 됩니다.
    */
@@ -379,7 +399,29 @@ export default function ChildScreen({
   useEffect(() => {
     setMissionList(dailyMissions)
     setDone(new Set(dailyMissions.filter((dm) => dm.is_completed).map((dm) => dm.id)))
-  }, [dailyMissions])
+    // #region agent log — 디버그: 롤백 직후에도 props가 옛 완료 상태인지(새로고침 전 스테일) 확인
+    {
+      const completed = dailyMissions.filter((dm) => dm.is_completed).length
+      fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '2793a5' },
+        body: JSON.stringify({
+          sessionId: '2793a5',
+          hypothesisId: 'R-CLIENT',
+          location: 'ChildScreen.tsx:dailyMissionsSync',
+          message: 'ChildScreen props snapshot',
+          data: {
+            today,
+            totalDm: dailyMissions.length,
+            completedDm: completed,
+            orphanJoin: dailyMissions.filter((dm) => !dm.missions).length,
+          },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {})
+    }
+    // #endregion
+  }, [dailyMissions, today])
 
   /** 날짜(오늘)이 바뀌면 축하·누적 코인 상태를 초기화합니다. */
   useEffect(() => {
@@ -396,7 +438,180 @@ export default function ChildScreen({
     setShowSleepReady(false)
     schoolTimeShownRef.current = false
     setShowSchoolTime(false)
+    setParentRedoModalMission(null)
   }, [today])
+
+  /**
+   * 부모 롤백·기타 갱신을 자녀 화면에 즉시 반영합니다.
+   * - daily_missions: 오늘 카드가 미완료로 바뀌면 슬라이더에 다시 보입니다.
+   * - mission_logs: 테이블은 예전부터 Realtime 에 포함되어 있어, daily_missions 이벤트가 안 오는 환경에서도 롤백을 감지합니다.
+   * - child_stats: 크레딧·하트·경험치 등이 서버와 같이 움직입니다(롤백 시 차감 포함).
+   */
+  useEffect(() => {
+    const supabase = createClient()
+
+    function pushParentRedoNotice(dmRow: DailyMissionWithTemplate) {
+      const key = dmRow.id
+      if (parentRedoNoticeDedupeRef.current === key) return
+      parentRedoNoticeDedupeRef.current = key
+      window.setTimeout(() => {
+        if (parentRedoNoticeDedupeRef.current === key) parentRedoNoticeDedupeRef.current = null
+      }, 2500)
+      setParentRedoModalMission(dmRow)
+    }
+
+    function consumeRollbackUiCooldown(dmId: string): boolean {
+      const now = Date.now()
+      const prev = rollbackUiCooldownRef.current.get(dmId) ?? 0
+      if (now - prev < 1600) return false
+      rollbackUiCooldownRef.current.set(dmId, now)
+      return true
+    }
+
+    function finishRollbackUi(dmId: string, snapshot: DailyMissionWithTemplate) {
+      setDone((prevDone) => {
+        const wasDone = prevDone.has(dmId)
+        const wasCompletedOnRow = snapshot.is_completed
+        if (!wasDone && !wasCompletedOnRow) return prevDone
+        if (!consumeRollbackUiCooldown(dmId)) return prevDone
+
+        if (snapshot.missions) {
+          const { credit } = scaledMissionRewards(snapshot.missions)
+          setTodayEarnedCredits((p) => Math.max(0, p - credit))
+        }
+        pushParentRedoNotice(snapshot)
+        setShowCelebration(false)
+        celebrationShownRef.current = false
+        if (celebrationShowTimerRef.current != null) {
+          clearTimeout(celebrationShowTimerRef.current)
+          celebrationShowTimerRef.current = null
+        }
+        const next = new Set(prevDone)
+        next.delete(dmId)
+        return next
+      })
+    }
+
+    /** DB Realtime·부모 Broadcast 모두 이 경로로 합칩니다 */
+    function applyRollbackByDailyMissionId(dmId: string) {
+      if (!dmId) return
+      setMissionList((prevList) => {
+        const snapshot = prevList.find((m) => m.id === dmId)
+        if (!snapshot) return prevList
+        queueMicrotask(() => finishRollbackUi(dmId, snapshot))
+        return prevList.map((m) =>
+          m.id === dmId ? { ...m, is_completed: false, completed_at: null } : m,
+        )
+      })
+    }
+
+    function onDailyMissionRemoteUpdate(payload: { new: Record<string, unknown> }) {
+      const row = payload.new
+      const rowDate = toYyyyMmDdDbValue(row.date)
+      if (rowDate !== today) return
+      if (!dbValueMeansIncomplete(row.is_completed)) return
+      const dmId = String(row.id ?? '')
+      if (!dmId) return
+      applyRollbackByDailyMissionId(dmId)
+    }
+
+    function onMissionLogRemoteUpdate(payload: { new: Record<string, unknown> }) {
+      const row = payload.new
+      const ad = toYyyyMmDdDbValue(row.assigned_date)
+      if (ad !== today) return
+      if (!dbValueMeansIncomplete(row.is_completed)) return
+      const templateId = String(row.mission_id ?? '')
+      if (!templateId) return
+
+      setMissionList((prevList) => {
+        const snapshot = prevList.find(
+          (m) => m.mission_template_id === templateId && toYyyyMmDdDbValue(m.date) === today,
+        )
+        if (!snapshot) return prevList
+        const dmId = snapshot.id
+        queueMicrotask(() => finishRollbackUi(dmId, snapshot))
+        return prevList.map((m) =>
+          m.id === dmId ? { ...m, is_completed: false, completed_at: null } : m,
+        )
+      })
+    }
+
+    /** 부모 앱이 같은 이름의 채널로 보내는 즉시 알림( DB postgres_changes 보조 ) */
+    function readBroadcastRollbackDailyMissionId(msg: unknown): string {
+      if (msg != null && typeof msg === 'object') {
+        const o = msg as Record<string, unknown>
+        if (typeof o.dailyMissionId === 'string') return o.dailyMissionId
+        const p = o.payload
+        if (p != null && typeof p === 'object' && typeof (p as Record<string, unknown>).dailyMissionId === 'string') {
+          return (p as { dailyMissionId: string }).dailyMissionId
+        }
+      }
+      return ''
+    }
+
+    const rollbackBroadcastTopic = `child-parent-rollback-${childId}`
+    const broadcastChannel = supabase
+      .channel(rollbackBroadcastTopic)
+      .on('broadcast', { event: 'mission_rollback' }, (msg: unknown) => {
+        const dmId = readBroadcastRollbackDailyMissionId(msg)
+        if (!dmId) return
+        applyRollbackByDailyMissionId(dmId)
+      })
+      .subscribe()
+
+    const dmChannel = supabase
+      .channel(`child-screen-dm-${childId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'daily_missions',
+          filter: `child_id=eq.${childId}`,
+        },
+        (payload) => onDailyMissionRemoteUpdate(payload as { new: Record<string, unknown> }),
+      )
+      .subscribe()
+
+    const mlChannel = supabase
+      .channel(`child-screen-ml-${childId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'mission_logs',
+          filter: `child_id=eq.${childId}`,
+        },
+        (payload) => onMissionLogRemoteUpdate(payload as { new: Record<string, unknown> }),
+      )
+      .subscribe()
+
+    const statsChannel = supabase
+      .channel(`child-screen-stats-${childId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'child_stats',
+          filter: `child_id=eq.${childId}`,
+        },
+        (payload) => {
+          setStats((prev) =>
+            normalizeChildStatsCreditsSplit(mergeChildStatsPatch(prev, payload.new as Record<string, unknown>)),
+          )
+        },
+      )
+      .subscribe()
+
+    return () => {
+      void supabase.removeChannel(broadcastChannel)
+      void supabase.removeChannel(dmChannel)
+      void supabase.removeChannel(mlChannel)
+      void supabase.removeChannel(statsChannel)
+    }
+  }, [childId, today])
 
   /** 루틴 시각 알림은 ref 로 ‘하루 1회’만 — 축하·수면·아침 화면만 막음 */
   useEffect(() => {
@@ -528,7 +743,8 @@ export default function ChildScreen({
     () =>
       missionList.filter((dm) => {
         const m = dm.missions
-        if (!m) return true
+        /** 미션 템플릿이 삭제된 오늘 행은 조인이 없어 슬라이더에 못 넣음 — 제외해야 빈 화면 원인 진단이 맞음 */
+        if (!m) return false
         if (isRetiredSpecialMissionTitle(m.title)) return false
         if (isRetiredRoutineMissionTitle(m.title)) return false
         return true
@@ -1105,6 +1321,11 @@ export default function ChildScreen({
         open={rapidTapModalOpen}
         onConfirm={handleRapidTapConfirm}
         onDeny={handleRapidTapDeny}
+      />
+
+      <ParentMissionRedoNoticeModal
+        mission={parentRedoModalMission}
+        onClose={() => setParentRedoModalMission(null)}
       />
 
       {showSchoolTime && !isSleeping && !showMorningWake ? (

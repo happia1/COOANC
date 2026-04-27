@@ -4,8 +4,9 @@
  * 부모 앱 — 승인 탭
  * - 상단은 루틴 탭과 같은 자녀 프로필 카드 + 다자녀 전환(스토어 selectedChildId 공유); 프로필 카드 탭 시 자녀 앱 화면으로 진입(홈과 동일 API).
  * - 구매 요청·미션 롤백은 선택 중인 자녀 기준으로만 표시합니다.
- * - 구매 요청: 대기·외부구매 중 — 「받았어요 ✓」로 도착 완료 처리(반려 없음). 아래 승인 내역에서 과거 건 확인.
- * - 미션 롤백: 카드 탭 시 하단 시트(스크롤, 10건까지 + 더보기). 「다시하기」는 API 즉시 롤백 후 자녀에게 브로드캐스트 알림.
+ * - 구매 요청: 대기·외부구매 중 — 파란 「승인」으로 도착 완료 처리(반려 없음). 「최근 승인 내역」버튼으로 하단 시트에서 과거 건 확인.
+ * - 최근 승인 내역: 오늘 완료 미션과 같은 하단 슬라이드 시트 — 최근 3건 먼저, 「더보기」로 전체.
+ * - 미션 롤백: 카드 탭 시 하단 시트(스크롤, 10건까지 + 더보기). 「다시하기」는 API 롤백 후 자녀 앱이 daily_missions Realtime 으로 팝업·카드를 맞춥니다.
  * - 미션 롤백 아래: 자녀 마켓 메뉴 제어(상품 표시/숨김, 가족 전용 상품 추가).
  */
 
@@ -28,8 +29,6 @@ import {
 } from '@/lib/koreaDate'
 import { PARENT_EXTERNAL_SHOP_URL } from '@/constants/parentShop'
 import { purchaseRequestStatusPill } from '@/lib/purchaseRequestStatusUi'
-import { playAudio, CHILD_AUDIO } from '@/lib/childAudio'
-
 /** mission_logs 조회 시 부모 탭 목록과 동일한 필드(실시간 갱신용) */
 const MISSION_LOG_SELECT_FOR_LIST =
   'id, child_id, assigned_date, completed_at, credit_earned, heart_earned, exp_earned, missions(title, icon_emoji)'
@@ -40,8 +39,27 @@ const ROLLBACK_SHEET_INITIAL = 10
 /** 부모 화면에 쌓는 승인 내역(처리 종료 요청) 상한 — 서버도 동일 개수로 내려줍니다 */
 const MAX_PARENT_REQUEST_HISTORY = 100
 
-/** 펼친 뒤 목록에서 먼저 보이는 건수 — 요청사항: 최근 5개 우선 표시 */
-const PURCHASE_HISTORY_PREVIEW_COUNT = 5
+/** 승인 내역 시트에서 먼저 보이는 건수 — 그 이상은 「더보기」 (오늘 완료 미션 시트와 동일한 패턴) */
+const PURCHASE_HISTORY_PREVIEW_COUNT = 3
+
+/**
+ * 자녀 홈이 구독하는 Realtime Broadcast 로 「다시하기」를 바로 알립니다.
+ * 비개발자 설명: DB 변경 알림만으로는 늦거나 안 올 때가 있어, 부모 기기에서 짧은 실시간 신호를 한 번 보냅니다.
+ */
+function notifyChildMissionRollbackBroadcast(childId: string, dailyMissionId: string) {
+  if (!childId || !dailyMissionId) return
+  const supabase = createClient()
+  const ch = supabase.channel(`child-parent-rollback-${childId}`)
+  ch.subscribe((status) => {
+    if (status !== 'SUBSCRIBED') return
+    void ch.send({
+      type: 'broadcast',
+      event: 'mission_rollback',
+      payload: { dailyMissionId },
+    })
+    window.setTimeout(() => void supabase.removeChannel(ch), 1000)
+  })
+}
 
 function mergeParentRequestHistory(prev: PurchaseRequest[], row: PurchaseRequest): PurchaseRequest[] {
   const filtered = prev.filter((x) => x.id !== row.id)
@@ -205,6 +223,8 @@ export default function ApprovalTab({
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null)
   const [rollbackSheetOpen, setRollbackSheetOpen] = useState(false)
   const [rollbackSheetShowAll, setRollbackSheetShowAll] = useState(false)
+  /** 「최근 승인 내역」— 오늘 완료 미션과 동일한 하단 슬라이드(바텀시트) 열림 여부 */
+  const [purchaseHistorySheetOpen, setPurchaseHistorySheetOpen] = useState(false)
 
   /**
    * 서울 기준 「오늘」 문자열 — 자정이 지나면 바뀌어야 `오늘 완료 미션` 목록이 비워집니다.
@@ -273,9 +293,6 @@ export default function ApprovalTab({
   const currentChild = childrenProfiles.find((c) => c.id === currentId) ?? childrenProfiles[0]
   const childLevel = currentChild?.level ?? 0
 
-  /** 태블릿 전용: 승인 내역 인라인 펼침 상태 */
-  const [historyInlineOpen, setHistoryInlineOpen] = useState(false)
-
   const tabs: ChildTab[] = useMemo(
     () => childrenProfiles.map((c) => ({ id: c.id, name: c.name })),
     [childrenProfiles],
@@ -291,18 +308,16 @@ export default function ApprovalTab({
     [historyRequests, currentId],
   )
 
-  /** 자녀를 바꾸면 펼침 상태 초기화 */
+  /** 자녀를 바꾸면 승인 시트·목록 펼침을 초기화(다른 아이 데이터가 섞여 보이지 않게) */
   useEffect(() => {
     setPurchaseHistoryShowAll(false)
-    setHistoryInlineOpen(false)
+    setPurchaseHistorySheetOpen(false)
   }, [currentId])
 
   const visiblePurchaseHistory = useMemo(() => {
     if (purchaseHistoryShowAll) return historyForChild
     return historyForChild.slice(0, PURCHASE_HISTORY_PREVIEW_COUNT)
   }, [historyForChild, purchaseHistoryShowAll])
-
-  const purchaseHistoryHasMore = historyForChild.length > PURCHASE_HISTORY_PREVIEW_COUNT
 
   /**
    * 구매 요청 카드 썸네일용 맵입니다.
@@ -485,7 +500,7 @@ export default function ApprovalTab({
         prev.map((r) => (r.id === requestId ? { ...r, status: 'parent_buying' as const } : r)),
       )
       window.open(PARENT_EXTERNAL_SHOP_URL, '_blank', 'noopener,noreferrer')
-      showToast('쇼핑 페이지를 열었어요. 주문 후 「받았어요 ✓」을 눌러 주세요.')
+      showToast('쇼핑 페이지를 열었어요. 주문 후 「승인」을 눌러 주세요.')
     } catch {
       showToast('네트워크 오류가 발생했어요', false)
     } finally {
@@ -532,14 +547,13 @@ export default function ApprovalTab({
   }
 
   /**
-   * 「다시하기」: 서버에서 즉시 롤백(카드·로그·크레딧·XP)한 뒤, Realtime 으로 자녀 화면에만 안내합니다.
-   * 브로드캐스트가 잠깐 실패해도 DB 는 이미 맞춰져 있고, 자녀 쪽은 child_stats 실시간 갱신으로 수치는 맞습니다.
+   * 「다시하기」: 서버에서 즉시 롤백(카드·로그·크레딧·XP)합니다.
+   * 자녀 기기는 Realtime(WebSocket)·Broadcast·DB 변경 구독으로 카드 복구와 안내 팝업을 받습니다.
    */
   async function handleRequestRedoFromChild(log: MissionLog) {
     if (!currentId) return
     setLoading(log.id)
     try {
-      playAudio(CHILD_AUDIO.dontLie)
       const res = await fetch('/api/mission/rollback', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -561,6 +575,8 @@ export default function ApprovalTab({
         showToast('일일 미션 정보를 받지 못했어요', false)
         return
       }
+
+      notifyChildMissionRollbackBroadcast(log.child_id, dailyMissionId)
 
       await refreshChildMissionLogs()
 
@@ -605,6 +621,9 @@ export default function ApprovalTab({
               <br />
               상품 구매를 원하실 경우 상품구매하기에서 주문이 가능합니다.
             </p>
+            {/**
+             * 보상 선택: 직접 보상(파랑) / 상품 구매(앰버) — 같은 블록 형태·테두리 없음
+             */}
             <div className="mt-5 flex flex-col gap-2">
               <button
                 type="button"
@@ -614,21 +633,23 @@ export default function ApprovalTab({
                   setApproveChoiceModal(null)
                   void handleApprove(id)
                 }}
-                className="w-full rounded-xl bg-green-500 px-4 py-2 text-sm font-bold text-white shadow-md active:scale-[0.98] disabled:opacity-50"
+                className="w-full rounded-xl border-0 bg-brand-blue py-3.5 text-sm font-black text-white shadow-md active:scale-[0.98] disabled:opacity-50"
               >
-                받았어요 ✓
+                자녀에게 직접 보상
               </button>
+              {/** 외부 쇼핑 연동 전까지 비활성 — 재개 시 disabled·문구 제거 후 handleParentShopPath 연결 */}
               <button
                 type="button"
-                disabled={loading === approveChoiceModal.requestId}
-                onClick={() => {
-                  const id = approveChoiceModal.requestId
-                  setApproveChoiceModal(null)
-                  void handleParentShopPath(id)
-                }}
-                className="w-full rounded-2xl border-2 border-amber-400 bg-amber-50 py-3.5 text-sm font-black text-amber-900 shadow-sm active:scale-[0.98] disabled:opacity-50"
+                disabled
+                aria-disabled="true"
+                className="w-full cursor-not-allowed rounded-xl border-0 bg-amber-500 py-3.5 text-sm font-black text-white shadow-md opacity-55"
               >
-                상품 구매하기
+                <span className="flex items-center justify-center gap-2">
+                  <span>상품 구매하기</span>
+                  <span className="rounded-md bg-black/20 px-1.5 py-0.5 text-[10px] font-black leading-none text-white">
+                    (준비중)
+                  </span>
+                </span>
               </button>
               <button
                 type="button"
@@ -644,11 +665,11 @@ export default function ApprovalTab({
 
       {/* ── 2컬럼 그리드 ────────────────────────────────────────────────────────
           모바일(grid-cols-1): 좌 컬럼 → 우 컬럼 순 스택
-          md+(grid-cols-2):   좌=프로필+구매요청+승인내역+완료미션, 우=스티커+마켓제어
+          md+(grid-cols-2):   좌=프로필+구매요청+최근승인내역+완료미션, 우=스티커+마켓제어
       ──────────────────────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 gap-6 w-full items-start md:grid-cols-2">
 
-      {/* ── 좌 컬럼: 프로필 + 구매 요청 + 승인 내역 + 오늘 완료 미션 ── */}
+      {/* ── 좌 컬럼: 프로필 + 구매 요청 + 최근 승인 내역 + 오늘 완료 미션 ── */}
       <div className="flex flex-col gap-5">
 
         {/* 통합 프로필 바 — RoutineTab과 동일 */}
@@ -735,13 +756,13 @@ export default function ApprovalTab({
                           </p>
                           {isParentBuying && (
                             <p className="mt-1.5 text-[9px] font-bold leading-snug text-sky-700">
-                              외부에서 주문한 뒤 「받았어요 ✓」으로 자녀에게 알려 주세요.
+                              외부에서 주문한 뒤 「승인」으로 자녀에게 알려 주세요.
                             </p>
                           )}
                         </div>
                       </div>
 
-                      {/* 받았어요(도착 완료) — 반려는 제거됨 */}
+                      {/* 승인(파랑) — 클릭 시 보상 제공 모달 또는 즉시 도착 완료 */}
                       <div className="flex shrink-0 flex-col gap-1 self-center">
                         {isParentBuying ? (
                           <>
@@ -749,14 +770,14 @@ export default function ApprovalTab({
                               type="button"
                               onClick={(e) => { e.stopPropagation(); void handleApprove(req.id) }}
                               disabled={loading === req.id}
-                              className="rounded-xl bg-green-500 px-4 py-2 text-[10px] font-bold text-white shadow-sm transition-all active:scale-95 disabled:opacity-50"
+                              className="rounded-xl border-0 bg-brand-blue px-4 py-2 text-[10px] font-bold text-white shadow-sm transition-all active:scale-95 disabled:opacity-50"
                             >
-                              {loading === req.id ? '…' : '받았어요 ✓'}
+                              {loading === req.id ? '…' : '승인'}
                             </button>
                             <button
                               type="button"
                               onClick={(e) => { e.stopPropagation(); window.open(PARENT_EXTERNAL_SHOP_URL, '_blank', 'noopener,noreferrer') }}
-                              className="rounded-xl bg-amber-500 px-4 py-2 text-[10px] font-bold text-white shadow-sm transition-all active:scale-95"
+                              className="rounded-xl border-0 bg-amber-500 px-4 py-2 text-[10px] font-bold text-white shadow-sm transition-all active:scale-95"
                             >
                               쿠팡 열기
                             </button>
@@ -766,9 +787,9 @@ export default function ApprovalTab({
                             type="button"
                             onClick={(e) => { e.stopPropagation(); setApproveChoiceModal({ requestId: req.id, itemName: req.item_name }) }}
                             disabled={loading === req.id}
-                            className="rounded-xl bg-green-500 px-4 py-2 text-[10px] font-bold text-white shadow-sm transition-all active:scale-95 disabled:opacity-50"
+                            className="rounded-xl border-0 bg-brand-blue px-4 py-2 text-[10px] font-bold text-white shadow-sm transition-all active:scale-95 disabled:opacity-50"
                           >
-                            받았어요 ✓
+                            승인
                           </button>
                         )}
                       </div>
@@ -780,69 +801,116 @@ export default function ApprovalTab({
           </div>
         </section>
 
-        {/* 승인 내역 — 접기/펼치기 (모바일·태블릿 공통) */}
-        {historyForChild.length > 0 && (
-          <section>
-            <button
-              type="button"
-              onClick={() => { setPurchaseHistoryShowAll(false); setHistoryInlineOpen((v) => !v) }}
-              className="w-full rounded-2xl bg-white px-4 py-2.5 text-left shadow-sm ring-1 ring-gray-100 transition-all active:scale-[0.99]"
-            >
-              <div className="flex items-center gap-3">
-                <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                  <span className="text-sm font-black text-brand-text">승인 내역</span>
-                  <span className="text-[11px] text-gray-400">탭하여 목록 {historyInlineOpen ? '접기' : '펼치기'}</span>
-                </div>
-                <span className="shrink-0 rounded-full bg-brand-blue/10 px-2.5 py-1 text-xs font-black tabular-nums text-brand-blue">
-                  {historyForChild.length}건
-                </span>
-                <span className={`shrink-0 text-lg font-bold text-gray-300 transition-transform ${historyInlineOpen ? 'rotate-90' : ''}`} aria-hidden>›</span>
+        {/* 최근 승인 내역 — 탭 시 하단 시트(오늘 완료 미션과 동일), 시트 안에서 최근 3건 + 더보기 */}
+        <section>
+          <button
+            type="button"
+            onClick={() => {
+              setRollbackSheetOpen(false)
+              setPurchaseHistoryShowAll(false)
+              setPurchaseHistorySheetOpen(true)
+            }}
+            className="w-full rounded-2xl bg-white px-4 py-2.5 text-left shadow-sm ring-1 ring-gray-100 transition-all active:scale-[0.99]"
+          >
+            <div className="flex items-center gap-3">
+              <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <span className="text-sm font-black text-brand-text">최근 승인 내역</span>
+                {/** 힌트 문구: 위 「오늘 완료 미션」행과 톤을 맞춤 */}
+                <span className="text-[11px] text-gray-400">탭하여 전체 · 상세 보기</span>
               </div>
-            </button>
-            {historyInlineOpen && (
-              <div className="mt-2">
-                <ul className="flex flex-col gap-1.5">
-                  {visiblePurchaseHistory.map((req) => {
-                    const pill = purchaseRequestStatusPill(req.status)
-                    return (
-                      <li key={req.id} className="rounded-xl bg-gray-50/90 px-3 py-2 ring-1 ring-gray-100">
-                        <div className="flex items-start justify-between gap-2">
-                          <p className="min-w-0 flex-1 truncate text-sm font-bold text-brand-text">{req.item_name}</p>
-                          <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-black ${pill.pillClass}`}>
-                            {pill.label}
-                          </span>
-                        </div>
-                        <p className="mt-1 text-[10px] tabular-nums text-gray-400">
-                          {purchaseHistoryPrimaryDate(req)} · {req.item_price.toLocaleString()}크레딧
-                        </p>
-                        {req.status === 'rejected' && req.parent_note ? (
-                          <p className="mt-1 line-clamp-2 text-[10px] text-gray-500">사유: {req.parent_note}</p>
-                        ) : null}
-                      </li>
-                    )
-                  })}
-                </ul>
-                {purchaseHistoryHasMore && (
+              <span className="shrink-0 rounded-full bg-brand-blue/10 px-2.5 py-1 text-xs font-black tabular-nums text-brand-blue">
+                {historyForChild.length}건
+              </span>
+              <span className="shrink-0 text-lg font-bold text-gray-300" aria-hidden>›</span>
+            </div>
+          </button>
+
+          {purchaseHistorySheetOpen && (
+            <div className="fixed inset-0 z-[100] flex flex-col justify-end">
+              {/** 딤: 탭 시 시트 닫기 */}
+              <button
+                type="button"
+                className="absolute inset-0 bg-black/45"
+                aria-label="닫기"
+                onClick={() => setPurchaseHistorySheetOpen(false)}
+              />
+              <div
+                className="relative z-[1] flex max-h-[min(78dvh,560px)] flex-col rounded-t-3xl bg-white shadow-2xl"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="purchase-history-sheet-title"
+              >
+                {/** 상단 잡는 막대 — iOS 느낌의 시트 */}
+                <div className="flex justify-center pt-2 pb-1">
+                  <span className="h-1 w-10 rounded-full bg-gray-200" />
+                </div>
+                <div className="border-b border-gray-100 px-5 pb-3 pt-1">
+                  <h3 id="purchase-history-sheet-title" className="text-base font-black text-brand-text">
+                    최근 승인 내역
+                  </h3>
+                </div>
+                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3">
+                  {historyForChild.length === 0 ? (
+                    <p className="py-8 text-center text-sm text-gray-400">최근 승인·도착한 내역이 없어요</p>
+                  ) : (
+                    <ul className="flex flex-col gap-1.5">
+                      {visiblePurchaseHistory.map((req) => {
+                        const pill = purchaseRequestStatusPill(req.status)
+                        return (
+                          <li key={req.id} className="rounded-xl bg-gray-50/90 px-3 py-2 ring-1 ring-gray-100">
+                            <div className="flex items-start justify-between gap-2">
+                              <p className="min-w-0 flex-1 truncate text-sm font-bold text-brand-text">{req.item_name}</p>
+                              <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-black ${pill.pillClass}`}>
+                                {pill.label}
+                              </span>
+                            </div>
+                            <p className="mt-1 text-[10px] tabular-nums text-gray-400">
+                              {purchaseHistoryPrimaryDate(req)} · {req.item_price.toLocaleString()}크레딧
+                            </p>
+                            {req.status === 'rejected' && req.parent_note ? (
+                              <p className="mt-1 line-clamp-2 text-[10px] text-gray-500">사유: {req.parent_note}</p>
+                            ) : null}
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  )}
+                </div>
+                {historyForChild.length > PURCHASE_HISTORY_PREVIEW_COUNT && !purchaseHistoryShowAll && (
+                  <div className="border-t border-gray-100 px-4 py-2">
+                    {/** 3건 초과 시에만, 롤백 시트의 「더보기」자리와 동일 */}
+                    <button
+                      type="button"
+                      onClick={() => setPurchaseHistoryShowAll(true)}
+                      className="w-full rounded-xl border border-gray-200 py-2.5 text-sm font-bold text-brand-text"
+                    >
+                      더보기 ({historyForChild.length - PURCHASE_HISTORY_PREVIEW_COUNT}건 더)
+                    </button>
+                  </div>
+                )}
+                <div className="border-t border-gray-100 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
                   <button
                     type="button"
-                    onClick={() => setPurchaseHistoryShowAll((v) => !v)}
-                    className="mt-2 w-full rounded-xl border border-gray-200 py-2.5 text-sm font-bold text-brand-text"
+                    onClick={() => setPurchaseHistorySheetOpen(false)}
+                    className="w-full rounded-2xl bg-gray-100 py-3 text-sm font-bold text-gray-600"
                   >
-                    {purchaseHistoryShowAll
-                      ? `간단히 보기 (${PURCHASE_HISTORY_PREVIEW_COUNT}건)`
-                      : `더보기 (${historyForChild.length - PURCHASE_HISTORY_PREVIEW_COUNT}건 더)`}
+                    닫기
                   </button>
-                )}
+                </div>
               </div>
-            )}
-          </section>
-        )}
+            </div>
+          )}
+        </section>
 
         {/* 오늘 완료 미션 — 버튼 → 하단 시트 (모바일·태블릿 공통) */}
         <section>
           <button
             type="button"
-            onClick={() => { setRollbackSheetShowAll(false); setRollbackSheetOpen(true) }}
+            onClick={() => {
+              setPurchaseHistorySheetOpen(false)
+              setRollbackSheetShowAll(false)
+              setRollbackSheetOpen(true)
+            }}
             className="w-full rounded-2xl bg-white px-4 py-2.5 text-left shadow-sm ring-1 ring-gray-100 transition-all active:scale-[0.99]"
           >
             <div className="flex items-center gap-3">

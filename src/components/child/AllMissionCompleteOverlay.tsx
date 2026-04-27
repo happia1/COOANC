@@ -6,19 +6,18 @@
  * 비개발자 설명:
  * - 반투명 배경 위에 “미션 완료!” 메시지와 오늘 번 코인 합을 보여줍니다.
  * - 화면이 켜질 때는 소리 없이 색종이(컨페티)만 터집니다.
- * - [내일 만나자! 잘자~]를 누르면 잘 준비 음성 후 수면 모드로 넘어갑니다(onSleep).
+ * - [내일 만나자! 잘자~]를 누르면 잘 준비 음 없이 수면 모드로 넘어갑니다(onSleep).
  */
 
 import { useEffect } from 'react'
 import confetti from 'canvas-confetti'
-import { playAudio, CHILD_AUDIO } from '@/lib/childAudio'
 
 interface Props {
   /** 오늘(이 세션에서) 미션으로 번 코인의 합 — 숫자 앞에 + 로 표시 */
   todayCredits: number
   /** 화면에 보일 아이 이름 */
   childName: string
-  /** 잘 준비 음성 재생 후 수면 모드로 전환 */
+  /** 수면 모드(잘자 화면)로 전환 */
   onSleep: () => void
 }
 
@@ -124,8 +123,7 @@ export default function AllMissionCompleteOverlay({
         <button
           type="button"
           onClick={() => {
-            playAudio(CHILD_AUDIO.sleepReady)
-            window.setTimeout(() => onSleep(), 800)
+            onSleep()
           }}
           className="w-full py-4 rounded-2xl font-black text-white text-lg
                      active:scale-95 transition-transform"

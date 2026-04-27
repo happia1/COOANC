@@ -12,8 +12,8 @@ declare global {
  * 브라우저 환경에서 Supabase와 통신하기 위한 클라이언트 생성
  * NEXT_PUBLIC_ 접두사가 붙은 환경 변수는 브라우저에 노출됩니다.
  * - 싱글톤으로 유지해 PostgREST·Auth 설정을 재사용합니다.
- * - 자녀 앱은 `channel()` 구독을 쓰지 않으므로, 초기화 직후 Realtime 웹소켓을 끊어
- *   불필요한 `wss://…/realtime` 핸드셰이크(수백 ms~수 초)를 줄입니다.
+ * - Realtime(WebSocket)은 끊지 않습니다. 자녀 홈(`ChildScreen`)이 부모 「다시하기」 알림을
+ *   `postgres_changes`·Broadcast 로 받기 때문입니다. (예전에는 미사용이라 disconnect 했음)
  */
 export const createClient = () => {
   const cached = globalThis.__cooancSupabaseBrowserClient
@@ -21,15 +21,5 @@ export const createClient = () => {
   const { url, anonKey } = requireSupabaseUrlAndAnonKey()
   const client = createBrowserClient(url, anonKey)
   globalThis.__cooancSupabaseBrowserClient = client
-  if (typeof window !== 'undefined') {
-    const tearDownRealtime = () => {
-      void client.realtime.disconnect()
-    }
-    tearDownRealtime()
-    /** 세션 갱신 시 SDK 가 다시 소켓을 열 수 있어, 로그인 상태에서도 한 번 더 끊습니다. */
-    client.auth.onAuthStateChange(() => {
-      tearDownRealtime()
-    })
-  }
   return client
 }

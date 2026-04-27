@@ -8,6 +8,7 @@
  */
 
 import { useCallback, useEffect, useLayoutEffect, useState } from 'react'
+import { useAlarmSoundPreview } from '@/hooks/useAlarmSoundPreview'
 import { createPortal } from 'react-dom'
 import {
   readRoutineAlarmPrefs,
@@ -31,7 +32,7 @@ const CORE_ROUTINE_ALARM_ITEMS: Array<{
 }> = [
   { row: 'wake', label: '기상', defaultSoundId: 'morning_greet' },
   { row: 'school', label: '등원', defaultSoundId: 'time_to_go' },
-  { row: 'return', label: '하원·귀가', defaultSoundId: 'good_morning' },
+  { row: 'return', label: '하원·귀가', defaultSoundId: 'tick_tock_timer' },
   { row: 'sleepReady', label: '잘 준비', defaultSoundId: 'sleep_ready' },
   { row: 'sleep', label: '취침', defaultSoundId: 'morning_alarm_birds' },
 ]
@@ -103,6 +104,18 @@ export default function RoutineAlarmSettingsSheet({ open, onClose }: Props) {
   const [addSound, setAddSound] = useState('')
   const [portalReady, setPortalReady] = useState(false)
   const [sheetEntered, setSheetEntered] = useState(false)
+  /** 알람 소리 시트에서만 쓰는 미리듣기(한 번에 하나) — 닫을 때·메인 닫힘 시 반드시 정지 */
+  const { play: previewPlay, stop: stopPreview, playingId: previewPlayingId } = useAlarmSoundPreview()
+
+  useEffect(() => {
+    if (!open) stopPreview()
+  }, [open, stopPreview])
+  useEffect(() => {
+    if (!soundSheet.open) stopPreview()
+  }, [soundSheet.open, stopPreview])
+  useEffect(() => {
+    if (!addOpen) stopPreview()
+  }, [addOpen, stopPreview])
 
   useLayoutEffect(() => {
     setPortalReady(true)
@@ -482,11 +495,24 @@ export default function RoutineAlarmSettingsSheet({ open, onClose }: Props) {
           />
           <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center">
             <div className="pointer-events-auto max-h-[70vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white px-4 pb-6 pt-3 shadow-xl">
-              <p className="mb-2 text-center text-sm font-black text-gray-900">알람 소리 선택</p>
+              <p className="mb-1 text-center text-sm font-black text-gray-900">알람 소리 선택</p>
+              <div className="mb-2 flex justify-end">
+                <button
+                  type="button"
+                  onClick={stopPreview}
+                  disabled={!previewPlayingId}
+                  className="rounded-lg px-2.5 py-1 text-[10px] font-bold text-gray-600 transition-colors enabled:hover:bg-gray-100 enabled:active:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  소리 끄기
+                </button>
+              </div>
               <SoundToggleList
                 sounds={alarmSounds}
                 selectedId={pickerSound}
                 onSelect={(id) => setPickerSound(id)}
+                onPreview={previewPlay}
+                playingId={previewPlayingId}
+                onStop={stopPreview}
               />
               <div className="mt-4 flex gap-2">
                 <button
@@ -535,11 +561,24 @@ export default function RoutineAlarmSettingsSheet({ open, onClose }: Props) {
                 <span className="text-[11px] font-bold text-gray-600">알림 사용</span>
                 <NotifyToggleSmall notify={addNotify} onToggle={() => setAddNotify((n) => !n)} />
               </div>
-              <p className="mb-1 text-[10px] font-bold text-gray-500">알람 소리</p>
+              <p className="mb-0.5 text-[10px] font-bold text-gray-500">알람 소리</p>
+              <div className="mb-1.5 flex justify-end">
+                <button
+                  type="button"
+                  onClick={stopPreview}
+                  disabled={!previewPlayingId}
+                  className="rounded-lg px-2.5 py-1 text-[10px] font-bold text-gray-600 transition-colors enabled:hover:bg-gray-100 enabled:active:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  소리 끄기
+                </button>
+              </div>
               <SoundToggleList
                 sounds={alarmSounds}
                 selectedId={addSound}
                 onSelect={(id) => setAddSound(id)}
+                onPreview={previewPlay}
+                playingId={previewPlayingId}
+                onStop={stopPreview}
               />
               <div className="mt-4 flex gap-2">
                 <button
@@ -760,14 +799,27 @@ function AlarmScheduleRow({
   )
 }
 
+/**
+ * 음원 pill + 미리듣기(▶) + 이 항목이 재생 중일 때만 쓰는 정지(■)
+ * (전체 `소리 끄기`는 시트 제목 옆·위쪽 버튼으로도 가능)
+ */
 function SoundToggleList({
   sounds,
   selectedId,
   onSelect,
+  onPreview,
+  onStop,
+  playingId,
 }: {
   sounds: SoundItem[]
   selectedId: string
   onSelect: (id: string) => void
+  /** (url, id) — 훅의 play 와 동일 순서: 주소, 목록 id */
+  onPreview: (url: string, id: string) => void
+  /** 현재 이 목록 id 가 재생 중이면 UI에서 강조 */
+  playingId: string | null
+  /** 재생 중인 소리를 멈춤(▶로 새로 재생해도 이전은 자동 정지) */
+  onStop: () => void
 }) {
   if (!sounds.length) {
     return (
@@ -780,6 +832,7 @@ function SoundToggleList({
     <div className="flex max-h-40 flex-wrap gap-1.5 overflow-y-auto py-1">
       {sounds.map((s) => {
         const on = selectedId === s.id
+        const isPlayingThis = playingId === s.id
         return (
           <div
             key={s.id}
@@ -789,7 +842,7 @@ function SoundToggleList({
               type="button"
               onClick={() => onSelect(s.id)}
               className={[
-                'min-w-0 max-w-[11rem] truncate rounded-full px-2 py-1 text-[10px] font-bold transition-all',
+                'min-w-0 max-w-[9rem] truncate rounded-full px-2 py-1 text-[10px] font-bold transition-all',
                 on ? 'bg-[#4A90E2] text-white' : 'text-gray-600 hover:bg-[#4A90E2]/10',
               ].join(' ')}
             >
@@ -797,19 +850,23 @@ function SoundToggleList({
             </button>
             <button
               type="button"
-              onClick={() => {
-                try {
-                  const audio = new Audio(s.url)
-                  audio.volume = 0.7
-                  void audio.play()
-                } catch {
-                  /* 미리듣기 실패 무시 */
-                }
-              }}
-              className="ml-auto shrink-0 p-1 text-gray-400 transition-colors active:text-blue-500"
+              onClick={() => onPreview(s.url, s.id)}
+              className={[
+                'shrink-0 rounded-full p-1 text-[10px] transition-colors',
+                isPlayingThis ? 'text-[#4A90E2]' : 'text-gray-400 active:text-blue-500',
+              ].join(' ')}
               aria-label="미리듣기"
             >
               ▶
+            </button>
+            <button
+              type="button"
+              onClick={onStop}
+              disabled={!playingId}
+              className="shrink-0 rounded-full p-1 text-[10px] text-gray-500 transition-colors enabled:hover:text-rose-600 enabled:active:text-rose-700 disabled:cursor-not-allowed disabled:opacity-30"
+              aria-label="미리듣기 정지"
+            >
+              ■
             </button>
           </div>
         )

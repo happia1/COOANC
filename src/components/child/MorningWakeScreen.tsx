@@ -3,7 +3,8 @@
 /**
  * 기상 화면 — 수면 모드 이후 아침 인사 + 컨페티
  *
- * 비개발자 설명: 밝은 그라데이션과 해 이모지로 아침 분위기를 내고, 시작 버튼으로 홈으로 돌아갑니다.
+ * 비개발자 설명: 밝은 그라데이션과 해 이모지로 아침 분위기를 내고, 시작 버튼을 누를 때만
+ * 「기분좋게 시작」 음이 나고(한 번), 버튼으로 홈으로 돌아갑니다. 팝업이 뜰 때는 소리를 내지 않습니다.
  */
 
 import { useEffect } from 'react'
@@ -16,9 +17,8 @@ interface Props {
 }
 
 export default function MorningWakeScreen({ childName, onStart }: Props) {
+  // 화면이 열릴 때는 효과음 없이 컨페티만(기분좋게 시작 음은 아래 [시작] 버튼에서만 재생)
   useEffect(() => {
-    playAudio(CHILD_AUDIO.goodMorning)
-
     const t = window.setTimeout(() => {
       confetti({
         particleCount: 60,

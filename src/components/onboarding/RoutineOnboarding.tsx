@@ -10,6 +10,7 @@
  */
 
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
+import { useAlarmSoundPreview } from '@/hooks/useAlarmSoundPreview'
 import { DEFAULT_ROUTINE_ALARM_SOUND_IDS } from '@/lib/routineAlarmSounds'
 
 // ── 미션 API가 받는 블록 타입 (DB 정렬·아이콘 매칭용, 화면은 오전/오후 두 덩어리만 노출)
@@ -220,7 +221,15 @@ export default function RoutineOnboarding({ onComplete, linkedChildId }: Props) 
   const [suggestSubmitMsg, setSuggestSubmitMsg] = useState<string | null>(null)
   const [suggestSubmitting, setSuggestSubmitting] = useState(false)
 
-  const previewAudioRef = useRef<HTMLAudioElement | null>(null)
+  const {
+    play: alarmPreviewPlay,
+    stop: stopAlarmPreview,
+    playingId: alarmPreviewPlayingId,
+  } = useAlarmSoundPreview()
+
+  useEffect(() => {
+    if (!sheet.open) stopAlarmPreview()
+  }, [sheet.open, stopAlarmPreview])
 
   useEffect(() => {
     let cancelled = false
@@ -240,17 +249,6 @@ export default function RoutineOnboarding({ onComplete, linkedChildId }: Props) 
       .catch(() => {})
     return () => {
       cancelled = true
-    }
-  }, [])
-
-  const playPreview = useCallback((url: string) => {
-    try {
-      previewAudioRef.current?.pause()
-      const a = new Audio(url)
-      previewAudioRef.current = a
-      void a.play()
-    } catch {
-      /* 미리듣기 실패 무시 */
     }
   }, [])
 
@@ -806,15 +804,28 @@ export default function RoutineOnboarding({ onComplete, linkedChildId }: Props) 
                     <span className="text-[11px] font-bold text-gray-600">알림 사용</span>
                     <NotifyToggleSmall notify={sheetNotify} onToggle={() => setSheetNotify((n) => !n)} />
                   </div>
-                  <p className="text-[10px] font-bold text-gray-500 mb-1">알람 소리</p>
+                  <p className="text-[10px] font-bold text-gray-500 mb-0.5">알람 소리</p>
+                  <div className="mb-1.5 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={stopAlarmPreview}
+                      disabled={!alarmPreviewPlayingId}
+                      className="rounded-lg px-2.5 py-1 text-[10px] font-bold text-gray-600 transition-colors enabled:hover:bg-gray-100 enabled:active:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      소리 끄기
+                    </button>
+                  </div>
                   <SoundToggleList
                     sounds={alarmSounds}
                     selectedId={sheetSound}
                     onSelect={(id) => {
                       setSheetSound(id)
                       const u = alarmSounds.find((s) => s.id === id)?.url
-                      if (u) playPreview(u)
+                      if (u) alarmPreviewPlay(u, id)
                     }}
+                    onPreview={alarmPreviewPlay}
+                    onStop={stopAlarmPreview}
+                    playingId={alarmPreviewPlayingId}
                   />
                   <div className="mt-4 flex gap-2">
                     <button
@@ -837,15 +848,28 @@ export default function RoutineOnboarding({ onComplete, linkedChildId }: Props) 
               )}
               {sheet.mode === 'sound' && (
                 <>
-                  <p className="text-center text-sm font-black text-brand-text mb-2">알람 소리 선택</p>
+                  <p className="text-center text-sm font-black text-brand-text mb-1">알람 소리 선택</p>
+                  <div className="mb-2 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={stopAlarmPreview}
+                      disabled={!alarmPreviewPlayingId}
+                      className="rounded-lg px-2.5 py-1 text-[10px] font-bold text-gray-600 transition-colors enabled:hover:bg-gray-100 enabled:active:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      소리 끄기
+                    </button>
+                  </div>
                   <SoundToggleList
                     sounds={alarmSounds}
                     selectedId={pickerSound}
                     onSelect={(id) => {
                       setPickerSound(id)
                       const u = alarmSounds.find((s) => s.id === id)?.url
-                      if (u) playPreview(u)
+                      if (u) alarmPreviewPlay(u, id)
                     }}
+                    onPreview={alarmPreviewPlay}
+                    onStop={stopAlarmPreview}
+                    playingId={alarmPreviewPlayingId}
                   />
                   <div className="mt-4 flex gap-2">
                     <button
@@ -1246,14 +1270,24 @@ function AlarmScheduleRow({
 }
 
 /** 알람 음원 목록 — pill 토글(라디오). API로 폴더 스캔된 목록을 그대로 사용 */
+/**
+ * 음 pill 선택 + ▶ 미리듣기 + (해당 음이 재생 중일 때만 쓰는) ■ 정지
+ * 상단「소리 끄기」는 전체 미리듣기를 끄는 별도 버튼
+ */
 function SoundToggleList({
   sounds,
   selectedId,
   onSelect,
+  onPreview,
+  onStop,
+  playingId,
 }: {
   sounds: AlarmSoundItem[]
   selectedId: string
   onSelect: (id: string) => void
+  onPreview: (url: string, id: string) => void
+  onStop: () => void
+  playingId: string | null
 }) {
   if (!sounds.length) {
     return (
@@ -1266,18 +1300,45 @@ function SoundToggleList({
     <div className="flex max-h-40 flex-wrap gap-1.5 overflow-y-auto py-1">
       {sounds.map((s) => {
         const on = selectedId === s.id
+        const isPlayingThis = playingId === s.id
         return (
-          <button
+          <div
             key={s.id}
-            type="button"
-            onClick={() => onSelect(s.id)}
-            className={[
-              'rounded-full border px-2.5 py-1 text-[10px] font-bold transition-all',
-              on ? 'border-brand-blue bg-brand-blue text-white' : 'border-gray-200 bg-white text-gray-600 hover:border-brand-blue/40',
-            ].join(' ')}
+            className="inline-flex max-w-full min-w-0 items-center gap-0.5 rounded-full border border-gray-200 bg-white pl-1 pr-0.5"
           >
-            {s.label}
-          </button>
+            <button
+              type="button"
+              onClick={() => onSelect(s.id)}
+              className={[
+                'min-w-0 max-w-[9rem] truncate rounded-full px-2 py-1 text-[10px] font-bold transition-all',
+                on
+                  ? 'bg-brand-blue text-white'
+                  : 'text-gray-600 hover:border-brand-blue/40 hover:bg-brand-blue/5',
+              ].join(' ')}
+            >
+              {s.label}
+            </button>
+            <button
+              type="button"
+              onClick={() => onPreview(s.url, s.id)}
+              className={[
+                'shrink-0 rounded-full p-1 text-[10px] transition-colors',
+                isPlayingThis ? 'text-brand-blue' : 'text-gray-400 active:text-brand-blue',
+              ].join(' ')}
+              aria-label="미리듣기"
+            >
+              ▶
+            </button>
+            <button
+              type="button"
+              onClick={onStop}
+              disabled={!playingId}
+              className="shrink-0 rounded-full p-1 text-[10px] text-gray-500 transition-colors enabled:hover:text-rose-600 enabled:active:text-rose-700 disabled:cursor-not-allowed disabled:opacity-30"
+              aria-label="미리듣기 정지"
+            >
+              ■
+            </button>
+          </div>
         )
       })}
     </div>

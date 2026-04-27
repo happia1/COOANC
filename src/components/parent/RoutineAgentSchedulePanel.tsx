@@ -1642,7 +1642,7 @@ export default function RoutineAgentSchedulePanel({
                 <div className="my-4 border-t border-gray-100" />
                 <p className="mb-0.5 text-center text-[11px] font-bold text-gray-500">빠른 입력</p>
                 <p className="mb-2 text-center text-[10px] font-medium leading-snug text-gray-400">
-                  칩을 누르면 대화창에 바로 일정 카드가 생기고, 제목·날짜는 카드에서 바로 고칠 수 있어요.
+                  아래의 키워드로 빠르게 일정을 등록해보세요!
                 </p>
                 <div className="flex flex-wrap justify-center gap-2">
                   {(
@@ -1685,7 +1685,7 @@ export default function RoutineAgentSchedulePanel({
                 ) : shell === 'schedule_image' ? (
                   <div className="shrink-0 space-y-2 border-b border-gray-100 bg-white px-3 py-3">
                     <p className="text-center text-sm font-bold leading-snug text-gray-800">
-                      일정과 관련된 사진을 올려 주시면 자동으로 읽어 드려요.
+                      일정과 관련된 사진으로 쉽고 빠른 일정 등록이 가능해요.
                     </p>
                   </div>
                 ) : null}

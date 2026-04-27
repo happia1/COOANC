@@ -1,34 +1,28 @@
-import { unstable_cache } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { createServiceRoleClient } from '@/lib/supabase/admin'
 import type { Mission } from '@/types/database'
 
 /**
  * 자녀 미션 RSC — `missions` 미션 템플릿 전체 조회
- * - 자주 바뀌지 않는 마스터 데이터이므로 60초마다만 서버에서 다시 읽습니다.
- * - `child_stats`·`daily_missions` 등 실시간에 가까운 데이터는 페이지에서 그대로 매 요청 조회합니다.
+ *
+ * 비개발자 설명:
+ * - 예전에는 Next `unstable_cache`(60초)로 목록을 잠깐 저장했다가, 부모가 루틴을 갈아엎은 직후
+ *   **이미 지워진 카드 id**로 오늘 일정을 채우려다 실패하는 문제가 있었습니다.
+ * - 그래서 **캐시 없이** 요청마다 DB에서 바로 읽습니다(자녀 홈·미션 탭이 항상 최신 템플릿을 봅니다).
  */
-const getMissionTemplatesChildRscInner = unstable_cache(
-  async () => {
-    const missionDb = createServiceRoleClient()
-    if (!missionDb) {
-      return { data: null as Mission[] | null, error: { message: 'no_service_role' as const } }
-    }
-    const res = await missionDb
-      .from('missions')
-      .select('*')
-      .order('scheduled_time', { ascending: true, nullsFirst: false })
-    return {
-      data: (res.data ?? null) as Mission[] | null,
-      error: res.error ? { message: res.error.message } : null,
-    }
-  },
-  ['missions-templates-child-rsc'],
-  { revalidate: 60 },
-)
-
 export async function getMissionTemplatesForChildMissionPage() {
-  return getMissionTemplatesChildRscInner()
+  const missionDb = createServiceRoleClient()
+  if (!missionDb) {
+    return { data: null as Mission[] | null, error: { message: 'no_service_role' as const } }
+  }
+  const res = await missionDb
+    .from('missions')
+    .select('*')
+    .order('scheduled_time', { ascending: true, nullsFirst: false })
+  return {
+    data: (res.data ?? null) as Mission[] | null,
+    error: res.error ? { message: res.error.message } : null,
+  }
 }
 
 /**

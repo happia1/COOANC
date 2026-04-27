@@ -1,0 +1,24 @@
+## COOANC 자녀앱 구조 (필독)
+
+자녀앱의 모든 UI는 단일 화면으로 통합되어 있습니다.
+
+### 핵심 파일
+- 자녀앱 메인: `src/components/child/ChildScreen.tsx`
+- 패널 (마켓/스티커/꾸미기/코인): `src/components/child/ChildPanelOverlay.tsx`
+- 마켓 UI 구현(컴포넌트, 비단일 경로): `src/components/child/MarketTab.tsx` — **패널에서만** 동적 import (`ChildPanelOverlay` → `activePanel === 'market'`)
+- 미션카드: `src/components/child/ChildMissionCard.tsx`
+- 라우트: `src/app/(child)/home/page.tsx`
+
+### 절대 금지
+- `src/app/(child)/mission/` 및 `src/app/(child)/market/` 폴더(페이지 라우트) — **없음**. 삭제됨.
+- `MissionTab.tsx` — **삭제됨**. 별도 미션 탭 컴포넌트·라우트를 새로 만들지 말 것.
+- 자녀앱 디버깅 시 `/mission`·`/market` **페이지**를 복원하거나 참조하지 말 것.
+
+### 미션카드 디버깅
+- `visibleMissions`: `ChildScreen.tsx` 내 `useMemo` 확인
+- `incompleteOrdered`: 완료되지 않은 미션 필터
+- `done`: `Set<string>` — 완료된 미션 ID 목록
+
+### 마켓 디버깅
+- `ChildPanelOverlay.tsx`의 `'market'` 패널 + 내부 `MarketTab` 컴포넌트
+- `betaMarketConfig.ts`에서 활성 상품 필터링
