@@ -6,29 +6,36 @@
 import { createClient } from '@/lib/supabase/client'
 import type { LocalCalendarEvent } from '@/types/database'
 
+/** `calendar_events.event_type` 과 동일 허용값 — DB 스키마와 맞춤 */
 const EVENT_TYPES: LocalCalendarEvent['eventType'][] = [
   'holiday',
   'vacation',
+  'travel',
+  'birthday',
+  'etc',
+  'school',
   'special',
   'other',
   'event',
-  'travel',
 ]
 
 const ROUTINE_OVERRIDES: LocalCalendarEvent['routineOverride'][] = ['weekend', 'none', 'weekday']
 
 function coerceEventType(raw: string | null | undefined): LocalCalendarEvent['eventType'] {
   const t = String(raw ?? '').toLowerCase()
-  return (EVENT_TYPES.includes(t as LocalCalendarEvent['eventType'])
-    ? t
-    : 'other') as LocalCalendarEvent['eventType']
+  if (EVENT_TYPES.includes(t as LocalCalendarEvent['eventType'])) {
+    return t as LocalCalendarEvent['eventType']
+  }
+  return 'other'
 }
 
 function coerceRoutineOverride(raw: string | null | undefined): LocalCalendarEvent['routineOverride'] {
-  const t = String(raw ?? '').toLowerCase()
-  return (ROUTINE_OVERRIDES.includes(t as LocalCalendarEvent['routineOverride'])
-    ? t
-    : 'weekend') as LocalCalendarEvent['routineOverride']
+  if (raw == null || String(raw).trim() === '') return 'none'
+  const t = String(raw).toLowerCase()
+  if (ROUTINE_OVERRIDES.includes(t as LocalCalendarEvent['routineOverride'])) {
+    return t as LocalCalendarEvent['routineOverride']
+  }
+  return 'none'
 }
 
 /** Supabase 행 → 캘린더 카드 모델 */

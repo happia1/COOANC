@@ -134,6 +134,21 @@ export type DailyMissionWithTemplate = DailyMission & {
   >
 }
 
+/**
+ * `calendar_events.event_type` 및 로컬 캘린더 — DB 스키마·에이전트와 동일 허용값.
+ * 순서: holiday → vacation → travel → birthday → etc → school → special → other → event
+ */
+export type CalendarEventType =
+  | 'holiday'
+  | 'vacation'
+  | 'travel'
+  | 'birthday'
+  | 'etc'
+  | 'school'
+  | 'special'
+  | 'other'
+  | 'event'
+
 export type CalendarEvent = {
   id: string
   parent_id: string
@@ -141,7 +156,7 @@ export type CalendarEvent = {
   title: string
   start_date: string    // YYYY-MM-DD
   end_date: string      // YYYY-MM-DD
-  event_type: 'holiday' | 'vacation' | 'special' | 'other' | 'event' | 'travel'
+  event_type: CalendarEventType
   /** 주중 루틴 강제 / 휴일(주말) 루틴 / 미션 없음 */
   routine_override: 'weekend' | 'none' | 'weekday'
   created_at: string
@@ -156,7 +171,8 @@ export type LocalCalendarEvent = {
   description?: string
   startDate: string       // YYYY-MM-DD
   endDate: string         // YYYY-MM-DD
-  eventType: 'holiday' | 'vacation' | 'special' | 'other' | 'event' | 'travel'
+  /** DB `event_type` 과 동일 — holiday·vacation·travel·birthday·etc·school·special·other·event */
+  eventType: CalendarEventType
   /** 로컬 캘린더용 — `CalendarEvent` 와 동일한 세 가지 */
   routineOverride: 'weekend' | 'none' | 'weekday'
 }

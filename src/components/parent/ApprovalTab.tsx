@@ -4,7 +4,7 @@
  * 부모 앱 — 승인 탭
  * - 상단은 루틴 탭과 같은 자녀 프로필 카드 + 다자녀 전환(스토어 selectedChildId 공유); 프로필 카드 탭 시 자녀 앱 화면으로 진입(홈과 동일 API).
  * - 구매 요청·미션 롤백은 선택 중인 자녀 기준으로만 표시합니다.
- * - 구매 요청: 대기·외부구매 중 — 파란 「승인」으로 도착 완료 처리(반려 없음). 구매 블록 바로 위 오른쪽 「최근구매내역」링크로 하단 시트에서 과거 건 확인.
+ * - 구매 요청: 대기·외부구매 중 — 파란 「승인」으로 도착 완료 처리(반려 없음). 「구매 요청」제목과 같은 줄 오른쪽 「최근구매내역」링크로 하단 시트에서 과거 건 확인.
  * - 최근 구매(승인) 내역: 오늘 완료 미션과 같은 하단 슬라이드 시트 — 최근 3건 먼저, 「더보기」로 전체.
  * - 미션 롤백: 카드 탭 시 하단 시트(스크롤, 10건까지 + 더보기). 「다시하기」는 API 롤백 후 자녀 앱이 daily_missions Realtime 으로 팝업·카드를 맞춥니다.
  * - 미션 롤백 아래: 자녀 마켓 메뉴 제어(상품 표시/숨김, 가족 전용 상품 추가).
@@ -705,29 +705,31 @@ export default function ApprovalTab({
         </div>
 
         {/**
-         * 구매 요청 블록과 한 덩어리로 보이게 묶음
-         * - 위쪽 한 줄: 오른쪽 끝 「최근구매내역」— 누르면 아래와 같은 바텀시트로 승인·반려·도착 이력 표시
+         * 구매 요청 섹션 + 최근 내역 바텀시트를 한 덩어리로 묶음
+         * - 제목 행·보조 문구·우측 링크: 메뉴 제어 블록과 같은 타이포·간격(상품 추가하기와 대응)
          */}
         <div className="flex flex-col gap-1.5">
-          <div className="flex justify-end">
-            <button
-              type="button"
-              onClick={() => {
-                setRollbackSheetOpen(false)
-                setPurchaseHistoryShowAll(false)
-                setPurchaseHistorySheetOpen(true)
-              }}
-              className="rounded text-xs font-bold text-brand-blue underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4A90E2] focus-visible:ring-offset-2"
-            >
-              최근구매내역
-            </button>
-          </div>
-
-        {/* 구매 요청 */}
-        <section id="parent-purchase-requests">
-          <div className="mb-2 flex items-center justify-between">
+        {/* 구매 요청 — 헤더·보조문·우측 링크는 ParentMarketMenuControl(메뉴 제어)과 동일 톤 */}
+        <section id="parent-purchase-requests" className="mt-1">
+          <div className="mb-1 flex items-start justify-between gap-2">
             <h2 className="text-sm font-bold text-brand-text">구매 요청</h2>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setRollbackSheetOpen(false)
+                  setPurchaseHistoryShowAll(false)
+                  setPurchaseHistorySheetOpen(true)
+                }}
+                className="shrink-0 text-[11px] font-bold text-gray-400 underline-offset-2 hover:text-gray-500 hover:underline"
+              >
+                최근구매내역
+              </button>
+            </div>
           </div>
+          <p className="mb-3 text-[11px] leading-snug text-gray-400">
+            자녀가 크레딧으로 구매를 요청한 내역이에요.
+          </p>
 
           <ChildProfileNav tabs={tabs} compact />
 

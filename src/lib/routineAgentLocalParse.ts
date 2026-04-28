@@ -34,6 +34,14 @@ const AMBIGUOUS = /다음달쯤|곧|언젠가|미정|추후|언제든|나중에|
 
 const CONJ = /(그리고|하지만|그런데|및|또한|그러나|또|그래서|그런|하지만|그러면)/g
 
+/**
+ * 상대 일자·루틴 키워드 검사용 문자열 정규화.
+ * 비개발자: 문장 중간의 마침표 때문에 「이번주 토요일」과 「루틴은」이 한 덩어리로 안 잡히던 문제를 줄입니다.
+ */
+function compactScheduleText(text: string): string {
+  return text.replace(/\s+/g, '').replace(/[.,!?…:;'"·]/g, '')
+}
+
 /** 일정 의도 판단용 최소 키워드(요청 사양) */
 const SCHEDULE_INTENT_WORDS = [
   '등록',
@@ -331,7 +339,7 @@ function nextSaturdayStartSundayEndSeoul(): { start: string; end: string } {
 }
 
 function parseRelativePhrase(text: string): string | null {
-  const c = text.replace(/\s+/g, '')
+  const c = compactScheduleText(text)
   if (/오늘/.test(c)) return getSeoulDateString()
   if (/내일/.test(c)) return addSeoulCalendarDays(getSeoulDateString(), 1)
   if (/모레/.test(c)) return addSeoulCalendarDays(getSeoulDateString(), 2)
@@ -410,7 +418,7 @@ export function extractDateRange(text: string): { start: string; end: string } |
   const today = getSeoulDateString()
   const y = Number(today.slice(0, 4))
   const mo = Number(today.slice(5, 7))
-  const c = text.replace(/\s+/g, '')
+  const c = compactScheduleText(text)
 
   const season = seasonVacationRangeIfNoExplicitDate(text, y, mo)
   if (season) return season
@@ -510,12 +518,13 @@ export function extractDateRange(text: string): { start: string; end: string } |
 }
 
 /**
- * `이번주 토요일`, `다음주 금요일`, `이번 주말` 등 상대 날짜 표현이 있는지 봅니다.
- * (공백 제거 후 검사 — `extractDateRange`가 실패하는 변형 입력에서도 API로 넘기기 위함)
+ * `이번주 토요일`, `다음주 금요일`, `이번 주말`, `다음주 월요일` 등 상대 날짜 표현이 있는지 봅니다.
+ * 공백·구두점 제거 후 검사해 문장 부호 때문에 패턴이 실패하지 않게 합니다.
  */
 function hasRelativeDateExpression(text: string): boolean {
-  const c = text.replace(/\s+/g, '')
+  const c = compactScheduleText(text)
   if (/오늘|내일|모레|글피/.test(c)) return true
+  /** 이번주 토요일·일요일, 다음주 월~일, 이번주말 등 — 공백·마침표 제거 후 `c` 에서 검사 */
   if (/(이번주|다음주|다다음주)(월|화|수|목|금|토|일)요?일?/.test(c)) return true
   if (/(이번주|다음주|다다음주)(월|화|수|목|금|토|일)/.test(c)) return true
   if (/이번주말|다음주말/.test(c)) return true
@@ -524,9 +533,10 @@ function hasRelativeDateExpression(text: string): boolean {
 
 /** 루틴 끄기·쉬는 날 등 일정/루틴 조정 의도가 드러나는지 봅니다 */
 function hasRoutineAdjustmentKeyword(text: string): boolean {
-  if (/루틴/.test(text)) return true
-  const compact = text.replace(/\s+/g, '')
-  if (/쉬는날/.test(compact)) return true
+  if (/루틴/i.test(text)) return true
+  if (/루틴\s*(off|off해|꺼|쉬어)/i.test(text)) return true
+  const compact = compactScheduleText(text)
+  if (/쉬는날|루틴off|루틴꺼|루틴쉬어|루틴은off/.test(compact)) return true
   return false
 }
 
@@ -581,7 +591,10 @@ export function classifyTextBeforeApi(
   if (!hasIntent) return 'irrelevant'
   if (!hasDate && hasKeyword) return 'missing_date'
   if (hasDate && !hasKeyword) return 'missing_content'
-  if (!hasDate && !hasKeyword) return 'irrelevant'
+  /** 날짜도 분류 못 했고 행사 키워드도 없어도 루틴 조정 문구면 무관(irrelevant)이 아니라 날짜 부족으로 유도 */
+  if (!hasDate && !hasKeyword) {
+    return hasRoutineAdjustmentKeyword(t) ? 'missing_date' : 'irrelevant'
+  }
   return 'ok'
 }
 
