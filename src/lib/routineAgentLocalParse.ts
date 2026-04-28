@@ -509,7 +509,29 @@ export function extractDateRange(text: string): { start: string; end: string } |
   return null
 }
 
+/**
+ * `이번주 토요일`, `다음주 금요일`, `이번 주말` 등 상대 날짜 표현이 있는지 봅니다.
+ * (공백 제거 후 검사 — `extractDateRange`가 실패하는 변형 입력에서도 API로 넘기기 위함)
+ */
+function hasRelativeDateExpression(text: string): boolean {
+  const c = text.replace(/\s+/g, '')
+  if (/오늘|내일|모레|글피/.test(c)) return true
+  if (/(이번주|다음주|다다음주)(월|화|수|목|금|토|일)요?일?/.test(c)) return true
+  if (/(이번주|다음주|다다음주)(월|화|수|목|금|토|일)/.test(c)) return true
+  if (/이번주말|다음주말/.test(c)) return true
+  return false
+}
+
+/** 루틴 끄기·쉬는 날 등 일정/루틴 조정 의도가 드러나는지 봅니다 */
+function hasRoutineAdjustmentKeyword(text: string): boolean {
+  if (/루틴/.test(text)) return true
+  const compact = text.replace(/\s+/g, '')
+  if (/쉬는날/.test(compact)) return true
+  return false
+}
+
 function hasConfidentDatePattern(text: string): boolean {
+  if (hasRelativeDateExpression(text)) return true
   if (AMBIGUOUS.test(text)) return false
   return extractDateRange(text) != null
 }
@@ -555,7 +577,7 @@ export function classifyTextBeforeApi(
   if (!t) return 'irrelevant'
   const hasDate = hasConfidentDatePattern(t)
   const hasKeyword = hasMappedKeyword(t)
-  const hasIntent = hasScheduleIntent(t)
+  const hasIntent = hasScheduleIntent(t) || hasRoutineAdjustmentKeyword(t)
   if (!hasIntent) return 'irrelevant'
   if (!hasDate && hasKeyword) return 'missing_date'
   if (hasDate && !hasKeyword) return 'missing_content'
