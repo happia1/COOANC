@@ -92,6 +92,45 @@ export function mergeServerAndLocalCalendar(
   return [...merged.values()]
 }
 
+/** 표준 UUID(v4 포함)처럼 보이면 DB 에서 온 행으로 간주 — 로컬 임시 id 와 구분 */
+const UUID_LIKE_ID =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+function looksLikeDbUuid(id: string): boolean {
+  return UUID_LIKE_ID.test(id.trim())
+}
+
+/**
+ * 같은 제목·시작일(localStorage 중복 삽입 등)이 여러 줄일 때 한 줄로 줄입니다.
+ * - 둘 중 id 가 DB UUID 형태면 그쪽을 우선
+ * - 둘 다 UUID 거나 둘 다 아니면 **나중에 나온 항목**을 유지(최근 저장 우선)
+ */
+export function dedupeMergedCalendarEventsByTitleAndStart(events: LocalCalendarEvent[]): LocalCalendarEvent[] {
+  const keyOrder: string[] = []
+  const byKey = new Map<string, LocalCalendarEvent>()
+
+  for (const e of events) {
+    const k = `${e.title.trim().toLowerCase()}\u0000${String(e.startDate).slice(0, 10)}`
+    if (!byKey.has(k)) keyOrder.push(k)
+
+    const prev = byKey.get(k)
+    if (!prev) {
+      byKey.set(k, e)
+      continue
+    }
+    const pDb = looksLikeDbUuid(prev.id)
+    const cDb = looksLikeDbUuid(e.id)
+    if (cDb && !pDb) byKey.set(k, e)
+    else if (pDb && !cDb) {
+      /* 이전 행 유지 */
+    } else {
+      byKey.set(k, e)
+    }
+  }
+
+  return keyOrder.map((k) => byKey.get(k)!)
+}
+
 type CalRow = {
   id: string
   title: string
@@ -105,14 +144,11 @@ type CalRow = {
 /**
  * 로그인한 부모 기준으로 `calendar_events` 를 읽어 옵니다.
  *
- * **부모 홈**(`app/parent/home/page.tsx`)은 `family_link_id IN (모든 자녀 링크)` 로 일정을 가져옵니다.
- * 예전 루틴 캘린더는 **현재 탭 자녀 한 개**의 `family_link_id` 만 조회해서,
- * 제주 일정이 형제 자녀 쪽 `family_link` 에만 붙어 있으면 홈 링크는 보이는데 캘린더 병합에는 안 나오는 불일치가 났습니다.
- * → 홈과 같이 **부모에 연결된 모든 `family_links.id`** 로 한 번에 조회합니다.
+ * 스키마: `calendar_events.family_link_id` → `family_links.id` (RLS 가 family_links 로 부모 확인).
+ * `parent_id` 컬럼은 없으므로 `.eq('parent_id', …)` 같은 조회는 쓰지 않습니다.
  *
- * `childId` 가 null이어도(탭 미선택 등) 부모 기준 전체 링크로 조회합니다.
- *
- * - 위가 비어 있거나 오류 시 `parent_id` + `child_id` 폴백(구 스키마)
+ * 흐름: 현재 부모 uid 로 `family_links.id` 목록을 구한 뒤 `calendar_events` 를 `family_link_id IN (…)` 로만 조회합니다.
+ * 자녀 필터가 필요하면(`childId` 지정) `child_id IS NULL` 이거나 해당 자녀인 행만 남깁니다.
  */
 export async function fetchParentCalendarEventsFromServer(childId: string | null): Promise<LocalCalendarEvent[]> {
   const supabase = createClient()
@@ -123,28 +159,19 @@ export async function fetchParentCalendarEventsFromServer(childId: string | null
 
   const { data: allLinks } = await supabase.from('family_links').select('id').eq('parent_id', user.id)
   const familyLinkIds = (allLinks ?? []).map((r) => r.id).filter(Boolean)
-  let rows: CalRow[] = []
+  if (familyLinkIds.length === 0) return []
 
-  if (familyLinkIds.length > 0) {
-    const res = await supabase
-      .from('calendar_events')
-      .select('id, title, start_date, end_date, event_type, routine_override, child_id')
-      .in('family_link_id', familyLinkIds)
-    if (!res.error && res.data) {
-      rows = res.data as CalRow[]
-    }
+  let q = supabase
+    .from('calendar_events')
+    .select('id, title, start_date, end_date, event_type, routine_override, child_id')
+    .in('family_link_id', familyLinkIds)
+
+  if (childId) {
+    q = q.or(`child_id.is.null,child_id.eq.${childId}`)
   }
 
-  if (rows.length === 0 && childId) {
-    const res2 = await supabase
-      .from('calendar_events')
-      .select('id, title, start_date, end_date, event_type, routine_override, child_id')
-      .eq('parent_id', user.id)
-      .or(`child_id.is.null,child_id.eq.${childId}`)
-    if (!res2.error && res2.data) {
-      rows = res2.data as CalRow[]
-    }
-  }
+  const res = await q
+  if (res.error || !res.data) return []
 
-  return rows.map(calendarEventRowToLocal)
+  return (res.data as CalRow[]).map(calendarEventRowToLocal)
 }

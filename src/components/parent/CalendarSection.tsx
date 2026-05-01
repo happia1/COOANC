@@ -15,6 +15,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react'
+import { flushSync } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import type { LocalCalendarEvent } from '@/types/database'
 import { getSeoulDateString } from '@/lib/koreaDate'
@@ -22,6 +23,7 @@ import { COOANC_CALENDAR_EVENTS_STORAGE_KEY } from '@/lib/localStorageChildScope
 import { COOANC_CALENDAR_STORAGE_UPDATE_EVENT } from '@/lib/syncAgentEventToLocalCalendar'
 import { createClient } from '@/lib/supabase/client'
 import {
+  dedupeMergedCalendarEventsByTitleAndStart,
   fetchParentCalendarEventsFromServer,
   mergeServerAndLocalCalendar,
 } from '@/lib/mergeParentCalendarEvents'
@@ -182,11 +184,21 @@ export default function CalendarSection({ childId, focusDate = null }: Props) {
         local = []
       }
       server = await fetchParentCalendarEventsFromServer(childId)
-      merged = mergeServerAndLocalCalendar(server, local, childId)
-      setEvents(merged)
+      merged = dedupeMergedCalendarEventsByTitleAndStart(
+        mergeServerAndLocalCalendar(server, local, childId),
+      )
+      /**
+       * flushSync 로 events 를 먼저 플러시한 뒤 revision 을 올립니다.
+       * 같은 배치에서만 처리되면 pendingFocusDate effect 가 revision===0 에서 계속 막히는 현상을 줄입니다.
+       */
+      flushSync(() => {
+        setEvents(merged)
+      })
+      setCalendarDataRevision((n) => n + 1)
     } catch {
-      setEvents([])
-    } finally {
+      flushSync(() => {
+        setEvents([])
+      })
       setCalendarDataRevision((n) => n + 1)
     }
     // #region agent log
@@ -222,10 +234,10 @@ export default function CalendarSection({ childId, focusDate = null }: Props) {
     // #endregion
   }, [childId])
 
-  useEffect(() => {
-    void refreshMergedEvents()
-  }, [refreshMergedEvents, focusDate])
-
+  /**
+   * 브리핑 `calendarDate=` 딥링크: **먼저** 해당 월로 이동·pending 날짜를 세팅한 뒤 병합을 돌립니다.
+   * 병합 effect 가 위와 순서가 바뀌면 같은 틱에서 년·월이 아직 예전 값일 때 revision 만 올라가는 레이스가 생길 수 있습니다.
+   */
   useEffect(() => {
     // 잘못된 쿼리 값은 무시해 앱 동작을 안전하게 유지합니다.
     if (!focusDate || !/^\d{4}-\d{2}-\d{2}$/.test(focusDate)) {
@@ -239,6 +251,10 @@ export default function CalendarSection({ childId, focusDate = null }: Props) {
     setYear(y)
     setMonth(m - 1)
   }, [focusDate])
+
+  useEffect(() => {
+    void refreshMergedEvents()
+  }, [refreshMergedEvents, focusDate])
 
   /** localStorage 가 바뀌면 서버 일정과 다시 합칩니다(다른 탭·에이전트 동기화 포함). */
   useEffect(() => {
@@ -445,7 +461,12 @@ export default function CalendarSection({ childId, focusDate = null }: Props) {
     if (!pendingFocusDate) return
     const toOpen = pendingFocusDate
     const [y, m] = toOpen.split('-').map(Number)
+    /** 아직 해당 월 달력으로 안 왔으면 월 이동만 기다림 — 여기서 pending 을 비우지 않음 */
     if (y !== year || m - 1 !== month) return
+    /**
+     * revision 0 은 한 번도 병합이 안 끝난 상태라 자동 열기 금지.
+     * 병합 후 revision≥1 일 때만 handleDayClick → 그 다음에만 pending 초기화.
+     */
     if (calendarDataRevision === 0) return
     handleDayClick(toOpen)
     setPendingFocusDate(null)

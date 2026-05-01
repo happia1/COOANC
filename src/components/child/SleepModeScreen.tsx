@@ -8,7 +8,8 @@
  */
 
 import { useEffect, useRef, useState } from 'react'
-import { playAudio, CHILD_AUDIO } from '@/lib/childAudio'
+import { CHILD_AUDIO, tryPlayAudioOnce } from '@/lib/childAudio'
+import { getSeoulDateString, getSeoulTimeHHMM } from '@/lib/koreaDate'
 
 /** 별 하나의 위치·애니메이션 값 — 클라이언트 마운트 후 한 번만 생성(SSR/하이드레이션 불일치 방지) */
 type StarSpec = {
@@ -49,17 +50,16 @@ export default function SleepModeScreen({ childName, alarmTime, onWake }: Props)
 
   useEffect(() => {
     const tick = () => {
-      const now = new Date()
-      const h = now.getHours().toString().padStart(2, '0')
-      const m = now.getMinutes().toString().padStart(2, '0')
-      const hm = `${h}:${m}`
+      const hm = getSeoulTimeHHMM()
       setCurrentTime(hm)
+      /** 서울 달력 날짜 + 시각 기준으로 하루에 한 번만 아침 인사 재생 시도 — 기기 시간대와 무관 */
+      const todaySeoul = getSeoulDateString()
 
       if (alarmTime && hm === alarmTime) {
-        const key = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}-${hm}`
+        const key = `${todaySeoul}-${hm}`
         if (alarmFiredForMinuteRef.current !== key) {
           alarmFiredForMinuteRef.current = key
-          playAudio(CHILD_AUDIO.morningGreet)
+          void tryPlayAudioOnce(CHILD_AUDIO.morningGreet, 1)
           window.setTimeout(() => onWake(), 1500)
         }
       }

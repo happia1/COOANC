@@ -67,7 +67,8 @@ import SleepReadyPopup from '@/components/child/SleepReadyPopup'
 import SchoolTimePopup from '@/components/child/SchoolTimePopup'
 import { readRoutineAlarmPrefs } from '@/lib/routineAlarmLocalPrefs'
 import { resolveRoutineAlarmSoundUrl } from '@/lib/routineAlarmSounds'
-import { toYyyyMmDdDbValue, dbValueMeansIncomplete } from '@/lib/koreaDate'
+import { installChildRoutineAudioUnlockOnFirstGesture } from '@/lib/childAudio'
+import { toYyyyMmDdDbValue, dbValueMeansIncomplete, getSeoulTimeHHMM, getSeoulWeekdayShort } from '@/lib/koreaDate'
 
 /**
  * 상단 레벨 카드 반응형 배율 (최대 1.7배) — 실측 너비 기준.
@@ -442,6 +443,11 @@ export default function ChildScreen({
     }
   }, [])
 
+  /** 브라우저 자동 재생 규격을 완화 — 아이가 화면을 한 번이라도 건드리면 알람 WAV 재생 허용에 유리합니다 */
+  useEffect(() => {
+    installChildRoutineAudioUnlockOnFirstGesture()
+  }, [])
+
   useEffect(() => {
     setMissionList(dailyMissions)
     setDone(new Set(dailyMissions.filter((dm) => dm.is_completed).map((dm) => dm.id)))
@@ -645,16 +651,14 @@ export default function ChildScreen({
   /**
    * 잘 준비·등원 시각 도달 시 팝업 — 30초마다 현재 시각과 비교
    * 비개발자 설명: 배터리를 아끼려고 1초마다 돌리지 않고, 대략 반분 안에 맞춰 뜹니다.
+   * 시각·요일은 **서울(한국)** 기준으로 부모가 설정한 시각과 맞춥니다(기기가 해외 시간대여도 같은 시에 울림).
    */
   useEffect(() => {
     if (!sleepReadyTimeHHMM && !schoolTimeHHMM) return
     const check = () => {
       if (blockRoutineAlarmPopupsRef.current) return
-      const now = new Date()
-      const hh = String(now.getHours()).padStart(2, '0')
-      const mm = String(now.getMinutes()).padStart(2, '0')
-      const current = `${hh}:${mm}`
-      const isWeekend = [0, 6].includes(now.getDay())
+      const current = getSeoulTimeHHMM()
+      const isWeekend = ['토', '일'].includes(getSeoulWeekdayShort(today))
 
       const allowSleepReady =
         sleepReadyTimeHHMM &&
@@ -686,6 +690,7 @@ export default function ChildScreen({
     schoolTimeEnabled,
     schoolTimeWeekday,
     schoolTimeWeekend,
+    today,
   ])
 
   /** 자정 자동 새로고침 */

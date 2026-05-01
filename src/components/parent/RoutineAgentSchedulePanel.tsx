@@ -47,6 +47,7 @@ import {
 } from '@/lib/routineAgentLocalParse'
 import {
   patchLocalCalendarEventInStorage,
+  rewriteLocalCalendarEventIdInStorage,
   shouldSkipSyncAgentEvent,
   syncAgentEventToLocalCalendar,
 } from '@/lib/syncAgentEventToLocalCalendar'
@@ -193,7 +194,10 @@ function normalizeParseResponse(raw: AgentParseResponse): AgentParseResponse {
     schedules,
     event: raw.event,
     suggestions: raw.suggestions ?? [],
-    saved_event_id: raw.saved_event_id ?? null,
+    saved_event_id:
+      raw.saved_event_id ??
+      (raw as { savedEventId?: string | null }).savedEventId ??
+      null,
   }
 }
 
@@ -1347,6 +1351,28 @@ export default function RoutineAgentSchedulePanel({
     }
   }
 
+  /**
+   * [등록하기] 시 로컬 전용 파싱(deferCalendarSync 등)처럼 parse 에서 온 saved_event_id 가 없으면
+   * commit-schedule 로 DB 행을 만들고 반환된 UUID 로만 localStorage id 를 맞춥니다.
+   */
+  const resolveDbCalendarEventIdForRegister = useCallback(
+    async (mergedEvent: AgentParseEvent, savedFromParse: string | null): Promise<string | null> => {
+      const trimmed = savedFromParse?.trim() || null
+      if (trimmed) return trimmed
+      if (!familyLinkId || !childId) return null
+      const out = await postAgentCommitSchedule({
+        family_link_id: familyLinkId,
+        child_id: childId,
+        input_type: 'text',
+        text_input: mergedEvent.title?.trim() || '일정',
+        event: mergedEvent,
+      })
+      const raw = out as { saved_event_id?: string | null; savedEventId?: string | null }
+      return (raw.saved_event_id ?? raw.savedEventId)?.trim() || null
+    },
+    [familyLinkId, childId],
+  )
+
   const handleUnifiedRegisterSingle = async (
     parseMsgId: string,
     suggestions: SuggestionUi[],
@@ -1367,25 +1393,35 @@ export default function RoutineAgentSchedulePanel({
         routine_off: payload.routineOffOn,
       }
       const localEventType = agentTypeToLocalCalendarType(payload.agentTypeCode)
-      let rowId = savedCalendarEventId || calendarRowIdIn || null
-      if (!rowId) {
-        rowId = syncAgentEventToLocalCalendar(childId!, mergedEvent, null, {
-          routineOverride: payload.routineOffOn ? 'none' : 'weekend',
-        })
-      } else {
-        patchLocalCalendarEventInStorage(rowId, {
-          title: payload.title,
-          startDate: payload.startDate,
-          endDate: payload.endDate,
-          eventType: localEventType,
-          description: payload.description,
-          routineOverride: payload.routineOffOn ? 'none' : 'weekend',
-        })
-      }
-      if (!rowId) {
-        onToast('캘린더에 저장하지 못했어요. 잠시 후 다시 시도해 주세요.', false)
+      const routineOv: LocalCalendarEvent['routineOverride'] = payload.routineOffOn ? 'none' : 'weekend'
+
+      const dbEventId = await resolveDbCalendarEventIdForRegister(mergedEvent, savedCalendarEventId)
+      if (!dbEventId) {
+        onToast(
+          familyLinkId && childId
+            ? '서버 일정 id를 받지 못했어요. 잠시 후 다시 시도해 주세요.'
+            : '가족 연결 정보가 없어 저장할 수 없어요.',
+          false,
+        )
         return
       }
+
+      const priorLocal = calendarRowIdIn?.trim() || null
+      if (priorLocal && priorLocal !== dbEventId) {
+        rewriteLocalCalendarEventIdInStorage(priorLocal, dbEventId)
+      }
+
+      syncAgentEventToLocalCalendar(childId!, mergedEvent, dbEventId, { routineOverride: routineOv })
+      patchLocalCalendarEventInStorage(dbEventId, {
+        title: payload.title,
+        startDate: payload.startDate,
+        endDate: payload.endDate,
+        eventType: localEventType,
+        description: payload.description,
+        routineOverride: routineOv,
+      })
+
+      const rowId = dbEventId
       const pending = pendingSuggestions(suggestions)
       await approvePendingSuggestionsBatch(pending, payload.routineOffOn)
       setMessages((prev) =>
@@ -1395,7 +1431,7 @@ export default function RoutineAgentSchedulePanel({
                 ...m,
                 confirmComplete: true,
                 calendarRowId: rowId,
-                parseResult: { ...m.parseResult, event: mergedEvent },
+                parseResult: { ...m.parseResult, event: mergedEvent, saved_event_id: dbEventId },
                 suggestions: mapSuggestionsAfterApprove(m.suggestions, payload.routineOffOn),
               }
             : m,
@@ -1457,25 +1493,35 @@ export default function RoutineAgentSchedulePanel({
         routine_off: payload.routineOffOn,
       }
       const localEventType = agentTypeToLocalCalendarType(payload.agentTypeCode)
-      let rowId = savedCalendarEventId || calendarRowIdIn || null
-      if (!rowId) {
-        rowId = syncAgentEventToLocalCalendar(childId!, mergedEvent, null, {
-          routineOverride: payload.routineOffOn ? 'none' : 'weekend',
-        })
-      } else {
-        patchLocalCalendarEventInStorage(rowId, {
-          title: payload.title,
-          startDate: payload.startDate,
-          endDate: payload.endDate,
-          eventType: localEventType,
-          description: payload.description,
-          routineOverride: payload.routineOffOn ? 'none' : 'weekend',
-        })
-      }
-      if (!rowId) {
-        onToast('캘린더에 저장하지 못했어요. 잠시 후 다시 시도해 주세요.', false)
+      const routineOvMulti: LocalCalendarEvent['routineOverride'] = payload.routineOffOn ? 'none' : 'weekend'
+
+      const dbEventIdMulti = await resolveDbCalendarEventIdForRegister(mergedEvent, savedCalendarEventId)
+      if (!dbEventIdMulti) {
+        onToast(
+          familyLinkId && childId
+            ? '서버 일정 id를 받지 못했어요. 잠시 후 다시 시도해 주세요.'
+            : '가족 연결 정보가 없어 저장할 수 없어요.',
+          false,
+        )
         return
       }
+
+      const priorLocalMulti = calendarRowIdIn?.trim() || null
+      if (priorLocalMulti && priorLocalMulti !== dbEventIdMulti) {
+        rewriteLocalCalendarEventIdInStorage(priorLocalMulti, dbEventIdMulti)
+      }
+
+      syncAgentEventToLocalCalendar(childId!, mergedEvent, dbEventIdMulti, { routineOverride: routineOvMulti })
+      patchLocalCalendarEventInStorage(dbEventIdMulti, {
+        title: payload.title,
+        startDate: payload.startDate,
+        endDate: payload.endDate,
+        eventType: localEventType,
+        description: payload.description,
+        routineOverride: routineOvMulti,
+      })
+
+      const rowId = dbEventIdMulti
       await approvePendingSuggestionsBatch(pending, payload.routineOffOn)
       setMessages((prev) =>
         prev.map((m) => {
@@ -1486,6 +1532,7 @@ export default function RoutineAgentSchedulePanel({
               : {
                   ...slot,
                   event: mergedEvent,
+                  savedEventId: dbEventIdMulti,
                   calendarRowId: rowId,
                   slotSuggestions: mapSuggestionsAfterApprove(slot.slotSuggestions, payload.routineOffOn),
                   routineCardComplete: true,

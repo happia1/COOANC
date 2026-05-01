@@ -13,6 +13,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getSeoulDateString, getSeoulTimeHHMM, getSeoulWeekdayShort } from '@/lib/koreaDate'
 import { readRoutineAlarmPrefs, readRoutineHasSchoolFromStorage } from '@/lib/routineAlarmLocalPrefs'
 import { resolveRoutineAlarmSoundUrl } from '@/lib/routineAlarmSounds'
+import { installChildRoutineAudioUnlockOnFirstGesture, playRoutineAlarmLooped } from '@/lib/childAudio'
 
 /** TexturePacker `mode.json` 과 맞춘 아틀라스 크기·프레임 (이미지 파일: `public/assets/img/common/ui/mode.png`) */
 const MODE_ATLAS = {
@@ -143,6 +144,16 @@ export default function MissionSleepMorningLayer({
    */
   const celebrationTimersRef = useRef<number[]>([])
   const audioRef = useRef<HTMLAudioElement | null>(null)
+  /**
+   * 브라우저 자동재생 정책으로 `play()` 가 거절된 경우 — 사용자가 「알람 소리 켜기」를 누르면 해제됩니다.
+   * 비개발자: 알람 창은 떴는데 스피커가 안 울릴 때 이 안내가 보입니다.
+   */
+  const [routineAlarmSoundBlocked, setRoutineAlarmSoundBlocked] = useState(false)
+
+  /** 앱에 들어온 뒤 아이가 화면을 한 번 건드리면 이후 알람 소리가 막힐 확률이 줄어듭니다 */
+  useEffect(() => {
+    installChildRoutineAudioUnlockOnFirstGesture()
+  }, [])
 
   const clearCelebrationTimers = useCallback(() => {
     celebrationTimersRef.current.forEach((id) => window.clearTimeout(id))
@@ -228,15 +239,18 @@ export default function MissionSleepMorningLayer({
       const picked = notShownYet.sort((a, b) => b.time.localeCompare(a.time))[0]
       localStorage.setItem(`cooanc_routine_alarm_popup_${picked.kind}_${childId}_${today}`, '1')
 
+      setRoutineAlarmSoundBlocked(false)
+      setActiveAlarmPopup({ kind: picked.kind, label: picked.label, time: picked.time })
+
       // 저장값은 id(예: morning_greet) 또는 예전 파일명일 수 있어 공통 해석 함수로 URL 을 만듭니다.
       const url = resolveRoutineAlarmSoundUrl(picked.sound)
-      const a = new Audio(url)
-      a.loop = true
-      audioRef.current = a
-      void a.play().catch(() => {
-        /* 자동 재생 차단 등 — 팝업만 표시 */
+      void playRoutineAlarmLooped(url, 1).then((a) => {
+        if (a) {
+          audioRef.current = a
+        } else {
+          setRoutineAlarmSoundBlocked(true)
+        }
       })
-      setActiveAlarmPopup({ kind: picked.kind, label: picked.label, time: picked.time })
     }
 
     checkAndOpenAlarmPopup()
@@ -262,8 +276,34 @@ export default function MissionSleepMorningLayer({
       a.currentTime = 0
       audioRef.current = null
     }
+    setRoutineAlarmSoundBlocked(false)
     setActiveAlarmPopup(null)
   }, [])
+
+  /** 자동 재생이 막혔을 때 — 버튼 탭은 「사용자 제스처」라 대부분의 기기에서 소리 재생에 성공합니다 */
+  const retryRoutineAlarmSoundFromGesture = useCallback(() => {
+    if (!activeAlarmPopup) return
+    void (async () => {
+      const prefs = readRoutineAlarmPrefs()
+      const soundRaw =
+        activeAlarmPopup.kind === 'wake'
+          ? prefs.soundWake
+          : activeAlarmPopup.kind === 'return'
+            ? prefs.soundReturn
+            : prefs.soundSleep
+      const url = resolveRoutineAlarmSoundUrl(soundRaw.trim() || prefs.soundWake)
+      const prev = audioRef.current
+      if (prev) {
+        prev.pause()
+        audioRef.current = null
+      }
+      const a = await playRoutineAlarmLooped(url, 1)
+      if (a) {
+        audioRef.current = a
+        setRoutineAlarmSoundBlocked(false)
+      }
+    })()
+  }, [activeAlarmPopup])
 
   const confettiPieces = useMemo(() => {
     const out: { key: string; src: string; delay: number }[] = []
@@ -394,6 +434,21 @@ export default function MissionSleepMorningLayer({
                 </p>
               </div>
               <p className="mt-2 text-center text-sm font-bold text-amber-700">{activeAlarmPopup.label}</p>
+
+              {routineAlarmSoundBlocked ? (
+                <div className="mt-4 space-y-2 rounded-2xl border border-amber-200 bg-amber-100/70 px-3 py-3 text-center">
+                  <p className="text-[11px] font-bold leading-snug text-amber-900">
+                    기기 브라우저가 알람 소리를 막았을 수 있어요. 아래를 누르면 스피커가 켜집니다.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={retryRoutineAlarmSoundFromGesture}
+                    className="w-full rounded-xl bg-amber-600 py-3 text-xs font-black text-white shadow active:scale-[0.99]"
+                  >
+                    알람 소리 켜기
+                  </button>
+                </div>
+              ) : null}
 
               <button
                 type="button"

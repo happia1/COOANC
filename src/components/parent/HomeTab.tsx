@@ -9,6 +9,7 @@
  * - 프로필 카드를 누르면 그 아이의 「자녀용 앱 화면」(미션·홈 등)으로 들어갑니다(쿠키 설정 후 /home).
  * - 맨 아래 「최근 활동」은 처음엔 접혀 있고, 헤더를 누르면 목록이 펼쳐집니다(루틴 탭 접기와 같은 화살표 동작).
  * - 구매 승인 대기 안내는 홈이 아니라 상단 종(알림·루틴 알람) 시트에서 보여 줍니다.
+ * - 「일정 브리핑」: 서울 기준 오늘부터 6일 후까지(7일) 구간에 들어오는 `calendar_events` + `public_holidays`(노동절·어린이날 등) + 기기 localStorage 일정을 합칩니다.
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -36,6 +37,39 @@ import { CHILD_GROWTH_LEVELS } from '@/constants/childGrowthLevels'
 import type { AgentLatestReportRow } from '@/lib/agentApi'
 import SpriteImage from '@/components/common/SpriteImage'
 import { ICONS } from '@/constants/sprites'
+
+/**
+ * 서버에서 내려온 브리핑용 일정이 현재 선택 자녀에 맞는지 판별합니다.
+ * 비개발자: 가족 안에 형제가 둘이면 DB에 각각 다른 일정이 붙습니다. 브리핑은 예전에는 형제 건까지 한 줄에 같이 나왔는데,
+ * 캘린더는 선택한 아이 일정만 보여 주므로「브리핑에만 있는 이상한 일정」「눌렀더니 캘린더에는 다른 제목만」같은 괴리가 생겼습니다.
+ * 루틴 탭 `CalendarSection` 의 `eventVisibleForSelectedChild` 와 같은 규칙입니다(travel 예외 포함).
+ */
+function briefingServerEventVisibleForSelectedChild(
+  ev: { child_id?: string | null; event_type?: string | null },
+  selectedChildId: string | null,
+): boolean {
+  if (!selectedChildId) return true
+  const cid = ev.child_id
+  /** null 이면 가족 공통으로 보는 일정(CalendarSection 과 동일) */
+  if (cid == null || String(cid).trim() === '') return true
+  if (cid === selectedChildId) return true
+  if (ev.event_type === 'travel') return true
+  return false
+}
+
+/**
+ * 브리핑에 쓸 「오늘~오늘+6일(포함 7일)」 구간과 일정 행이 겹치는지 봅니다.
+ * 비개발자: 하루짜리 공휴일은 그날만, 긴 방학 같은 일정은 이 주에 걸치는 한 줄로 잡습니다.
+ */
+function briefingOverlapsSeoulWeekWindow(
+  ev: { start_date: string; end_date?: string | null },
+  windowStart: string,
+  windowEndInclusive: string,
+): boolean {
+  const start = String(ev.start_date).slice(0, 10)
+  const end = String(ev.end_date ?? ev.start_date).slice(0, 10)
+  return end >= windowStart && start <= windowEndInclusive
+}
 
 export type ChildSummary = {
   id: string
@@ -78,10 +112,11 @@ type Props = {
   upcomingEvents: {
     id: string
     start_date: string
-    end_date: string
+    end_date: string | null
     routine_override?: string | null
     event_type?: string | null
     title?: string | null
+    child_id?: string | null
   }[]
   /** 지난 14일 중 미션 완료 기록이 있는 날짜 수(자녀별 서버 계산값). */
   daysWithDataByChild: Record<string, number>
@@ -202,7 +237,8 @@ export default function HomeTab({ childrenData, upcomingEvents, daysWithDataByCh
 
   useEffect(() => {
     const today = getSeoulDateString()
-    const sevenDaysLater = addSeoulCalendarDays(today, 7)
+    /** 로컬 캘린더도 서버 브리핑과 같은 7일(오늘+6) 창으로 맞춥니다 */
+    const windowEndInclusive = addSeoulCalendarDays(today, 6)
     const reloadLocalCalendar = () => {
       try {
         const raw = localStorage.getItem(COOANC_CALENDAR_EVENTS_STORAGE_KEY)
@@ -231,10 +267,9 @@ export default function HomeTab({ childrenData, upcomingEvents, daysWithDataByCh
           })
           // 현재 자녀 일정 + `travel` 은 타 자녀 id로만 저장된 가족 일정이 있을 수 있어 캘린더와 동일 예외
           .filter((r) => !r.childId || r.childId === child?.id || r.eventType === 'travel')
-          // [오늘~+7일]과 겹치는 일정만 반영
-          .filter((r) => r.endDate >= today && r.startDate <= sevenDaysLater)
+          // [오늘~오늘+6일] 과 겹치는 일정 전부 반영 — 건수는 아래 브리핑 병합에서 창 안으로 한 번 더 걸러 정렬만 합니다
+          .filter((r) => r.endDate >= today && r.startDate <= windowEndInclusive)
           .sort((a, b) => a.startDate.localeCompare(b.startDate))
-          .slice(0, 5)
           .map((r) => ({
             id: r.id,
             start_date: r.startDate,
@@ -316,12 +351,30 @@ export default function HomeTab({ childrenData, upcomingEvents, daysWithDataByCh
    */
   const effectiveUpcomingEvents = useMemo(() => {
     type Ev = (typeof localUpcomingEvents)[number]
-    const server = (upcomingEvents ?? []) as Ev[]
-    const local = localUpcomingEvents
-    const keyOf = (e: { id?: string; start_date: string; end_date: string; title?: string | null }) => {
+    const briefingWindowStart = getSeoulDateString()
+    const briefingWindowEndInclusive = addSeoulCalendarDays(briefingWindowStart, 6)
+
+    /** 서버 목록은 가족 전체 링크·공휴일 포함이므로 선택 자녀에 맞는 캘린더 행만 남긴 뒤, 브리핑 7일 창 안으로 걸러냅니다 */
+    const server = (upcomingEvents ?? []).filter((e) => {
+      if (!briefingOverlapsSeoulWeekWindow(e, briefingWindowStart, briefingWindowEndInclusive)) return false
+      return briefingServerEventVisibleForSelectedChild(e, currentId ?? null)
+    }) as Ev[]
+
+    const local = localUpcomingEvents.filter((e) =>
+      briefingOverlapsSeoulWeekWindow(e, briefingWindowStart, briefingWindowEndInclusive),
+    )
+
+    /** `end_date` 는 DB에 빈값일 수 있어 `start_date` 로 대체합니다(캘린더 병합과 동일) */
+    const keyOf = (e: {
+      id?: string
+      start_date: string
+      end_date: string | null
+      title?: string | null
+    }) => {
       if (e.id && String(e.id).length >= 8 && !String(e.id).startsWith('__')) return `id:${e.id}`
       const t = (e.title ?? '').trim()
-      return `r:${e.start_date}|${e.end_date}|${t}`
+      const end = String(e.end_date ?? e.start_date).slice(0, 10)
+      return `r:${e.start_date.slice(0, 10)}|${end}|${t}`
     }
     const map = new Map<string, Ev>()
     for (const e of server) {
@@ -330,10 +383,16 @@ export default function HomeTab({ childrenData, upcomingEvents, daysWithDataByCh
     for (const e of local) {
       map.set(keyOf(e), e)
     }
+
+    /** 창 안 전체 노출 — 비정상 대량 저장 대비 여유 한도만 둠 */
     return [...map.values()]
-      .sort((a, b) => a.start_date.localeCompare(b.start_date))
-      .slice(0, 5)
-  }, [localUpcomingEvents, upcomingEvents])
+      .sort((a, b) => {
+        const c = a.start_date.localeCompare(b.start_date)
+        if (c !== 0) return c
+        return String(a.title ?? '').localeCompare(String(b.title ?? ''))
+      })
+      .slice(0, 24)
+  }, [localUpcomingEvents, upcomingEvents, currentId])
 
   // #region agent log
   useEffect(() => {

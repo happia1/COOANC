@@ -39,9 +39,15 @@ export function shouldSkipSyncAgentEvent(ev: AgentParseEvent): boolean {
   return false
 }
 
+/** 서버에서 받은 일정 UUID — 공백-only 는 없음과 동일로 봅니다 */
+function normalizeSavedEventId(savedEventId: string | null | undefined): string | null {
+  const s = typeof savedEventId === 'string' ? savedEventId.trim() : ''
+  return s.length > 0 ? s : null
+}
+
 /**
  * 에이전트 일정 한 건을 로컬 캘린더 배열 끝에 붙입니다(이미 같은 `id` 가 있으면 생략).
- * @param savedEventId 서버가 준 `saved_event_id` — 있으면 로컬 행 `id` 로 써서 중복 삽입을 막습니다.
+ * @param savedEventId 서버가 준 `saved_event_id` — **반드시 이 값을 행 id 로 사용**(있으면 임의 UUID 생성 안 함 → 서버 병합 시 중복 방지)
  */
 export function syncAgentEventToLocalCalendar(
   childId: string | null,
@@ -57,8 +63,10 @@ export function syncAgentEventToLocalCalendar(
   const endRaw = (event.end_date && String(event.end_date).trim()) || ''
   const end = endRaw || start
 
+  const stableId = normalizeSavedEventId(savedEventId)
+
   const row: LocalCalendarEvent = {
-    id: savedEventId && savedEventId.length > 0 ? savedEventId : crypto.randomUUID(),
+    id: stableId ?? crypto.randomUUID(),
     childId,
     title: (event.title || '일정').trim() || '일정',
     ...(event.description?.trim() ? { description: event.description.trim() } : {}),
@@ -72,7 +80,8 @@ export function syncAgentEventToLocalCalendar(
     const raw = localStorage.getItem(COOANC_CALENDAR_EVENTS_STORAGE_KEY)
     const parsed = raw ? (JSON.parse(raw) as unknown) : []
     const list: LocalCalendarEvent[] = Array.isArray(parsed) ? (parsed as LocalCalendarEvent[]) : []
-    if (row.id && list.some((e) => e && e.id === row.id)) {
+    /** 같은 id 가 이미 있으면 삽입 생략(서버 id 또는 극히 드문 random 충돌) */
+    if (list.some((e) => e && e.id === row.id)) {
       window.dispatchEvent(new Event(COOANC_CALENDAR_STORAGE_UPDATE_EVENT))
       return row.id
     }
@@ -83,6 +92,34 @@ export function syncAgentEventToLocalCalendar(
   } catch {
     /* 손상된 JSON 등은 무시 */
     return null
+  }
+}
+
+/**
+ * 파싱 직후 임시(random) id 로 넣었던 행을 서버 `saved_event_id` 로 바꿉니다.
+ * 서버와 같은 id 행이 이미 있으면 임시 행만 제거해 merge 중복을 없앱니다.
+ */
+export function rewriteLocalCalendarEventIdInStorage(oldId: string, newId: string): void {
+  if (typeof window === 'undefined' || !oldId || !newId || oldId === newId) return
+  const nextServer = normalizeSavedEventId(newId)
+  if (!nextServer) return
+  try {
+    const raw = localStorage.getItem(COOANC_CALENDAR_EVENTS_STORAGE_KEY)
+    const parsed = raw ? (JSON.parse(raw) as unknown) : []
+    if (!Array.isArray(parsed)) return
+    const list = parsed as LocalCalendarEvent[]
+    const oldIdx = list.findIndex((e) => e && e.id === oldId)
+    if (oldIdx === -1) return
+    const dupIdx = list.findIndex((e) => e && e.id === nextServer)
+    if (dupIdx !== -1 && dupIdx !== oldIdx) {
+      list.splice(oldIdx, 1)
+    } else {
+      list[oldIdx] = { ...list[oldIdx], id: nextServer }
+    }
+    localStorage.setItem(COOANC_CALENDAR_EVENTS_STORAGE_KEY, JSON.stringify(list))
+    window.dispatchEvent(new Event(COOANC_CALENDAR_STORAGE_UPDATE_EVENT))
+  } catch {
+    /* 손상된 JSON 등은 무시 */
   }
 }
 

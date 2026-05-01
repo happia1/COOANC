@@ -6,6 +6,8 @@
  * 「오늘 미션 달성률」은 자녀 앱「오늘의 미션」과 같이,
  * **그날짜(date)로 배정된 daily_missions 행 전부**를 분모로 씁니다.
  * (오전·오후·스페셜 등 당일 생성·배정된 카드가 빠지지 않도록 블록별 필터는 두지 않습니다.)
+ *
+ * 「일정 브리핑」용으로 오늘~오늘+6일 구간의 `calendar_events`와 동일 구간 `public_holidays` 를 함께 불러 `HomeTab` 에 넘깁니다(캘린더 빨간 공휴일과 동일 테이블).
  */
 
 export const dynamic = 'force-dynamic'
@@ -75,7 +77,8 @@ export default async function ParentHomePage() {
   }
 
   const today = getSeoulDateString()
-  const sevenDaysLater = addSeoulCalendarDays(today, 7)
+  /** 일정 브리핑·캘린더 카드와 맞춤: 서울 기준 「오늘」부터 **6일 뒤**까지(포함하면 7일치) 겹치는 일정만 사용 */
+  const briefingEndInclusive = addSeoulCalendarDays(today, 6)
   const weekStart = getSeoulMondayOfWeekContaining(today)
   const weekEnd = addSeoulCalendarDays(weekStart, 6)
   const primaryChildId = childIds[0]
@@ -88,6 +91,8 @@ export default async function ParentHomePage() {
     weekDailyRes,
     recentLogsRes,
     calendarEventsRes,
+    /** 루틴 캘린더의 빨간 법정공휴일과 같은 출처(`public_holidays`)를 브리핑에도 포함합니다 */
+    publicHolidaysBriefingRes,
     completedMissionDaysRes,
     agentReportsRes,
   ] = await Promise.all([
@@ -113,15 +118,24 @@ export default async function ParentHomePage() {
       .order('completed_at', { ascending: false })
       .limit(30),
 
-    // 홈 상단 일정 브리핑(향후 7일): family_link_id 기준 캘린더 일정
+    // 홈 상단 일정 브리핑 — 오늘~오늘+6일 구간과 겹치는 캘린더 일정(자녀 필터링은 클라이언트)
     supabase
       .from('calendar_events')
-      .select('id, start_date, end_date, routine_override, title, event_type')
+      // child_id 는 홈 브리핑을 「선택 자녀」 기준으로 걸 때 사용합니다(CalendarSection 과 동일).
+      .select('id, start_date, end_date, routine_override, title, event_type, child_id')
       .in('family_link_id', familyLinkIds)
       .or(`end_date.gte.${today},end_date.is.null`)
-      .lte('start_date', sevenDaysLater)
+      .lte('start_date', briefingEndInclusive)
       .order('start_date', { ascending: true })
-      .limit(5),
+      .limit(50),
+
+    /** 동일 브리핑 구간의 법정 공휴일(노동절·어린이날 등) — 캘린더 칸 이름과 같은 DB */
+    supabase
+      .from('public_holidays')
+      .select('date, name')
+      .gte('date', today)
+      .lte('date', briefingEndInclusive)
+      .order('date', { ascending: true }),
 
     // AI 리포트 준비 진행도:
     // mission_logs.assigned_date 누락 케이스를 피하기 위해
@@ -213,22 +227,47 @@ export default async function ParentHomePage() {
     }
   })
 
-  const upcomingEvents = (calendarEventsRes.data ?? []) as {
+  type BriefingEv = {
     id: string
     start_date: string
-    end_date: string
+    end_date: string | null
     routine_override?: string | null
     event_type?: string | null
     title?: string | null
-  }[]
+    child_id?: string | null
+  }
 
-  console.log('[home] calendar query', {
+  const phBriefingRows: BriefingEv[] = (publicHolidaysBriefingRes.data ?? []).map((raw) => {
+    const d = String((raw as { date: string }).date).slice(0, 10)
+    const name = String((raw as { name: string }).name ?? '').trim()
+    return {
+      id: `__public_holiday__:${d}`,
+      start_date: d,
+      end_date: d,
+      routine_override: 'none',
+      event_type: 'holiday',
+      title: name || '공휴일',
+      child_id: null,
+    }
+  })
+
+  const calendarBriefingRows = (calendarEventsRes.data ?? []) as BriefingEv[]
+
+  /** 공휴일부터 합치고 시작일 순으로 정렬 — 클라에서 다시 한 번 브리핑 구간 필터링합니다 */
+  const upcomingEvents: BriefingEv[] = [...phBriefingRows, ...calendarBriefingRows].sort((a, b) =>
+    a.start_date.localeCompare(b.start_date),
+  )
+
+  console.log('[home] calendar+brief query', {
     today,
-    sevenDaysLater,
+    briefingEndInclusive,
     parentId: auth.user.id,
     familyLinkIds,
-    result: upcomingEvents,
-    error: calendarEventsRes.error?.message,
+    publicHolidayCount: phBriefingRows.length,
+    calendarRows: calendarBriefingRows.length,
+    merged: upcomingEvents.length,
+    calendarError: calendarEventsRes.error?.message,
+    holidaysError: publicHolidaysBriefingRes.error?.message,
   })
 
   const daysWithDataByChild: Record<string, number> = {}

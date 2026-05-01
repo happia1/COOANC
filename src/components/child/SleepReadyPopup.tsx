@@ -7,8 +7,8 @@
  *               실제 재생 주소는 부모(ChildScreen)가 `soundSrc` 로 넘깁니다.
  */
 
-import { useEffect } from 'react'
-import { playAudio, CHILD_AUDIO } from '@/lib/childAudio'
+import { useEffect, useRef, useState } from 'react'
+import { CHILD_AUDIO, tryPlayAudioOnce } from '@/lib/childAudio'
 
 interface Props {
   childName: string
@@ -20,9 +20,40 @@ interface Props {
 }
 
 export default function SleepReadyPopup({ childName, soundSrc, onGoMission, onClose }: Props) {
+  const soundRef = useRef<HTMLAudioElement | null>(null)
+  const [needsTapForSound, setNeedsTapForSound] = useState(false)
+
   useEffect(() => {
-    playAudio(soundSrc ?? CHILD_AUDIO.sleepReady)
+    let cancelled = false
+    const url = soundSrc ?? CHILD_AUDIO.sleepReady
+
+    void (async () => {
+      const ok = await tryPlayAudioOnce(url, 1)
+      if (!cancelled && !ok) setNeedsTapForSound(true)
+    })()
+
+    return () => {
+      cancelled = true
+      const el = soundRef.current
+      if (el) {
+        el.pause()
+        soundRef.current = null
+      }
+    }
   }, [soundSrc])
+
+  async function playAlarmFromGesture() {
+    const url = soundSrc ?? CHILD_AUDIO.sleepReady
+    const audio = new Audio(url)
+    audio.volume = 1
+    soundRef.current = audio
+    try {
+      await audio.play()
+      setNeedsTapForSound(false)
+    } catch {
+      setNeedsTapForSound(true)
+    }
+  }
 
   return (
     <div
@@ -51,6 +82,19 @@ export default function SleepReadyPopup({ childName, soundSrc, onGoMission, onCl
           <br />
           잠 잘 준비를 해볼까요? 😊
         </p>
+
+        {needsTapForSound ? (
+          <div className="mb-4 rounded-2xl border border-violet-200 bg-violet-50 px-3 py-2 text-[11px] font-bold leading-snug text-violet-950">
+            소리가 안 들렸나요? 브라우저가 알람 재생을 막았을 수 있어요. 아래를 눌러 주세요.
+            <button
+              type="button"
+              className="mt-2 w-full rounded-xl bg-violet-600 py-2.5 text-xs font-black text-white"
+              onClick={() => void playAlarmFromGesture()}
+            >
+              알람 소리 듣기
+            </button>
+          </div>
+        ) : null}
 
         <button
           type="button"

@@ -7,8 +7,8 @@
  *               실제 재생 주소는 부모(ChildScreen)가 `soundSrc` 로 넘깁니다.
  */
 
-import { useEffect } from 'react'
-import { playAudio, CHILD_AUDIO } from '@/lib/childAudio'
+import { useEffect, useRef, useState } from 'react'
+import { CHILD_AUDIO, tryPlayAudioOnce } from '@/lib/childAudio'
 
 interface Props {
   /** 자녀 이름 — 문구에 넣어 개인화 */
@@ -20,9 +20,41 @@ interface Props {
 }
 
 export default function SchoolTimePopup({ childName, soundSrc, onClose }: Props) {
+  const soundRef = useRef<HTMLAudioElement | null>(null)
+  const [needsTapForSound, setNeedsTapForSound] = useState(false)
+
   useEffect(() => {
-    playAudio(soundSrc ?? CHILD_AUDIO.timeToGo)
+    let cancelled = false
+    const url = soundSrc ?? CHILD_AUDIO.timeToGo
+
+    void (async () => {
+      const ok = await tryPlayAudioOnce(url, 1)
+      if (!cancelled && !ok) setNeedsTapForSound(true)
+    })()
+
+    return () => {
+      cancelled = true
+      const el = soundRef.current
+      if (el) {
+        el.pause()
+        soundRef.current = null
+      }
+    }
   }, [soundSrc])
+
+  /** 버튼 누름 = 사용자 제스처 → 많은 브라우저에서 이때부터 소리 허용 */
+  async function playAlarmFromGesture() {
+    const url = soundSrc ?? CHILD_AUDIO.timeToGo
+    const audio = new Audio(url)
+    audio.volume = 1
+    soundRef.current = audio
+    try {
+      await audio.play()
+      setNeedsTapForSound(false)
+    } catch {
+      setNeedsTapForSound(true)
+    }
+  }
 
   return (
     <div
@@ -48,6 +80,19 @@ export default function SchoolTimePopup({ childName, soundSrc, onClose }: Props)
           <br />
           출발할 준비 됐나요? 😊
         </p>
+
+        {needsTapForSound ? (
+          <div className="mb-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] font-bold leading-snug text-emerald-900">
+            소리가 안 들렸나요? 기기 브라우저가 알람 재생을 막았을 수 있어요. 아래를 눌러 주세요.
+            <button
+              type="button"
+              className="mt-2 w-full rounded-xl bg-emerald-600 py-2.5 text-xs font-black text-white"
+              onClick={() => void playAlarmFromGesture()}
+            >
+              알람 소리 듣기
+            </button>
+          </div>
+        ) : null}
 
         <button
           type="button"
