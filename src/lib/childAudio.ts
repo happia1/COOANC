@@ -19,6 +19,8 @@ export const CHILD_AUDIO = {
   dontLie: '/assets/audio/alerts/거짓말은 나 속상해.wav',
   /** 뽀모도로 등 추후용 — 파일 추가 전까지 재생 실패 시 콘솔만 경고 */
   tickTock: '/assets/audio/alerts/tick-tock-timer.wav',
+  /** 연속 탭 확인 팝업 등 — 짧은 보조 효과음(`public/assets/audio/alerts/no.wav`) */
+  popupAlert: '/assets/audio/alerts/no.wav',
 } as const
 
 /** `installChildRoutineAudioUnlockOnFirstGesture` 가 전역 리스너를 중복해서 붙지 않게 합니다 */

@@ -8,7 +8,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react'
-import { CHILD_AUDIO, tryPlayAudioOnce } from '@/lib/childAudio'
+import { CHILD_AUDIO } from '@/lib/childAudio'
 
 interface Props {
   /** 자녀 이름 — 문구에 넣어 개인화 */
@@ -27,24 +27,30 @@ export default function SchoolTimePopup({ childName, soundSrc, onClose }: Props)
     let cancelled = false
     const url = soundSrc ?? CHILD_AUDIO.timeToGo
 
-    void (async () => {
-      const ok = await tryPlayAudioOnce(url, 1)
-      if (!cancelled && !ok) setNeedsTapForSound(true)
-    })()
+    const audio = new Audio(url)
+    audio.volume = 1
+    soundRef.current = audio
+
+    void audio.play().catch(() => {
+      if (!cancelled) setNeedsTapForSound(true)
+    })
 
     return () => {
       cancelled = true
-      const el = soundRef.current
-      if (el) {
-        el.pause()
-        soundRef.current = null
-      }
+      audio.pause()
+      audio.currentTime = 0
+      soundRef.current = null
     }
   }, [soundSrc])
 
   /** 버튼 누름 = 사용자 제스처 → 많은 브라우저에서 이때부터 소리 허용 */
   async function playAlarmFromGesture() {
     const url = soundSrc ?? CHILD_AUDIO.timeToGo
+    const prev = soundRef.current
+    if (prev) {
+      prev.pause()
+      prev.currentTime = 0
+    }
     const audio = new Audio(url)
     audio.volume = 1
     soundRef.current = audio
@@ -96,7 +102,15 @@ export default function SchoolTimePopup({ childName, soundSrc, onClose }: Props)
 
         <button
           type="button"
-          onClick={onClose}
+          onClick={() => {
+            const el = soundRef.current
+            if (el) {
+              el.pause()
+              el.currentTime = 0
+              soundRef.current = null
+            }
+            onClose()
+          }}
           className="w-full py-4 rounded-2xl font-black text-white text-base active:scale-95 transition-transform"
           style={{
             background: 'linear-gradient(135deg, #11998e, #38ef7d)',

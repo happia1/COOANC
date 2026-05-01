@@ -8,7 +8,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react'
-import { CHILD_AUDIO, tryPlayAudioOnce } from '@/lib/childAudio'
+import { CHILD_AUDIO } from '@/lib/childAudio'
 
 interface Props {
   childName: string
@@ -27,23 +27,29 @@ export default function SleepReadyPopup({ childName, soundSrc, onGoMission, onCl
     let cancelled = false
     const url = soundSrc ?? CHILD_AUDIO.sleepReady
 
-    void (async () => {
-      const ok = await tryPlayAudioOnce(url, 1)
-      if (!cancelled && !ok) setNeedsTapForSound(true)
-    })()
+    const audio = new Audio(url)
+    audio.volume = 1
+    soundRef.current = audio
+
+    void audio.play().catch(() => {
+      if (!cancelled) setNeedsTapForSound(true)
+    })
 
     return () => {
       cancelled = true
-      const el = soundRef.current
-      if (el) {
-        el.pause()
-        soundRef.current = null
-      }
+      audio.pause()
+      audio.currentTime = 0
+      soundRef.current = null
     }
   }, [soundSrc])
 
   async function playAlarmFromGesture() {
     const url = soundSrc ?? CHILD_AUDIO.sleepReady
+    const prev = soundRef.current
+    if (prev) {
+      prev.pause()
+      prev.currentTime = 0
+    }
     const audio = new Audio(url)
     audio.volume = 1
     soundRef.current = audio
@@ -98,7 +104,15 @@ export default function SleepReadyPopup({ childName, soundSrc, onGoMission, onCl
 
         <button
           type="button"
-          onClick={onGoMission}
+          onClick={() => {
+            const el = soundRef.current
+            if (el) {
+              el.pause()
+              el.currentTime = 0
+              soundRef.current = null
+            }
+            onGoMission()
+          }}
           className="w-full py-4 rounded-2xl font-black text-white text-base mb-3
                      active:scale-95 transition-transform"
           style={{
@@ -111,7 +125,15 @@ export default function SleepReadyPopup({ childName, soundSrc, onGoMission, onCl
 
         <button
           type="button"
-          onClick={onClose}
+          onClick={() => {
+            const el = soundRef.current
+            if (el) {
+              el.pause()
+              el.currentTime = 0
+              soundRef.current = null
+            }
+            onClose()
+          }}
           className="w-full py-3 rounded-2xl font-medium text-gray-400 text-sm bg-gray-50 active:bg-gray-100"
         >
           나중에 할게요

@@ -3,58 +3,82 @@
 /**
  * 미션 카드 연속 탭 감지 확인 팝업
  *
- * 3초 이내에 5개 이상의 미션 카드를 연속으로 탭했을 때 노출됩니다.
- * - 이미지: /assets/img/missions/routine/dont_lie.png
- * - 음성: /assets/audio/alerts/거짓말은 나 속상해.wav (마운트 시 자동 재생, 1회만)
- * - 버튼: "미안.. 다시할게" (취소) / "정말 다 했어!" (확인)
+ * 비개발자: 아이가 미션 카드를 아주 빠르게 여러 장 탭하면 이 창이 떠요. 정말 끝냈는지 다시 확인합니다.
  *
- * 비개발자 설명:
- * 아이가 미션 카드를 너무 빠르게 여러 번 탭하면 이 팝업이 나타납니다.
- * 캐릭터 이미지와 함께 "정말 한 거 맞아?" 한 줄만 보여 주고, 확인·취소 버튼으로 선택하게 합니다.
+ * 3초 이내에 5개 이상의 미션 카드를 연속으로 탭했을 때 노출됩니다.
+ * - 이미지: `/assets/img/missions/routine/dont_lie.png`
+ * - 음성: `거짓말은 나 속상해.wav` 재생 후 약 0.3초 뒤 `no.wav` 추가 재생(1회)
+ * - 버튼: 「미안.. 다시 할게」「정말 다 했어!」— 둘 다 누르면 재생 중인 소리를 먼저 멈춥니다.
  */
 
 import { useEffect, useRef } from 'react'
 import Image from 'next/image'
 import { createPortal } from 'react-dom'
+import { CHILD_AUDIO } from '@/lib/childAudio'
 
 type Props = {
   /** 팝업 표시 여부 */
   open: boolean
-  /** "정말 다 했어!" 버튼 — 5번째 미션을 완료로 처리합니다 */
+  /** 「정말 다 했어!」— 5번째 미션을 완료로 처리 */
   onConfirm: () => void
-  /** "미안.. 다시할게" 버튼 — 5번째 미션 완료를 취소합니다 */
+  /** 「미안.. 다시 할게」— 5번째 미션 완료 취소 */
   onDeny: () => void
 }
 
-/** 확인 팝업에 쓸 이미지/음성 경로 */
 const DONT_LIE_IMG_SRC = '/assets/img/missions/routine/dont_lie.png'
-const DONT_LIE_AUDIO_SRC = '/assets/audio/alerts/거짓말은 나 속상해.wav'
 
 export default function RapidTapConfirmModal({ open, onConfirm, onDeny }: Props) {
-  /** 음성을 한 번만 재생하기 위한 Audio 인스턴스 */
-  const audioRef = useRef<HTMLAudioElement | null>(null)
+  const dontLieAudioRef = useRef<HTMLAudioElement | null>(null)
+  const noAudioRef = useRef<HTMLAudioElement | null>(null)
+
+  /** 연속 재생 중인 두 트랙을 모두 끕니다 */
+  function stopAll() {
+    const refs = [dontLieAudioRef, noAudioRef]
+    for (const r of refs) {
+      const el = r.current
+      if (el) {
+        el.pause()
+        el.currentTime = 0
+        r.current = null
+      }
+    }
+  }
 
   useEffect(() => {
     if (!open) return
 
-    /** 팝업이 열릴 때마다 새 Audio 객체를 만들어 처음부터 재생합니다 */
-    const audio = new Audio(DONT_LIE_AUDIO_SRC)
-    audio.volume = 0.85
-    audioRef.current = audio
-
-    void audio.play().catch(() => {
-      // 브라우저 자동재생 정책으로 인해 소리가 나지 않을 수 있습니다 — 조용히 무시합니다
+    const dontLie = new Audio(CHILD_AUDIO.dontLie)
+    dontLie.volume = 0.85
+    dontLieAudioRef.current = dontLie
+    void dontLie.play().catch(() => {
+      /* 자동재생 정책으로 차단될 수 있음 — UI는 그대로 유지 */
     })
 
+    /** 첫 멘트 후 짧은 보조음 */
+    const noTimer = window.setTimeout(() => {
+      const no = new Audio(CHILD_AUDIO.popupAlert)
+      no.volume = 0.9
+      noAudioRef.current = no
+      void no.play().catch(() => {})
+    }, 300)
+
     return () => {
-      audio.pause()
-      audio.currentTime = 0
-      audioRef.current = null
+      window.clearTimeout(noTimer)
+      stopAll()
     }
   }, [open])
 
-  if (!open) return null
-  if (typeof window === 'undefined') return null
+  function handleConfirm() {
+    stopAll()
+    onConfirm()
+  }
+
+  function handleDeny() {
+    stopAll()
+    onDeny()
+  }
+
+  if (!open || typeof window === 'undefined') return null
 
   const modal = (
     <div
@@ -63,13 +87,9 @@ export default function RapidTapConfirmModal({ open, onConfirm, onDeny }: Props)
       aria-modal="true"
       aria-label="정말 다 했어?"
     >
-      {/* 반투명 배경 — 탭해도 닫히지 않습니다(의도적 확인 필요) */}
       <div className="absolute inset-0 bg-black/60" />
 
-      {/* 팝업 카드 */}
       <div className="relative z-10 mx-4 flex w-full max-w-xs flex-col items-center rounded-3xl bg-white px-6 pb-6 pt-8 shadow-2xl">
-
-        {/* 캐릭터 이미지 */}
         <div className="mb-4 h-36 w-36 overflow-hidden rounded-2xl">
           <Image
             src={DONT_LIE_IMG_SRC}
@@ -81,26 +101,19 @@ export default function RapidTapConfirmModal({ open, onConfirm, onDeny }: Props)
           />
         </div>
 
-        {/* 메인 메시지 — 빠른 연속 탭 안내 문구는 넣지 않고 짧게만 확인합니다 */}
-        <p className="mb-6 text-center text-2xl font-black text-gray-900">
-          정말 한 거 맞아?
-        </p>
+        <p className="mb-6 text-center text-2xl font-black text-gray-900">정말 한 거 맞아?</p>
 
-        {/* 버튼 2개 */}
         <div className="flex w-full flex-col gap-3">
-          {/* 확인 버튼 */}
           <button
             type="button"
-            onClick={onConfirm}
+            onClick={handleConfirm}
             className="w-full rounded-2xl bg-[#4A90E2] py-4 text-base font-black text-white shadow-md transition-opacity active:opacity-80"
           >
             정말 다 했어! 🙌
           </button>
-
-          {/* 취소 버튼 */}
           <button
             type="button"
-            onClick={onDeny}
+            onClick={handleDeny}
             className="w-full rounded-2xl bg-gray-100 py-4 text-base font-bold text-gray-600 transition-opacity active:opacity-80"
           >
             미안.. 다시 할게 😅
