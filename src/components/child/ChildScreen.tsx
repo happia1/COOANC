@@ -1262,7 +1262,10 @@ export default function ChildScreen({
           onCompleted={openSeedModal}
           showHeartRow
         />
-        <div className="flex flex-col items-center">
+        {/*
+          비개발자: 물조리개와 화분 사이 — 부모 gap + 이 div 의 mt 를 줄이면 화분이 더 위로 옵니다.
+        */}
+        <div className="mt-0 flex flex-col items-center">
           {plantHint ? (
             <p className="mb-1 max-w-[10rem] rounded-lg bg-black/75 px-2 py-1 text-center text-[9px] font-bold text-white shadow-md">
               {plantHint}

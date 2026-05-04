@@ -5,12 +5,15 @@
  *
  * 비개발자 설명:
  * - 탭하면 보유 하트 1개를 써서 화분 진행도를 올립니다.
- * - 하트·숫자는 물조리개 **오른쪽 옆**에만 두고, 둥근 배경·테두리 같은 **감싼 블록은 쓰지 않습니다**(하트 → 숫자 순, 살짝 아래 정렬).
+ * - 위에는 **하트 + 숫자** 한 줄 — 레벨 카드 크레딧 줄과 같이 **왼쪽 정렬·간격**, 숫자는 같은 크기·색, 하트는 미션과 같은 `icons.png` 하트 스프라이트.
+ * - 아래에 **물조리개 그림**을 둡니다.
  * - 하트 구간에 따라 물조리개 PNG 가 바뀝니다(100 / 200 / 300).
  */
 
 import { useState } from 'react'
 import Image from 'next/image'
+import SpriteImage from '@/components/common/SpriteImage'
+import { ICONS } from '@/constants/sprites'
 import { getWateringCanImage } from '@/constants/plantTrees'
 import type { WaterResult } from '@/hooks/usePlantPot'
 
@@ -24,7 +27,7 @@ type Props = {
   onCompleted: () => void
   /** 단계가 한 칸 올라갔을 때(선택) */
   onLevelUp?: () => void
-  /** false면 오른쪽 옆 하트·숫자 표시를 숨깁니다. */
+  /** false면 상단 하트·숫자 줄을 숨깁니다. */
   showHeartRow?: boolean
 }
 
@@ -115,13 +118,45 @@ export default function WateringCanButton({
         disabled={disabled || pouring}
         className={
           showHeartRow
-            ? 'relative inline-flex overflow-visible border-0 bg-transparent p-0 pt-0 pr-0 pl-0 transition-transform active:scale-90 disabled:opacity-50'
+            ? 'flex w-full max-w-full flex-col items-stretch gap-3 overflow-visible border-0 bg-transparent p-0 transition-transform active:scale-90 disabled:opacity-50'
             : 'flex h-14 w-14 shrink-0 items-center justify-center border-0 bg-transparent p-0 transition-transform active:scale-90 disabled:opacity-50'
         }
         aria-label={`물 주기 — 보유 하트 ${hearts}개`}
       >
-        {/* 비개발자: 조리개 그림 + 오른쪽에 하트·숫자만(배경 박스 없음, 세로는 조리개 중심보다 살짝 아래) */}
-        <div className="relative shrink-0 overflow-visible" style={{ width: 28, height: 28 }}>
+        {/*
+          비개발자: ChildLevelStatsCard 크레딧 줄과 동일하게 왼쪽부터(justify-start) 아이콘 18 + 숫자.
+          하트 그림은 MissionProgressHeartsRow 와 같은 스프라이트(채워진 하트 색).
+          aria-hidden: 버튼 aria-label 로 개수를 이미 읽어 줍니다.
+        */}
+        {showHeartRow ? (
+          <div className="flex w-full min-w-0 max-w-full items-center gap-1.5" aria-hidden>
+            <span className="inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center">
+              <SpriteImage
+                sheet={ICONS}
+                frame="heart"
+                width={18}
+                clipRotated={false}
+                className="h-[18px] w-[18px] shrink-0 select-none object-contain"
+              />
+            </span>
+            <span
+              className="min-w-0 shrink-0 truncate font-black tabular-nums leading-none"
+              style={{
+                fontSize: 20,
+                color: '#7A4F00',
+                letterSpacing: '-0.5px',
+              }}
+            >
+              {hearts}
+            </span>
+          </div>
+        ) : null}
+
+        {/*
+          비개발자: 하트 줄 아래 물조리개 — gap·translate-y 로 위치, 아주 약간만 오른쪽(-translate-x-1).
+          크기는 32px 정사각으로 예전(28)보다 살짝만 키웠습니다.
+        */}
+        <div className="relative shrink-0 self-center -translate-x-1 translate-y-1 overflow-visible" style={{ width: 32, height: 32 }}>
           <div
             style={{
               width: '100%',
@@ -130,19 +165,9 @@ export default function WateringCanButton({
               animation: pouring ? 'canTilt 0.5s ease-in-out' : undefined,
             }}
           >
-            <Image src={canImg} alt="물조리개" fill className="object-contain" sizes="28px" priority />
+            <Image src={canImg} alt="물조리개" fill className="object-contain" sizes="32px" priority />
           </div>
           {drops ? [0, 1, 2].map((i) => <WaterDrop key={i} index={i} />) : null}
-
-          {showHeartRow ? (
-            <div
-              className="pointer-events-none absolute top-1/2 left-full z-10 ml-0.5 flex -translate-y-1/2 translate-y-1.5 items-center gap-px drop-shadow-[0_1px_2px_rgba(0,0,0,0.35)]"
-              aria-hidden
-            >
-              <span className="text-[9px] leading-none">❤️</span>
-              <span className="-ml-px text-[9px] font-black leading-none tabular-nums text-pink-500">{hearts}</span>
-            </div>
-          ) : null}
         </div>
       </button>
     </>
