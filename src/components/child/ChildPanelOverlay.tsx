@@ -7,7 +7,8 @@
  * activePanel에 따라 마켓/코인/꾸미기/스티커 중 하나를 표시합니다.
  *
  * 비개발자 설명:
- * - 상단 바의 아이콘(🏪🪙👗⭐)을 탭하면 이 패널이 화면 아래에서 올라옵니다.
+ * - 폰·패드 세로: 아이콘을 탭하면 패널이 아래에서 올라옵니다.
+ * - 패드 가로(너비 md 이상 + 가로 모드): 같은 패널이 오른쪽에서 슬라이드되어 들어옵니다.
  * - 어두운 배경(딤)을 탭하거나 × 버튼을 누르면 닫힙니다.
  */
 
@@ -140,11 +141,12 @@ export default function ChildPanelOverlay({
         aria-hidden
       />
 
-      {/* 패널 본체 — 하단에서 슬라이드업 */}
+      {/* 패널 본체 — 세로: 하단 슬라이드업 / 패드 가로: 우측 슬라이드 */}
       <div
         className={[
           'absolute bottom-0 left-0 right-0',
-          'bg-white rounded-t-3xl',
+          'md:landscape:bottom-0 md:landscape:top-0 md:landscape:left-auto md:landscape:right-0 md:landscape:h-full md:landscape:w-full md:landscape:max-w-[420px]',
+          'bg-white rounded-t-3xl md:landscape:rounded-none md:landscape:rounded-l-3xl',
           'flex flex-col',
           /*
            * 꾸미기 패널: 68dvh 고정 — 아이템 수와 무관하게 일정한 높이.
@@ -153,10 +155,15 @@ export default function ChildPanelOverlay({
            *   480px+ 기기의 7열 2행(가장 많은 아이템인 배경 탭) = 약 150px → 여유 있음
            *   overflow-hidden 으로 스크롤바 원천 차단.
            * 나머지 패널: 85dvh 최대 (콘텐츠에 맞게 자동 확장).
+           * 패드 가로: 세로 높이 전체를 쓰므로 dressup 도 h-full.
            */
-          active === 'dressup' ? 'h-[68dvh]' : 'max-h-[85dvh]',
+          active === 'dressup'
+            ? 'h-[68dvh] md:landscape:h-full md:landscape:max-h-none'
+            : 'max-h-[85dvh] md:landscape:h-full md:landscape:max-h-none',
           'transform transition-transform duration-300 ease-out',
-          isSlideUpOpen ? 'translate-y-0' : 'translate-y-full',
+          isSlideUpOpen
+            ? 'translate-y-0 md:landscape:translate-y-0 md:landscape:translate-x-0'
+            : 'translate-y-full md:landscape:translate-y-0 md:landscape:translate-x-full',
         ].join(' ')}
         role="dialog"
         aria-modal="true"

@@ -27,7 +27,7 @@ export function ChildProfileAvatarPicker({
       <div className="flex flex-col gap-2 border-t border-gray-100 pt-4" id={id}>
         <p className="text-xs font-bold text-gray-500">홈 화면 캐릭터</p>
         <p className="text-[11px] leading-snug text-gray-400">
-          아래에서 골라요. 홈 섬에 정면으로 서 있는 친구가 바뀌어요.
+          자녀가 좋아하늩 케릭터를 설정해주세요.
         </p>
         {/* 온보딩: 각 카드(블록) 안에 사각 영역을 두고 캐릭터를 넣음 — 동그라미 링/프레임 없음 */}
         <div className="flex flex-row items-end justify-between gap-1 sm:gap-1.5">

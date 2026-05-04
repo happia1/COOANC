@@ -501,7 +501,7 @@ function BlockSection({ label, children }: { label: string; children: React.Reac
 
 /**
  * 가로 스크롤 칩
- * - fixedChipsToggleable 이 false(기본): 기상·취침은 항상 파란 스타일·해제 불가
+ * - fixedChipsToggleable 이 false(기본): 기상·잘 시간은 항상 파란 스타일·해제 불가
  * - true: DB와 맞춤용 — 고정 칩도 끄면 회색으로 보임
  */
 function HorizontalChips({
@@ -514,7 +514,7 @@ function HorizontalChips({
   pool: ChipDef[]
   selectedIds: string[]
   hasSchool: boolean
-  /** true면 기상·취침도 일반 칩처럼 선택/해제 */
+  /** true면 기상·잘 시간도 일반 칩처럼 선택/해제 */
   fixedChipsToggleable?: boolean
   onToggle: (id: string, isFixed: boolean) => void
 }) {

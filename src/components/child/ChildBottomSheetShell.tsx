@@ -24,8 +24,10 @@ type Props = {
 }
 
 /**
- * 자녀 화면 공통 바텀시트 껍데기(딤 + 아래에서 슬라이드 + 핸들 막대)
- * - 지도(항해지도)를 열 때 패널이 **아래에서 천천히** 올라오도록 `SHEET_ENTER_MS` 로 속도를 맞춥니다.
+ * 자녀 화면 공통 시트 껍데기(딤 + 슬라이드)
+ * - 세로·좁은 가로: 아래에서 슬라이드 + 핸들 막대.
+ * - 패드 가로(md+landscape): 오른쪽 전체 높이 패널로 슬라이드(다른 부모·자녀 시트와 통일).
+ * - 지도(항해지도)는 `SHEET_ENTER_MS` 로 천천히 올라오도록 속도를 맞춥니다.
  */
 export default function ChildBottomSheetShell({
   open,
@@ -74,7 +76,12 @@ export default function ChildBottomSheetShell({
   if (!mounted) return null
 
   return (
-    <div className="fixed inset-0 z-[100] mx-auto w-full max-w-md" role="dialog" aria-modal aria-labelledby={titleId}>
+    <div
+      className="fixed inset-0 z-[100] mx-auto w-full max-w-md md:landscape:mx-0 md:landscape:max-w-none"
+      role="dialog"
+      aria-modal
+      aria-labelledby={titleId}
+    >
       <button
         type="button"
         className={`absolute inset-0 bg-black/40 transition-opacity ease-out ${
@@ -91,14 +98,18 @@ export default function ChildBottomSheetShell({
         - `min-h-0` + 안쪽 `overflow-hidden` 으로 flex 자식이 스크롤 영역까지 높이를 넘기도록 함
       */}
       <div
-        className={`absolute bottom-0 left-0 right-0 flex min-h-0 flex-col overflow-hidden rounded-t-3xl bg-gradient-to-b from-sky-100 via-white to-white pb-[env(safe-area-inset-bottom,0px)] shadow-[0_-8px_32px_rgba(0,0,0,0.12)] transition-transform ease-[cubic-bezier(0.33,0.02,0.2,1)] ${
+        className={`absolute bottom-0 left-0 right-0 flex min-h-0 flex-col overflow-hidden rounded-t-3xl bg-gradient-to-b from-sky-100 via-white to-white pb-[env(safe-area-inset-bottom,0px)] shadow-[0_-8px_32px_rgba(0,0,0,0.12)] transition-transform ease-[cubic-bezier(0.33,0.02,0.2,1)] md:landscape:bottom-0 md:landscape:top-0 md:landscape:left-auto md:landscape:right-0 md:landscape:h-full md:landscape:max-h-none md:landscape:w-full md:landscape:max-w-[420px] md:landscape:rounded-none md:landscape:rounded-l-3xl md:landscape:shadow-[-8px_0_32px_rgba(0,0,0,0.12)] ${
           compact ? 'max-h-[min(96dvh,100dvh)]' : 'max-h-[min(88dvh,100dvh)]'
-        } ${entered ? 'translate-y-0' : 'translate-y-full'}`}
+        } ${
+          entered
+            ? 'translate-y-0 md:landscape:translate-y-0 md:landscape:translate-x-0'
+            : 'translate-y-full md:landscape:translate-y-0 md:landscape:translate-x-full'
+        }`}
         style={{ transitionDuration: `${SHEET_ENTER_MS}ms` }}
       >
         {!compact && (
           <div
-            className={`flex shrink-0 flex-col items-center pb-2 pt-3 ${swipeToClose ? 'touch-none select-none' : ''}`}
+            className={`flex shrink-0 flex-col items-center pb-2 pt-3 md:landscape:hidden ${swipeToClose ? 'touch-none select-none' : ''}`}
             onPointerDown={
               swipeToClose
                 ? (e) => {

@@ -3,7 +3,7 @@
 /**
  * 부모 「루틴 알람 설정」전용 시트 — 알람시계(alarm.png) 느낌의 생활 알람만 다룹니다.
  * - 알림·공지는 상단 `notice.png` 버튼의 ParentBellBoardSheet 를 씁니다(루틴 설정은 알람시계 버튼만).
- * - 온보딩과 동일한 기상·등원·하원·귀가·잘 준비·취침 + 추가 일정, 우측 + 로 추가, 행마다 삭제 가능
+ * - 온보딩과 동일한 기상·등원·하원·귀가·잘 준비·잘 시간 + 추가 일정, 우측 + 로 추가, 행마다 삭제 가능
  * - 등원·잘 준비는 child_stats 에 시각·주중/주말·(주중|주말 중 하나라도 켜면 true 인) 사용 여부를 저장합니다.
  */
 
@@ -19,8 +19,12 @@ import {
 } from '@/lib/routineAlarmLocalPrefs'
 import { createClient } from '@/lib/supabase/client'
 import { useParentStore } from '@/store/parentStore'
+import { mergeRoutineAlarmPickListFromApi } from '@/lib/routineAlarmSounds'
+import RoutineAlarmSoundToggleList, {
+  type AlarmSoundPickRow,
+} from '@/components/common/RoutineAlarmSoundToggleList'
 
-type SoundItem = { id: string; label: string; url: string }
+type SoundItem = AlarmSoundPickRow
 
 /** 기본 루틴 알람 행 — 라벨·행 키·저장값이 없을 때 쓸 defaultSoundId (soundId = prefs ?? defaultSoundId) */
 type CoreRoutineRowKey = 'wake' | 'return' | 'sleep' | 'school' | 'sleepReady'
@@ -34,7 +38,7 @@ const CORE_ROUTINE_ALARM_ITEMS: Array<{
   { row: 'school', label: '등원', defaultSoundId: 'time_to_go' },
   { row: 'return', label: '하원·귀가', defaultSoundId: 'tick_tock_timer' },
   { row: 'sleepReady', label: '잘 준비', defaultSoundId: 'sleep_ready' },
-  { row: 'sleep', label: '취침', defaultSoundId: 'morning_alarm_birds' },
+  { row: 'sleep', label: '잘 시간', defaultSoundId: 'sleep_time_alert' },
 ]
 
 /** 행 키 → 기본 소리 id (API 목록 로드 후에도 prefs 가 비었을 때 폴백) */
@@ -160,11 +164,11 @@ export default function RoutineAlarmSettingsSheet({ open, onClose }: Props) {
     setCustomAlarms(p.customAlarms.map((c) => ({ ...c })))
 
     let cancelled = false
-    fetch('/api/assets/alarm-sounds')
+    fetch('/api/assets/alarm-sounds', { cache: 'no-store' })
       .then((r) => r.json())
       .then((j: { sounds?: SoundItem[] }) => {
         if (cancelled) return
-        const list = Array.isArray(j.sounds) ? j.sounds : []
+        const list = mergeRoutineAlarmPickListFromApi(Array.isArray(j.sounds) ? j.sounds : [])
         setAlarmSounds(list)
         setSoundWake((prev) => prev || CORE_DEFAULT_SOUND_BY_ROW.wake)
         setSoundReturn((prev) => prev || CORE_DEFAULT_SOUND_BY_ROW.return)
@@ -172,7 +176,16 @@ export default function RoutineAlarmSettingsSheet({ open, onClose }: Props) {
         setSoundSchool((prev) => prev || CORE_DEFAULT_SOUND_BY_ROW.school)
         setSoundSleepReady((prev) => prev || CORE_DEFAULT_SOUND_BY_ROW.sleepReady)
       })
-      .catch(() => {})
+      .catch(() => {
+        if (cancelled) return
+        const list = mergeRoutineAlarmPickListFromApi([])
+        setAlarmSounds(list)
+        setSoundWake((prev) => prev || CORE_DEFAULT_SOUND_BY_ROW.wake)
+        setSoundReturn((prev) => prev || CORE_DEFAULT_SOUND_BY_ROW.return)
+        setSoundSleep((prev) => prev || CORE_DEFAULT_SOUND_BY_ROW.sleep)
+        setSoundSchool((prev) => prev || CORE_DEFAULT_SOUND_BY_ROW.school)
+        setSoundSleepReady((prev) => prev || CORE_DEFAULT_SOUND_BY_ROW.sleepReady)
+      })
     return () => {
       cancelled = true
     }
@@ -346,13 +359,18 @@ export default function RoutineAlarmSettingsSheet({ open, onClose }: Props) {
   const overlay = (
     <div className="fixed inset-0 z-[100]" role="dialog" aria-modal="true" aria-labelledby="routine-alarm-sheet-title">
       <button type="button" className="absolute inset-0 bg-black/45" aria-label="닫기" onClick={onClose} />
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center">
+      {/*
+        메인 시트: 세로 화면은 하단 슬라이드, 패드 가로는 우측 슬라이드(알림·공지 시트와 동일).
+      */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center md:landscape:inset-x-0 md:landscape:inset-y-0 md:landscape:bottom-0 md:landscape:left-auto md:landscape:right-0 md:landscape:top-0 md:landscape:justify-end">
         <div
-          className={`pointer-events-auto flex max-h-[min(90dvh,100vh-1rem)] w-full max-w-md overflow-x-hidden flex-col rounded-t-2xl bg-white shadow-2xl transition-transform duration-300 ease-out ${
-            sheetEntered ? 'translate-y-0' : 'translate-y-full'
+          className={`pointer-events-auto flex max-h-[min(90dvh,100vh-1rem)] w-full max-w-md overflow-x-hidden flex-col rounded-t-2xl bg-white shadow-2xl transition-transform duration-300 ease-out md:landscape:h-full md:landscape:max-h-none md:landscape:rounded-none md:landscape:rounded-l-2xl ${
+            sheetEntered
+              ? 'translate-y-0 md:landscape:translate-y-0 md:landscape:translate-x-0'
+              : 'translate-y-full md:landscape:translate-y-0 md:landscape:translate-x-full'
           }`}
         >
-          <div className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-gray-200" aria-hidden />
+          <div className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-gray-200 md:landscape:hidden" aria-hidden />
           <div className="border-b border-gray-100 px-4 pb-2 pt-3">
             <p id="routine-alarm-sheet-title" className="text-center text-sm font-black text-gray-900">
               루틴 알람
@@ -434,7 +452,7 @@ export default function RoutineAlarmSettingsSheet({ open, onClose }: Props) {
                 onPickSound={() => openSoundPickerCore('sleepReady')}
               />
               <AlarmScheduleRow
-                label="취침"
+                label="잘 시간"
                 time={sleepTime}
                 onTimeChange={setSleepTime}
                 notify={notifySleep}
@@ -493,8 +511,11 @@ export default function RoutineAlarmSettingsSheet({ open, onClose }: Props) {
             aria-label="닫기"
             onClick={() => setSoundSheet({ open: false })}
           />
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center">
-            <div className="pointer-events-auto max-h-[70vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white px-4 pb-6 pt-3 shadow-xl">
+          {/*
+            소리 선택 보조 시트: 메인과 같이 패드 가로에서는 오른쪽 전면 패널 형태가 자연스럽습니다.
+          */}
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center md:landscape:inset-x-0 md:landscape:inset-y-0 md:landscape:bottom-0 md:landscape:left-auto md:landscape:right-0 md:landscape:top-0 md:landscape:justify-end">
+            <div className="pointer-events-auto max-h-[70vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white px-4 pb-6 pt-3 shadow-xl md:landscape:h-full md:landscape:max-h-none md:landscape:rounded-none md:landscape:rounded-l-2xl md:landscape:shadow-2xl">
               <p className="mb-1 text-center text-sm font-black text-gray-900">알람 소리 선택</p>
               <div className="mb-2 flex justify-end">
                 <button
@@ -506,13 +527,14 @@ export default function RoutineAlarmSettingsSheet({ open, onClose }: Props) {
                   소리 끄기
                 </button>
               </div>
-              <SoundToggleList
+              <RoutineAlarmSoundToggleList
                 sounds={alarmSounds}
                 selectedId={pickerSound}
                 onSelect={(id) => setPickerSound(id)}
                 onPreview={previewPlay}
                 playingId={previewPlayingId}
                 onStop={stopPreview}
+                accent="parentBlue"
               />
               <div className="mt-4 flex gap-2">
                 <button
@@ -543,8 +565,8 @@ export default function RoutineAlarmSettingsSheet({ open, onClose }: Props) {
             aria-label="닫기"
             onClick={() => setAddOpen(false)}
           />
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center">
-            <div className="pointer-events-auto max-h-[80vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white px-4 pb-6 pt-3 shadow-xl">
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center md:landscape:inset-x-0 md:landscape:inset-y-0 md:landscape:bottom-0 md:landscape:left-auto md:landscape:right-0 md:landscape:top-0 md:landscape:justify-end">
+            <div className="pointer-events-auto max-h-[80vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white px-4 pb-6 pt-3 shadow-xl md:landscape:h-full md:landscape:max-h-none md:landscape:rounded-none md:landscape:rounded-l-2xl md:landscape:shadow-2xl">
               <p className="mb-3 text-center text-sm font-black text-gray-900">추가 알림</p>
               <label className="mb-1 block text-[10px] font-bold text-gray-500">이름</label>
               <input
@@ -572,13 +594,14 @@ export default function RoutineAlarmSettingsSheet({ open, onClose }: Props) {
                   소리 끄기
                 </button>
               </div>
-              <SoundToggleList
+              <RoutineAlarmSoundToggleList
                 sounds={alarmSounds}
                 selectedId={addSound}
                 onSelect={(id) => setAddSound(id)}
                 onPreview={previewPlay}
                 playingId={previewPlayingId}
                 onStop={stopPreview}
+                accent="parentBlue"
               />
               <div className="mt-4 flex gap-2">
                 <button
@@ -799,78 +822,3 @@ function AlarmScheduleRow({
   )
 }
 
-/**
- * 음원 pill + 미리듣기(▶) + 이 항목이 재생 중일 때만 쓰는 정지(■)
- * (전체 `소리 끄기`는 시트 제목 옆·위쪽 버튼으로도 가능)
- */
-function SoundToggleList({
-  sounds,
-  selectedId,
-  onSelect,
-  onPreview,
-  onStop,
-  playingId,
-}: {
-  sounds: SoundItem[]
-  selectedId: string
-  onSelect: (id: string) => void
-  /** (url, id) — 훅의 play 와 동일 순서: 주소, 목록 id */
-  onPreview: (url: string, id: string) => void
-  /** 현재 이 목록 id 가 재생 중이면 UI에서 강조 */
-  playingId: string | null
-  /** 재생 중인 소리를 멈춤(▶로 새로 재생해도 이전은 자동 정지) */
-  onStop: () => void
-}) {
-  if (!sounds.length) {
-    return (
-      <p className="rounded-lg bg-gray-50 px-2 py-2 text-[10px] leading-snug text-gray-500">
-        알람 음원 목록을 불러오는 중이거나 폴더가 비어 있어요.
-      </p>
-    )
-  }
-  return (
-    <div className="flex max-h-40 flex-wrap gap-1.5 overflow-y-auto py-1">
-      {sounds.map((s) => {
-        const on = selectedId === s.id
-        const isPlayingThis = playingId === s.id
-        return (
-          <div
-            key={s.id}
-            className="inline-flex max-w-full min-w-0 items-center gap-0.5 rounded-full border border-gray-200 bg-white pl-1 pr-0.5"
-          >
-            <button
-              type="button"
-              onClick={() => onSelect(s.id)}
-              className={[
-                'min-w-0 max-w-[9rem] truncate rounded-full px-2 py-1 text-[10px] font-bold transition-all',
-                on ? 'bg-[#4A90E2] text-white' : 'text-gray-600 hover:bg-[#4A90E2]/10',
-              ].join(' ')}
-            >
-              {s.label}
-            </button>
-            <button
-              type="button"
-              onClick={() => onPreview(s.url, s.id)}
-              className={[
-                'shrink-0 rounded-full p-1 text-[10px] transition-colors',
-                isPlayingThis ? 'text-[#4A90E2]' : 'text-gray-400 active:text-blue-500',
-              ].join(' ')}
-              aria-label="미리듣기"
-            >
-              ▶
-            </button>
-            <button
-              type="button"
-              onClick={onStop}
-              disabled={!playingId}
-              className="shrink-0 rounded-full p-1 text-[10px] text-gray-500 transition-colors enabled:hover:text-rose-600 enabled:active:text-rose-700 disabled:cursor-not-allowed disabled:opacity-30"
-              aria-label="미리듣기 정지"
-            >
-              ■
-            </button>
-          </div>
-        )
-      })}
-    </div>
-  )
-}

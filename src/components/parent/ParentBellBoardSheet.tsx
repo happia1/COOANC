@@ -65,13 +65,20 @@ export default function ParentBellBoardSheet({
   const overlay = (
     <div className="fixed inset-0 z-[100]" role="dialog" aria-modal="true" aria-labelledby="parent-bell-board-title">
       <button type="button" className="absolute inset-0 bg-black/45" aria-label="닫기" onClick={onClose} />
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center">
+      {/*
+        모바일·패드 세로: 아래에서 올라오는 시트.
+        패드 가로(md + landscape): 화면 오른쪽에서 밀려 들어오는 패널(캘린더 일정 시트와 같은 패턴).
+      */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center md:landscape:inset-x-0 md:landscape:inset-y-0 md:landscape:bottom-0 md:landscape:left-auto md:landscape:right-0 md:landscape:top-0 md:landscape:justify-end">
         <section
-          className={`pointer-events-auto flex max-h-[min(85dvh,100vh-1rem)] w-full max-w-md flex-col rounded-t-2xl bg-white shadow-2xl transition-transform duration-300 ease-out ${
-            sheetEntered ? 'translate-y-0' : 'translate-y-full'
+          className={`pointer-events-auto flex max-h-[min(85dvh,100vh-1rem)] w-full max-w-md flex-col rounded-t-2xl bg-white shadow-2xl transition-transform duration-300 ease-out md:landscape:h-full md:landscape:max-h-none md:landscape:rounded-none md:landscape:rounded-l-2xl ${
+            sheetEntered
+              ? 'translate-y-0 md:landscape:translate-y-0 md:landscape:translate-x-0'
+              : 'translate-y-full md:landscape:translate-y-0 md:landscape:translate-x-full'
           }`}
         >
-          <div className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-gray-200" aria-hidden />
+          {/* 가로 모드에서는 Mac/태블릿에서 흔한 하단 시트 손잡이 막대는 숨깁니다 */}
+          <div className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-gray-200 md:landscape:hidden" aria-hidden />
           <div className="border-b border-gray-100 px-4 pb-2 pt-3">
             <p id="parent-bell-board-title" className="text-center text-sm font-black text-gray-900">
               알림 · 공지

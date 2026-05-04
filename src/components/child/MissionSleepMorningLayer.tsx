@@ -192,7 +192,7 @@ export default function MissionSleepMorningLayer({
   const isWeekendToday = useMemo(() => ['토', '일'].includes(getSeoulWeekdayShort(today)), [today])
 
   /**
-   * 기상/하원·귀가/취침 알람을 현재 시각 기준으로 검사해,
+   * 기상/하원·귀가/잘 시간 알람을 현재 시각 기준으로 검사해,
    * 아직 표시하지 않은 "가장 최근 시각" 알람 팝업을 하나 엽니다.
    */
   useEffect(() => {
@@ -224,7 +224,7 @@ export default function MissionSleepMorningLayer({
       }
       if (prefs.notifySleep && prefs.soundSleep.trim() && nowHm >= prefs.sleepTime) {
         if (!(isWeekendToday && !prefs.sleepOnWeekend)) {
-          candidates.push({ kind: 'sleep', label: '취침', time: prefs.sleepTime, sound: prefs.soundSleep })
+          candidates.push({ kind: 'sleep', label: '잘 시간', time: prefs.sleepTime, sound: prefs.soundSleep })
         }
       }
       if (candidates.length === 0) return
@@ -390,7 +390,7 @@ export default function MissionSleepMorningLayer({
         </div>
       )}
 
-      {/* 루틴 알람 팝업: 유형별(기상/하원·귀가/취침)로 이미지 노출을 다르게 처리 */}
+      {/* 루틴 알람 팝업: 유형별(기상/하원·귀가/잘 시간)로 이미지 노출을 다르게 처리 */}
       {activeAlarmPopup && (
         <div
           className="fixed inset-0 z-[107] flex items-center justify-center px-4 pt-4 pb-[max(1rem,calc(env(safe-area-inset-bottom)+5.5rem))] sm:px-6"
@@ -411,7 +411,7 @@ export default function MissionSleepMorningLayer({
                 {/**
                  * 요청사항 반영:
                  * - 하원·귀가(return): 이미지 제거
-                 * - 취침(sleep): 수면모드 이미지 사용
+                 * - 잘 시간(sleep): 수면모드 이미지 사용
                  * - 기상(wake): 기존 아침 해 이미지 유지
                  */}
                 <ModeAtlasSprite
@@ -424,7 +424,11 @@ export default function MissionSleepMorningLayer({
             ) : null}
             <div className="px-6 pb-6 pt-2">
               <p id="routine-alarm-modal-title" className="text-center text-xl font-black text-amber-950">
-                {activeAlarmPopup.kind === 'sleep' ? '취침 알람이에요!' : activeAlarmPopup.kind === 'return' ? '하원·귀가 알람이에요!' : '좋은 아침이에요!'}
+                {activeAlarmPopup.kind === 'sleep'
+                  ? '잘 시간 알람이에요!'
+                  : activeAlarmPopup.kind === 'return'
+                    ? '하원·귀가 알람이에요!'
+                    : '좋은 아침이에요!'}
               </p>
 
               {/* 노란 블록: 해당 알람 시각(HH:MM)만 크게 표시 */}

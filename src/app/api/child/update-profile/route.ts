@@ -5,6 +5,24 @@ import { createServiceRoleClient, serviceRoleEnvMissingMessage } from '@/lib/sup
 import { getAgeFromBirthDateIso } from '@/lib/ageFromBirthDate'
 import { isAllowedChildProfileAvatarUrl } from '@/lib/childProfileAvatar'
 
+/** PostgREST/Postgres 「해당 칼럼 없음」— 로컬 DB 마이그레이션 뒤처짐 등으로 첫 패치가 실패할 때 단계별로 줄여 재시도합니다 */
+function isRecoverableMissingColumn(error: {
+  code?: string
+  message?: string | undefined
+  details?: string | undefined
+} | null | undefined): boolean {
+  if (!error) return false
+  const code = String(error.code ?? '')
+  const msg = `${String(error.message ?? '')} ${String(error.details ?? '')}`
+  return (
+    code === '42703' ||
+    code === 'PGRST204' ||
+    (msg.includes('Could not find') && msg.includes('column')) ||
+    msg.includes('does not exist') ||
+    msg.includes('Undefined column')
+  )
+}
+
 const INSTITUTIONS = new Set(['home', 'daycare', 'kindergarten', 'school'])
 
 /**
@@ -159,10 +177,47 @@ export async function POST(req: NextRequest) {
   if (holidayRoutineMode !== undefined) patch.holiday_routine_mode = holidayRoutineMode
   if (avatarUrlPatch !== undefined) patch.avatar_url = avatarUrlPatch
 
-  const { error: upErr } = await admin.from('profiles').update(patch).eq('id', childId)
+  /** 새 칼럼(holiday_routine_mode 등) 없는 DB에서는 한 번에 갱신이 실패하므로, 컬럼 없음류일 때 필드를 하나씩 빼 재시도 */
+  let attemptPatch: Record<string, string | number | null> = { ...patch }
+  let skippedFields: string[] = []
+  let upErr:
+    | { code?: string; message?: string; details?: string }
+    | null
+    | undefined = null
+
+  const dropRetryOrder = ['holiday_routine_mode', 'age_group', 'institution_type'] as const
+  while (true) {
+    const { error } = await admin.from('profiles').update(attemptPatch).eq('id', childId)
+    upErr = error ?? null
+    if (!upErr) break
+    if (!isRecoverableMissingColumn(upErr)) break
+
+    let droppedSomething = false
+    for (const key of dropRetryOrder) {
+      if (Object.prototype.hasOwnProperty.call(attemptPatch, key)) {
+        skippedFields.push(String(key))
+        delete attemptPatch[key]
+        droppedSomething = true
+        break
+      }
+    }
+    if (!droppedSomething || Object.keys(attemptPatch).length === 0) break
+  }
+
   if (upErr) {
     console.error('[child/update-profile] profiles update:', upErr)
-    return NextResponse.json({ error: '저장에 실패했어요. 잠시 후 다시 시도해 주세요.' }, { status: 500 })
+    const code = String(upErr.code ?? '')
+    const msg = String(upErr.message ?? '')
+    const migrationsHint =
+      'Supabase SQL Editor에서 저장소 migrations(예: 024_profiles_missions_missing_columns, 064_profiles_holiday_routine_mode 등) 적용 여부를 확인해 주세요.'
+    const errorText = isRecoverableMissingColumn(upErr)
+      ? `초기 루틴 저장에 필요한 DB 칼럼이 없거나 스키마 캐시가 맞지 않아요. ${migrationsHint} (오류 코드: ${code || '?'})`
+      : `저장에 실패했어요. 잠시 후 다시 시도해 주세요. ${code ? `(코드: ${code})` : ''}${msg ? ` ${msg.slice(0, 180)}` : ''}`
+    return NextResponse.json({ error: errorText }, { status: 500 })
+  }
+
+  if (skippedFields.length) {
+    console.warn('[child/update-profile] 일부 필드는 현재 스키마에 없어 저장에서 제외했어요:', skippedFields.join(','))
   }
   /** 저장 직후 같은 연결로 다시 읽어, 클라이언트 재조회 지연 없이 UI 가 맞출 수 있게 합니다. */
   const { data: fresh } = await admin
@@ -196,7 +251,11 @@ export async function POST(req: NextRequest) {
    */
   // Next.js 최신 타입 시그니처: revalidateTag(tag, profile)
   // 즉시 재검증 의도를 명확히 하기 위해 "max" 프로필을 사용합니다.
-  revalidateTag('parent-home-child-profiles', 'max')
+  try {
+    revalidateTag('parent-home-child-profiles', 'max')
+  } catch (revalidateErr) {
+    console.warn('[child/update-profile] revalidateTag (무시 가능):', revalidateErr)
+  }
 
   return NextResponse.json({ ok: true, profile: { avatar_url: freshAvatar } })
 }

@@ -7,14 +7,14 @@
  *
  * 비개발자 설명:
  * - 배경 이미지 위에 캐릭터가 서 있고, 하단에 오늘의 미션 카드가 가로로 스크롤됩니다.
- * - 상단 오른쪽 아이콘을 탭하면 마켓/코인/꾸미기/스티커 패널이 아래에서 올라옵니다.
+ * - 상단 오른쪽 아이콘을 탭하면 마켓/코인/꾸미기/스티커 패널이, 폰·패드 세로에선 아래에서, 패드 가로(md+landscape)에서는 오른쪽에서 열립니다.
  * - 왼쪽 상단 🚪 버튼을 누르면 부모 화면으로 나갑니다.
  *
  * 레이아웃 레이어(아래 → 위):
  *   L1. 배경 이미지 (tablet_kidsroom_background_portrait.png)
  *   L2. 캐릭터 스프라이트 (앵커포인트 기반 배치)
  *   L3. UI 오버레이 (상단 바 + 크레딧/하트 배지 + 미션 섹션)
- *   L4. 패널 오버레이 (마켓/코인/꾸미기/스티커 — 하단 슬라이드업)
+ *   L4. 패널 오버레이 (마켓/코인/꾸미기/스티커 — 세로: 하단 슬라이드 / 패드 가로: 우측 슬라이드)
  */
 
 import { useRef, useState, useCallback, useMemo, useEffect, memo } from 'react'
@@ -32,6 +32,7 @@ import {
 import { BACKGROUND_ANCHORS } from '@/constants/backgroundAnchors'
 import { ICONS } from '@/constants/sprites'
 import { getUnlockedFeatures } from '@/constants/childScreenFeatures'
+import { usePlantPot } from '@/hooks/usePlantPot'
 import { useContainerSize } from '@/hooks/useContainerSize'
 import ChildMissionCard from '@/components/child/ChildMissionCard'
 import ChildPanelOverlay, { type PanelType } from '@/components/child/ChildPanelOverlay'
@@ -61,6 +62,9 @@ import { fireMissionCardConfetti } from '@/lib/missionCardConfetti'
 import { tryApplyCompletePayload } from '@/lib/applyDailyMissionCompleteStats'
 import AllMissionCompleteOverlay from '@/components/child/AllMissionCompleteOverlay'
 import ChildAlarmClockPopup from '@/components/child/ChildAlarmClockPopup'
+import PlantPot from '@/components/child/PlantPot'
+import WateringCanButton from '@/components/child/WateringCanButton'
+import SeedSelectModal from '@/components/child/SeedSelectModal'
 import SleepModeScreen from '@/components/child/SleepModeScreen'
 import MorningWakeScreen from '@/components/child/MorningWakeScreen'
 import SleepReadyPopup from '@/components/child/SleepReadyPopup'
@@ -296,6 +300,24 @@ export default function ChildScreen({
   const [stats, setStats] = useState<ChildStats | null>(() =>
     initialStats ? normalizeChildStatsCreditsSplit(initialStats) : null,
   )
+
+  /** 화분(식물) — `child_stats`의 pot_* 컬럼과 동기화 */
+  const { pot, hearts: plantHearts, loading: plantLoading, water, resetPot } = usePlantPot(childId)
+  /** 완성 후 씨앗 고르기 모달 */
+  const [seedModalOpen, setSeedModalOpen] = useState(false)
+  /** 하트가 0일 때 물주기 시 잠깐 뜨는 안내 */
+  const [plantHint, setPlantHint] = useState<string | null>(null)
+
+  const openSeedModal = useCallback(() => setSeedModalOpen(true), [])
+
+  /** 물줄 때 숫자는 상단 스탯과 맞추되, 스탯보다 훅이 먼저 갱신될 때를 대비해 둘 중 있는 값 사용 */
+  const waterButtonHearts = stats?.hearts ?? plantHearts
+
+  useEffect(() => {
+    if (!plantHint) return
+    const id = window.setTimeout(() => setPlantHint(null), 2200)
+    return () => clearTimeout(id)
+  }, [plantHint])
 
   useEffect(() => {
     setStats(initialStats ? normalizeChildStatsCreditsSplit(initialStats) : null)
@@ -1284,6 +1306,36 @@ export default function ChildScreen({
             뽀모도로·스티커·장바구니 — 상단이 아니라 화면 세로 중앙에 가깝게(캐릭터 발 앵커 기준).
             비개발자: 시계·하트·바구니만 아래로 내려가고, 나가기·코인은 오른쪽 위에 그대로 있습니다.
           */}
+          {/*
+            화분·물주기 — 오른쪽 아이콘 띠와 대칭으로 캐릭터 왼편에 둡니다.
+            비개발자: 하트를 모아 물을 주면 나무가 자라요. 다 자라면 씨앗을 고를 수 있어요.
+          */}
+          {!plantLoading && pot && (
+            <div
+              className="absolute left-4 z-[21] flex flex-col items-center gap-1 pointer-events-auto"
+              style={{
+                top: `${(anchor.characterFootY - 0.12) * 100}%`,
+                transform: 'translateY(-50%)',
+              }}
+            >
+              {plantHint ? (
+                <p className="max-w-[10rem] rounded-lg bg-black/75 px-2 py-1 text-center text-[9px] font-bold text-white shadow-md">
+                  {plantHint}
+                </p>
+              ) : null}
+              <PlantPot pot={pot} onRequestSeedSelect={openSeedModal} />
+              <WateringCanButton
+                hearts={waterButtonHearts}
+                disabled={plantLoading || !pot}
+                onWater={water}
+                onNoHearts={() =>
+                  setPlantHint('하트가 부족해요! 미션을 하면 하트를 받을 수 있어요.')
+                }
+                onCompleted={openSeedModal}
+              />
+            </div>
+          )}
+
           <div
             className="absolute right-4 flex flex-col items-center gap-3 pointer-events-auto"
             style={{
@@ -1435,6 +1487,14 @@ export default function ChildScreen({
       <ParentMissionRedoNoticeModal
         mission={parentRedoModalMission}
         onClose={() => setParentRedoModalMission(null)}
+      />
+
+      <SeedSelectModal
+        open={seedModalOpen}
+        onClose={() => setSeedModalOpen(false)}
+        onConfirm={async (treeId) => {
+          await resetPot(treeId)
+        }}
       />
 
       {showSchoolTime && !isSleeping && !showMorningWake ? (

@@ -25,7 +25,7 @@ import { buildWeeklyRoutineDays, type WeeklyRoutineDay } from '@/lib/childWeekly
 import { COOANC_CALENDAR_EVENTS_STORAGE_KEY } from '@/lib/localStorageChildScope'
 import { COOANC_CALENDAR_STORAGE_UPDATE_EVENT } from '@/lib/syncAgentEventToLocalCalendar'
 import { useParentStore } from '@/store/parentStore'
-import ChildProfileNav, { type ChildTab } from '@/components/parent/ChildProfileNav'
+import { useChildSiblingAvatarNav, type ChildTab } from '@/components/parent/ChildProfileNav'
 import EconomicEqPanel from '@/components/parent/EconomicEqPanel'
 import { PARENT_NEUTRAL_CARD_CLASSNAME } from '@/lib/parentNeutralBlockStyle'
 import ParentAgentHomeCards from '@/components/parent/ParentAgentHomeCards'
@@ -476,12 +476,11 @@ export default function HomeTab({ childrenData, upcomingEvents, daysWithDataByCh
   }, [effectiveUpcomingEvents])
 
   const tabs: ChildTab[] = childrenData.map((c) => ({ id: c.id, name: c.name }))
+  /** 다자녀일 때만 — 프로필 카드 속 캐릭터 좌우 ‹ › 에 연결합니다 */
+  const siblingNav = useChildSiblingAvatarNav(tabs)
 
   return (
     <div className="w-full px-4 md:px-6 lg:px-8 py-4 flex flex-col gap-4 md:gap-6">
-      {/* 자녀 전환: ◀ ▶ 및 스와이프 (Zustand 로 루틴 탭과 동일한 자녀 선택) */}
-      <ChildProfileNav tabs={tabs} />
-
       {!child ? (
         <div className="flex flex-col items-center justify-center py-20 gap-4">
           <div className="text-center">
@@ -521,6 +520,8 @@ export default function HomeTab({ childrenData, upcomingEvents, daysWithDataByCh
                   streakDays={s?.streak_days ?? 0}
                   ageGroupLabel={child.ageGroupLabel}
                   childcareLabel={child.childcareLabel}
+                  siblingNav={siblingNav}
+                  avatarEnterShortcut
                 />
               </ParentEnterChildUiLink>
 

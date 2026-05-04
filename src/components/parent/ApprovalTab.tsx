@@ -2,7 +2,7 @@
 
 /**
  * 부모 앱 — 승인 탭
- * - 상단은 루틴 탭과 같은 자녀 프로필 카드 + 다자녀 전환(스토어 selectedChildId 공유); 프로필 카드 탭 시 자녀 앱 화면으로 진입(홈과 동일 API).
+ * - 상단은 홈과 같은 자녀 프로필 카드(다자녀 시 캐릭터 양 옆 ‹ ›·스와이프); 프로필 카드 탭 시 자녀 앱 진입(API); 구매 내역 등은 선택 자녀 기준.
  * - 구매 요청·미션 롤백은 선택 중인 자녀 기준으로만 표시합니다.
  * - 구매 요청: 대기·외부구매 중 — 파란 「승인」으로 도착 완료 처리(반려 없음). 「구매 요청」제목과 같은 줄 오른쪽 「최근구매내역」링크로 하단 시트에서 과거 건 확인.
  * - 최근 구매(승인) 내역: 오늘 완료 미션과 같은 하단 슬라이드 시트 — 최근 3건 먼저, 「더보기」로 전체.
@@ -15,7 +15,7 @@ import { usePathname } from 'next/navigation'
 import ParentEnterChildUiLink from '@/components/parent/ParentEnterChildUiLink'
 import { CompactChildProfileCard } from '@/components/parent/CompactChildProfileCard'
 import { useParentStore } from '@/store/parentStore'
-import ChildProfileNav, { type ChildTab } from '@/components/parent/ChildProfileNav'
+import { useChildSiblingAvatarNav, type ChildTab } from '@/components/parent/ChildProfileNav'
 import ParentMarketMenuControl from '@/components/parent/ParentMarketMenuControl'
 import PraiseStickerPanel from '@/components/parent/PraiseStickerPanel'
 import type { PurchaseRequest, StoreItem } from '@/types/database'
@@ -297,6 +297,9 @@ export default function ApprovalTab({
     () => childrenProfiles.map((c) => ({ id: c.id, name: c.name })),
     [childrenProfiles],
   )
+
+  /** 다자녀: 프로필 카드의 캐릭터 양 옆 ‹ › 과 동일 규칙 */
+  const siblingNav = useChildSiblingAvatarNav(tabs)
 
   const requestsForChild = useMemo(
     () => (currentId ? requests.filter((r) => r.child_id === currentId) : []),
@@ -691,6 +694,8 @@ export default function ApprovalTab({
               streakDays={currentChild.streakDays}
               ageGroupLabel={currentChild.ageGroupLabel}
               childcareLabel={currentChild.childcareLabel}
+              siblingNav={siblingNav}
+              avatarEnterShortcut
             />
           </ParentEnterChildUiLink>
         )}
@@ -730,8 +735,6 @@ export default function ApprovalTab({
           <p className="mb-3 text-[11px] leading-snug text-gray-400">
             자녀가 크레딧으로 구매를 요청한 내역이에요.
           </p>
-
-          <ChildProfileNav tabs={tabs} compact />
 
           <div className="mt-2 flex flex-col gap-3">
             {requestsForChild.length === 0 ? (

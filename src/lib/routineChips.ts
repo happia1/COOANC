@@ -41,7 +41,8 @@ export const PM_CHIPS: ChipDef[] = [
   { id: 'pm-brush', title: '잠자리 양치', emoji: '', type: 'recommended', apiBlock: 'bedtime' },
   { id: 'pm-pajama', title: '잠옷 갈아입기', emoji: '', type: 'recommended', apiBlock: 'bedtime' },
   { id: 'pm-bedread', title: '잠자리 독서', emoji: '', type: 'optional', apiBlock: 'bedtime' },
-  { id: 'pm-sleep', title: '취침', emoji: '', type: 'fixed', apiBlock: 'bedtime' },
+  /** 마지막 고정 블록: 침실 — 앱에서는 「잘 시간」으로 안내하지만 과거 DB 에는 「취침」이 남아 있을 수 있습니다. */
+  { id: 'pm-sleep', title: '잘 시간', emoji: '', type: 'fixed', apiBlock: 'bedtime' },
 ]
 
 /** 기상 → 취침 순서(오전 칩 먼저, 이어서 오후~취침) — 정렬 시 같은 제목(물마시기 등)은 block 으로 구분 */
@@ -68,6 +69,8 @@ function minutesFromHHMMSafe(t: string | null | undefined): number {
 const MISSION_TITLE_ALIASES: Record<string, string> = {
   '일어나기': '기상',
   '양치하기': '양치',
+  /** 구 버전 미션 제목 — 칩 제목 「잘 시간」 과 동일한 슬롯으로 취급합니다. */
+  취침: '잘 시간',
   /** 구 DB/시드 — 칩·정렬 키는 "세수하기" 로 통일 */
   세수: '세수하기',
 }
@@ -303,7 +306,7 @@ function scheduledTimeForChip(
   if (chip.title === '기상') {
     return opts.notifyWake && /^\d{2}:\d{2}$/.test(opts.wake) ? opts.wake : null
   }
-  if (chip.title === '취침') {
+  if (chip.title === '잘 시간' || chip.title === '취침') {
     return opts.notifySleep && /^\d{2}:\d{2}$/.test(opts.sleep) ? opts.sleep : null
   }
   const firstPm = opts.selPmIds[0]
@@ -323,7 +326,7 @@ function missionDescriptionForChip(
   hasSchool: boolean,
 ): string | null {
   if (chip.title === '기상') return alarmDescription(soundWake)
-  if (chip.title === '취침') return alarmDescription(soundSleep)
+  if (chip.title === '잘 시간' || chip.title === '취침') return alarmDescription(soundSleep)
   const firstPm = pmIds[0]
   if (hasSchool && firstPm && chip.id === firstPm) return alarmDescription(soundReturn)
   return null

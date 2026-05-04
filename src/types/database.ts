@@ -77,6 +77,14 @@ export type ChildStats = {
   school_time_enabled?: boolean
   school_time_weekday?: boolean
   school_time_weekend?: boolean
+  /** 화분 성장 단계 0~6 (없으면 0 으로 간주) */
+  pot_stage?: number
+  /** 현재 단계에서 물주기로 쓴 하트 누적 */
+  pot_hearts_used?: number
+  /** 완성(6단계) 후 씨앗 선택 전 */
+  pot_completed?: boolean
+  /** 심은 나무 종류 코드 (예: apple) */
+  pot_tree_id?: string
   created_at: string
   updated_at: string
 }

@@ -11,7 +11,7 @@
  * - 캘린더는 스페셜 미션처럼 제목·+가 흰 카드 밖에 두고, 우하단 **하단 독바 바로 위**에 작은 원형 파비콘으로 AI 루틴 도우미 패널을 엽니다.
  * - 도우미 창을 닫아도 **대화 내역은 유지**되며, 닫힌 상태에서 AI 분석이 끝나면 플로팅 버튼에 **미읽음 숫자**가 표시됩니다.
  * - 매일 스페셜은 「보상 배율」로만 배율을 바꿉니다(카드에 「보상 N배」 문구는 넣지 않음).
- * - 상단 자녀 프로필 카드를 누르면 홈 탭과 같이 「부모가 이 자녀 앱 화면 보기」로 들어갑니다(API 쿠키 후 /home).
+ * - 상단 자녀 프로필 카드에서 캐릭터 좌우 ‹ › 또는 스와이프로 다자녀 전환, 카드 탭 시 「부모가 이 자녀 앱 화면 보기」로 들어갑니다(API 쿠키 후 /home).
  */
 
 import { useState, useEffect, useLayoutEffect, useMemo, useCallback, useRef } from 'react'
@@ -20,7 +20,7 @@ import { usePathname, useSearchParams } from 'next/navigation'
 import ParentEnterChildUiLink from '@/components/parent/ParentEnterChildUiLink'
 import { CompactChildProfileCard } from '@/components/parent/CompactChildProfileCard'
 import { useParentStore } from '@/store/parentStore'
-import ChildProfileNav, { type ChildTab } from '@/components/parent/ChildProfileNav'
+import { useChildSiblingAvatarNav, type ChildTab } from '@/components/parent/ChildProfileNav'
 import CalendarSection from '@/components/parent/CalendarSection'
 import RoutineKeywordBuilderSheet from '@/components/parent/RoutineKeywordBuilderSheet'
 import SpecialMissionAddSheet from '@/components/parent/SpecialMissionAddSheet'
@@ -524,6 +524,7 @@ export default function RoutineTab({
   }, [pathname])
 
   const tabs: ChildTab[] = children.map((c) => ({ id: c.id, name: c.name }))
+  const siblingNav = useChildSiblingAvatarNav(tabs)
 
   const scopedInitial = useMemo(() => missionsLinkedToChild(initial, currentId), [initial, currentId])
   const [missions, setMissions] = useState<Mission[]>(scopedInitial)
@@ -662,9 +663,6 @@ export default function RoutineTab({
         </div>
       )}
 
-      {/* 자녀 전환 네비 — 모바일·태블릿 공통 */}
-      <ChildProfileNav tabs={tabs} compact />
-
       {/**
        * 루틴 도우미(챗봇) FAB
        * - 모바일: 독바 바로 위 (bottom = 독높이 + safe-area + 10px)
@@ -751,6 +749,8 @@ export default function RoutineTab({
                 streakDays={currentChild.streakDays}
                 ageGroupLabel={currentChild.ageGroupLabel}
                 childcareLabel={currentChild.childcareLabel}
+                siblingNav={siblingNav}
+                avatarEnterShortcut
               />
             </ParentEnterChildUiLink>
           )}

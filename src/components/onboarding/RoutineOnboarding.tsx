@@ -3,7 +3,8 @@
 /**
  * 자녀 프로필 등록 직후 루틴 온보딩 (3단계)
  *
- * 1단계 — 연령·기관·학원·기상·하원/귀가·취침 (각 시간마다 알림 켜기/끄기)
+ * 1단계 — 연령·기관·「일정별 알람」: 부모 루틴 알람 시트와 동일하게 기상·등원·하원·귀가·잘 준비·잘 시간(주중·주말 토글 + 소리)
+ *    「알람 소리 선택」팝업은 소리 목록을 **기상 / 등원 / 취침 / 기타** 네 구역 카드로 나눠 보여 줍니다(온보딩 전용 강조 UI).
  * 2단계 — 평일·휴일 루틴 한 화면: 평일 오전·오후 칩 + 휴일은 「평일과 같음」/「휴일만 따로」(후자 선택 시 휴일 오전·오후 블록 표시) 후 완료
  *
  * (구) 4단계 요약 화면은 없습니다. 키워드는 미리 정의된 목록만 쓰며, 새 미션은 설정의 「미션 추가 제안」으로 안내합니다.
@@ -11,7 +12,15 @@
 
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { useAlarmSoundPreview } from '@/hooks/useAlarmSoundPreview'
-import { DEFAULT_ROUTINE_ALARM_SOUND_IDS } from '@/lib/routineAlarmSounds'
+import {
+  writeRoutineAlarmPrefs,
+  type RoutineCustomAlarmStored,
+} from '@/lib/routineAlarmLocalPrefs'
+import { createClient } from '@/lib/supabase/client'
+import RoutineAlarmSoundToggleList, {
+  type AlarmSoundPickRow,
+} from '@/components/common/RoutineAlarmSoundToggleList'
+import { DEFAULT_ROUTINE_ALARM_SOUND_IDS, mergeRoutineAlarmPickListFromApi } from '@/lib/routineAlarmSounds'
 
 // ── 미션 API가 받는 블록 타입 (DB 정렬·아이콘 매칭용, 화면은 오전/오후 두 덩어리만 노출)
 type ApiBlock = 'morning' | 'afternoon' | 'evening' | 'bedtime'
@@ -42,7 +51,7 @@ const AM_CHIPS: ChipDef[] = [
 ]
 
 /**
- * 오후 루틴: 귀가 후 ~ 취침까지 흔한 순서 (API 블록만 오후/저녁/잠자리로 나눔)
+ * 오후 루틴: 귀가 후 ~ 잘 시간까지 흔한 순서 (API 블록만 오후/저녁/잠자리로 나눔)
  */
 const PM_CHIPS: ChipDef[] = [
   { id: 'pm-hands', title: '손씻기', emoji: '', type: 'recommended', apiBlock: 'afternoon' },
@@ -57,7 +66,8 @@ const PM_CHIPS: ChipDef[] = [
   { id: 'pm-brush', title: '잠자리 양치', emoji: '', type: 'recommended', apiBlock: 'bedtime' },
   { id: 'pm-pajama', title: '잠옷 갈아입기', emoji: '', type: 'recommended', apiBlock: 'bedtime' },
   { id: 'pm-bedread', title: '잠자리 독서', emoji: '', type: 'optional', apiBlock: 'bedtime' },
-  { id: 'pm-sleep', title: '취침', emoji: '', type: 'fixed', apiBlock: 'bedtime' },
+  /** 마지막 고정 블록: 잠자리 — 제목과 루틴 「잘 시간」 알람 라벨을 맞춤 */
+  { id: 'pm-sleep', title: '잘 시간', emoji: '', type: 'fixed', apiBlock: 'bedtime' },
 ]
 
 /** 고정·추천만 기본 선택 (학교 안 다니면 등원 칩 제외) */
@@ -86,18 +96,27 @@ function scheduledTimeForChip(
     selPmIds: string[]
     wake: string
     sleep: string
+    schoolTime: string
     returnAnchor: string
     hasSchool: boolean
     notifyWake: boolean
     notifyReturn: boolean
     notifySleep: boolean
+    schoolWeekday: boolean
+    schoolWeekend: boolean
   },
 ): string | null {
   if (chip.title === '기상') {
     return opts.notifyWake && /^\d{2}:\d{2}$/.test(opts.wake) ? opts.wake : null
   }
-  if (chip.title === '취침') {
+  if (chip.title === '잘 시간' || chip.title === '취침') {
     return opts.notifySleep && /^\d{2}:\d{2}$/.test(opts.sleep) ? opts.sleep : null
+  }
+  /** 등원 미션 칩은 별도 «등원» 알람 시각·사용 여부를 따름(부모 루틴 알람과 동일; 기관 선택과 무관하게 등원 행 설정과 맞춤) */
+  if (chip.title === '등원하기') {
+    const st = opts.schoolTime.trim()
+    if (!(opts.schoolWeekday || opts.schoolWeekend)) return null
+    return /^\d{2}:\d{2}$/.test(st) ? st : null
   }
   const firstPm = opts.selPmIds[0]
   if (opts.hasSchool && firstPm && chip.id === firstPm) {
@@ -133,12 +152,14 @@ function missionDescriptionForChip(
   chip: ChipDef,
   pmIds: string[],
   soundWake: string,
+  soundSchool: string,
   soundReturn: string,
   soundSleep: string,
   hasSchool: boolean,
 ): string | null {
   if (chip.title === '기상') return alarmDescription(soundWake)
-  if (chip.title === '취침') return alarmDescription(soundSleep)
+  if (chip.title === '잘 시간' || chip.title === '취침') return alarmDescription(soundSleep)
+  if (chip.title === '등원하기') return alarmDescription(soundSchool)
   const firstPm = pmIds[0]
   if (hasSchool && firstPm && chip.id === firstPm) return alarmDescription(soundReturn)
   return null
@@ -146,20 +167,11 @@ function missionDescriptionForChip(
 
 function sortRowTie(rowId: string): string {
   if (rowId === 'wake') return '0'
-  if (rowId === 'return') return '1'
-  if (rowId === 'sleep') return '2'
-  return `3-${rowId}`
-}
-
-type AlarmSoundItem = { id: string; label: string; url: string }
-
-/** 사용자가 추가한 알람 일정 */
-type CustomAlarm = {
-  id: string
-  label: string
-  time: string
-  notify: boolean
-  soundFile: string
+  if (rowId === 'school') return '1'
+  if (rowId === 'return') return '2'
+  if (rowId === 'sleepReady') return '3'
+  if (rowId === 'sleep') return '4'
+  return `5-${rowId}`
 }
 
 type AgeGroup = 'preschool' | 'school'
@@ -188,17 +200,36 @@ export default function RoutineOnboarding({ onComplete, linkedChildId }: Props) 
   const [sleepTime, setSleepTime] = useState('21:00')
   const [returnHomeTime, setReturnHomeTime] = useState('15:00')
 
-  /** 기상 / 하원·귀가(첫 오후 활동) / 취침 알림 각각 켜짐 여부 */
+  /** 기상 / 하원·귀가(첫 오후 활동) / 잘 시간 알림 각각 주중 스위치(전역 notify_* 플래그)로 켜짐 여부 */
   const [notifyWake, setNotifyWake] = useState(true)
   const [notifyReturn, setNotifyReturn] = useState(true)
   const [notifySleep, setNotifySleep] = useState(true)
 
   /** 알람 음원 (파일명 id) — `/api/assets/alarm-sounds` 로 목록 로드 */
-  const [alarmSounds, setAlarmSounds] = useState<AlarmSoundItem[]>([])
+  const [alarmSounds, setAlarmSounds] = useState<AlarmSoundPickRow[]>([])
   const [soundWake, setSoundWake] = useState('')
   const [soundReturn, setSoundReturn] = useState('')
   const [soundSleep, setSoundSleep] = useState('')
-  const [customAlarms, setCustomAlarms] = useState<CustomAlarm[]>([])
+  /** 등원·잘 준비 알람 음원 id — 부모 앱 RoutineAlarmSettingsSheet 와 동일 키 */
+  const [soundSchool, setSoundSchool] = useState('')
+  const [soundSleepReady, setSoundSleepReady] = useState('')
+
+  /** 기상·하원·잘 시간: 주중 ON 은 cooanc_notify_* , 주말 ON 은 cooanc_alarm_prefs 의 *OnWeekend */
+  const [wakeOnWeekend, setWakeOnWeekend] = useState(true)
+  const [returnOnWeekend, setReturnOnWeekend] = useState(true)
+  const [sleepOnWeekend, setSleepOnWeekend] = useState(true)
+
+  /** 등원 알람 시각 및 주중/주말(부모 시트와 동일 — child_stats.school_time* 로도 저장) */
+  const [schoolTime, setSchoolTime] = useState('08:30')
+  const [schoolWeekday, setSchoolWeekday] = useState(true)
+  const [schoolWeekend, setSchoolWeekend] = useState(true)
+
+  /** 잘 준비 알람 */
+  const [sleepReadyTime, setSleepReadyTime] = useState('20:30')
+  const [sleepReadyWeekday, setSleepReadyWeekday] = useState(true)
+  const [sleepReadyWeekend, setSleepReadyWeekend] = useState(true)
+
+  const [customAlarms, setCustomAlarms] = useState<RoutineCustomAlarmStored[]>([])
   /** 상단 휴지통: 추가 일정만 체크 후 일괄 삭제 */
   const [alarmDeleteMode, setAlarmDeleteMode] = useState(false)
   const [selectedAlarmDeleteIds, setSelectedAlarmDeleteIds] = useState<Set<string>>(() => new Set())
@@ -233,24 +264,54 @@ export default function RoutineOnboarding({ onComplete, linkedChildId }: Props) 
 
   useEffect(() => {
     let cancelled = false
-    fetch('/api/assets/alarm-sounds')
+    fetch('/api/assets/alarm-sounds', { cache: 'no-store' })
       .then((r) => r.json())
-      .then((j: { sounds?: AlarmSoundItem[] }) => {
+      .then((j: { sounds?: AlarmSoundPickRow[] }) => {
         if (cancelled) return
-        const list = Array.isArray(j.sounds) ? j.sounds : []
+        const raw = Array.isArray(j.sounds) ? j.sounds : []
+        const list = mergeRoutineAlarmPickListFromApi(raw)
         setAlarmSounds(list)
         const first = list[0]?.id ?? ''
         setSoundWake((p) => p || DEFAULT_ROUTINE_ALARM_SOUND_IDS.wake || first)
         setSoundReturn((p) => p || DEFAULT_ROUTINE_ALARM_SOUND_IDS.returnHome || first)
         setSoundSleep((p) => p || DEFAULT_ROUTINE_ALARM_SOUND_IDS.sleep || first)
+        setSoundSchool((p) => p || DEFAULT_ROUTINE_ALARM_SOUND_IDS.school || first)
+        setSoundSleepReady((p) => p || DEFAULT_ROUTINE_ALARM_SOUND_IDS.sleepReady || first)
         setSheetSound((p) => p || first)
         setPickerSound((p) => p || first)
       })
-      .catch(() => {})
+      .catch(() => {
+        if (cancelled) return
+        const list = mergeRoutineAlarmPickListFromApi([])
+        setAlarmSounds(list)
+        const first = list[0]?.id ?? ''
+        setSoundWake((p) => p || DEFAULT_ROUTINE_ALARM_SOUND_IDS.wake || first)
+        setSoundReturn((p) => p || DEFAULT_ROUTINE_ALARM_SOUND_IDS.returnHome || first)
+        setSoundSleep((p) => p || DEFAULT_ROUTINE_ALARM_SOUND_IDS.sleep || first)
+        setSoundSchool((p) => p || DEFAULT_ROUTINE_ALARM_SOUND_IDS.school || first)
+        setSoundSleepReady((p) => p || DEFAULT_ROUTINE_ALARM_SOUND_IDS.sleepReady || first)
+        setSheetSound((p) => p || first)
+        setPickerSound((p) => p || first)
+      })
     return () => {
       cancelled = true
     }
   }, [])
+
+  /**
+   * 잘 시간 행에서만 소리 시트 목록을 재정렬 — 기본 선택 id(sleep_time_alert) pill이 목록 최상단에 오게 해
+   * 스크롤 영역이 짧아서 아래 줄에 숨는 문제를 줄입니다.
+   */
+  const soundsForSoundSheetPicker = useMemo(() => {
+    if (!sheet.open || sheet.mode !== 'sound') return alarmSounds
+    if (sheet.rowId !== 'sleep') return alarmSounds
+    const sid = DEFAULT_ROUTINE_ALARM_SOUND_IDS.sleep
+    const ix = alarmSounds.findIndex((s) => s.id === sid)
+    if (ix <= 0) return alarmSounds
+    const next = [...alarmSounds]
+    const [picked] = next.splice(ix, 1)
+    return [picked, ...next]
+  }, [alarmSounds, sheet])
 
   const soundLabel = useCallback(
     (fileId: string) => alarmSounds.find((s) => s.id === fileId)?.label ?? (fileId ? fileId : '소리'),
@@ -299,11 +360,13 @@ export default function RoutineOnboarding({ onComplete, linkedChildId }: Props) 
       if (rowId === 'wake') current = soundWake
       else if (rowId === 'return') current = soundReturn
       else if (rowId === 'sleep') current = soundSleep
+      else if (rowId === 'school') current = soundSchool
+      else if (rowId === 'sleepReady') current = soundSleepReady
       else current = customAlarms.find((c) => c.id === rowId)?.soundFile ?? ''
       setPickerSound(current || alarmSounds[0]?.id || '')
       setSheet({ open: true, mode: 'sound', rowId })
     },
-    [soundWake, soundReturn, soundSleep, customAlarms, alarmSounds],
+    [soundWake, soundReturn, soundSleep, soundSchool, soundSleepReady, customAlarms, alarmSounds],
   )
 
   /** 루틴 설정 화면에서 미션 제안 보내기 — 서버는 로그만 남기고, 메일 자동화는 추후 연결 */
@@ -349,6 +412,8 @@ export default function RoutineOnboarding({ onComplete, linkedChildId }: Props) 
     if (rowId === 'wake') setSoundWake(v)
     else if (rowId === 'return') setSoundReturn(v)
     else if (rowId === 'sleep') setSoundSleep(v)
+    else if (rowId === 'school') setSoundSchool(v)
+    else if (rowId === 'sleepReady') setSoundSleepReady(v)
     else setCustomAlarms((prev) => prev.map((c) => (c.id === rowId ? { ...c, soundFile: v } : c)))
     setSheet({ open: false })
   }, [sheet, pickerSound])
@@ -369,6 +434,7 @@ export default function RoutineOnboarding({ onComplete, linkedChildId }: Props) 
         time: sheetTime,
         notify: sheetNotify,
         soundFile: sheetSound || first,
+        onWeekend: true,
       },
     ])
     setSheet({ open: false })
@@ -388,7 +454,7 @@ export default function RoutineOnboarding({ onComplete, linkedChildId }: Props) 
     return '15:00'
   }, [returnHomeTime])
 
-  /** 화면에 그릴 알람 행 — 시각 오름차순, 같은 시각이면 기상→하원→취침→추가 순 */
+  /** 화면에 그릴 알람 행 — 시각 오름차순, 같은 시각이면 기상→등원→하원→잘 준비→잘 시간→추가 순 */
   const sortedAlarmRows = useMemo(() => {
     type Row = {
       rowId: string
@@ -396,8 +462,11 @@ export default function RoutineOnboarding({ onComplete, linkedChildId }: Props) 
       minutes: number
       time: string
       setTime: (t: string) => void
-      notify: boolean
-      setNotify: (v: boolean) => void
+      /** 부모 시트 「주중」 열과 동일 의미 — 등원·잘 준비는 해당 주중 토글, 그 외는 알림 자체 on */
+      weekdayNotify: boolean
+      setWeekdayNotify: (v: boolean) => void
+      weekendNotify: boolean
+      setWeekendNotify: (v: boolean) => void
       soundFile: string
       deletable: boolean
     }
@@ -408,9 +477,24 @@ export default function RoutineOnboarding({ onComplete, linkedChildId }: Props) 
       minutes: minutesFromHHMM(wakeTime),
       time: wakeTime,
       setTime: setWakeTime,
-      notify: notifyWake,
-      setNotify: setNotifyWake,
-      soundFile: soundWake,
+      weekdayNotify: notifyWake,
+      setWeekdayNotify: setNotifyWake,
+      weekendNotify: wakeOnWeekend,
+      setWeekendNotify: setWakeOnWeekend,
+      soundFile:       soundWake,
+      deletable: false,
+    })
+    rows.push({
+      rowId: 'school',
+      label: '등원',
+      minutes: minutesFromHHMM(schoolTime),
+      time: schoolTime,
+      setTime: setSchoolTime,
+      weekdayNotify: schoolWeekday,
+      setWeekdayNotify: setSchoolWeekday,
+      weekendNotify: schoolWeekend,
+      setWeekendNotify: setSchoolWeekend,
+      soundFile: soundSchool,
       deletable: false,
     })
     if (hasSchool) {
@@ -420,32 +504,52 @@ export default function RoutineOnboarding({ onComplete, linkedChildId }: Props) 
         minutes: minutesFromHHMM(returnHomeTime),
         time: returnHomeTime,
         setTime: setReturnHomeTime,
-        notify: notifyReturn,
-        setNotify: setNotifyReturn,
+        weekdayNotify: notifyReturn,
+        setWeekdayNotify: setNotifyReturn,
+        weekendNotify: returnOnWeekend,
+        setWeekendNotify: setReturnOnWeekend,
         soundFile: soundReturn,
         deletable: false,
       })
     }
     rows.push({
+      rowId: 'sleepReady',
+      label: '잘 준비',
+      minutes: minutesFromHHMM(sleepReadyTime),
+      time: sleepReadyTime,
+      setTime: setSleepReadyTime,
+      weekdayNotify: sleepReadyWeekday,
+      setWeekdayNotify: setSleepReadyWeekday,
+      weekendNotify: sleepReadyWeekend,
+      setWeekendNotify: setSleepReadyWeekend,
+      soundFile: soundSleepReady,
+      deletable: false,
+    })
+    rows.push({
       rowId: 'sleep',
-      label: '취침',
+      label: '잘 시간',
       minutes: minutesFromHHMM(sleepTime),
       time: sleepTime,
       setTime: setSleepTime,
-      notify: notifySleep,
-      setNotify: setNotifySleep,
+      weekdayNotify: notifySleep,
+      setWeekdayNotify: setNotifySleep,
+      weekendNotify: sleepOnWeekend,
+      setWeekendNotify: setSleepOnWeekend,
       soundFile: soundSleep,
       deletable: false,
     })
     for (const c of customAlarms) {
+      const wkEnd = c.onWeekend !== false
       rows.push({
         rowId: c.id,
         label: c.label,
         minutes: minutesFromHHMM(c.time),
         time: c.time,
         setTime: (t) => setCustomAlarms((prev) => prev.map((x) => (x.id === c.id ? { ...x, time: t } : x))),
-        notify: c.notify,
-        setNotify: (v) => setCustomAlarms((prev) => prev.map((x) => (x.id === c.id ? { ...x, notify: v } : x))),
+        weekdayNotify: c.notify,
+        setWeekdayNotify: (v) => setCustomAlarms((prev) => prev.map((x) => (x.id === c.id ? { ...x, notify: v } : x))),
+        weekendNotify: wkEnd,
+        setWeekendNotify: (v) => setCustomAlarms((prev) => prev.map((x) => (x.id === c.id ? { ...x, onWeekend: v } : x))),
         soundFile: c.soundFile,
         deletable: true,
       })
@@ -454,14 +558,25 @@ export default function RoutineOnboarding({ onComplete, linkedChildId }: Props) 
     return rows
   }, [
     wakeTime,
+    schoolTime,
     returnHomeTime,
+    sleepReadyTime,
     sleepTime,
     hasSchool,
     notifyWake,
     notifyReturn,
     notifySleep,
+    schoolWeekday,
+    schoolWeekend,
+    sleepReadyWeekday,
+    sleepReadyWeekend,
+    wakeOnWeekend,
+    returnOnWeekend,
+    sleepOnWeekend,
     soundWake,
+    soundSchool,
     soundReturn,
+    soundSleepReady,
     soundSleep,
     customAlarms,
   ])
@@ -471,7 +586,7 @@ export default function RoutineOnboarding({ onComplete, linkedChildId }: Props) 
     pmIds: string[],
     repeatType: 'daily' | 'weekly',
     options: { hasSchoolForAnchor: boolean; linkedChildId: string | null },
-    customs: CustomAlarm[],
+    customs: RoutineCustomAlarmStored[],
   ) {
     /** 풀 정의 순서대로 미션 생성 (가로 스크롤 순서와 동일) */
     const ordered: ChipDef[] = [...AM_CHIPS.filter((c) => amIds.includes(c.id)), ...PM_CHIPS.filter((c) => pmIds.includes(c.id))]
@@ -481,13 +596,24 @@ export default function RoutineOnboarding({ onComplete, linkedChildId }: Props) 
         selPmIds: pmIds,
         wake: wakeTime,
         sleep: sleepTime,
+        schoolTime,
         returnAnchor,
         hasSchool: options.hasSchoolForAnchor,
         notifyWake,
         notifyReturn,
         notifySleep,
+        schoolWeekday,
+        schoolWeekend,
       })
-      const description = missionDescriptionForChip(chip, pmIds, soundWake, soundReturn, soundSleep, options.hasSchoolForAnchor)
+      const description = missionDescriptionForChip(
+        chip,
+        pmIds,
+        soundWake,
+        soundSchool,
+        soundReturn,
+        soundSleep,
+        options.hasSchoolForAnchor,
+      )
       const res = await fetch('/api/mission/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -565,9 +691,19 @@ export default function RoutineOnboarding({ onComplete, linkedChildId }: Props) 
             holidayRoutineMode: mode === 'withCustomHoliday' ? 'custom' : 'as_weekday',
           }),
         })
-        const j = await res.json().catch(() => ({}))
+        const text = await res.text()
+        let j: { error?: string } = {}
+        try {
+          j = text ? (JSON.parse(text) as { error?: string }) : {}
+        } catch {
+          j = {}
+        }
         if (!res.ok) {
-          throw new Error(typeof j.error === 'string' ? j.error : '연령·보육 정보 저장에 실패했어요.')
+          throw new Error(
+            typeof j.error === 'string' && j.error.trim()
+              ? j.error
+              : text?.trim()?.slice(0, 280) || `연령·보육 정보 저장 요청 오류 (${res.status})`,
+          )
         }
       }
 
@@ -577,25 +713,54 @@ export default function RoutineOnboarding({ onComplete, linkedChildId }: Props) 
       }
       if (typeof window !== 'undefined') {
         localStorage.setItem('cooanc_routine_has_school', hasSchool ? '1' : '0')
-        localStorage.setItem('cooanc_notify_wake', notifyWake ? '1' : '0')
-        localStorage.setItem('cooanc_notify_return', notifyReturn ? '1' : '0')
-        localStorage.setItem('cooanc_notify_sleep', notifySleep ? '1' : '0')
-        localStorage.setItem(
-          'cooanc_alarm_prefs',
-          JSON.stringify({
-            wake: soundWake,
-            return: soundReturn,
-            sleep: soundSleep,
-            wakeTime,
-            returnHomeTime,
-            sleepTime,
-            custom: customAlarms,
-            wakeOnWeekend: true,
-            returnOnWeekend: true,
-            sleepOnWeekend: true,
-            sleepReadyTime: '20:30',
-          }),
-        )
+        writeRoutineAlarmPrefs({
+          notifyWake,
+          notifyReturn,
+          notifySleep,
+          wakeTime,
+          returnHomeTime,
+          sleepTime,
+          soundWake,
+          soundReturn,
+          soundSleep,
+          customAlarms,
+          wakeOnWeekend,
+          returnOnWeekend,
+          sleepOnWeekend,
+          sleepReadyTime,
+          soundSleepReady,
+          sleepReadyEnabled: sleepReadyWeekday || sleepReadyWeekend,
+          sleepReadyWeekday,
+          sleepReadyWeekend,
+          schoolTime,
+          soundSchool,
+          schoolEnabled: schoolWeekday || schoolWeekend,
+          schoolWeekday,
+          schoolWeekend,
+        })
+      }
+
+      /** 등원·잘 준비 시각은 부모 루틴 알람 시트와 같이 DB child_stats 에도 남김 */
+      if (linkedChildId) {
+        const supabase = createClient()
+        const schoolEnabledOut = schoolWeekday || schoolWeekend
+        const sleepReadyEnabledOut = sleepReadyWeekday || sleepReadyWeekend
+        const { error: statsErr } = await supabase
+          .from('child_stats')
+          .update({
+            school_time: schoolTime,
+            school_time_enabled: schoolEnabledOut,
+            school_time_weekday: schoolWeekday,
+            school_time_weekend: schoolWeekend,
+            sleep_ready_time: sleepReadyTime,
+            sleep_ready_time_enabled: sleepReadyEnabledOut,
+            sleep_ready_time_weekday: sleepReadyWeekday,
+            sleep_ready_time_weekend: sleepReadyWeekend,
+          })
+          .eq('child_id', linkedChildId)
+        if (statsErr) {
+          console.warn('[onboarding routine] 등원·잘 준비 알람 child_stats 저장 실패:', statsErr.message)
+        }
       }
       onComplete()
     } catch (e) {
@@ -680,7 +845,7 @@ export default function RoutineOnboarding({ onComplete, linkedChildId }: Props) 
           <div className="rounded-lg bg-white px-2 py-1.5 shadow-sm border border-gray-100">
             {/*
               1행: 제목 한 줄 + 열 너비 w-8에 +, w-9에 휴지통(삭제 모드는 제목 옆에 취소·선택 삭제)
-              2행: 데이터 행과 동일 그리드로 「소리」「ON/OFF」를 음표·토글 바로 위에 배치
+              2행: 데이터 행과 맞춤 — 「소리」「주중」「주말」(부모 루틴 알람 시트와 동일)
             */}
             <div className="mb-0.5 flex flex-col gap-0.5 border-b border-gray-200 pb-1">
               <div className="flex items-center gap-1">
@@ -741,8 +906,9 @@ export default function RoutineOnboarding({ onComplete, linkedChildId }: Props) 
                 <div className="flex w-8 shrink-0 items-end justify-center pb-0.5">
                   <span className="text-center text-[8px] font-bold text-gray-500">소리</span>
                 </div>
-                <div className="flex w-9 shrink-0 items-end justify-center pb-0.5">
-                  <span className="text-center text-[8px] font-bold text-gray-500">ON/OFF</span>
+                <div className="flex w-[3.65rem] shrink-0 items-end justify-center gap-0.5 pb-0.5">
+                  <span className="flex w-7 justify-end text-[7px] font-bold leading-none text-gray-500">주중</span>
+                  <span className="flex w-7 justify-end text-[7px] font-bold leading-none text-gray-500">주말</span>
                 </div>
               </div>
             </div>
@@ -753,8 +919,10 @@ export default function RoutineOnboarding({ onComplete, linkedChildId }: Props) 
                   label={row.label}
                   time={row.time}
                   onTimeChange={row.setTime}
-                  notify={row.notify}
-                  onNotifyChange={row.setNotify}
+                  weekdayNotify={row.weekdayNotify}
+                  onWeekdayNotifyChange={row.setWeekdayNotify}
+                  weekendNotify={row.weekendNotify}
+                  onWeekendNotifyChange={row.setWeekendNotify}
                   soundTitle={soundLabel(row.soundFile)}
                   onPickSound={() => openSoundSheet(row.rowId)}
                   deleteMode={alarmDeleteMode}
@@ -764,6 +932,11 @@ export default function RoutineOnboarding({ onComplete, linkedChildId }: Props) 
                 />
               ))}
             </div>
+            {!hasSchool ? (
+              <p className="mt-1.5 px-1 text-[10px] leading-snug text-gray-400">
+                가정보육으로 설정된 경우 하원·귀가 알람은 쓰지 않아요. (등원 알람만 계속 설정할 수 있어요.)
+              </p>
+            ) : null}
           </div>
 
           <button
@@ -815,7 +988,7 @@ export default function RoutineOnboarding({ onComplete, linkedChildId }: Props) 
                       소리 끄기
                     </button>
                   </div>
-                  <SoundToggleList
+                  <RoutineAlarmSoundToggleList
                     sounds={alarmSounds}
                     selectedId={sheetSound}
                     onSelect={(id) => {
@@ -826,6 +999,9 @@ export default function RoutineOnboarding({ onComplete, linkedChildId }: Props) 
                     onPreview={alarmPreviewPlay}
                     onStop={stopAlarmPreview}
                     playingId={alarmPreviewPlayingId}
+                    accent="routineBlue"
+                    emphasizeCategoryBlocks
+                    listMaxHeightClass="max-h-72"
                   />
                   <div className="mt-4 flex gap-2">
                     <button
@@ -859,17 +1035,22 @@ export default function RoutineOnboarding({ onComplete, linkedChildId }: Props) 
                       소리 끄기
                     </button>
                   </div>
-                  <SoundToggleList
-                    sounds={alarmSounds}
+                  <RoutineAlarmSoundToggleList
+                    sounds={soundsForSoundSheetPicker}
                     selectedId={pickerSound}
                     onSelect={(id) => {
                       setPickerSound(id)
-                      const u = alarmSounds.find((s) => s.id === id)?.url
+                      const u = soundsForSoundSheetPicker.find((s) => s.id === id)?.url
                       if (u) alarmPreviewPlay(u, id)
                     }}
                     onPreview={alarmPreviewPlay}
                     onStop={stopAlarmPreview}
                     playingId={alarmPreviewPlayingId}
+                    accent="routineBlue"
+                    emphasizeCategoryBlocks
+                    listMaxHeightClass={
+                      sheet.open && sheet.mode === 'sound' && sheet.rowId === 'sleep' ? 'max-h-80' : 'max-h-72'
+                    }
                   />
                   <div className="mt-4 flex gap-2">
                     <button
@@ -1169,14 +1350,43 @@ function NotifyToggleSmall({ notify, onToggle }: { notify: boolean; onToggle: ()
 }
 
 /**
- * 일정별 알람 한 줄 — 시계는 하나만(클릭 시 시간 선택), 브라우저 기본 시계 아이콘은 숨김
+ * 미니 스위치: 부모 루틴 알람 시트 NotifyToggleSmall / WeekendMiniToggle 과 같은 크기(주중·주말 열)
+ */
+function RoutineAlarmMiniToggle({
+  on,
+  onToggle,
+  ariaLabel,
+}: {
+  on: boolean
+  onToggle: () => void
+  ariaLabel: string
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      className={`relative h-3.5 w-7 shrink-0 rounded-full transition-all ${on ? 'bg-brand-blue' : 'bg-gray-200'}`}
+      aria-pressed={on}
+      aria-label={ariaLabel}
+    >
+      <span
+        className={`absolute top-0.5 h-2.5 w-2.5 rounded-full bg-white shadow transition-all ${on ? 'left-3.5' : 'left-0.5'}`}
+      />
+    </button>
+  )
+}
+
+/**
+ * 일정별 알람 한 줄 — 시계는 하나만(클릭 시 시간 선택), 부모 앱과 같이 「주중」「주말」 별도 토글 + 소리
  */
 function AlarmScheduleRow({
   label,
   time,
   onTimeChange,
-  notify,
-  onNotifyChange,
+  weekdayNotify,
+  onWeekdayNotifyChange,
+  weekendNotify,
+  onWeekendNotifyChange,
   soundTitle,
   onPickSound,
   deleteMode,
@@ -1187,8 +1397,10 @@ function AlarmScheduleRow({
   label: string
   time: string
   onTimeChange: (t: string) => void
-  notify: boolean
-  onNotifyChange: (v: boolean) => void
+  weekdayNotify: boolean
+  onWeekdayNotifyChange: (v: boolean) => void
+  weekendNotify: boolean
+  onWeekendNotifyChange: (v: boolean) => void
   soundTitle: string
   onPickSound: () => void
   deleteMode?: boolean
@@ -1262,90 +1474,27 @@ function AlarmScheduleRow({
       >
         <MusicNoteIcon className="h-4 w-4" />
       </button>
-      <div className="flex w-9 shrink-0 items-center justify-center">
-        <NotifyToggleSmall notify={notify} onToggle={() => onNotifyChange(!notify)} />
+      {/* 주중 열은 평일에 울림 여부, 주말 열은 주말에도 같은 알람을 재생할지(부모 RoutineAlarmSettingsSheet 와 동일) */}
+      <div className="flex w-[3.65rem] shrink-0 items-center justify-end gap-0.5">
+        <div className="flex w-7 justify-end">
+          <RoutineAlarmMiniToggle
+            on={weekdayNotify}
+            onToggle={() => onWeekdayNotifyChange(!weekdayNotify)}
+            ariaLabel={`${label} 주중`}
+          />
+        </div>
+        <div className="flex w-7 justify-end">
+          <RoutineAlarmMiniToggle
+            on={weekendNotify}
+            onToggle={() => onWeekendNotifyChange(!weekendNotify)}
+            ariaLabel={`${label} 주말`}
+          />
+        </div>
       </div>
     </div>
   )
 }
 
-/** 알람 음원 목록 — pill 토글(라디오). API로 폴더 스캔된 목록을 그대로 사용 */
-/**
- * 음 pill 선택 + ▶ 미리듣기 + (해당 음이 재생 중일 때만 쓰는) ■ 정지
- * 상단「소리 끄기」는 전체 미리듣기를 끄는 별도 버튼
- */
-function SoundToggleList({
-  sounds,
-  selectedId,
-  onSelect,
-  onPreview,
-  onStop,
-  playingId,
-}: {
-  sounds: AlarmSoundItem[]
-  selectedId: string
-  onSelect: (id: string) => void
-  onPreview: (url: string, id: string) => void
-  onStop: () => void
-  playingId: string | null
-}) {
-  if (!sounds.length) {
-    return (
-      <p className="rounded-lg bg-gray-50 px-2 py-2 text-[10px] leading-snug text-gray-500">
-        public/assets/audio/alarm 폴더에 mp3·wav 등 파일을 넣으면 여기에 자동으로 나타나요.
-      </p>
-    )
-  }
-  return (
-    <div className="flex max-h-40 flex-wrap gap-1.5 overflow-y-auto py-1">
-      {sounds.map((s) => {
-        const on = selectedId === s.id
-        const isPlayingThis = playingId === s.id
-        return (
-          <div
-            key={s.id}
-            className="inline-flex max-w-full min-w-0 items-center gap-0.5 rounded-full border border-gray-200 bg-white pl-1 pr-0.5"
-          >
-            <button
-              type="button"
-              onClick={() => onSelect(s.id)}
-              className={[
-                'min-w-0 max-w-[9rem] truncate rounded-full px-2 py-1 text-[10px] font-bold transition-all',
-                on
-                  ? 'bg-brand-blue text-white'
-                  : 'text-gray-600 hover:border-brand-blue/40 hover:bg-brand-blue/5',
-              ].join(' ')}
-            >
-              {s.label}
-            </button>
-            <button
-              type="button"
-              onClick={() => onPreview(s.url, s.id)}
-              className={[
-                'shrink-0 rounded-full p-1 text-[10px] transition-colors',
-                isPlayingThis ? 'text-brand-blue' : 'text-gray-400 active:text-brand-blue',
-              ].join(' ')}
-              aria-label="미리듣기"
-            >
-              ▶
-            </button>
-            <button
-              type="button"
-              onClick={onStop}
-              disabled={!playingId}
-              className="shrink-0 rounded-full p-1 text-[10px] text-gray-500 transition-colors enabled:hover:text-rose-600 enabled:active:text-rose-700 disabled:cursor-not-allowed disabled:opacity-30"
-              aria-label="미리듣기 정지"
-            >
-              ■
-            </button>
-          </div>
-        )
-      })}
-    </div>
-  )
-}
-
-/** 가로 스크롤 칩 줄 — 일상 순서가 왼→오 */
 function HorizontalChips({
   pool,
   selectedIds,

@@ -62,6 +62,8 @@ const PNG_BY_TITLE: Record<string, string> = {
    * (구 파일명 `goodnight.png` 는 현재 리포지토리에 없음)
    */
   잠자기: `${BASE}/p.m/go_to_bed.png`,
+  /** 제목 변경: 구 「취침」·신 「잘 시간」 같은 썸네일 */
+  '잘 시간': `${BASE}/p.m/go_to_bed.png`,
 
   // --- 키워드 칩 (046 제목과 다른 이름) ---
   '가방 챙기기': `${BASE}/p.m/bag_packing.png`,

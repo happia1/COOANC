@@ -12,7 +12,14 @@ export const AUDIO = {
 
   /** 알림 효과음 - 경고/거절 반응 */
   ALERTS: {
-    TICK_TOCK_TIMER: `${BASE}/alerts/alarm-tick-tock-clock-timer-1045.wav`,
+    /**
+     * 루틴 알람 카탈로그 「째깍 타이머」용.
+     * 예전 경로 `alerts/alarm-tick-tock-clock-timer-1045.wav` 는 레포에 없어 404가 나기 쉬워,
+     * 틱톡 타이머(`alerts/tick-tock-timer.wav`)와 **다른 파일**로 실제 소리를 구분합니다.
+     */
+    JIAGGAK_ROUTINE_TIMER: `${BASE}/countdown/alarm-children-happy-countdown-923.wav`,
+    /** (호환) 예전 이름 — 루틴 알람에서만 의미적으로 `JIAGGAK_ROUTINE_TIMER` 와 동일 용도 */
+    TICK_TOCK_TIMER: `${BASE}/countdown/alarm-children-happy-countdown-923.wav`,
     CARTOON_NO:      `${BASE}/alerts/cartoon-girl-saying-no-no-no-2257.wav`,
   },
 

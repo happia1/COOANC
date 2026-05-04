@@ -8,7 +8,7 @@
  * - 로그아웃
  * - 알림 / 소리 토글 (localStorage)
  */
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useLayoutEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { resolveDisplayAge } from '@/lib/ageFromBirthDate'
@@ -22,6 +22,7 @@ import { removeLocalStorageScopedToChild } from '@/lib/localStorageChildScope'
 import { CompactChildProfileCard } from '@/components/parent/CompactChildProfileCard'
 import DeleteParentAccountSection from '@/components/parent/DeleteParentAccountSection'
 import ChildProfileEditModal from '@/components/settings/ChildProfileEditModal'
+import ChildProfileAddSheet from '@/components/settings/ChildProfileAddSheet'
 
 /** 설정에서 불러온 자녀 한 줄(수정 모달에 그대로 넘김) */
 type LinkedChildRow = {
@@ -40,6 +41,12 @@ type LinkedChildRow = {
 export default function SettingsPage() {
   const router = useRouter()
   const clearSelectionIfChildRemoved = useParentStore((s) => s.clearSelectionIfChildRemoved)
+
+  /**
+   * 패드 가로(md + landscape)에서만 쓰는 우측 패널 등장 애니메이션.
+   * 비개발자: 설정 화면이 아래가 아니라 오른쪽에서 슬라이드되어 들어옵니다.
+   */
+  const [settingsPanelEntered, setSettingsPanelEntered] = useState(false)
 
   const [notifOn, setNotifOn] = useState(true)
   const [soundOn, setSoundOn] = useState(true)
@@ -62,6 +69,15 @@ export default function SettingsPage() {
   const [deleteMsg, setDeleteMsg] = useState<string | null>(null)
   /** 연필 → 자녀 프로필 수정 모달에 넘길 행 */
   const [editingChild, setEditingChild] = useState<LinkedChildRow | null>(null)
+  /** 우측 + 버튼 → 온보딩과 같은 흐름의 자녀 추가 슬라이드 시트 */
+  const [addChildSheetOpen, setAddChildSheetOpen] = useState(false)
+
+  useLayoutEffect(() => {
+    const id = requestAnimationFrame(() => {
+      requestAnimationFrame(() => setSettingsPanelEntered(true))
+    })
+    return () => cancelAnimationFrame(id)
+  }, [])
 
   /** 로컬 토글 + 내 프로필(role) 로드 — 끝나기 전엔 프로필 카드를 스켈레톤으로 둠 */
   useEffect(() => {
@@ -237,8 +253,28 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-gradient-to-b from-sky-100 via-white to-green-50">
-      <div className="mx-auto flex w-full max-w-md flex-col gap-4 px-4 pb-10 pt-6">
+    <>
+      {/*
+        패드 가로: 딤을 탭하면 상단바에서 왔을 때와 같이 이전 화면으로 돌아갑니다.
+        (세로·좁은 화면에서는 전체 폭을 쓰는 기존 페이지 그대로입니다.)
+      */}
+      <button
+        type="button"
+        className="hidden md:landscape:fixed md:landscape:inset-0 md:landscape:z-40 md:landscape:block md:landscape:bg-black/30 md:landscape:backdrop-blur-[1px]"
+        aria-label="설정 닫기"
+        onClick={() => router.back()}
+      />
+      <div
+        className={[
+          'flex min-h-screen flex-col bg-gradient-to-b from-sky-100 via-white to-green-50',
+          'md:landscape:fixed md:landscape:inset-y-0 md:landscape:right-0 md:landscape:left-auto md:landscape:z-50',
+          'md:landscape:h-full md:landscape:min-h-0 md:landscape:w-full md:landscape:max-w-[420px]',
+          'md:landscape:overflow-y-auto md:landscape:shadow-[-12px_0_40px_rgba(0,0,0,0.15)]',
+          'md:landscape:transition-transform md:landscape:duration-300 md:landscape:ease-out',
+          settingsPanelEntered ? 'md:landscape:translate-x-0' : 'md:landscape:translate-x-full',
+        ].join(' ')}
+      >
+        <div className="mx-auto flex w-full max-w-md flex-col gap-4 px-4 pb-10 pt-6 md:landscape:mx-0 md:landscape:max-w-none">
         {/* 상단: 화살표 대신 얇은 회색 글자로 뒤로가기(터치 영역은 글자 전체) */}
         <div className="mb-1 flex items-center">
           <button
@@ -318,8 +354,18 @@ export default function SettingsPage() {
 
         {profileLoaded && userRole === 'parent' ? (
           <div className="flex flex-col gap-3">
-            {/** 위「부모 프로필」·아래「알림」과 같이 페이지 배경만 둡니다. */}
-            <p className="text-xs font-bold uppercase tracking-wider text-gray-400">자녀 프로필</p>
+            {/** 제목 줄 오른쪽 + 로 자녀 추가 시트 오픈(온보딩과 동일: 등록 후 초기 루틴) */}
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs font-bold uppercase tracking-wider text-gray-400">자녀 프로필</p>
+              <button
+                type="button"
+                onClick={() => setAddChildSheetOpen(true)}
+                className="shrink-0 rounded-lg px-1.5 py-0.5 text-xs font-bold uppercase tracking-wider text-gray-400 transition-colors hover:text-gray-500 active:scale-95"
+                aria-label="자녀 프로필 추가"
+              >
+                <span aria-hidden>+</span>
+              </button>
+            </div>
             {childrenLoading ? (
               <p className="text-sm font-bold text-gray-700">불러오는 중…</p>
             ) : linkedChildren.length === 0 ? (
@@ -332,6 +378,7 @@ export default function SettingsPage() {
                   const ag = resolveProfileAgeGroup(c.age_group, displayAge)
                   return (
                     <li key={c.id} className="list-none">
+                      {/* 설정 탭 자녀 카드: 좌 아바타 · 중앙 이름/Lv와 메타(연령·기관·나이) · 우측 수정/삭제 */}
                       <CompactChildProfileCard
                         name={c.name}
                         age={displayAge}
@@ -343,6 +390,7 @@ export default function SettingsPage() {
                         ageGroupLabel={profileAgeGroupShortLabel(ag)}
                         childcareLabel={profileInstitutionLabel(ag, c.institution_type)}
                         hideStats
+                        profileLayout="row"
                         mission={null}
                         actions={
                           pendingDeleteId === c.id ? (
@@ -421,6 +469,12 @@ export default function SettingsPage() {
         {profileLoaded && userRole === 'parent' ? <DeleteParentAccountSection /> : null}
       </div>
 
+      <ChildProfileAddSheet
+        open={addChildSheetOpen}
+        onClose={() => setAddChildSheetOpen(false)}
+        onRegistered={() => void loadLinkedChildren()}
+      />
+
       <ChildProfileEditModal
         open={editingChild !== null}
         child={editingChild}
@@ -449,7 +503,8 @@ export default function SettingsPage() {
            */
         }}
       />
-    </div>
+      </div>
+    </>
   )
 }
 

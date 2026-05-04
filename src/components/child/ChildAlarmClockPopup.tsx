@@ -37,7 +37,7 @@ type NextAlarmResult = {
 const POMODORO_MINUTES = [1, 3, 5, 10, 15, 20, 25, 30] as const
 
 /** 하단 알람 목록에서 숨길 기본 루틴 블록 라벨 */
-const HIDDEN_BOTTOM_ALARM_LABELS = ['기상', '하원·귀가', '취침'] as const
+const HIDDEN_BOTTOM_ALARM_LABELS = ['기상', '하원·귀가', '잘 시간'] as const
 
 /**
  * 뽀모도로 컨트롤 아이콘 — 글자 대신 재생 / 일시정지 / 정지(초기화) 모양만 표시합니다.
@@ -153,7 +153,7 @@ function buildRoutineAlarmRows(prefs: RoutineAlarmPrefsLoaded, hasSchool: boolea
     rows.push({ label: '하원·귀가', time: prefs.returnHomeTime, onWeekend: prefs.returnOnWeekend })
   }
   if (prefs.notifySleep) {
-    rows.push({ label: '취침', time: prefs.sleepTime, onWeekend: prefs.sleepOnWeekend })
+    rows.push({ label: '잘 시간', time: prefs.sleepTime, onWeekend: prefs.sleepOnWeekend })
   }
   for (const c of prefs.customAlarms) {
     const custom = c as RoutineCustomAlarmStored
@@ -237,7 +237,7 @@ export default function ChildAlarmClockPopup({ open, onClose }: Props) {
 
   /**
    * 팝업이 열릴 때 부모앱에서 저장한 루틴 알람 설정(localStorage)을 읽어옵니다.
-   * 비개발자용: 부모가 맞춰둔 기상/취침 시간을 아이 화면에서 그대로 보여줍니다.
+   * 비개발자용: 부모가 맞춰둔 기상/잘 시간 등 루틴 시간을 아이 화면에서 그대로 보여줍니다.
    */
   useEffect(() => {
     if (!open) return
@@ -316,7 +316,7 @@ export default function ChildAlarmClockPopup({ open, onClose }: Props) {
     () => formatSeoulDigitalClockParts(new Date(nowMs)),
     [nowMs],
   )
-  /** 하단 리스트는 요청사항에 따라 기본 루틴(기상/하원·귀가/취침)을 제외합니다. */
+  /** 하단 리스트는 요청사항에 따라 기본 루틴(기상/하원·귀가/잘 시간)을 제외합니다. */
   const visibleBottomAlarmRows = useMemo(
     () =>
       alarmRows.filter(
@@ -489,7 +489,7 @@ export default function ChildAlarmClockPopup({ open, onClose }: Props) {
                         {/**
                          * 요청사항:
                          * - "다음 알람" 문구 삭제
-                         * - 상단에는 알람 종류(기상/취침/하원·귀가), 아래에는 시간만 표시
+                         * - 상단에는 알람 종류(기상/잘 시간/하원·귀가), 아래에는 시간만 표시
                          */}
                         <p className="text-sm font-black text-gray-900">{nextAlarm.label}</p>
                         <p className="mt-1 text-xl font-black tabular-nums text-[#4A90E2]">{nextAlarm.time}</p>

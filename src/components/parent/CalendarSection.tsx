@@ -34,6 +34,12 @@ const EVENT_COLORS: Record<LocalCalendarEvent['eventType'], { bg: string; text: 
   holiday: { bg: 'bg-red-50', text: 'text-red-700', dot: 'bg-red-400' },
   vacation: { bg: 'bg-blue-50', text: 'text-blue-700', dot: 'bg-blue-400' },
   special: { bg: 'bg-yellow-50', text: 'text-yellow-700', dot: 'bg-yellow-400' },
+  /** 생일 등 — 분홍 톤 */
+  birthday: { bg: 'bg-rose-50', text: 'text-rose-800', dot: 'bg-rose-500' },
+  /** 기타 라벨(etc 등) — DB etc */
+  etc: { bg: 'bg-purple-50', text: 'text-purple-800', dot: 'bg-purple-500' },
+  /** 개학일·등교일 등 학교 계열 일정 */
+  school: { bg: 'bg-indigo-50', text: 'text-indigo-800', dot: 'bg-indigo-500' },
   other: { bg: 'bg-gray-100', text: 'text-gray-700', dot: 'bg-gray-400' },
   /** 행사 — 초록 톤(학교·기관 행사 등) */
   event: { bg: 'bg-emerald-50', text: 'text-emerald-800', dot: 'bg-emerald-500' },
@@ -46,6 +52,9 @@ const EVENT_LEGEND_CHIP_SELECTED: Record<LocalCalendarEvent['eventType'], { bg: 
   holiday: { bg: 'bg-red-200', text: 'text-red-900', dot: 'bg-red-600' },
   vacation: { bg: 'bg-blue-200', text: 'text-blue-900', dot: 'bg-blue-600' },
   special: { bg: 'bg-yellow-200', text: 'text-yellow-900', dot: 'bg-yellow-600' },
+  birthday: { bg: 'bg-rose-200', text: 'text-rose-950', dot: 'bg-rose-600' },
+  etc: { bg: 'bg-purple-200', text: 'text-purple-950', dot: 'bg-purple-600' },
+  school: { bg: 'bg-indigo-200', text: 'text-indigo-950', dot: 'bg-indigo-600' },
   other: { bg: 'bg-gray-300', text: 'text-gray-900', dot: 'bg-gray-600' },
   event: { bg: 'bg-emerald-200', text: 'text-emerald-950', dot: 'bg-emerald-600' },
   travel: { bg: 'bg-sky-200', text: 'text-sky-950', dot: 'bg-sky-600' },
@@ -55,6 +64,9 @@ const EVENT_LEGEND_CHIP_SELECTED: Record<LocalCalendarEvent['eventType'], { bg: 
 const EVENT_TYPE_LABELS: Record<LocalCalendarEvent['eventType'], string> = {
   holiday: '공휴일',
   vacation: '방학',
+  birthday: '생일',
+  etc: '기타(상세)',
+  school: '학교',
   special: '기념일',
   other: '기타',
   event: '행사',
@@ -65,9 +77,12 @@ const EVENT_TYPE_LABELS: Record<LocalCalendarEvent['eventType'], string> = {
 const EVENT_TYPES_ORDER: LocalCalendarEvent['eventType'][] = [
   'holiday',
   'vacation',
+  'travel',
+  'birthday',
+  'school',
   'special',
   'event',
-  'travel',
+  'etc',
   'other',
 ]
 
