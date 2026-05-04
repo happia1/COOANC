@@ -23,6 +23,11 @@ type Props = {
   onCompleted: () => void
   /** 단계가 한 칸 올라갔을 때(선택) */
   onLevelUp?: () => void
+  /**
+   * false면 물조리개 아래 ❤️·숫자 줄을 숨깁니다.
+   * 비개발자: 타이머·장바구니와 한 줄로만 맞출 때 씁니다.
+   */
+  showHeartRow?: boolean
 }
 
 export default function WateringCanButton({
@@ -32,6 +37,7 @@ export default function WateringCanButton({
   onNoHearts,
   onCompleted,
   onLevelUp,
+  showHeartRow = true,
 }: Props) {
   const [pouring, setPouring] = useState(false)
   const canImg = getWateringCanImage(hearts)
@@ -54,22 +60,27 @@ export default function WateringCanButton({
       type="button"
       onClick={handleClick}
       disabled={disabled || pouring}
-      className="flex flex-col items-center gap-0.5 transition-transform active:scale-90 disabled:opacity-50"
+      className={
+        showHeartRow
+          ? 'flex flex-col items-center gap-0.5 transition-transform active:scale-90 disabled:opacity-50'
+          : 'flex h-14 w-14 shrink-0 items-center justify-center border-0 bg-transparent p-0 transition-transform active:scale-90 disabled:opacity-50'
+      }
       aria-label={`물 주기 — 보유 하트 ${hearts}개`}
     >
-      {/* 물조리개 — `getWateringCanImage(hearts)` 로 단계 결정 */}
+      {/* 물조리개 — 타이머·장바구니와 동일하게 아이콘 영역 48×48px */}
       <div
         className={`relative h-12 w-12 transition-transform ${pouring ? 'scale-75 rotate-12' : ''}`}
       >
         <Image src={canImg} alt="물조리개" fill className="object-contain" sizes="48px" priority />
       </div>
-      {/* 현재 보유 하트 */}
-      <div className="flex items-center gap-0.5">
-        <span className="text-[10px]" aria-hidden>
-          ❤️
-        </span>
-        <span className="text-[10px] font-black text-pink-400">{hearts}</span>
-      </div>
+      {showHeartRow ? (
+        <div className="flex items-center gap-0.5">
+          <span className="text-[10px]" aria-hidden>
+            ❤️
+          </span>
+          <span className="text-[10px] font-black text-pink-400">{hearts}</span>
+        </div>
+      ) : null}
     </button>
   )
 }

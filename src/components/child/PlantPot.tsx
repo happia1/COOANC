@@ -5,7 +5,7 @@
  *
  * 비개발자 설명:
  * - 큰 그림은 「지금 식물이 어느 단계인지」를 보여 주는 PNG예요.
- * - 분홍 줄이 진행 바입니다. 하트로 물을 줄 때마다 조금씩 차요.
+ * - 단계 이름 문구는 캐릭터 주변 레이아웃을 줄이려 넣지 않아요(accessibility 용 라벨·alt 는 유지).
  * - 완성이 되면 「씨앗 고르기」로 다음 식물을 시작할 수 있어요.
  */
 
@@ -46,9 +46,6 @@ export default function PlantPot({ pot, onRequestSeedSelect }: Props) {
           />
         </div>
       )}
-
-      {/* 단계 이름 */}
-      <span className="mt-0.5 text-[9px] font-bold text-white/70">{label}</span>
 
       {showSeedCta ? (
         <button

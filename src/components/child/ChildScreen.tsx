@@ -1303,36 +1303,29 @@ export default function ChildScreen({
           </div>
 
           {/*
-            뽀모도로·스티커·장바구니 — 상단이 아니라 화면 세로 중앙에 가깝게(캐릭터 발 앵커 기준).
-            비개발자: 시계·하트·바구니만 아래로 내려가고, 나가기·코인은 오른쪽 위에 그대로 있습니다.
+            뽀모도로·물조리개·스티커·장바구니 — 화면 세로 중앙 쪽(캐릭터 발 앵커 기준).
+            비개발자: 시계와 장바구니 사이에 물조리개가 오고, 세 아이콘 크기·열 정렬을 맞춥니다.
           */}
           {/*
-            화분·물주기 — 오른쪽 아이콘 띠와 대칭으로 캐릭터 왼편에 둡니다.
-            비개발자: 하트를 모아 물을 주면 나무가 자라요. 다 자라면 씨앗을 고를 수 있어요.
+            화분만 토끼 왼쪽 발 옆에 둡니다. 물조리개는 우측 열(뽀모도로·장바구니 사이)로 옮겼습니다.
+            캐릭터 줄은 같은 Y 에서 translate(-50%, -100%) 로 발 원점을 잡습니다.
+            여기도 top = 발 높이, translateY(-100%) 로 이 블록의 **바닥**이 발 줄에 닿도록 해 러그 위에 붙여 보입니다.
           */}
           {!plantLoading && pot && (
             <div
-              className="absolute left-4 z-[21] flex flex-col items-center gap-1 pointer-events-auto"
+              className="absolute z-[21] flex flex-col items-center pointer-events-auto"
               style={{
-                top: `${(anchor.characterFootY - 0.12) * 100}%`,
-                transform: 'translateY(-50%)',
+                left: '18%',
+                top: `${anchor.characterFootY * 100}%`,
+                transform: 'translateY(-100%)',
               }}
             >
               {plantHint ? (
-                <p className="max-w-[10rem] rounded-lg bg-black/75 px-2 py-1 text-center text-[9px] font-bold text-white shadow-md">
+                <p className="max-w-[10rem] rounded-lg bg-black/75 px-2 py-1 text-center text-[9px] font-bold text-white shadow-md mb-1">
                   {plantHint}
                 </p>
               ) : null}
               <PlantPot pot={pot} onRequestSeedSelect={openSeedModal} />
-              <WateringCanButton
-                hearts={waterButtonHearts}
-                disabled={plantLoading || !pot}
-                onWater={water}
-                onNoHearts={() =>
-                  setPlantHint('하트가 부족해요! 미션을 하면 하트를 받을 수 있어요.')
-                }
-                onCompleted={openSeedModal}
-              />
             </div>
           )}
 
@@ -1356,6 +1349,19 @@ export default function ChildScreen({
                 className="h-12 w-12 shrink-0 select-none object-contain drop-shadow-md"
               />
             </button>
+
+            {!plantLoading && pot ? (
+              <WateringCanButton
+                showHeartRow={false}
+                hearts={waterButtonHearts}
+                disabled={plantLoading || !pot}
+                onWater={water}
+                onNoHearts={() =>
+                  setPlantHint('하트가 부족해요! 미션을 하면 하트를 받을 수 있어요.')
+                }
+                onCompleted={openSeedModal}
+              />
+            ) : null}
 
             {features.sticker && (
               <button

@@ -9,7 +9,7 @@
  * - 완성(7단계) 이후에는 물 주기 탭 시 초기화되거나, 「씨앗 고르기」에서 `resetPot`으로 나무를 다시 정합니다.
  */
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { HEARTS_PER_STAGE, type PlantStage, type PlantTreeId } from '@/constants/plantTrees'
 import { createClient } from '@/lib/supabase/client'
 import { readChildStatInt } from '@/lib/childCreditsSplit'
@@ -31,11 +31,20 @@ export function usePlantPot(childId: string) {
   const [pot, setPot] = useState<PotState | null>(null)
   const [hearts, setHearts] = useState(0)
   const [loading, setLoading] = useState(true)
+  /**
+   * DB 에 `pot_tree_id` 가 없어 서버에서는 나무 종류를 읽지 못합니다.
+   * 이 디바이스 세션 안에서만 `씨앗 고르기`로 선택한 나무를 기억합니다(자녀 바뀔 때 초기화).
+   */
+  const chosenTreeRef = useRef<PlantTreeId>(DEFAULT_TREE)
+
+  useEffect(() => {
+    chosenTreeRef.current = DEFAULT_TREE
+  }, [childId])
 
   const refresh = useCallback(async () => {
     const { data, error } = await supabase
       .from('child_stats')
-      .select('hearts, pot_stage, pot_hearts_used, pot_completed, pot_tree_id')
+      .select('hearts, pot_stage, pot_hearts_used, pot_completed')
       .eq('child_id', childId)
       .maybeSingle()
 
@@ -51,12 +60,10 @@ export function usePlantPot(childId: string) {
 
     const stageRaw = readChildStatInt(data.pot_stage)
     const stage = Math.min(7, Math.max(0, stageRaw)) as PlantStage
-    const treeRaw =
-      typeof data.pot_tree_id === 'string' && data.pot_tree_id ? data.pot_tree_id : DEFAULT_TREE
 
     setHearts(readChildStatInt(data.hearts))
     setPot({
-      treeId: treeRaw as PlantTreeId,
+      treeId: chosenTreeRef.current,
       stage,
       heartsUsed: readChildStatInt(data.pot_hearts_used),
       heartsNeeded: HEARTS_PER_STAGE[stage],
@@ -117,13 +124,13 @@ export function usePlantPot(childId: string) {
   /** 씨앗 고르기 확인 시 — 단계 초기화 + 선택한 나무 id 저장 */
   const resetPot = useCallback(
     async (treeId: PlantTreeId = DEFAULT_TREE) => {
+      chosenTreeRef.current = treeId
       await supabase
         .from('child_stats')
         .update({
           pot_stage: 0,
           pot_hearts_used: 0,
           pot_completed: false,
-          pot_tree_id: treeId,
         })
         .eq('child_id', childId)
       await refresh()
