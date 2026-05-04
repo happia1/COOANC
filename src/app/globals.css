@@ -137,7 +137,7 @@
   }
 }
 
-/* ChildLevelStatsCard — 오늘 미션 완주율 하트: 새로 켜진 칸만 아래→위로 터짐(도달·차오름) */
+/* (미션 탭 등) 미션 완주 하트 칸 — 새로 켜진 칸만 아래→위로 터짐; 자녀 홈 헤더는 MissionProgressHeartsRow 인라인 키프레임 사용 */
 @keyframes mission-heart-slot-fill {
   0% {
     transform: scaleY(0.28);

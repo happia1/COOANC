@@ -46,6 +46,8 @@ export function toYyyyMmDdDbValue(value: unknown): string | null {
 
 /** Postgres boolean 이 문자열 등으로 올 때도 「완료 아님」을 안전히 판별합니다. */
 export function dbValueMeansIncomplete(isCompleted: unknown): boolean {
+  /** Realtime `payload.new` 에서 컬럼이 빠진 경우(undefined) — 불완료가 아니라 「정보 없음」으로 보고 롤백하지 않습니다. 그렇지 않으면 카드가 다시 나타나는 현상이 날 수 있어요. */
+  if (isCompleted === undefined) return false
   if (isCompleted === false) return true
   if (isCompleted === true) return false
   if (typeof isCompleted === 'string') {

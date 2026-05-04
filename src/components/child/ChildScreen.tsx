@@ -7,13 +7,13 @@
  *
  * 비개발자 설명:
  * - 배경 이미지 위에 캐릭터가 서 있고, 하단에 오늘의 미션 카드가 가로로 스크롤됩니다.
- * - 상단 오른쪽 아이콘을 탭하면 마켓/코인/꾸미기/스티커 패널이, 폰·패드 세로에선 아래에서, 패드 가로(md+landscape)에서는 오른쪽에서 열립니다.
- * - 왼쪽 상단 🚪 버튼을 누르면 부모 화면으로 나갑니다.
+ * - 상단 오른쪽(나가기 아래 스택) 아이콘을 탭하면 마켓/코인/스티커 패널이, 폰·패드 세로에선 아래에서, 패드 가로(md+landscape)에서는 오른쪽에서 열립니다.
+ * - 상단 오른쪽 나가기(유리 버튼)를 누르면 부모 화면으로 나갑니다.
  *
  * 레이아웃 레이어(아래 → 위):
  *   L1. 배경 이미지 (tablet_kidsroom_background_portrait.png)
  *   L2. 캐릭터 스프라이트 (앵커포인트 기반 배치)
- *   L3. UI 오버레이 (상단 바 + 크레딧/하트 배지 + 미션 섹션)
+ *   L3. UI 오버레이 (상단: 왼쪽 레벨·크레딧 카드 + 그 아래 식물 전용 유리 블록, 오른쪽 아이콘 열 + 미션 섹션)
  *   L4. 패널 오버레이 (마켓/코인/꾸미기/스티커 — 세로: 하단 슬라이드 / 패드 가로: 우측 슬라이드)
  */
 
@@ -37,6 +37,7 @@ import { useContainerSize } from '@/hooks/useContainerSize'
 import ChildMissionCard from '@/components/child/ChildMissionCard'
 import ChildPanelOverlay, { type PanelType } from '@/components/child/ChildPanelOverlay'
 import ChildLevelStatsCard from '@/components/child/ChildLevelStatsCard'
+import MissionProgressHeartsRow from '@/components/child/MissionProgressHeartsRow'
 import { normalizeChildStatsCreditsSplit, mergeChildStatsPatch } from '@/lib/childCreditsSplit'
 import { completionRateToHearts } from '@/lib/missionHeartCount'
 import { scaledMissionRewards } from '@/lib/missionRewardMultiplier'
@@ -48,6 +49,10 @@ import {
   type RoutineFlowSortable,
 } from '@/lib/routineChips'
 import { mergePraiseStickerGrantsFromServer } from '@/lib/mergePraiseStickerGrantsFromServer'
+import {
+  CHILD_HOME_TOP_BAR_GLASS_CLASS,
+  CHILD_HOME_TOP_BAR_GLASS_STYLE,
+} from '@/lib/childHomeTopBarGlass'
 import { ASSETS, CHILD_HOME_BACKGROUND_CACHE_BUST } from '@/constants/assets'
 import type {
   ChildStats,
@@ -92,15 +97,57 @@ const LEVEL_BLOCK_SCALE_BASE_W = 400
 const LEVEL_BLOCK_SCALE_FULL_W = 820
 const LEVEL_BLOCK_SCALE_MAX = 1.7
 
-function scaleForLevelBlock(containerWidthPx: number): number {
+/** 문·타이머·스티커·장바구니(·코인) 스택 — 레벨 카드와 같은 너비 구간, 최대 1.3배까지만 키웁니다. */
+const RIGHT_ICON_STACK_SCALE_BASE_W = LEVEL_BLOCK_SCALE_BASE_W
+const RIGHT_ICON_STACK_SCALE_FULL_W = LEVEL_BLOCK_SCALE_FULL_W
+const RIGHT_ICON_STACK_SCALE_MAX = 1.3
+
+/**
+ * 화면(컨테이너) 가로 너비에 따라 1배~max 배율을 선형 보간합니다.
+ * 비개발자: 좁은 폰은 1배, 넓은 화면일수록 max 에 가깝게 커집니다.
+ */
+function scaleFromContainerWidth(
+  containerWidthPx: number,
+  baseW: number,
+  fullW: number,
+  maxScale: number,
+): number {
   if (!(containerWidthPx > 0)) return 1
-  const span = LEVEL_BLOCK_SCALE_FULL_W - LEVEL_BLOCK_SCALE_BASE_W
+  const span = fullW - baseW
   if (span <= 0) return 1
-  if (containerWidthPx <= LEVEL_BLOCK_SCALE_BASE_W) return 1
-  if (containerWidthPx >= LEVEL_BLOCK_SCALE_FULL_W) return LEVEL_BLOCK_SCALE_MAX
-  const t = (containerWidthPx - LEVEL_BLOCK_SCALE_BASE_W) / span
-  return 1 + t * (LEVEL_BLOCK_SCALE_MAX - 1)
+  if (containerWidthPx <= baseW) return 1
+  if (containerWidthPx >= fullW) return maxScale
+  const t = (containerWidthPx - baseW) / span
+  return 1 + t * (maxScale - 1)
 }
+
+function scaleForLevelBlock(containerWidthPx: number): number {
+  return scaleFromContainerWidth(
+    containerWidthPx,
+    LEVEL_BLOCK_SCALE_BASE_W,
+    LEVEL_BLOCK_SCALE_FULL_W,
+    LEVEL_BLOCK_SCALE_MAX,
+  )
+}
+
+function scaleForRightIconStack(containerWidthPx: number): number {
+  return scaleFromContainerWidth(
+    containerWidthPx,
+    RIGHT_ICON_STACK_SCALE_BASE_W,
+    RIGHT_ICON_STACK_SCALE_FULL_W,
+    RIGHT_ICON_STACK_SCALE_MAX,
+  )
+}
+
+/**
+ * 우측 상단 나가기·타이머·스티커·장바구니(·코인) 버튼 셸 — 왼쪽 레벨 카드와 같은 유리 톤.
+ * 비개발자: 레벨 블록과 똑같이 살짝 비치는 흰 배경, 흐림, 둥근 모서리로 맞춥니다.
+ * 안 그림(문·시계·박스·바구니)은 그보다 한 단계 더 작게 넣어 전체가 덜 답답해 보이게 했습니다.
+ */
+const CHILD_HOME_RIGHT_ICON_GLASS_CLASS = [
+  CHILD_HOME_TOP_BAR_GLASS_CLASS,
+  'flex h-10 w-10 shrink-0 items-center justify-center',
+].join(' ')
 
 // ─── 파티클 타입 정의 ────────────────────────────────────────────────────────
 
@@ -411,10 +458,16 @@ export default function ChildScreen({
   /** daily_missions·mission_logs·Strict Mode 이중 호출이 겹쳐도 팝업·done·코인 조정이 한 번만 실행되게 합니다 */
   const parentRedoNoticeDedupeRef = useRef<string | null>(null)
   const rollbackUiCooldownRef = useRef<Map<string, number>>(new Map())
+  /**
+   * 완료 API가 성공했는데 부모 RSC/캐시가 잠깐 늦으면 `dailyMissions` 가 다시 비완료처럼 내려와
+   * `done`(완료 목록) 이 통째로 초기화되어 카드가 다시 보이는 현상을 막습니다.
+   * 부모가 진짜로 「다시하기」하거나 Realtime 이 비완료로 오면 이 집합에서 해당 id 를 빼고 롤백 UI 를 허용합니다.
+   */
+  const optimisticDailyMissionCompleteIdsRef = useRef<Set<string>>(new Set())
 
   /**
    * 뽀모도로·알람 팝업(ChildAlarmClockPopup) 열림 여부
-   * 비개발자 설명: 캐릭터 옆 타이머 아이콘을 누르면 true 가 되고, 닫기로 false 가 됩니다.
+   * 비개발자 설명: 상단 우측 타이머(유리 버튼)를 누르면 true 가 되고, 닫기로 false 가 됩니다.
    */
   const [clockPopupOpen, setClockPopupOpen] = useState(false)
 
@@ -471,8 +524,26 @@ export default function ChildScreen({
   }, [])
 
   useEffect(() => {
+    /** 서버 배열로 목록을 맞추되, 방금 API 로 끝낸 행은 서버가 아직 `is_completed=false` 인 한 `done` 에 남깁니다. */
     setMissionList(dailyMissions)
-    setDone(new Set(dailyMissions.filter((dm) => dm.is_completed).map((dm) => dm.id)))
+    setDone(() => {
+      const serverDone = new Set(dailyMissions.filter((dm) => dm.is_completed).map((dm) => dm.id))
+      const merged = new Set(serverDone)
+      const pend = optimisticDailyMissionCompleteIdsRef.current
+      for (const id of [...pend]) {
+        const row = dailyMissions.find((dm) => dm.id === id)
+        if (!row) {
+          pend.delete(id)
+          continue
+        }
+        if (row.is_completed) {
+          pend.delete(id)
+          continue
+        }
+        merged.add(id)
+      }
+      return merged
+    })
   }, [dailyMissions, today])
 
   /** 날짜(오늘)이 바뀌면 축하·누적 코인 상태를 초기화합니다. */
@@ -491,6 +562,7 @@ export default function ChildScreen({
     schoolTimeShownRef.current = false
     setShowSchoolTime(false)
     setParentRedoModalMission(null)
+    optimisticDailyMissionCompleteIdsRef.current.clear()
   }, [today])
 
   /**
@@ -547,6 +619,7 @@ export default function ChildScreen({
     /** DB Realtime·부모 Broadcast 모두 이 경로로 합칩니다 */
     function applyRollbackByDailyMissionId(dmId: string) {
       if (!dmId) return
+      optimisticDailyMissionCompleteIdsRef.current.delete(dmId)
       setMissionList((prevList) => {
         const snapshot = prevList.find((m) => m.id === dmId)
         if (!snapshot) return prevList
@@ -581,6 +654,7 @@ export default function ChildScreen({
         )
         if (!snapshot) return prevList
         const dmId = snapshot.id
+        optimisticDailyMissionCompleteIdsRef.current.delete(dmId)
         queueMicrotask(() => finishRollbackUi(dmId, snapshot))
         return prevList.map((m) =>
           m.id === dmId ? { ...m, is_completed: false, completed_at: null } : m,
@@ -841,7 +915,7 @@ export default function ChildScreen({
         const endCoinX = badgeRect.left + badgeRect.width / 2 - containerRect.left
         const endCoinY = badgeRect.top + badgeRect.height / 2 - containerRect.top
         /**
-         * 애정 하트는 상단 **Mission Complete** 막대(하트 5칸) 중심으로 날아갑니다.
+         * 애정 하트는 하단 「오늘의 미션」줄 오른쪽 **완주 하트 5칸** 중심으로 날아갑니다.
          * (없으면 예전과 같이 크레딧 배지로 떨어짐)
          */
         const endHeartX = missionHeartsRow
@@ -903,6 +977,7 @@ export default function ChildScreen({
             /* 응답이 JSON이 아니면 stats 동기화 생략 */
           }
           if (res.ok) {
+            optimisticDailyMissionCompleteIdsRef.current.add(dm.id)
             setStats((prev) => tryApplyCompletePayload(prev, json) ?? prev)
           } else {
             setTodayEarnedCredits((p) => Math.max(0, p - creditReward))
@@ -1026,6 +1101,10 @@ export default function ChildScreen({
     }
 
     if (toUndo.length === 0) return
+
+    for (const id of toUndo) {
+      optimisticDailyMissionCompleteIdsRef.current.delete(id)
+    }
 
     const idSet = new Set(toUndo)
     /**
@@ -1159,8 +1238,41 @@ export default function ChildScreen({
       ? Math.round(containerH * anchor.characterScale * homeCharacterSizeMultiplier)
       : 0
 
-  /** 왼쪽 상단 레벨 박스 — 컨테이너 가로가 넓어질수록 최대 1.7배(글자·아이콘 동일 비율) */
+  /** 상단 왼쪽(레벨·크레딧 통합 카드) — 컨테이너 가로가 넓어질수록 최대 1.7배(글자·아이콘 동일 비율) */
   const levelBlockScale = useMemo(() => scaleForLevelBlock(containerW), [containerW])
+
+  /** 상단 오른쪽(문·타이머·스티커·장바구니·코인) — 같은 너비 기준, 최대 1.3배 */
+  const rightIconStackScale = useMemo(() => scaleForRightIconStack(containerW), [containerW])
+
+  /**
+   * 물조리개 + 화분 **세로 스택**(위→아래) — 레벨 카드 아래 **별도 유리 블록**에 넣습니다.
+   * 비개발자: 스탯이 아직 없을 때는 카드가 없으므로, 그때만 예전처럼 발 옆 절대 위치로 따로 둡니다.
+   */
+  const plantStackInLevelBlock = useMemo(() => {
+    if (plantLoading || !pot) return null
+    return (
+      <>
+        <WateringCanButton
+          hearts={waterButtonHearts}
+          disabled={plantLoading || !pot}
+          onWater={water}
+          onNoHearts={() =>
+            setPlantHint('하트가 부족해요! 미션을 하면 하트를 받을 수 있어요.')
+          }
+          onCompleted={openSeedModal}
+          showHeartRow
+        />
+        <div className="flex flex-col items-center">
+          {plantHint ? (
+            <p className="mb-1 max-w-[10rem] rounded-lg bg-black/75 px-2 py-1 text-center text-[9px] font-bold text-white shadow-md">
+              {plantHint}
+            </p>
+          ) : null}
+          <PlantPot pot={pot} onRequestSeedSelect={openSeedModal} />
+        </div>
+      </>
+    )
+  }, [plantLoading, pot, waterButtonHearts, water, openSeedModal, plantHint])
 
   // ─────────────────────────────────────────────────────────────────────────
   // 렌더링
@@ -1221,80 +1333,124 @@ export default function ChildScreen({
         {/* ── L3: UI 오버레이 ──────────────────────────────────────────────── */}
         <div className="absolute inset-0 z-20 flex flex-col pointer-events-none">
 
-          {/* ── 상단 영역: 좌(레벨 블록) / 우(나가기 + 아이콘 스택) ──────── */}
+          {/*
+            상단: 왼쪽은 레벨 카드 + 그 아래 식물 유리 블록(간격 mt-3, 가로는 grid 로 레벨 카드와 동일 너비) / 오른쪽은 아이콘 열.
+          */}
           <div
-            className="flex justify-between items-start px-4 gap-3"
+            className="flex w-full items-start justify-between gap-3 px-4"
             style={{ paddingTop: 'max(16px, env(safe-area-inset-top))' }}
           >
-            {/*
-              좌측: 레벨 스탯 카드만 (뽀모도로는 화면 중앙 쪽 우측에 별도 배치)
-            */}
-            <div className="pointer-events-none min-w-0 flex flex-col items-start gap-2">
-              {stats && (
+            <div className="pointer-events-none relative flex min-w-0 flex-1 flex-col items-start gap-2">
+              {stats ? (
                 <div
-                  className="pointer-events-none"
+                  className="pointer-events-none grid w-max min-w-0 max-w-full grid-cols-1 gap-0"
                   style={{
                     transformOrigin: 'top left',
                     transform: `scale(${levelBlockScale})`,
                   }}
                 >
-                  <ChildLevelStatsCard
-                    ref={missionHeartsRef}
-                    stats={stats}
-                    filledHearts={filledHearts}
-                    creditRef={creditBadgeRef}
-                    shine={badgeShine}
-                  />
+                  <ChildLevelStatsCard stats={stats} creditRef={creditBadgeRef} shine={badgeShine} />
+                  {plantStackInLevelBlock ? (
+                    <div
+                      className={[
+                        CHILD_HOME_TOP_BAR_GLASS_CLASS,
+                        'pointer-events-auto mt-3 flex w-full min-w-0 flex-col items-center gap-3 overflow-visible px-3 py-3',
+                      ].join(' ')}
+                      style={CHILD_HOME_TOP_BAR_GLASS_STYLE}
+                      role="group"
+                      aria-label="화분과 물 주기"
+                    >
+                      {plantStackInLevelBlock}
+                    </div>
+                  ) : null}
                 </div>
-              )}
-              {/* 별 이펙트 — 크레딧 행 주변(고정 위치)에만 그려짐, 레이아웃 높이 없음 */}
-              {badgeShine && creditBadgeRef.current && (
+              ) : null}
+              {badgeShine && creditBadgeRef.current ? (
                 <BadgeStarBurst badgeRef={creditBadgeRef} />
-              )}
+              ) : null}
             </div>
 
-            {/*
-              우측 상단: 나가기 → 코인만 고정.
-              뽀모도로·스티커·장바구니는 아래 별도 블록에서 화면 중앙 쪽으로 내려 배치합니다.
-            */}
-            <div className="flex flex-col items-center gap-3 pointer-events-auto shrink-0">
-              {/* 나가기 문 — 다른 아이콘과 같은 중앙 정렬 슬롯 */}
+            <div
+              className="flex shrink-0 flex-col items-end gap-3 pointer-events-auto"
+              style={{
+                transformOrigin: 'top right',
+                transform: `scale(${rightIconStackScale})`,
+              }}
+            >
               <a
                 href={exitHref}
-                className="flex h-14 w-14 shrink-0 items-center justify-center transition active:scale-95"
+                className={`${CHILD_HOME_RIGHT_ICON_GLASS_CLASS} no-underline transition active:scale-95`}
+                style={CHILD_HOME_TOP_BAR_GLASS_STYLE}
                 aria-label="나가기"
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/assets/img/common/ui/exit.png" alt="" width={36} height={36} className="h-9 w-9 object-contain drop-shadow-md" />
+                <img
+                  src="/assets/img/common/ui/exit.png"
+                  alt=""
+                  width={24}
+                  height={24}
+                  className="h-6 w-6 object-contain drop-shadow-md"
+                />
               </a>
-
-              {/* 아이템(꾸미기) 아이콘 — 베타 미노출 */}
-              {/* {features.dressUp && (
+              <button
+                type="button"
+                onClick={() => setClockPopupOpen(true)}
+                className={`${CHILD_HOME_RIGHT_ICON_GLASS_CLASS} border-0 bg-transparent p-0 transition-transform active:scale-90`}
+                style={CHILD_HOME_TOP_BAR_GLASS_STYLE}
+                aria-label="뽀모도로·알람 팝업 열기"
+              >
+                <SpriteImage
+                  sheet={ICONS}
+                  frame="timer"
+                  width={28}
+                  className="h-7 w-7 shrink-0 select-none object-contain drop-shadow-md"
+                />
+              </button>
+              {features.sticker && (
                 <button
                   type="button"
-                  onClick={() => setActivePanel('dressup')}
-                  className="w-11 h-11 bg-white/40 rounded-2xl flex items-center justify-center shadow-md backdrop-blur-sm transition active:scale-95"
-                  aria-label="캐릭터 꾸미기 열기"
+                  onClick={() => setActivePanel('sticker')}
+                  className={`${CHILD_HOME_RIGHT_ICON_GLASS_CLASS} border-0 bg-transparent p-0 transition active:scale-95`}
+                  style={CHILD_HOME_TOP_BAR_GLASS_STYLE}
+                  aria-label="칭찬 스티커 판 열기"
                 >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={`/assets/img/characters/items/background/${encodeURIComponent('items (21).png')}`}
+                    src="/assets/img/common/ui/luckybox.png"
                     alt=""
-                    width={30}
-                    height={30}
-                    className="h-[30px] w-[30px] object-contain"
+                    width={28}
+                    height={28}
+                    className="h-7 w-7 object-contain drop-shadow-md"
                   />
                 </button>
-              )} */}
-
-              {/* 코인 주머니 — 슬롯 크기를 위와 맞춤 */}
+              )}
+              {features.market && (
+                <button
+                  type="button"
+                  onClick={() => setActivePanel('market')}
+                  className={`${CHILD_HOME_RIGHT_ICON_GLASS_CLASS} border-0 bg-transparent p-0 transition active:scale-95`}
+                  style={CHILD_HOME_TOP_BAR_GLASS_STYLE}
+                  aria-label="마켓 열기"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src="/assets/img/common/ui/basket_filled.png"
+                    alt=""
+                    width={28}
+                    height={28}
+                    className="h-7 w-7 object-contain drop-shadow-md"
+                  />
+                </button>
+              )}
               {features.coinPocket && (
                 <button
                   type="button"
                   onClick={() => setActivePanel('coins')}
-                  className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/40 shadow-md backdrop-blur-sm transition active:scale-95"
+                  className={`${CHILD_HOME_RIGHT_ICON_GLASS_CLASS} border-0 bg-transparent p-0 transition active:scale-95`}
+                  style={CHILD_HOME_TOP_BAR_GLASS_STYLE}
                   aria-label="내 크레딧 열기"
                 >
-                  <span className="text-xl" role="img" aria-hidden>
+                  <span className="text-lg leading-none" role="img" aria-hidden>
                     💰
                   </span>
                 </button>
@@ -1303,102 +1459,20 @@ export default function ChildScreen({
           </div>
 
           {/*
-            뽀모도로·물조리개·스티커·장바구니 — 화면 세로 중앙 쪽(캐릭터 발 앵커 기준).
-            비개발자: 시계와 장바구니 사이에 물조리개가 오고, 세 아이콘 크기·열 정렬을 맞춥니다.
+            스탯 카드가 아직 없을 때만 — 물조리개·화분을 발 옆 절대 위치에 둡니다(평소는 레벨 카드 footer 안).
           */}
-          {/*
-            화분만 토끼 왼쪽 발 옆에 둡니다. 물조리개는 우측 열(뽀모도로·장바구니 사이)로 옮겼습니다.
-            캐릭터 줄은 같은 Y 에서 translate(-50%, -100%) 로 발 원점을 잡습니다.
-            여기도 top = 발 높이, translateY(-100%) 로 이 블록의 **바닥**이 발 줄에 닿도록 해 러그 위에 붙여 보입니다.
-          */}
-          {!plantLoading && pot && (
+          {!stats && plantStackInLevelBlock ? (
             <div
-              className="absolute z-[21] flex flex-col items-center pointer-events-auto"
+              className="pointer-events-auto absolute z-[21]"
               style={{
-                left: '18%',
+                left: '14%',
                 top: `${anchor.characterFootY * 100}%`,
-                transform: 'translateY(-100%)',
+                transform: 'translateY(calc(-90% - 18px))',
               }}
             >
-              {plantHint ? (
-                <p className="max-w-[10rem] rounded-lg bg-black/75 px-2 py-1 text-center text-[9px] font-bold text-white shadow-md mb-1">
-                  {plantHint}
-                </p>
-              ) : null}
-              <PlantPot pot={pot} onRequestSeedSelect={openSeedModal} />
+              <div className="flex flex-col items-center gap-3">{plantStackInLevelBlock}</div>
             </div>
-          )}
-
-          <div
-            className="absolute right-4 flex flex-col items-center gap-3 pointer-events-auto"
-            style={{
-              top: `${(anchor.characterFootY - 0.12) * 100}%`,
-              transform: 'translateY(-50%)',
-            }}
-          >
-            <button
-              type="button"
-              onClick={() => setClockPopupOpen(true)}
-              className="flex h-14 w-14 shrink-0 items-center justify-center border-0 bg-transparent p-0 transition-transform active:scale-90"
-              aria-label="뽀모도로·알람 팝업 열기"
-            >
-              <SpriteImage
-                sheet={ICONS}
-                frame="timer"
-                width={48}
-                className="h-12 w-12 shrink-0 select-none object-contain drop-shadow-md"
-              />
-            </button>
-
-            {!plantLoading && pot ? (
-              <WateringCanButton
-                showHeartRow={false}
-                hearts={waterButtonHearts}
-                disabled={plantLoading || !pot}
-                onWater={water}
-                onNoHearts={() =>
-                  setPlantHint('하트가 부족해요! 미션을 하면 하트를 받을 수 있어요.')
-                }
-                onCompleted={openSeedModal}
-              />
-            ) : null}
-
-            {features.sticker && (
-              <button
-                type="button"
-                onClick={() => setActivePanel('sticker')}
-                className="flex h-14 w-14 shrink-0 items-center justify-center transition active:scale-95"
-                aria-label="칭찬 스티커 판 열기"
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={`/assets/img/items/stickers/${encodeURIComponent('heart (5).png')}`}
-                  alt=""
-                  width={48}
-                  height={48}
-                  className="h-12 w-12 object-contain drop-shadow-md"
-                />
-              </button>
-            )}
-
-            {features.market && (
-              <button
-                type="button"
-                onClick={() => setActivePanel('market')}
-                className="flex h-14 w-14 shrink-0 items-center justify-center transition active:scale-95"
-                aria-label="마켓 열기"
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src="/assets/img/common/ui/basket_filled.png"
-                  alt=""
-                  width={48}
-                  height={48}
-                  className="h-12 w-12 object-contain drop-shadow-md"
-                />
-              </button>
-            )}
-          </div>
+          ) : null}
 
           {/* ── 스페이서 ────────────────────────────────────────────────── */}
           <div className="flex-1" />
@@ -1408,16 +1482,19 @@ export default function ChildScreen({
             className="pointer-events-auto max-h-[45vh] flex flex-col"
             style={{ paddingBottom: 'max(20px, env(safe-area-inset-bottom))' }}
           >
-            {/* 미션 헤더 — 우측 하트는 상단 배지와 중복되므로 완료 카운트만 표시 */}
-            <div className="mb-2 flex shrink-0 items-center justify-between px-5 min-[400px]:px-6">
-              <p className="text-[clamp(0.875rem,calc(0.8rem+0.2vw),1.125rem)] font-black text-white drop-shadow">
+            {/* 미션 헤더 — 오른쪽: 완주 하트 5칸 → 완료 수/전체(예: 10/19) */}
+            <div className="mb-2 flex shrink-0 items-center justify-between gap-2 px-5 min-[400px]:px-6">
+              <p className="min-w-0 text-[clamp(0.875rem,calc(0.8rem+0.2vw),1.125rem)] font-black text-white drop-shadow">
                 오늘의 미션
               </p>
-              {visibleMissions.length > 0 && (
-                <span className="text-[clamp(0.7rem,calc(0.65rem+0.12vw),0.85rem)] font-bold text-white/80 drop-shadow">
-                  {visibleMissions.filter((dm) => done.has(dm.id)).length}/{visibleMissions.length}
-                </span>
-              )}
+              {visibleMissions.length > 0 ? (
+                <div className="flex shrink-0 items-center gap-1.5">
+                  <MissionProgressHeartsRow ref={missionHeartsRef} filledHearts={filledHearts} />
+                  <span className="shrink-0 text-[clamp(0.7rem,calc(0.65rem+0.12vw),0.85rem)] font-bold tabular-nums text-white/80 drop-shadow">
+                    {visibleMissions.filter((dm) => done.has(dm.id)).length}/{visibleMissions.length}
+                  </span>
+                </div>
+              ) : null}
             </div>
 
             {/* 미션 카드 가로 스크롤 */}

@@ -101,8 +101,8 @@ export async function POST(req: NextRequest) {
     exp_earned: expEarned,
   }
 
-  const [, existingLogResult, statsPeek] = await Promise.all([
-    supabase.from('daily_missions').update({ is_completed: true, completed_at: completedAt }).eq('id', dailyMissionId),
+  /** 읽기만 먼저 병렬로 — `daily_missions` 완료 플래그는 반드시 성공한 뒤에만 로그·스탯을 씁니다(실패 시 DB만 어긋나는 버그 방지). */
+  const [existingLogResult, statsPeek] = await Promise.all([
     supabase
       .from('mission_logs')
       .select('id, is_completed')
@@ -112,6 +112,14 @@ export async function POST(req: NextRequest) {
       .maybeSingle(),
     supabase.from('child_stats').select('*').eq('child_id', childId).maybeSingle(),
   ])
+
+  const { error: dmCompleteErr } = await supabase
+    .from('daily_missions')
+    .update({ is_completed: true, completed_at: completedAt })
+    .eq('id', dailyMissionId)
+  if (dmCompleteErr) {
+    return NextResponse.json({ error: '미션 완료 상태를 저장하지 못했어요' }, { status: 500 })
+  }
 
   const existingLog = existingLogResult.data
   const logWrite = existingLog
