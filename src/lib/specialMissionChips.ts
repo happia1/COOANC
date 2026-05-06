@@ -228,13 +228,27 @@ export function isRetiredSpecialMissionTitle(storedTitle: string): boolean {
  * - 이벤트형(`repeat_type: event`) 또는 난이도 `special`(매일·주간 스페셜 모두 포함).
  * 예전에는 주간(`weekly`) + `special` 만 두 면 일상으로 잘못 분류되던 경우가 있어 `difficulty` 로 통일합니다.
  */
-export function isSpecialSectionMission(m: Pick<Mission, 'repeat_type' | 'difficulty'>): boolean {
+export function isSpecialSectionMission(
+  m: Pick<Mission, 'repeat_type' | 'difficulty'> & { title?: string | null },
+): boolean {
+  /**
+   * 레거시 데이터 보정:
+   * - 과거에 생성된 「기도/기도하기」가 `difficulty: easy`로 남아 있어도
+   *   현재 정책(스페셜 전용)대로 스페셜 구역으로 보이게 강제합니다.
+   */
+  const rawTitle = (m.title ?? '').trim()
+  if (rawTitle) {
+    const normalizedTitle = displaySpecialMissionTitle(rawTitle)
+    if (normalizedTitle === '기도하기') return true
+  }
   if (m.repeat_type === 'event') return true
   return m.difficulty === 'special'
 }
 
 /** 일상 미션(주중·주말 블록) 템플릿 여부 — 이벤트·special 난이도 제외 */
-export function isRoutineSectionMission(m: Pick<Mission, 'repeat_type' | 'difficulty'>): boolean {
+export function isRoutineSectionMission(
+  m: Pick<Mission, 'repeat_type' | 'difficulty'> & { title?: string | null },
+): boolean {
   return !isSpecialSectionMission(m)
 }
 

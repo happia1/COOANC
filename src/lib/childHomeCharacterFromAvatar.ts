@@ -36,9 +36,9 @@ const DEFAULT_STAGE: HomeIslandStageSprite = {
 
 /**
  * 홈 화면(자녀 방 배경)에서 토끼만 살짝 더 크게 보이게 할 때 쓰는 배율입니다.
- * 비개발자 설명: 1이면 기존과 같고, 1.09면 키가 약 9% 정도만 커집니다(다른 동물·곰·여우 등은 그대로).
+ * 비개발자 설명: 1이면 기존과 같습니다.
  */
-export const BUNNY_HOME_DISPLAY_SCALE = 1.09
+export const BUNNY_HOME_DISPLAY_SCALE = 0.85
 
 /**
  * 요청사항: 자녀 앱(ChildScreen)의 수달(`otter`) 캐릭터만 더 크게 보이도록 하는 배율입니다.

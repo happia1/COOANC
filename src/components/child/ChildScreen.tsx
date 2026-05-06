@@ -121,17 +121,25 @@ const RIGHT_ICON_COIN_SCALE_MAX = 1.3
 
 /** 캐릭터(무대) — 가로가 넓어질수록 최대 2배까지 확대 */
 const CHARACTER_UI_SCALE_MAX = 2
-/** 토끼 캐릭터만 별도 상한 — 요청 반영: 최대 1.7배 */
-const BUNNY_CHARACTER_UI_SCALE_MAX = 1.7
+/** 토끼 캐릭터만 별도 상한 — 요청 반영: 최대 1.35배 */
+const BUNNY_CHARACTER_UI_SCALE_MAX = 1.35
 
-/** 화분·물조리개(발 옆) — 레벨 카드와 같은 너비 구간, 최대 2배까지 확대 */
-const PLANT_FEET_UI_SCALE_MAX = 2
+/** 화분·물조리개(발 옆) — 모바일에서 최대 1.5배까지 확대 */
+const PLANT_FEET_UI_SCALE_MAX = 1.5
 
 /**
  * 발 옆 화분·물조리개의 **표시 크기**와 **토끼와의 가로 간격(px)** 을 맞출 때 쓰는 기준 가로(px).
  * 비개발자: 가로 885일 때 화분·물조리개 크기(배율)와, 토끼 발치 기준 가로 간격을 그대로 유지합니다.
  */
 const PLANT_FEET_LAYOUT_REFERENCE_W = 885
+/** 데스크톱/태블릿에서 화분·물조리개를 토끼 기준으로 벌리는 배율(1=기존, 1.35=35% 더 멀게) */
+const PLANT_FEET_GAP_SPREAD_MULTIPLIER = 1.35
+/** 모바일에서 화분·물조리개 간격 배율(1=기존, 1.15=15% 더 멀게) */
+const PLANT_FEET_GAP_SPREAD_MULTIPLIER_MOBILE = 1.15
+/** 초소형 모바일(<=300px)에서 화분·물조리개 간격 배율(1=기존, 1.10=10% 더 멀게) */
+const PLANT_FEET_GAP_SPREAD_MULTIPLIER_TINY_MOBILE = 1.1
+/** 물조리개만 화분보다 살짝 크게 보이도록 하는 추가 배율 */
+const WATERING_CAN_EXTRA_SCALE = 1.08
 
 /**
  * 토끼(러그 중심 `rugCenterX`)와 화분·물조리개 사이 **가로 거리(px)** 를 기준 너비에서의 값으로 고정합니다.
@@ -154,9 +162,17 @@ function plantFeetAnchorsKeepRugGapPx(
       canPct: wateringCanBesideRightFootX * 100,
     }
   }
+  const spreadMultiplier =
+    containerWidthPx <= 300
+      ? PLANT_FEET_GAP_SPREAD_MULTIPLIER_TINY_MOBILE
+      : containerWidthPx < 768
+      ? PLANT_FEET_GAP_SPREAD_MULTIPLIER_MOBILE
+      : PLANT_FEET_GAP_SPREAD_MULTIPLIER
   /** 기준 너비에서 토끼 중심 ↔ 화분·물조리개 **중심**까지 가로 거리(px) — 이 값을 모든 너비에서 유지 */
-  const gapPlantCenterPx = (rugCenterX - plantPotBesideLeftFootX) * referenceWidthPx
-  const gapCanCenterPx = (wateringCanBesideRightFootX - rugCenterX) * referenceWidthPx
+  const gapPlantCenterPx =
+    (rugCenterX - plantPotBesideLeftFootX) * referenceWidthPx * spreadMultiplier
+  const gapCanCenterPx =
+    (wateringCanBesideRightFootX - rugCenterX) * referenceWidthPx * spreadMultiplier
   /** 중심에서 위 거리만큼 떨어진 픽셀 위치 → 현재 너비로 나눈 비율(0~1) */
   let plant = rugCenterX - gapPlantCenterPx / containerWidthPx
   let can = rugCenterX + gapCanCenterPx / containerWidthPx
@@ -1454,9 +1470,12 @@ export default function ChildScreen({
   const rightIconPrimaryScale = useMemo(() => scaleForRightIconPrimary(containerW), [containerW])
   const rightIconCoinScale = useMemo(() => scaleForRightIconCoin(containerW), [containerW])
 
-  /** 발 옆 화분·물조리개 — 화면 가로가 넓어질수록 최대 2배까지 확대 */
+  /** 발 옆 화분·물조리개 — 768px 경계에서도 작아지지 않도록 전체 구간에서 현재 계산값의 1.5배 유지 */
   const plantFeetUiScale = useMemo(
-    () => scaleForPlantFeetUi(containerW),
+    () => {
+      const base = scaleForPlantFeetUi(containerW)
+      return base * 1.5
+    },
     [containerW],
   )
 
@@ -1714,7 +1733,7 @@ export default function ChildScreen({
               >
                 <div
                   style={{
-                    transform: `scale(${plantFeetUiScale})`,
+                    transform: `scale(${plantFeetUiScale * WATERING_CAN_EXTRA_SCALE})`,
                     transformOrigin: 'center bottom',
                   }}
                 >

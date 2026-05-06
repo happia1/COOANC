@@ -88,29 +88,33 @@ export default function ChildMissionCard({ mission, onComplete, tapResetKey = 0 
   /** 카드 DOM 참조 — 파티클·컨페티 출발 좌표(getBoundingClientRect) 계산에 사용 */
   const cardRef = useRef<HTMLButtonElement>(null)
 
-  /** 태블릿/PC(768px 이상)에서는 카드 전체를 현재 대비 1.5배로 확대합니다. */
-  const tabletDesktopScale = vw >= 768 ? 1.5 : 1
-  /** 카드 폭 기준(기존 clamp와 동일 구간 360→900 선형 보간): 150px → 255px */
-  const baseCardWidthPx =
-    vw <= CHILD_HOME_MISSION_FLUID_VW.minPx
-      ? 150
-      : vw >= CHILD_HOME_MISSION_FLUID_VW.maxPx
-        ? 255
-        : 150 + ((255 - 150) * (vw - CHILD_HOME_MISSION_FLUID_VW.minPx)) / (CHILD_HOME_MISSION_FLUID_VW.maxPx - CHILD_HOME_MISSION_FLUID_VW.minPx)
-  /** 이미지 박스 기준(기존 clamp와 동일 구간 360→900 선형 보간): 116px → 197.2px */
-  const baseImageBoxPx =
-    vw <= CHILD_HOME_MISSION_FLUID_VW.minPx
-      ? 116
-      : vw >= CHILD_HOME_MISSION_FLUID_VW.maxPx
-        ? 197.2
-        : 116 +
-          ((197.2 - 116) * (vw - CHILD_HOME_MISSION_FLUID_VW.minPx)) /
-            (CHILD_HOME_MISSION_FLUID_VW.maxPx - CHILD_HOME_MISSION_FLUID_VW.minPx)
+  /**
+   * 모바일에서만 카드 크기를 확대합니다.
+   * - 360px 이하: 1배
+   * - 430px 이상(모바일 구간): 최대 1.3배
+   * - 768px 이상에서도 1.3배를 유지해 경계에서 갑자기 작아지지 않게 합니다.
+   */
+  const mobileScaleBaseW = CHILD_HOME_MISSION_FLUID_VW.minPx
+  const mobileScaleFullW = 430
+  const mobileScaleMax = 1.3
+  const mobileCardScale =
+    vw >= 768
+      ? mobileScaleMax
+      : vw <= mobileScaleBaseW
+        ? 1
+        : vw >= mobileScaleFullW
+          ? mobileScaleMax
+          : 1 + ((vw - mobileScaleBaseW) * (mobileScaleMax - 1)) / (mobileScaleFullW - mobileScaleBaseW)
 
-  const cardWidthPx = Math.round(baseCardWidthPx * tabletDesktopScale)
-  const imageBoxPx = Math.round(baseImageBoxPx * tabletDesktopScale)
-  const spriteW = Math.round(childHomeMissionSpriteWidthPx(vw) * tabletDesktopScale)
-  const rewardIconPx = Math.round(childHomeMissionRewardIconSizePx(vw) * tabletDesktopScale)
+  const baseCardWidthPx = 150
+  const baseImageBoxPx = 116
+  const baseSpriteW = Math.round(childHomeMissionSpriteWidthPx(CHILD_HOME_MISSION_FLUID_VW.minPx))
+  const baseRewardIconPx = Math.round(childHomeMissionRewardIconSizePx(CHILD_HOME_MISSION_FLUID_VW.minPx))
+
+  const cardWidthPx = Math.round(baseCardWidthPx * mobileCardScale)
+  const imageBoxPx = Math.round(baseImageBoxPx * mobileCardScale)
+  const spriteW = Math.round(baseSpriteW * mobileCardScale)
+  const rewardIconPx = Math.round(baseRewardIconPx * mobileCardScale)
 
   const m = mission.missions
   if (!m) return null

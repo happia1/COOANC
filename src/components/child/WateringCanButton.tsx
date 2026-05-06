@@ -62,7 +62,13 @@ const WateringCanButton = forwardRef<HTMLButtonElement, Props>(function Watering
       aria-label={`물 주기 — 보유 하트 ${hearts}개`}
     >
       <div className="relative shrink-0 overflow-visible" style={{ width: 32, height: 32 }}>
-        <Image src={canImg} alt="물조리개" fill className="object-contain" sizes="32px" priority />
+        {/**
+         * 비개발자 설명:
+         * - 화면에서는 부모 `scale()`로 32px보다 크게 보일 수 있습니다.
+         * - `sizes`를 너무 작게(32px) 주면 저해상도 원본을 선택해 확대 시 흐릿해질 수 있어,
+         *   최대 표시 크기를 고려한 값(96px)으로 올려 선명도를 유지합니다.
+         */}
+        <Image src={canImg} alt="물조리개" fill className="object-contain" sizes="96px" priority />
       </div>
     </button>
   )
