@@ -9,7 +9,7 @@
 import Image from 'next/image'
 import { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { getPlantStageCelebrationTitle, STAGE_IMAGE, STAGE_LABELS, type PlantStage } from '@/constants/plantTrees'
+import { getPlantStageCelebrationTitle, STAGE_IMAGE, type PlantStage } from '@/constants/plantTrees'
 
 type Props = {
   open: boolean
@@ -67,7 +67,6 @@ export default function PlantStageCelebrationModal({ open, stage, onClose }: Pro
   if (!open || stage === null || stage < 1 || typeof window === 'undefined') return null
 
   const title = getPlantStageCelebrationTitle(stage)
-  const label = STAGE_LABELS[stage]
   const imgSrc = STAGE_IMAGE[stage]
 
   const modal = (
@@ -83,20 +82,19 @@ export default function PlantStageCelebrationModal({ open, stage, onClose }: Pro
         <p id="plant-celebrate-desc" className="sr-only">
           성장 단계 안내 및 축하
         </p>
-        {/* 단계별 화분 일러스트 — 새 단계 도달 후 모습 */}
-        <div className="relative mb-5 h-[7.25rem] w-[7.25rem] shrink-0">
-          <Image src={imgSrc} alt="" fill className="object-contain drop-shadow-md" sizes="116px" priority />
+        {/* 단계별 화분 일러스트 — 기존 116px 대비 1.3배(약 151px), 정수 픽셀로 선명도 유지 */}
+        <div className="relative mb-5 h-[151px] w-[151px] shrink-0">
+          <Image src={imgSrc} alt="" fill className="object-contain drop-shadow-md" sizes="151px" priority />
         </div>
         <h2 id="plant-celebrate-title" className="mb-2 text-center text-xl font-black leading-snug text-gray-900 sm:text-2xl">
           {title}
         </h2>
-        <p className="mb-6 text-center text-sm font-semibold leading-snug text-emerald-700/90">{`지금 「${label}」 단계예요.`}</p>
         <button
           type="button"
           onClick={onClose}
           className="w-full rounded-2xl bg-[#63C964] py-3.5 text-base font-black text-white shadow-md transition-opacity active:opacity-85 sm:py-4"
         >
-          좋아요!
+          물 주러가기
         </button>
       </div>
     </div>

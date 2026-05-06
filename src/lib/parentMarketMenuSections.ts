@@ -25,9 +25,9 @@ export const PARENT_MARKET_MENU_SECTIONS: {
   /** 이 행에 넣을 DB category 값들 */
   dbCategories: readonly StoreItemCategory[]
 }[] = [
+  { id: 'event', title: '이벤트', dbCategories: ['activity', 'experience'] },
   { id: 'snack', title: '간식', dbCategories: ['food'] },
   { id: 'toy', title: '장난감', dbCategories: ['toy'] },
-  { id: 'event', title: '이벤트', dbCategories: ['activity', 'experience'] },
 ]
 
 const ALL_DB: Set<string> = new Set(PARENT_MARKET_MENU_SECTIONS.flatMap((s) => s.dbCategories))

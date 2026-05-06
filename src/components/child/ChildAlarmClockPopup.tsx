@@ -745,21 +745,21 @@ export default function ChildAlarmClockPopup({ open, onClose }: Props) {
                           </p>
                         </div>
                         {imageSrc ? (
-                          <div className="flex h-10 w-10 shrink-0 items-center justify-center">
+                          <div className="flex h-14 w-14 shrink-0 items-center justify-center">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
                               src={imageSrc}
                               alt=""
-                              className="h-7 w-7 object-contain"
+                              className="h-11 w-11 object-contain"
                               draggable={false}
                             />
                           </div>
                         ) : visual !== 'none' ? (
-                          <div className="flex h-10 w-10 shrink-0 items-center justify-center">
+                          <div className="flex h-14 w-14 shrink-0 items-center justify-center">
                             {visual === 'morning' ? (
-                              <MorningAlarmSprite scale={0.13} />
+                              <MorningAlarmSprite scale={0.19} />
                             ) : (
-                              <SleepAlarmSprite scale={0.2} />
+                              <SleepAlarmSprite scale={0.29} />
                             )}
                           </div>
                         ) : null}

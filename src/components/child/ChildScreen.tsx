@@ -41,7 +41,6 @@ import { useContainerSize } from '@/hooks/useContainerSize'
 import ChildMissionCard from '@/components/child/ChildMissionCard'
 import ChildPanelOverlay, { type PanelType } from '@/components/child/ChildPanelOverlay'
 import ChildLevelStatsCard from '@/components/child/ChildLevelStatsCard'
-import MissionProgressHeartsRow from '@/components/child/MissionProgressHeartsRow'
 import { normalizeChildStatsCreditsSplit, mergeChildStatsPatch } from '@/lib/childCreditsSplit'
 import { completionRateToHearts } from '@/lib/missionHeartCount'
 import { scaledMissionRewards } from '@/lib/missionRewardMultiplier'
@@ -279,8 +278,12 @@ type Particle = {
   startY: number  // 카드 중심 Y (컨테이너 기준)
   endX: number    // 크레딧 배지 중심 X (컨테이너 기준)
   endY: number    // 크레딧 배지 중심 Y (컨테이너 기준)
+  midX: number    // 포물선 중간 지점 X (컨테이너 기준)
+  midY: number    // 포물선 중간 지점 Y (컨테이너 기준)
   type: 'coin' | 'heart' | 'star'
   delay: number   // 애니메이션 시작 지연(ms) — 여러 파티클이 조금씩 시차를 두고 날아갑니다
+  durationMs: number
+  sizePx: number
 }
 
 type Props = {
@@ -321,25 +324,38 @@ type Props = {
  * 개별 파티클 컴포넌트 — particleFly 키프레임으로 목적지까지 날아갑니다.
  * CSS 변수 --tx / --ty 에 이동 거리를 주입해 키프레임이 활용합니다.
  *
- * 비개발자 설명: 코인(🪙), 하트(❤️), 별(⭐) 중 하나를 화면에 띄워
+ * 비개발자 설명: 코인/하트/별 중 하나를 화면에 띄워
  *               카드에서 크레딧 배지 쪽으로 날아가게 만드는 컴포넌트입니다.
  */
 const MissionParticle = memo(function MissionParticle({ particle: p }: { particle: Particle }) {
-  const emoji = p.type === 'coin' ? '🪙' : p.type === 'heart' ? '❤️' : '⭐'
+  const isIconSprite = p.type === 'coin' || p.type === 'heart'
+  const animationName = p.type === 'heart' ? 'heartFloatFly' : 'particleFly'
   return (
     <div
       style={{
         position: 'absolute',
         left: p.startX,
         top: p.startY,
-        fontSize: 20,
+        fontSize: p.sizePx,
         lineHeight: 1,
         '--tx': `${p.endX - p.startX}px`,
         '--ty': `${p.endY - p.startY}px`,
-        animation: `particleFly 550ms cubic-bezier(0.25,0.46,0.45,0.94) ${p.delay}ms forwards`,
+        '--mx': `${p.midX - p.startX}px`,
+        '--my': `${p.midY - p.startY}px`,
+        animation: `${animationName} ${p.durationMs}ms cubic-bezier(0.2,0.7,0.2,1) ${p.delay}ms forwards`,
       } as React.CSSProperties}
     >
-      {emoji}
+      {isIconSprite ? (
+        <SpriteImage
+          sheet={ICONS}
+          frame={p.type === 'coin' ? 'credit' : 'heart'}
+          width={p.sizePx}
+          clipRotated={false}
+          className="select-none"
+        />
+      ) : (
+        '⭐'
+      )}
     </div>
   )
 })
@@ -452,7 +468,7 @@ export default function ChildScreen({
   /** 크레딧 배지 ref — 동전 파티클이 날아가는 목적지(숫자·아이콘 줄) */
   const creditBadgeRef = useRef<HTMLDivElement>(null)
   /** Mission Complete 하트 5칸 ref — **애정 하트(미션 보상)** 파티클 목적지 */
-  const missionHeartsRef = useRef<HTMLDivElement>(null)
+  const levelHeartsRef = useRef<HTMLDivElement>(null)
   /** 발 옆 화분 래퍼 — 물조리개에서 하트 날림 목표 좌표 */
   const plantPotWrapRef = useRef<HTMLDivElement>(null)
   /** 발 옆 물조리개 버튼 — 하트 날림 출발 좌표 */
@@ -1094,7 +1110,7 @@ export default function ChildScreen({
       /** 낙관적 완료 — DOM에서 카드를 제거하기 전에 파티클을 먼저 띄웁니다 */
       const containerRect = containerRef.current?.getBoundingClientRect()
       const badgeRect = creditBadgeRef.current?.getBoundingClientRect()
-      const missionHeartsRow = missionHeartsRef.current?.getBoundingClientRect()
+      const levelHeartsRow = levelHeartsRef.current?.getBoundingClientRect()
 
       if (containerRect && badgeRect) {
         const startX = cardRect.left + cardRect.width / 2 - containerRect.left
@@ -1102,33 +1118,74 @@ export default function ChildScreen({
         const endCoinX = badgeRect.left + badgeRect.width / 2 - containerRect.left
         const endCoinY = badgeRect.top + badgeRect.height / 2 - containerRect.top
         /**
-         * 애정 하트는 하단 「오늘의 미션」줄 오른쪽 **완주 하트 5칸** 중심으로 날아갑니다.
+         * 애정 하트는 상단 레벨 블록의 **크레딧 아래 하트 줄** 중심으로 날아갑니다.
          * (없으면 예전과 같이 크레딧 배지로 떨어짐)
          */
-        const endHeartX = missionHeartsRow
-          ? missionHeartsRow.left + missionHeartsRow.width / 2 - containerRect.left
+        const endHeartX = levelHeartsRow
+          ? levelHeartsRow.left + levelHeartsRow.width / 2 - containerRect.left
           : endCoinX
-        const endHeartY = missionHeartsRow
-          ? missionHeartsRow.top + missionHeartsRow.height / 2 - containerRect.top
+        const endHeartY = levelHeartsRow
+          ? levelHeartsRow.top + levelHeartsRow.height / 2 - containerRect.top
           : endCoinY
 
-        const base = Date.now()
-        const newParticles: Particle[] = [
-          { id: base,     startX,            startY, endX: endCoinX, endY: endCoinY, type: 'coin', delay: 0   },
-          { id: base + 1, startX: startX - 20, startY, endX: endCoinX, endY: endCoinY, type: 'coin', delay: 60  },
-          { id: base + 2, startX: startX + 20, startY, endX: endCoinX, endY: endCoinY, type: 'coin', delay: 120 },
-        ]
-        if (heartReward > 0) {
-          newParticles.push(
-            { id: base + 3, startX, startY: startY + 10, endX: endHeartX, endY: endHeartY, type: 'heart', delay: 80 },
-          )
+        /**
+         * 보상 개수만큼 파티클을 만듭니다.
+         * - 시작점을 카드 중심 근처로 랜덤 분산해 "터져 나오는" 느낌을 냅니다.
+         * - midY를 더 위로 잡아 포물선 비행처럼 보이게 합니다.
+         */
+        const base = Date.now() * 1000
+        const newParticles: Particle[] = []
+        let idSeq = 0
+        const pushBurstParticles = (
+          count: number,
+          type: 'coin' | 'heart',
+          targetX: number,
+          targetY: number,
+          baseDelayMs: number,
+        ) => {
+          for (let i = 0; i < Math.max(0, count); i += 1) {
+            const burstX = (Math.random() - 0.5) * 48
+            const burstY = -8 - Math.random() * 26
+            const particleStartX = startX + burstX
+            const particleStartY = startY + burstY
+            const curveBias = (Math.random() - 0.5) * (type === 'heart' ? 30 : 18)
+            const arcLift = type === 'heart' ? 90 + Math.random() * 58 : 54 + Math.random() * 44
+            const midX = particleStartX + (targetX - particleStartX) * 0.45 + curveBias
+            const midY =
+              particleStartY +
+              (targetY - particleStartY) * (type === 'heart' ? 0.32 : 0.38) -
+              arcLift
+            newParticles.push({
+              id: base + idSeq,
+              startX: particleStartX,
+              startY: particleStartY,
+              endX: targetX,
+              endY: targetY,
+              midX,
+              midY,
+              type,
+              delay: baseDelayMs + i * 70,
+              // 코인은 하트보다 살짝 느리게 이동해 개수가 더 또렷하게 보이도록 조정합니다.
+              durationMs:
+                type === 'coin'
+                  ? 1120 + Math.round(Math.random() * 220)
+                  : 1780 + Math.round(Math.random() * 320),
+              sizePx: type === 'heart' ? 25 + Math.round(Math.random() * 4) : 20 + Math.round(Math.random() * 4),
+            })
+            idSeq += 1
+          }
         }
+        pushBurstParticles(creditReward, 'coin', endCoinX, endCoinY, 0)
+        pushBurstParticles(heartReward, 'heart', endHeartX, endHeartY, 90)
+
         setParticles((prev) => [...prev, ...newParticles])
 
+        const lastFlightEndMs =
+          newParticles.reduce((max, p) => Math.max(max, p.delay + p.durationMs), 0) + 60
         setTimeout(() => {
           setParticles((prev) => prev.filter((p) => !newParticles.find((np) => np.id === p.id)))
           triggerBadgeShine()
-        }, 650)
+        }, lastFlightEndMs)
       }
 
       setTimeout(() => {
@@ -1584,6 +1641,7 @@ export default function ChildScreen({
                   <ChildLevelStatsCard
                     stats={stats}
                     creditRef={creditBadgeRef}
+                    heartRef={levelHeartsRef}
                     shine={badgeShine}
                     heartsCount={waterButtonHearts}
                   />
@@ -1818,7 +1876,28 @@ export default function ChildScreen({
               </p>
               {visibleMissions.length > 0 ? (
                 <div className="flex shrink-0 items-center gap-1.5">
-                  <MissionProgressHeartsRow ref={missionHeartsRef} filledHearts={filledHearts} />
+                  {/**
+                   * 오늘의 미션 진행도 바(0~100%).
+                   * 기존 하트 5칸 대신 베이비핑크 게이지가 부드럽게 차오릅니다.
+                   */}
+                  <div
+                    className="relative h-2.5 w-[112px] overflow-hidden rounded-full ring-1 ring-white/45"
+                    style={{ background: 'rgba(255,255,255,0.28)' }}
+                    role="progressbar"
+                    aria-label={`오늘의 미션 진행도 ${filledHearts}/5`}
+                    aria-valuenow={filledHearts}
+                    aria-valuemin={0}
+                    aria-valuemax={5}
+                  >
+                    <div
+                      className="h-full rounded-full transition-all duration-700 ease-out"
+                      style={{
+                        width: `${Math.max(0, Math.min(100, (filledHearts / 5) * 100))}%`,
+                        background: 'linear-gradient(90deg, #FDC5D7 0%, #FF9FC2 100%)',
+                        boxShadow: '0 0 10px rgba(253,197,215,0.68)',
+                      }}
+                    />
+                  </div>
                   <span className="shrink-0 text-[clamp(0.7rem,calc(0.65rem+0.12vw),0.85rem)] font-bold tabular-nums text-white/80 drop-shadow">
                     {visibleMissions.filter((dm) => done.has(dm.id)).length}/{visibleMissions.length}
                   </span>
@@ -1835,8 +1914,36 @@ export default function ChildScreen({
                 </div>
               </div>
             ) : incompleteOrdered.length === 0 ? (
-              // 전부 완료 시 인라인 배너는 쓰지 않음 — 축하는 AllMissionCompleteOverlay 한 곳에서만 처리
-              <div className="shrink-0 px-5 min-[400px]:px-6" aria-hidden />
+              // 모든 미션 완료 상태에서 하단 미션 카드 영역에도 축하 배경/문구를 보여 줍니다.
+              <div className="shrink-0 px-5 min-[400px]:px-6">
+                <div
+                  className="relative flex min-h-[250px] items-center justify-center overflow-hidden rounded-2xl border border-white/65 px-4 py-6 text-center shadow-[0_10px_26px_rgba(0,0,0,0.18)]"
+                  style={{
+                    backgroundImage:
+                      'linear-gradient(to bottom, rgba(255,255,255,0.28), rgba(255,255,255,0.28)), url("/assets/img/characters/onboarding/congrats.png")',
+                    backgroundPosition: 'center',
+                    backgroundSize: 'cover',
+                    backgroundRepeat: 'no-repeat',
+                  }}
+                  role="status"
+                  aria-live="polite"
+                >
+                  <div className="flex flex-col items-center justify-center gap-3">
+                    {/* 캐릭터 이미지를 박스 정중앙에 보이도록 별도 이미지로 한 번 더 배치합니다. */}
+                    <Image
+                      src="/assets/img/characters/onboarding/congrats.png"
+                      alt="모든 미션 완료 축하 캐릭터"
+                      width={168}
+                      height={168}
+                      className="h-auto w-[152px] select-none object-contain"
+                      priority
+                    />
+                    <p className="text-lg font-black text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.35)]">
+                      모든 미션을 완료했어요!
+                    </p>
+                  </div>
+                </div>
+              </div>
             ) : (
               <div
                 className="flex snap-x snap-mandatory flex-row overflow-x-auto px-5 pb-3 pt-1 min-[400px]:px-6 [scrollbar-width:none] [scroll-padding-left:1.25rem] [scroll-padding-right:1.25rem] min-[400px]:[scroll-padding-left:1.5rem] min-[400px]:[scroll-padding-right:1.5rem] [gap:clamp(0.75rem,calc(0.5rem+0.9vw),1.25rem)] [&::-webkit-scrollbar]:hidden"
@@ -1956,7 +2063,6 @@ export default function ChildScreen({
       {showCelebration && (
         <AllMissionCompleteOverlay
           todayCredits={todayEarnedCredits}
-          childName={childName}
           onSleep={() => {
             setShowCelebration(false)
             setIsSleeping(true)

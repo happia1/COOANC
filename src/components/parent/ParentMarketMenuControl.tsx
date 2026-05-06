@@ -429,7 +429,7 @@ export default function ParentMarketMenuControl({
         </div>
       </div>
       <p className="mb-3 text-[11px] leading-snug text-gray-400">
-        자녀의 마켓에 올라갈 상품을 구성해보세요.
+        자녀의 마켓에 올라가는 상품을 직접 관리할 수 있어요.
       </p>
 
       {toggleSaveErr && (
@@ -442,7 +442,7 @@ export default function ParentMarketMenuControl({
         <div className="rounded-2xl bg-white p-6 text-center text-sm text-gray-400 shadow-sm">자녀를 연결해 주세요</div>
       ) : itemsForChild.length === 0 ? (
         <div className="rounded-2xl bg-white p-6 text-center text-sm text-gray-400 shadow-sm">
-          표시할 상품이 없어요. 상품 추가하기로 넣을 수 있어요.
+          상품을 추가해주세요.
         </div>
       ) : (
         <div className="space-y-6 rounded-2xl bg-white p-3 shadow-sm">

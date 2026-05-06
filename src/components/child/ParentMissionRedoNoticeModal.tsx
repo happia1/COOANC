@@ -13,7 +13,6 @@ import SpriteImage from '@/components/common/SpriteImage'
 import { MISSION_ROUTINES_ATLAS } from '@/constants/missionRoutineAtlas'
 import { missionRoutineIconFrame } from '@/lib/missionRoutineIconFrame'
 import { resolveRoutineMissionPngUrl } from '@/lib/routineMissionThumbnail'
-import { isSpecialSectionMission } from '@/lib/specialMissionChips'
 import type { DailyMissionWithTemplate } from '@/types/database'
 
 type Props = {
@@ -28,7 +27,6 @@ export default function ParentMissionRedoNoticeModal({ mission, onClose }: Props
   if (typeof window === 'undefined') return null
 
   const m = mission.missions
-  const special = isSpecialSectionMission(m)
   const routineFrame = missionRoutineIconFrame(m.title, m.description)
   const routineImagePath = resolveRoutineMissionPngUrl({
     title: m.title,
@@ -38,7 +36,6 @@ export default function ParentMissionRedoNoticeModal({ mission, onClose }: Props
   })
   /** 「밥 다 먹기」 PNG 보정(카드와 동일) — 상대적으로 어두워 보여 밝기를 조금 올립니다 */
   const brightPng = routineImagePath?.includes('clean_up_all.png') ? 'brightness(1.24) saturate(1.06)' : null
-  const imgBg = special ? 'bg-amber-100' : 'bg-[#FFF0E8]'
 
   const modal = (
     <div
@@ -54,7 +51,6 @@ export default function ParentMissionRedoNoticeModal({ mission, onClose }: Props
         <div
           className={[
             'mx-auto mb-4 flex h-[116px] w-[116px] items-center justify-center overflow-hidden rounded-2xl',
-            imgBg,
           ].join(' ')}
         >
           {routineImagePath ? (

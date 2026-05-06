@@ -10,20 +10,18 @@
  */
 
 import { useEffect } from 'react'
+import Image from 'next/image'
 import confetti from 'canvas-confetti'
 
 interface Props {
   /** 오늘(이 세션에서) 미션으로 번 코인의 합 — 숫자 앞에 + 로 표시 */
   todayCredits: number
-  /** 화면에 보일 아이 이름 */
-  childName: string
   /** 수면 모드(잘자 화면)로 전환 */
   onSleep: () => void
 }
 
 export default function AllMissionCompleteOverlay({
   todayCredits,
-  childName,
   onSleep,
 }: Props) {
   useEffect(() => {
@@ -96,9 +94,6 @@ export default function AllMissionCompleteOverlay({
         <p id="all-mission-complete-title" className="text-2xl font-black text-gray-800 mb-1">
           미션 완료!
         </p>
-        <p className="text-sm text-gray-400 mb-6">
-          {childName}(이)가 오늘 모든 미션을 해냈어요!
-        </p>
 
         <div
           className="rounded-2xl py-5 px-6 mb-6"
@@ -107,18 +102,31 @@ export default function AllMissionCompleteOverlay({
             border: '2px solid #FFD700',
           }}
         >
-          <p className="text-xs font-bold text-yellow-600 mb-2 tracking-wide">오늘 번 코인</p>
+          {/* 중앙 축하 이미지는 요청한 온보딩 축하 PNG를 그대로 사용합니다. */}
+          <div className="mb-3 flex items-center justify-center">
+            <Image
+              src="/assets/img/characters/onboarding/congrats.png"
+              alt="미션 완료 축하 이미지"
+              width={180}
+              height={180}
+              className="h-auto w-[160px] select-none object-contain"
+              priority
+            />
+          </div>
           <div className="flex items-center justify-center gap-2">
-            <span className="text-4xl" aria-hidden>
-              🪙
-            </span>
+            {/* 홈 상단 카드와 동일한 크레딧 코인 이미지를 사용합니다. */}
+            <img
+              src={`/assets/img/common/ui/${encodeURIComponent('크레딧.png')}`}
+              alt=""
+              aria-hidden
+              className="h-10 w-10 select-none object-contain"
+              draggable={false}
+            />
             <span className="text-5xl font-black" style={{ color: '#D4A000' }}>
               +{todayCredits}
             </span>
           </div>
         </div>
-
-        <p className="text-sm text-gray-400 mb-7">내일도 미션이 기다리고 있어요! 🌟</p>
 
         <button
           type="button"

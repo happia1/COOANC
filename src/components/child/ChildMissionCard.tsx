@@ -126,7 +126,8 @@ export default function ChildMissionCard({ mission, onComplete, tapResetKey = 0 
   const cardWidthPx = Math.round(baseCardWidthPx * finalCardScale)
   const imageBoxPx = Math.round(baseImageBoxPx * finalCardScale)
   const spriteW = Math.round(baseSpriteW * finalCardScale)
-  const rewardIconPx = Math.round(baseRewardIconPx * finalCardScale)
+  /** 크레딧·하트 아이콘을 살짝 키워 숫자 정보가 더 잘 보이게 합니다. */
+  const rewardIconPx = Math.round(baseRewardIconPx * finalCardScale * 1.12)
 
   const m = mission.missions
   if (!m) return null
@@ -171,7 +172,7 @@ export default function ChildMissionCard({ mission, onComplete, tapResetKey = 0 
 
   /** 보상 알약·아이콘 행 클래스 — 스페셜은 골드 알약 전용 클래스(링은 CSS에서 처리) */
   const rewardPillClassName = [
-    '-mt-1.5 inline-flex max-w-full flex-wrap items-center justify-center gap-x-2 gap-y-0.5 rounded-full px-4 py-1 font-black tabular-nums tracking-tight text-[#888888] text-[clamp(0.8125rem,calc(0.75rem+0.14vw),1rem)]',
+    '-mt-1.5 inline-flex max-w-full flex-wrap items-center justify-center gap-x-2.5 gap-y-0.5 rounded-full px-4 py-1.5 font-black tabular-nums tracking-tight text-[#757575] text-[clamp(0.9375rem,calc(0.82rem+0.2vw),1.125rem)]',
     special
       ? CHILD_HOME_MISSION_CARD_SPECIAL_REWARD_PILL_BG_CLASSNAME
       : 'bg-stone-100/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] ring-1 ring-black/[0.06]',
@@ -227,7 +228,7 @@ export default function ChildMissionCard({ mission, onComplete, tapResetKey = 0 
         </div>
 
         {/* ── 미션명 (한 줄 고정) ── */}
-        <p className="w-full text-center font-bold leading-snug text-gray-800 line-clamp-1 text-[clamp(0.875rem,calc(0.8rem+0.15vw),1.0625rem)]">
+        <p className="w-full text-center font-bold leading-snug text-gray-500 line-clamp-1 text-[clamp(0.9375rem,calc(0.85rem+0.18vw),1.125rem)]">
           {m.title}
         </p>
 

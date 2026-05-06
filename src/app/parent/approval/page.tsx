@@ -74,13 +74,17 @@ export default async function ApprovalPage() {
       : Promise.resolve({ data: [], error: null }),
 
     (async () => {
+      /**
+       * 비개발자 설명:
+       * - 먼저 "이 부모가 볼 수 있는 상품 범위(전체 공개 + 우리 가족 전용)"만 가져옵니다.
+       * - 활성/장난감 필터는 아래에서 JS로 한 번 더 적용합니다.
+       */
       if (linkIds.length === 0) {
-        return supabase.from('store_items').select('*').eq('is_active', true).is('family_link_id', null)
+        return supabase.from('store_items').select('*').is('family_link_id', null)
       }
       return supabase
         .from('store_items')
         .select('*')
-        .eq('is_active', true)
         .or(`family_link_id.is.null,family_link_id.in.(${linkIds.join(',')})`)
     })(),
 
@@ -137,7 +141,14 @@ export default async function ApprovalPage() {
     console.warn('[parent approval] child_market_hidden_items:', hiddenRes.error.message)
   }
 
-  const storeItems = (storeRes.data ?? []) as StoreItem[]
+  /**
+   * 비개발자 설명:
+   * - 메뉴 제어에는 "활성 상품"을 기본으로 보여 줍니다.
+   * - 단, 장난감은 베타 기간 비활성이어도 제어할 수 있어야 해서 항상 포함합니다.
+   */
+  const storeItems = ((storeRes.data ?? []) as StoreItem[]).filter(
+    (item) => item.is_active || item.category === 'toy',
+  )
 
   /** 메뉴 제어에서 쓰는 자녀별 크레딧 덮어쓰기(서버 스냅샷) */
   const initialCreditOverridesByChild: Record<string, Record<string, number>> = {}

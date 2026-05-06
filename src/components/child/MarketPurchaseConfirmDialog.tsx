@@ -3,19 +3,18 @@
 /**
  * 마켓 「구매 요청」확인 팝업 — 마트놀이(계산대) 연출
  *
- * 1) 영수증(잔액·살 물건) + 하단 취소 | 구매하기
- * 2) 구매하기 → 「정말 구매하시겠어요?」+ 최종 차감(-N)만 강조, 확인 시에만 계산 연출 시작
- * 3) 계산기·손 슬라이드 등장 → 슬롯 차감 + 동전 낙하 → 「남은 크레딧」
- * 4) 확인 → API 요청 후 닫힘(`child_message` 는 부모 구매 요청 카드에 표시)
+ * 1) 상품 선택 직후 → 「정말 구매하시겠어요?」로 바로 진입
+ * 2) 「네, 살게요」에서 계산기·손 슬라이드 등장 + 슬롯 차감 + 동전 낙하
+ * 3) 「남은 크레딧」 확인 → API 요청 후 닫힘(`child_message` 는 부모 구매 요청 카드에 표시)
  *
  * 하단 버튼 유무로 영수증 영역 높이가 줄어들면 `absolute bottom` 장식이 위로 밀려 보이므로,
  * 장식이 보이는 구간은 본문·푸터에 고정 최소 높이를 둡니다.
  */
 
-import { useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { StoreItem } from '@/types/database'
 import SpriteImage from '@/components/common/SpriteImage'
-import StoreItemThumbnail from '@/components/common/StoreItemThumbnail'
 import { SHOP_ANIMATIONS, ICONS } from '@/constants/sprites'
 import type { MarketItemFrameKey } from '@/lib/marketItemFrame'
 
@@ -33,8 +32,8 @@ type Props = {
   onSuccessDismiss: () => void
 }
 
-/** confirm: 영수증 → finalSure: 정말 구매?(-N) → animating~calcDone: 계산대 연출 */
-type CheckoutStep = 'confirm' | 'finalSure' | 'animating' | 'calcDone'
+/** MVP: 바로 finalSure(정말 구매?) → animating~calcDone: 계산대 연출 */
+type CheckoutStep = 'finalSure' | 'animating' | 'calcDone'
 
 function DigitSlot({ digit, tone }: { digit: number; tone: 'blue' | 'green' }) {
   const d = ((digit % 10) + 10) % 10
@@ -43,7 +42,7 @@ function DigitSlot({ digit, tone }: { digit: number; tone: 'blue' | 'green' }) {
   return (
     <span
       className="relative inline-block overflow-hidden align-baseline tabular-nums"
-      style={{ width: '0.62em', height: `${digitHeightEm}em` }}
+      style={{ width: '0.72em', height: `${digitHeightEm}em` }}
       aria-hidden
     >
       <span
@@ -78,7 +77,7 @@ function SlotIntegerPlain({
   const pad = Math.max(0, minDigits - raw.length)
   const digits = [...Array(pad).fill('0'), ...raw]
   return (
-    <span className="inline-flex items-baseline gap-px" style={{ fontSize: 'inherit' }}>
+    <span className="inline-flex items-baseline gap-[0.06em]" style={{ fontSize: 'inherit' }}>
       {digits.map((ch, i) => (
         <DigitSlot key={i} digit={Number(ch)} tone={tone} />
       ))}
@@ -140,7 +139,8 @@ function useSlotBalanceSteps(from: number, to: number, runId: number, opts: Slot
   return { current, done }
 }
 
-const SLOW_SLOT: SlotOpts = { tickMs: 135, initialDelayMs: 320 }
+/** 요청사항: 남은 크레딧 숫자 다이얼 차감이 더 천천히 보이도록 속도를 낮춥니다. */
+const SLOW_SLOT: SlotOpts = { tickMs: 240, initialDelayMs: 460 }
 
 export default function MarketPurchaseConfirmDialog({
   selected,
@@ -149,19 +149,19 @@ export default function MarketPurchaseConfirmDialog({
   onSubmit,
   onSuccessDismiss,
 }: Props) {
-  const { item, frame } = selected
+  const { item } = selected
   const price = item.credit_price
   const after = Math.max(0, balanceBefore - price)
   const digitLen = Math.max(balanceBefore.toString().length, after.toString().length, 2)
 
-  const [checkoutStep, setCheckoutStep] = useState<CheckoutStep>('confirm')
+  const [checkoutStep, setCheckoutStep] = useState<CheckoutStep>('finalSure')
   const [payRunId, setPayRunId] = useState(0)
   /** React Strict Mode 에서 입장 애니메이션이 두 번 도는 것을 줄이기 위해 다음 프레임에만 클래스 부여 */
   const [decoAnimate, setDecoAnimate] = useState(false)
   const [requestBusy, setRequestBusy] = useState(false)
 
   useEffect(() => {
-    setCheckoutStep('confirm')
+    setCheckoutStep('finalSure')
     setPayRunId(0)
     setDecoAnimate(false)
   }, [item.id, balanceBefore])
@@ -197,11 +197,6 @@ export default function MarketPurchaseConfirmDialog({
     return () => window.clearTimeout(t)
   }, [checkoutStep, slotDone])
 
-  /** 첫 「구매하기」— 아직 계산 연출은 시작하지 않고, 최종 확인 단계로만 이동 */
-  function goToFinalSure() {
-    setCheckoutStep('finalSure')
-  }
-
   /** 「정말 구매」확인 — 여기서부터 슬롯·동전 애니메이션 */
   function startCheckoutAnimation() {
     setCheckoutStep('animating')
@@ -220,13 +215,13 @@ export default function MarketPurchaseConfirmDialog({
   }
 
   const showDeco = checkoutStep === 'animating' || checkoutStep === 'calcDone'
-  const backdropClosable = checkoutStep === 'confirm' || checkoutStep === 'finalSure'
+  const backdropClosable = checkoutStep === 'finalSure'
   /** 계산대 장식이 붙는 박스 — 단계마다 본문 높이가 달라져도 이 값으로 맞춰 장식 위치 고정 */
-  const decoPhaseMinBodyHeight = 'min-h-[300px] sm:min-h-[320px]'
+  const decoPhaseMinBodyHeight = 'min-h-[172px] sm:min-h-[186px]'
 
-  return (
+  const dialog = (
     <div
-      className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 px-6"
+      className="fixed inset-0 z-[210] flex items-center justify-center bg-black/40 px-4 py-10 sm:px-6 sm:py-12"
       role="dialog"
       aria-modal="true"
       aria-labelledby="market-purchase-title"
@@ -236,13 +231,12 @@ export default function MarketPurchaseConfirmDialog({
       }}
     >
       <div
-        className="relative w-full max-w-md overflow-visible rounded-3xl shadow-2xl"
-        style={{ background: '#FFF8F0' }}
+        className="relative my-auto w-full max-w-md overflow-visible"
         onClick={(e) => e.stopPropagation()}
       >
         <div
           className={`relative w-full overflow-visible pb-2 pt-4 ${
-            showDeco ? decoPhaseMinBodyHeight : 'min-h-[260px] sm:min-h-[280px]'
+            showDeco ? decoPhaseMinBodyHeight : 'min-h-[146px] sm:min-h-[160px]'
           }`}
         >
           {showDeco && (
@@ -276,69 +270,9 @@ export default function MarketPurchaseConfirmDialog({
             </>
           )}
 
-          {/* 영수증 — 장식보다 아래 레이어(계산기·손이 영수증 위로 올라옴), 본문은 좁은 열이라 숫자는 가리지 않음 */}
+          {/* 본문 카드 — 장식보다 아래 레이어(계산기·손이 본문 위로 올라옴) */}
           <div className="relative z-[10] mx-auto flex w-full max-w-[min(100%,19rem)] justify-center px-4 pt-2 sm:max-w-[20.5rem] sm:px-6">
-            <div
-              className="market-receipt-sheet relative w-full overflow-visible rounded-xl px-4 pb-6 pt-4 text-center shadow-md sm:px-5"
-              style={{
-                background:
-                  'repeating-linear-gradient(0deg, rgba(0,0,0,0.03) 0px, rgba(0,0,0,0.03) 1px, transparent 1px, transparent 8px), linear-gradient(180deg, #ffffff 0%, #fbfaf8 100%)',
-                boxShadow:
-                  '0 6px 20px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.95), inset 0 0 0 1px rgba(0,0,0,0.05)',
-                border: '1px dashed rgba(0,0,0,0.12)',
-              }}
-            >
-              <div className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-gray-200/90" aria-hidden />
-
-              {checkoutStep === 'confirm' && (
-                <>
-                  <div className="mb-1.5 flex items-center justify-center gap-1.5">
-                    <SpriteImage sheet={ICONS} frame="credits" width={18} clipRotated={false} />
-                    <span className="text-[11px] font-bold tracking-tight text-gray-500 sm:text-xs">
-                      내 크레딧
-                    </span>
-                  </div>
-                  <div className="text-2xl font-black leading-tight tabular-nums sm:text-3xl">
-                    <span className="text-brand-blue">{balanceBefore.toLocaleString('ko-KR')}</span>
-                  </div>
-                  {/* 좁은 화면에서는 세로 스택으로 바꿔 이미지/텍스트가 겹치지 않게 정렬합니다. */}
-                  {/* 요청사항: 중간 구분선을 없애고 여백을 줄여 카드 높이를 낮춥니다. */}
-                  <div className="mt-2.5 flex flex-col items-center gap-2.5 text-center sm:mt-3 sm:flex-row sm:items-start sm:text-left">
-                    {/* 모바일에서 이미지 박스를 함께 줄여 전체 카드 비율을 안정적으로 유지합니다. */}
-                    <div className="flex h-[4.6rem] w-[4.6rem] shrink-0 items-end justify-center overflow-hidden rounded-xl bg-white/90 shadow-inner ring-1 ring-black/[0.06] sm:h-[5.75rem] sm:w-[5.75rem]">
-                      <StoreItemThumbnail
-                        imageUrl={item.image_url}
-                        frame={frame}
-                        height={74}
-                        className="max-h-[4.1rem] max-w-full object-contain object-bottom sm:max-h-[5.25rem]"
-                        priority
-                        sizes="(max-width: 640px) 25vw, 92px"
-                      />
-                    </div>
-                    {/* 세로 스택일 때도 텍스트 블록이 자연스럽게 줄바꿈되도록 중앙 정렬을 허용합니다. */}
-                    <div className="flex min-w-0 flex-1 flex-col items-center justify-center gap-1.5 sm:items-start">
-                      <p
-                        id="market-purchase-title"
-                        className="text-[0.82rem] font-black leading-snug text-brand-text sm:text-[0.95rem]"
-                      >
-                        {item.name}
-                      </p>
-                      {item.description && (
-                        <p className="line-clamp-2 text-[10px] leading-snug text-gray-400 sm:text-[11px]">
-                          {item.description}
-                        </p>
-                      )}
-                      {/* 가격 행도 모바일에서는 중앙, 넓은 화면에서는 좌측 정렬로 전환합니다. */}
-                      <div className="mt-1 flex flex-wrap items-center justify-center gap-2 sm:justify-start">
-                        <SpriteImage sheet={ICONS} frame="credit" width={20} clipRotated={false} />
-                        <span className="text-[1.75rem] font-black leading-none tabular-nums text-red-600 sm:text-3xl">
-                          -{price.toLocaleString('ko-KR')}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </>
-              )}
+            <div className="relative w-full overflow-visible rounded-3xl bg-white px-4 pb-6 pt-5 text-center shadow-2xl ring-1 ring-black/[0.06] sm:px-5">
 
               {checkoutStep === 'finalSure' && (
                 <div className="py-6">
@@ -361,23 +295,7 @@ export default function MarketPurchaseConfirmDialog({
               )}
 
               {checkoutStep === 'animating' && (
-                <div className="relative flex min-h-[240px] flex-col items-center justify-center py-8">
-                  <div className="pointer-events-none absolute left-1/2 top-0 z-[5] w-max -translate-x-1/2" aria-hidden>
-                    {[0, 1, 2, 3, 4].map((i) => (
-                      <span
-                        key={`${payRunId}-c-${i}`}
-                        className="market-credit-coin-drop-slow absolute left-1/2 top-0 -translate-x-1/2"
-                        style={
-                          {
-                            animationDelay: `${i * 420}ms`,
-                            ['--coin-dx' as string]: `${-10 + i * 5}px`,
-                          } as CSSProperties
-                        }
-                      >
-                        <SpriteImage sheet={ICONS} frame="credit" width={34} clipRotated={false} />
-                      </span>
-                    ))}
-                  </div>
+                <div className="relative flex min-h-[138px] flex-col items-center justify-center py-4">
                   <p className="mb-2 text-sm font-bold text-gray-500">남은 크레딧</p>
                   <div className="text-4xl font-black leading-none tabular-nums text-brand-blue sm:text-5xl">
                     <SlotIntegerPlain value={slotBalance} minDigits={digitLen} tone="blue" />
@@ -386,72 +304,56 @@ export default function MarketPurchaseConfirmDialog({
               )}
 
               {checkoutStep === 'calcDone' && (
-                <div className="flex min-h-[240px] flex-col items-center justify-center py-10">
+                <div className="flex min-h-[138px] flex-col items-center justify-center py-4">
                   <p className="mb-2 text-sm font-bold text-gray-500">남은 크레딧</p>
                   <div className="text-4xl font-black tabular-nums text-brand-blue sm:text-5xl">
                     <SlotIntegerPlain value={after} minDigits={digitLen} tone="blue" />
                   </div>
                 </div>
               )}
+
+              {/*
+                버튼을 같은 카드 안으로 넣어 박스가 여러 겹으로 보이지 않게 정리합니다.
+                단계별 높이 흔들림을 줄이기 위해 최소 높이는 유지합니다.
+              */}
+              <div className="-mt-1 flex min-h-[46px] items-center gap-2.5 px-1 pb-0 pt-0.5">
+                {checkoutStep === 'finalSure' && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={onClose}
+                      className="flex-1 rounded-2xl border-2 border-sky-200/90 bg-white py-3 text-sm font-bold text-gray-600 shadow-sm active:scale-[0.98]"
+                    >
+                      취소
+                    </button>
+                    <button
+                      type="button"
+                      onClick={startCheckoutAnimation}
+                      className="flex-1 rounded-2xl bg-amber-500 py-3 text-sm font-black text-white shadow-md active:scale-[0.98]"
+                    >
+                      네, 살게요
+                    </button>
+                  </>
+                )}
+                {checkoutStep === 'animating' && <div className="h-12 w-full shrink-0" aria-hidden />}
+                {checkoutStep === 'calcDone' && (
+                  <button
+                    type="button"
+                    disabled={requestBusy}
+                    onClick={() => void handleAcknowledgeAndSubmit()}
+                    className="w-full rounded-2xl bg-brand-blue py-3 text-sm font-black text-white shadow-md active:scale-[0.98] disabled:opacity-50"
+                  >
+                    {requestBusy ? '보내는 중…' : '확인'}
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>
-
-        {/*
-          animating 단계에서 버튼이 사라지면 카드 전체 높이가 줄어들어 배경이 덜컥이므로,
-          푸터 슬롯 높이는 항상 동일하게 유지합니다.
-        */}
-        <div className="flex min-h-[60px] items-center gap-3 px-5 pb-6 pt-2">
-          {checkoutStep === 'confirm' && (
-            <>
-              <button
-                type="button"
-                onClick={onClose}
-                className="flex-1 rounded-2xl border-2 border-sky-200/90 bg-white py-3 text-sm font-bold text-gray-600 shadow-sm active:scale-[0.98]"
-              >
-                취소
-              </button>
-              <button
-                type="button"
-                onClick={goToFinalSure}
-                className="flex-1 rounded-2xl bg-amber-500 py-3 text-sm font-black text-white shadow-md active:scale-[0.98]"
-              >
-                구매하기
-              </button>
-            </>
-          )}
-          {checkoutStep === 'finalSure' && (
-            <>
-              <button
-                type="button"
-                onClick={() => setCheckoutStep('confirm')}
-                className="flex-1 rounded-2xl border-2 border-sky-200/90 bg-white py-3 text-sm font-bold text-gray-600 shadow-sm active:scale-[0.98]"
-              >
-                돌아가기
-              </button>
-              <button
-                type="button"
-                onClick={startCheckoutAnimation}
-                className="flex-1 rounded-2xl bg-amber-500 py-3 text-sm font-black text-white shadow-md active:scale-[0.98]"
-              >
-                네, 살게요
-              </button>
-            </>
-          )}
-          {checkoutStep === 'animating' && <div className="h-12 w-full shrink-0" aria-hidden />}
-          {checkoutStep === 'calcDone' && (
-            <button
-              type="button"
-              disabled={requestBusy}
-              onClick={() => void handleAcknowledgeAndSubmit()}
-              className="w-full rounded-2xl bg-brand-blue py-3 text-sm font-black text-white shadow-md active:scale-[0.98] disabled:opacity-50"
-            >
-              {requestBusy ? '보내는 중…' : '확인'}
-            </button>
-          )}
-        </div>
-
       </div>
     </div>
   )
+
+  if (typeof document === 'undefined') return null
+  return createPortal(dialog, document.body)
 }

@@ -684,17 +684,64 @@
  */
 @keyframes particleFly {
   0% {
-    transform: translate(-50%, -50%) scale(1.2);
+    transform: translate(-50%, -50%) scale(0.5) rotate(-18deg);
     opacity: 1;
   }
-  70% {
+  20% {
+    transform: translate(-50%, -50%) scale(1.18) rotate(0deg);
+    opacity: 1;
+  }
+  55% {
+    transform: translate(
+      calc(var(--mx) - 50%),
+      calc(var(--my) - 50%)
+    ) scale(1) rotate(12deg);
     opacity: 1;
   }
   100% {
     transform: translate(
       calc(var(--tx) - 50%),
       calc(var(--ty) - 50%)
-    ) scale(0.6);
+    ) scale(0.58) rotate(0deg);
+    opacity: 0;
+  }
+}
+
+/**
+ * 하트 전용 비행 애니메이션.
+ * 비개발자 설명: 하트가 천천히 하늘거리며(좌우로 흔들리며) 목적지로 날아갑니다.
+ */
+@keyframes heartFloatFly {
+  0% {
+    transform: translate(-50%, -50%) scale(0.56) rotate(-12deg);
+    opacity: 0.95;
+  }
+  22% {
+    transform: translate(
+      calc((var(--mx) * 0.28) - 50% + 16px),
+      calc((var(--my) * 0.24) - 50% - 10px)
+    ) scale(1.02) rotate(6deg);
+    opacity: 1;
+  }
+  48% {
+    transform: translate(
+      calc((var(--mx) * 0.52) - 50% - 18px),
+      calc((var(--my) * 0.48) - 50% - 20px)
+    ) scale(1.08) rotate(-10deg);
+    opacity: 1;
+  }
+  76% {
+    transform: translate(
+      calc((var(--tx) * 0.78) - 50% + 14px),
+      calc((var(--ty) * 0.78) - 50% - 10px)
+    ) scale(0.96) rotate(10deg);
+    opacity: 0.98;
+  }
+  100% {
+    transform: translate(
+      calc(var(--tx) - 50%),
+      calc(var(--ty) - 50%)
+    ) scale(0.62) rotate(0deg);
     opacity: 0;
   }
 }

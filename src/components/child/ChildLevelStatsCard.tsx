@@ -15,6 +15,8 @@ import { CHILD_HOME_TOP_BAR_GLASS_CLASS, CHILD_HOME_TOP_BAR_GLASS_STYLE } from '
 interface ChildLevelStatsCardProps {
   stats: Pick<ChildStats, 'current_level' | 'exp' | 'exp_to_next_level' | 'credits'>
   creditRef?: React.RefObject<HTMLDivElement | null>
+  /** 하트 파티클 도착 좌표 계산용 ref (크레딧 아래 하트 줄) */
+  heartRef?: React.RefObject<HTMLDivElement | null>
   shine?: boolean
   className?: string
   /** 물주기에 쓸 보유 하트 — 넣으면 크레딧 아래에 아이콘+숫자 한 줄이 더 붙습니다. */
@@ -29,6 +31,7 @@ function formatCredits(value: number): string {
 export default function ChildLevelStatsCard({
   stats,
   creditRef,
+  heartRef,
   shine = false,
   className = '',
   heartsCount,
@@ -126,7 +129,7 @@ export default function ChildLevelStatsCard({
         {typeof heartsCount === 'number' ? (
           <>
             <div className="mt-2 h-px w-full" style={{ background: 'rgba(255,255,255,0.5)' }} />
-            <div className="mt-2 flex min-w-0 max-w-full items-center gap-1.5">
+            <div ref={heartRef} className="mt-2 flex min-w-0 max-w-full items-center gap-1.5">
               <span className="inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center">
                 <SpriteImage
                   sheet={ICONS}
