@@ -123,6 +123,18 @@ const RIGHT_ICON_COIN_SCALE_MAX = 1.3
 const CHARACTER_UI_SCALE_MAX = 2
 /** 토끼 캐릭터만 별도 상한 — 요청 반영: 최대 1.35배 */
 const BUNNY_CHARACTER_UI_SCALE_MAX = 1.35
+/** 수달 캐릭터만 별도 상한 — 요청 반영: 최대 1.5배 */
+const OTTER_CHARACTER_UI_SCALE_MAX = 1.5
+/** 토끼·수달 외 캐릭터 상한 — 요청 반영: 최대 1.3배 */
+const OTHER_CHARACTER_UI_SCALE_MAX = 1.3
+/** 병아리 캐릭터 상한 — 요청 반영: 최대 1배 */
+const CHICK_CHARACTER_UI_SCALE_MAX = 1
+/** 병아리 캐릭터 하한 — 요청 반영: 최소 2/3배 */
+const CHICK_CHARACTER_UI_SCALE_MIN = 2 / 3
+/** 햄스터 캐릭터 상한 — 요청 반영: 최대 1.1배 */
+const HAMSTER_CHARACTER_UI_SCALE_MAX = 1.1
+/** 햄스터 캐릭터 하한 — 요청 반영: 최소 2/3배 */
+const HAMSTER_CHARACTER_UI_SCALE_MIN = 2 / 3
 
 /** 화분·물조리개(발 옆) — 모바일에서 최대 1.5배까지 확대 */
 const PLANT_FEET_UI_SCALE_MAX = 1.5
@@ -198,6 +210,34 @@ function scaleForCharacterUi(containerWidthPx: number): number {
     LEVEL_BLOCK_SCALE_FULL_W,
     CHARACTER_UI_SCALE_MAX,
   )
+}
+
+/**
+ * 병아리 전용 배율 — 좁은 화면에서는 2/3배, 넓은 화면으로 갈수록 최대 1배까지 선형 보간합니다.
+ * 비개발자: 병아리는 작은 화면에서 지금보다 더 작게, 큰 화면에서도 과하게 크지 않게 제한합니다.
+ */
+function scaleForChickUi(containerWidthPx: number): number {
+  if (!(containerWidthPx > 0)) return CHICK_CHARACTER_UI_SCALE_MIN
+  const span = LEVEL_BLOCK_SCALE_FULL_W - LEVEL_BLOCK_SCALE_BASE_W
+  if (span <= 0) return CHICK_CHARACTER_UI_SCALE_MIN
+  if (containerWidthPx <= LEVEL_BLOCK_SCALE_BASE_W) return CHICK_CHARACTER_UI_SCALE_MIN
+  if (containerWidthPx >= LEVEL_BLOCK_SCALE_FULL_W) return CHICK_CHARACTER_UI_SCALE_MAX
+  const t = (containerWidthPx - LEVEL_BLOCK_SCALE_BASE_W) / span
+  return CHICK_CHARACTER_UI_SCALE_MIN + t * (CHICK_CHARACTER_UI_SCALE_MAX - CHICK_CHARACTER_UI_SCALE_MIN)
+}
+
+/**
+ * 햄스터 전용 배율 — 좁은 화면에서는 2/3배, 넓은 화면으로 갈수록 최대 1.1배까지 선형 보간합니다.
+ * 비개발자: 햄스터는 작은 화면에서 더 작게, 큰 화면에서도 과하게 커지지 않게 제한합니다.
+ */
+function scaleForHamsterUi(containerWidthPx: number): number {
+  if (!(containerWidthPx > 0)) return HAMSTER_CHARACTER_UI_SCALE_MIN
+  const span = LEVEL_BLOCK_SCALE_FULL_W - LEVEL_BLOCK_SCALE_BASE_W
+  if (span <= 0) return HAMSTER_CHARACTER_UI_SCALE_MIN
+  if (containerWidthPx <= LEVEL_BLOCK_SCALE_BASE_W) return HAMSTER_CHARACTER_UI_SCALE_MIN
+  if (containerWidthPx >= LEVEL_BLOCK_SCALE_FULL_W) return HAMSTER_CHARACTER_UI_SCALE_MAX
+  const t = (containerWidthPx - LEVEL_BLOCK_SCALE_BASE_W) / span
+  return HAMSTER_CHARACTER_UI_SCALE_MIN + t * (HAMSTER_CHARACTER_UI_SCALE_MAX - HAMSTER_CHARACTER_UI_SCALE_MIN)
 }
 
 /**
@@ -1508,21 +1548,34 @@ export default function ChildScreen({
         ? OTTER_HOME_DISPLAY_SCALE
         : 1
 
-  /** 비개발자: 토끼는 너무 커 보이지 않게 최대 1.7배, 그 외 캐릭터는 최대 2배까지 허용합니다. */
+  /** 비개발자: 토끼/수달/병아리/햄스터는 각각 상한을 두고, 그 외 캐릭터는 최대 1.3배까지 허용합니다. */
   const characterUiMaxScale =
     characterSprite.character === 'bunny'
       ? BUNNY_CHARACTER_UI_SCALE_MAX
-      : CHARACTER_UI_SCALE_MAX
+      : characterSprite.character === 'otter'
+        ? OTTER_CHARACTER_UI_SCALE_MAX
+        : characterSprite.character === 'chicks'
+          ? CHICK_CHARACTER_UI_SCALE_MAX
+          : characterSprite.character === 'hamster'
+            ? HAMSTER_CHARACTER_UI_SCALE_MAX
+        : OTHER_CHARACTER_UI_SCALE_MAX
 
   /** 캐릭터 표시 높이 (px) — 배경 높이의 characterScale 비율(토끼는 추가 배율 적용) */
   /**
-   * 캐릭터 배율(가로 반응형): 좁은 화면은 1배, 넓은 가로/전체화면으로 갈수록 커집니다.
-   * - 토끼/수달의 개별 보정(예: 1.09, 1.12)은 유지합니다.
-   * - 최종 상한은 토끼 1.7배, 그 외 캐릭터 2배입니다.
+   * 캐릭터 배율(가로 반응형): 화면 가로에 따라 커집니다.
+   * - 토끼/수달의 개별 보정은 유지합니다.
+   * - 병아리는 최소 2/3배 ~ 최대 1배 전용 곡선을 사용합니다.
+   * - 햄스터는 최소 2/3배 ~ 최대 1.1배 전용 곡선을 사용합니다.
+   * - 최종 상한은 토끼 1.35배, 수달 1.5배, 병아리 1배, 햄스터 1.1배, 그 외 캐릭터 1.3배입니다.
    */
   const characterUiScale = useMemo(
-    () => Math.min(characterUiMaxScale, homeCharacterSizeMultiplier * scaleForCharacterUi(containerW)),
-    [characterUiMaxScale, containerW, homeCharacterSizeMultiplier],
+    () =>
+      characterSprite.character === 'chicks'
+        ? scaleForChickUi(containerW)
+        : characterSprite.character === 'hamster'
+          ? scaleForHamsterUi(containerW)
+        : Math.min(characterUiMaxScale, homeCharacterSizeMultiplier * scaleForCharacterUi(containerW)),
+    [characterSprite.character, characterUiMaxScale, containerW, homeCharacterSizeMultiplier],
   )
 
   const characterDisplayH =
@@ -1678,7 +1731,8 @@ export default function ChildScreen({
                     alt=""
                     width={24}
                     height={24}
-                    className="h-6 w-6 object-contain drop-shadow-md"
+                    // 버튼 블록은 고정하고, 나가기 문 아이콘 그림만 오른쪽으로 아주 미세하게 이동합니다.
+                    className="h-6 w-6 translate-x-[1px] object-contain drop-shadow-md"
                   />
                 </a>
                 <button
@@ -1692,9 +1746,11 @@ export default function ChildScreen({
                   <img
                     src="/assets/img/common/ui/music.png"
                     alt=""
-                    width={22}
-                    height={22}
-                    className="h-[22px] w-[22px] object-contain drop-shadow-md"
+                    // 기존 28px의 3/4인 21px로 축소해 음표 아이콘만 작게 보이게 합니다.
+                    width={21}
+                    height={21}
+                    // 버튼 블록은 고정하고, 음표 아이콘 그림만 왼쪽으로 조금 더(2px) 이동합니다.
+                    className="h-[21px] w-[21px] -translate-x-[2px] object-contain drop-shadow-md"
                   />
                 </button>
                 <button
@@ -1708,7 +1764,8 @@ export default function ChildScreen({
                     sheet={ICONS}
                     frame="timer"
                     width={28}
-                    className="h-7 w-7 shrink-0 select-none object-contain drop-shadow-md"
+                    // 버튼 블록은 고정하고, 타이머 아이콘 그림만 오른쪽으로 조금 더(2px) 이동합니다.
+                    className="h-7 w-7 shrink-0 translate-x-[2px] select-none object-contain drop-shadow-md"
                   />
                 </button>
                 {features.sticker && (

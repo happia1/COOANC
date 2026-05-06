@@ -149,7 +149,7 @@ export const SPECIAL_MISSION_CHIP_CATEGORIES: SpecialMissionChipCategoryDef[] = 
   {
     id: 'manners',
     label: '예절',
-    chipIds: ['sp-greet', 'sp-pray', 'sp-massage'],
+    chipIds: ['sp-greet', 'sp-massage'],
   },
   {
     id: 'health-beauty',

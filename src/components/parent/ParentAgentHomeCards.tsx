@@ -73,7 +73,7 @@ function hasDisplayableAgentContent(row: AgentLatestReportRow | null | undefined
 type Props = {
   /** `useParentAgentReport` 한 번만 호출한 결과를 넘깁니다. */
   agent: UseParentAgentReportResult
-  /** 지난 14일 중 미션 완료 기록이 있는 날짜 수(홈 서버 계산값) */
+  /** 이번 주(월~일) 중 데일리 미션 기록이 존재하는 날짜 수(홈 서버 계산값) */
   daysWithData: number
   /** 홈 서버 조회(calendar_events) 기반 일정 브리핑 문구 */
   calendarNoticeText?: string
@@ -110,7 +110,14 @@ type DmRow = {
 }
 
 /**
- * 최근 7일 daily_missions 를 한 번만 조회해
+ * 모듈 레벨 캐시:
+ * 같은 자녀·같은 기준일(since) 조합은 한 번 계산한 결과를 재사용해
+ * 탭 전환/리렌더 때 `daily_missions` 중복 조회를 줄입니다.
+ */
+const WEEKLY_STATS_CACHE = new Map<string, WeeklyStats>()
+
+/**
+ * 최근 14일 daily_missions 를 한 번만 조회해
  * 루틴 성실도 일별 평균 + 스페셜 루틴 TOP 5 를 동시에 계산합니다.
  */
 function useWeeklyStats(childId: string) {
@@ -118,12 +125,27 @@ function useWeeklyStats(childId: string) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (!childId) { setLoading(false); return }
+    if (!childId) {
+      setLoading(false)
+      return
+    }
 
-    // 오늘 포함 최근 7일
-    const since = new Date(Date.now() - 6 * 24 * 60 * 60 * 1000)
+    // 오늘 포함 최근 14일
+    const since = new Date(Date.now() - 13 * 24 * 60 * 60 * 1000)
       .toISOString()
       .split('T')[0]
+    const cacheKey = `${childId}:${since}`
+
+    // 같은 조건으로 이미 계산한 결과가 있으면 DB 조회를 생략합니다.
+    const cached = WEEKLY_STATS_CACHE.get(cacheKey)
+    if (cached) {
+      setStats(cached)
+      setLoading(false)
+      return
+    }
+
+    let cancelled = false
+    setLoading(true)
 
     createClient()
       .from('daily_missions')
@@ -131,16 +153,19 @@ function useWeeklyStats(childId: string) {
       .eq('child_id', childId)
       .gte('date', since)
       .then(({ data }) => {
+        if (cancelled) return
         const rows = (data ?? []) as DmRow[]
 
         // ── 1. 일별 완료율 평균 ────────────────────────────
-        const byDate: Record<string, { total: number; done: number }> = {}
+        const byDate = new Map<string, { total: number; done: number }>()
         rows.forEach((r) => {
-          if (!byDate[r.date]) byDate[r.date] = { total: 0, done: 0 }
-          byDate[r.date].total++
-          if (r.completed) byDate[r.date].done++
+          const key = String(r.date)
+          const cur = byDate.get(key) ?? { total: 0, done: 0 }
+          cur.total += 1
+          if (r.completed) cur.done += 1
+          byDate.set(key, cur)
         })
-        const dailyRates = Object.values(byDate).filter((d) => d.total > 0)
+        const dailyRates = Array.from(byDate.values()).filter((d) => d.total > 0)
         const avgRate =
           dailyRates.length > 0
             ? Math.round(
@@ -150,22 +175,29 @@ function useWeeklyStats(childId: string) {
             : 0
 
         // ── 2. 스페셜 루틴 TOP 5 (difficulty='special', repeat_type='daily') ──
-        const specialCounts: Record<string, number> = {}
+        const specialCounts = new Map<string, number>()
         rows.forEach((r) => {
           if (!r.completed) return
           const m = r.missions
           if (m?.difficulty === 'special' && m?.repeat_type === 'daily') {
-            specialCounts[m.title] = (specialCounts[m.title] ?? 0) + 1
+            const title = m.title || '알 수 없음'
+            specialCounts.set(title, (specialCounts.get(title) ?? 0) + 1)
           }
         })
-        const topSpecial = Object.entries(specialCounts)
+        const topSpecial = Array.from(specialCounts.entries())
           .map(([title, count]) => ({ title, count }))
           .sort((a, b) => b.count - a.count)
           .slice(0, 5)
 
-        setStats({ avgRate, activeDays: dailyRates.length, topSpecial })
+        const result = { avgRate, activeDays: dailyRates.length, topSpecial }
+        WEEKLY_STATS_CACHE.set(cacheKey, result)
+        setStats(result)
         setLoading(false)
       })
+
+    return () => {
+      cancelled = true
+    }
   }, [childId])
 
   return { stats, loading }
@@ -182,7 +214,7 @@ function getRoutineTier(pct: number): { label: string; badgeClass: string; desc:
 }
 
 /**
- * 최근 7일 일별 완료율 평균을 등급·설명과 함께 보여 줍니다.
+ * 최근 14일 일별 완료율 평균을 등급·설명과 함께 보여 줍니다.
  * 데이터 축적 일수에 관계 없이 매일 자동 갱신됩니다.
  */
 function RoutineSincerityBlock({
@@ -235,7 +267,7 @@ function RoutineSincerityBlock({
       )}
 
       <p className="text-[9px] text-gray-400">
-        최근 7일 일별 평균{activeDays > 0 ? ` (${activeDays}일 기준)` : ''}
+        최근 14일 일별 평균{activeDays > 0 ? ` (${activeDays}일 기준)` : ''}
       </p>
     </div>
   )
@@ -244,7 +276,7 @@ function RoutineSincerityBlock({
 // ─── 스페셜 루틴 TOP 5 블록 ──────────────────────────────────────────────────
 
 /**
- * 최근 7일간 달성한 스페셜 루틴(difficulty='special') 상위 5개를 보여 줍니다.
+ * 최근 14일간 달성한 스페셜 루틴(difficulty='special') 상위 5개를 보여 줍니다.
  */
 function TopSpecialMissionsBlock({
   loading,
@@ -263,7 +295,7 @@ function TopSpecialMissionsBlock({
           <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-gray-200 border-t-gray-400" />
         </div>
       ) : missions.length === 0 ? (
-        <p className="text-[10px] text-gray-400">최근 7일 스페셜 루틴 기록이 없어요</p>
+        <p className="text-[10px] text-gray-400">최근 14일 스페셜 루틴 기록이 없어요</p>
       ) : (
         <div className="space-y-1.5">
           {missions.map((m, i) => (
@@ -282,7 +314,7 @@ function TopSpecialMissionsBlock({
         </div>
       )}
 
-      <p className="text-[9px] text-gray-400">최근 7일 기준</p>
+      <p className="text-[9px] text-gray-400">최근 14일 기준</p>
     </div>
   )
 }
@@ -482,7 +514,7 @@ export default function ParentAgentHomeCards({
   const noticeText =
     calendarNoticeText?.trim() ||
     rawCalendarNotice ||
-    '이번 주는 특별 일정이 없어요. 루틴에 집중하기 좋은 한 주예요.'
+    '이번주는 특별한 일정이 없어요.'
   const errorCopy = getAgentErrorCopy(errorReason)
 
   return (
@@ -490,7 +522,7 @@ export default function ParentAgentHomeCards({
       {/* 일정 브리핑 — 홈의 오늘의 진행도·EQ 블록과 동일한 중립 카드(`parentNeutralBlockStyle`) */}
       <section className={`w-full ${PARENT_NEUTRAL_CARD_CLASSNAME} px-3 py-3`}>
         <div className="mb-2 flex items-center justify-between gap-2">
-          <p className="text-sm font-bold text-gray-700">일정 브리핑</p>
+          <p className="text-sm font-bold text-gray-700">다가오는 일정</p>
           <button
             type="button"
             onClick={onOpenCalendarEventSheet}
@@ -500,7 +532,7 @@ export default function ParentAgentHomeCards({
           </button>
         </div>
         {calendarUpcomingEvents.length === 0 ? (
-          <p className="whitespace-pre-line text-[12px] font-normal leading-relaxed text-gray-700">
+          <p className="whitespace-pre-line text-center text-[12px] font-normal leading-relaxed text-gray-500">
             {noticeText}
           </p>
         ) : (

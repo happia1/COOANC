@@ -10,12 +10,7 @@ import { createPortal } from 'react-dom'
 import { useEffect, useId, useState } from 'react'
 import type { ChildStats } from '@/types/database'
 import type { WeeklyRoutineDay } from '@/lib/childWeeklyRoutine'
-import {
-  parseAgentReportPayload,
-  type AgentEqScores,
-  type AgentLatestReportRow,
-  type AgentReportJsonV1,
-} from '@/lib/agentApi'
+import { type AgentEqScores, type AgentLatestReportRow } from '@/lib/agentApi'
 import { PARENT_NEUTRAL_CARD_CLASSNAME } from '@/lib/parentNeutralBlockStyle'
 
 /** 차트·피드백에 필요한 `child_stats` 일부 + 레벨 뱃지 표시용 레벨 */
@@ -123,16 +118,6 @@ function EqDelayExplainModal({
       </div>
     </div>,
     document.body,
-  )
-}
-
-// ─── 카드 래퍼 ───────────────────────────────────────────────────────────────
-
-function ReportCard({ children, className }: { children: React.ReactNode; className?: string }) {
-  return (
-    <div className={[`${PARENT_NEUTRAL_CARD_CLASSNAME} p-3 text-sm text-gray-800`, className ?? ''].join(' ')}>
-      {children}
-    </div>
   )
 }
 
@@ -346,15 +331,8 @@ export default function EconomicEqPanel({
   childName,
   agentChildId,
   agentRow,
-  agentLoading,
 }: Props) {
   const gradId = useId().replace(/:/g, '')
-
-  const parsed = parseAgentReportPayload(agentRow?.report_text ?? null)
-  const jsonReport: AgentReportJsonV1 | null = parsed.kind === 'json' ? parsed.data : null
-  const legacyText = parsed.kind === 'legacy' ? parsed.text : ''
-
-  const showAgentBlock = Boolean(agentChildId)
 
   // 이번 주 미션이 배정된 날들의 평균 완주율 (0~100)
   const daysWithMissions = weeklyRoutine.filter((d) => d.hasMissions)
@@ -366,36 +344,6 @@ export default function EconomicEqPanel({
   return (
     <section className="w-full space-y-4">
       <p className="text-sm font-bold text-gray-700">우리아이 경제 EQ 지수</p>
-
-      {/* ── AI 리포트 카드 ─────────────────────────────────────────────────── */}
-      {showAgentBlock ? (
-        <div className="space-y-3">
-          {agentLoading && !agentRow ? (
-            <div className="flex items-center justify-center gap-2 rounded-xl border border-sky-100 bg-sky-50/40 py-4">
-              <span className="h-4 w-4 animate-spin rounded-full border-2 border-sky-200 border-t-sky-500" aria-hidden />
-              <span className="text-xs font-bold text-sky-800">AI 리포트 불러오는 중…</span>
-            </div>
-          ) : null}
-
-          {parsed.kind === 'json' && jsonReport ? (
-            <>
-              {Array.isArray(jsonReport.wishlist_items) && jsonReport.wishlist_items.length > 0 ? (
-                <ReportCard>
-                  <p className="text-[10px] font-bold text-gray-500 mb-2">위시리스트</p>
-                  <p className="text-[13px] leading-relaxed whitespace-pre-wrap">
-                    {jsonReport.wishlist_comment?.trim() || '아이가 바라는 목표를 응원해 주세요.'}
-                  </p>
-                </ReportCard>
-              ) : null}
-            </>
-          ) : legacyText.trim() ? (
-            <ReportCard>
-              <p className="text-[10px] font-bold text-gray-500 mb-2">AI 인사이트 (이전 형식)</p>
-              <p className="text-[13px] leading-relaxed whitespace-pre-wrap">{legacyText}</p>
-            </ReportCard>
-          ) : null}
-        </div>
-      ) : null}
 
       {/* ── EQ 지수 종합 (저축 비율·저축 습관 원형 게이지) ──────────────── */}
       <EqScoreCircles

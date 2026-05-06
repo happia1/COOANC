@@ -50,7 +50,8 @@ export default function ChildTopBar({ isParentPreview = false }: Props) {
             className="flex h-8 w-8 items-center justify-center shrink-0 transition-opacity hover:opacity-80"
             aria-label="뽀모도로·알람 팝업 열기"
           >
-            <SpriteImage sheet={ICONS} frame="timer" width={22} className="h-[22px] w-[22px] shrink-0 select-none object-contain" />
+            {/* 버튼 컨테이너가 아닌 타이머 아이콘 그림만 오른쪽으로 조금 더(2px) 이동합니다. */}
+            <SpriteImage sheet={ICONS} frame="timer" width={22} className="h-[22px] w-[22px] shrink-0 translate-x-[2px] select-none object-contain" />
           </button>
           {/**
            * 부모 미리보기 시 `exitHref` 가 `/api/parent/exit-child-ui` 인데,
@@ -63,7 +64,8 @@ export default function ChildTopBar({ isParentPreview = false }: Props) {
             className="flex h-8 w-8 items-center justify-center shrink-0 transition-opacity hover:opacity-80"
             aria-label="나가기"
           >
-            <Image src="/assets/img/common/ui/exit.png" alt="" width={20} height={20} className="h-5 w-5 object-contain" />
+            {/* 버튼 컨테이너가 아닌 나가기 문 아이콘 그림만 오른쪽으로 이동합니다. */}
+            <Image src="/assets/img/common/ui/exit.png" alt="" width={20} height={20} className="h-5 w-5 translate-x-[1px] object-contain" />
           </button>
         </div>
       </div>

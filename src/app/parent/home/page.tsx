@@ -11,6 +11,8 @@
  */
 
 export const dynamic = 'force-dynamic'
+/** 부모 홈 서버 쿼리 재실행을 60초 단위로 제한해 과도한 RLS 조회를 줄입니다. */
+export const revalidate = 60
 export const preferredRegion = 'hnd1'
 
 
@@ -84,7 +86,6 @@ export default async function ParentHomePage() {
   const primaryChildId = childIds[0]
 
   const childIdsKey = [...childIds].sort().join(',')
-  const fourteenDaysAgo = addSeoulCalendarDays(today, -14)
   const [
     cachedProfilesRes,
     statsRes,
@@ -93,7 +94,7 @@ export default async function ParentHomePage() {
     calendarEventsRes,
     /** 루틴 캘린더의 빨간 법정공휴일과 같은 출처(`public_holidays`)를 브리핑에도 포함합니다 */
     publicHolidaysBriefingRes,
-    completedMissionDaysRes,
+    weeklyMissionDaysRes,
     agentReportsRes,
   ] = await Promise.all([
     getCachedChildProfilesForParentHome(childIdsKey),
@@ -138,14 +139,15 @@ export default async function ParentHomePage() {
       .order('date', { ascending: true }),
 
     // AI 리포트 준비 진행도:
-    // mission_logs.assigned_date 누락 케이스를 피하기 위해
-    // daily_missions 완료(date) 기준으로 "최근 14일 완료 일수"를 계산합니다.
+    // "완료 이력"이 아니라 데일리 카드가 실제로 존재하는 날짜 수를 사용합니다.
+    // 기준 구간은 "이번 주 월~일(시작일 포함)" 7일이며,
+    // 날짜별로 daily_missions 행이 1개라도 있으면 해당 날짜를 누적으로 인정합니다.
     supabase
       .from('daily_missions')
       .select('child_id, date')
       .in('child_id', childIds)
-      .eq('is_completed', true)
-      .gte('date', fourteenDaysAgo),
+      .gte('date', weekStart)
+      .lte('date', weekEnd),
 
     // 최신 리포트 1건 조회: 자동 실행 필요 여부 판단용
     supabase
@@ -274,7 +276,7 @@ export default async function ParentHomePage() {
   for (const cid of childIds) daysWithDataByChild[cid] = 0
   const daysSetByChild: Record<string, Set<string>> = {}
   for (const cid of childIds) daysSetByChild[cid] = new Set<string>()
-  for (const row of (completedMissionDaysRes.data ?? []) as { child_id: string; date: string | null }[]) {
+  for (const row of (weeklyMissionDaysRes.data ?? []) as { child_id: string; date: string | null }[]) {
     if (!row.child_id) continue
     const day =
       typeof row.date === 'string'
@@ -300,7 +302,8 @@ export default async function ParentHomePage() {
    *   쿨다운과 함께 백그라운드에서 처리합니다.
    * - 서버에서 "7일 이상" 조건을 추가하면 매 접속마다 외부 에이전트가 호출되므로 제거했습니다.
    */
-  const shouldRunAgent = !lastReport && daysWithData >= 3
+  // 이번 주(월~일) 7일 모두 데일리 기록이 존재할 때만 최초 분석을 실행합니다.
+  const shouldRunAgent = !lastReport && daysWithData >= 7
   if (agentBaseUrl && shouldRunAgent) {
     void fetch(`${agentBaseUrl}/agent-a/run`, {
       method: 'POST',

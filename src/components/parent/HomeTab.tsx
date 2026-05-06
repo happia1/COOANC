@@ -118,7 +118,7 @@ type Props = {
     title?: string | null
     child_id?: string | null
   }[]
-  /** 지난 14일 중 미션 완료 기록이 있는 날짜 수(자녀별 서버 계산값). */
+  /** 이번 주(월~일) 중 데일리 미션 기록이 있는 날짜 수(자녀별 서버 계산값). */
   daysWithDataByChild: Record<string, number>
 }
 
@@ -462,7 +462,7 @@ export default function HomeTab({ childrenData, upcomingEvents, daysWithDataByCh
 
   const calendarNoticeText = useMemo(() => {
     if (!effectiveUpcomingEvents || effectiveUpcomingEvents.length === 0) {
-      return '이번 주는 특별 일정이 없어요. 루틴에 집중하기 좋은 한 주예요.'
+      return '이번주는 특별한 일정이 없어요.'
     }
     const next = effectiveUpcomingEvents[0]
     const label =

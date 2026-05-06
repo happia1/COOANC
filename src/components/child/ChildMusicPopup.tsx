@@ -85,9 +85,10 @@ export default function ChildMusicPopup({ open, onClose }: Props) {
             <img
               src="/assets/img/common/ui/music.png"
               alt=""
-              width={44}
-              height={44}
-              className="h-11 w-11 object-contain"
+              // 기존 44px의 3/4인 33px로 축소해 음표 아이콘을 더 작게 표시합니다.
+              width={33}
+              height={33}
+              className="h-[33px] w-[33px] object-contain"
               draggable={false}
             />
           </div>
