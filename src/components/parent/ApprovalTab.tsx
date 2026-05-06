@@ -7,6 +7,7 @@
  * - 구매 요청: 대기·외부구매 중 — 파란 「승인」으로 도착 완료 처리(반려 없음). 「구매 요청」제목과 같은 줄 오른쪽 「최근구매내역」링크로 하단 시트에서 과거 건 확인.
  * - 최근 구매(승인) 내역: 오늘 완료 미션과 같은 하단 슬라이드 시트 — 최근 3건 먼저, 「더보기」로 전체.
  * - 미션 롤백: 카드 탭 시 하단 시트(스크롤, 10건까지 + 더보기). 「다시하기」는 API 롤백 후 자녀 앱이 daily_missions Realtime 으로 팝업·카드를 맞춥니다.
+ *   자녀가 그날 미션을 모두 끝내고 수면 모드로 들어간 날에는 롤백이 막히며, 중앙 안내 창으로 알려 줍니다.
  * - 미션 롤백 아래: 자녀 마켓 메뉴 제어(상품 표시/숨김, 가족 전용 상품 추가).
  */
 
@@ -223,6 +224,8 @@ export default function ApprovalTab({
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null)
   const [rollbackSheetOpen, setRollbackSheetOpen] = useState(false)
   const [rollbackSheetShowAll, setRollbackSheetShowAll] = useState(false)
+  /** 자녀 수면 모드 진입 후에는 그날 미션 롤백 불가 — API 가 알려 주면 이 창을 띄웁니다 */
+  const [rollbackSleepLockModalOpen, setRollbackSleepLockModalOpen] = useState(false)
   /** 「최근구매내역」링크 — 오늘 완료 미션과 동일한 하단 슬라이드(바텀시트) 열림 여부 */
   const [purchaseHistorySheetOpen, setPurchaseHistorySheetOpen] = useState(false)
 
@@ -563,14 +566,18 @@ export default function ApprovalTab({
         body: JSON.stringify({ missionLogId: log.id }),
       })
       const text = await res.text()
-      let json: { error?: string; dailyMissionId?: string } = {}
+      let json: { error?: string; dailyMissionId?: string; code?: string } = {}
       try {
-        json = text ? (JSON.parse(text) as { error?: string; dailyMissionId?: string }) : {}
+        json = text ? (JSON.parse(text) as { error?: string; dailyMissionId?: string; code?: string }) : {}
       } catch {
         json = {}
       }
       if (!res.ok) {
-        showToast(json.error ?? '롤백에 실패했어요', false)
+        if (json.code === 'sleep_session_locked') {
+          setRollbackSleepLockModalOpen(true)
+        } else {
+          showToast(json.error ?? '롤백에 실패했어요', false)
+        }
         return
       }
       const dailyMissionId = typeof json.dailyMissionId === 'string' ? json.dailyMissionId : null
@@ -600,6 +607,32 @@ export default function ApprovalTab({
           }`}
         >
           {toast.msg}
+        </div>
+      )}
+
+      {rollbackSleepLockModalOpen && (
+        <div
+          className="fixed inset-0 z-[215] flex items-center justify-center bg-black/50 px-5"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="rollback-sleep-lock-title"
+        >
+          <div className="w-full max-w-sm rounded-3xl bg-white px-6 py-8 shadow-2xl">
+            <h3 id="rollback-sleep-lock-title" className="mb-3 text-lg font-black text-gray-900">
+              되돌리기를 할 수 없어요
+            </h3>
+            <p className="mb-6 text-sm font-semibold leading-relaxed text-gray-600">
+              자녀가 그날 미션을 모두 완료한 뒤 수면 모드(잘자 화면)로 들어가면, 그날의 미션은 더 이상
+              되돌릴 수 없어요. 거짓 완료를 막기 위한 설정이에요.
+            </p>
+            <button
+              type="button"
+              className="w-full rounded-2xl bg-brand-blue py-3.5 text-base font-black text-white shadow-md active:opacity-90"
+              onClick={() => setRollbackSleepLockModalOpen(false)}
+            >
+              확인
+            </button>
+          </div>
         </div>
       )}
 

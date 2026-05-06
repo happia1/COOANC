@@ -31,5 +31,14 @@ export const BACKGROUND_ANCHORS = {
     characterFootY: 0.530,
     /** 배경 높이의 몇 배로 캐릭터를 그릴지 (기존 0.187의 1.5배) */
     characterScale: 0.28,
+    /**
+     * 화분 UI 가로 앵커(0~1) — 캐릭터 **왼발** 쪽(화면에서 발 왼쪽).
+     * 비개발자: 발 높이 근처에 두고 `translate(-50%, …)` 로 가운데를 발 옆에 맞춥니다.
+     */
+    plantPotBesideLeftFootX: 0.385,
+    /**
+     * 물조리개 가로 앵커 — 캐릭터 **오른발** 쪽.
+     */
+    wateringCanBesideRightFootX: 0.615,
   },
 } as const

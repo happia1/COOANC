@@ -82,6 +82,12 @@ const ROOF_IMAGE_SRC = `/assets/img/layouts/backgrounds/market_roof_fill.png?v=$
 /** 요청사항: 물건이 담긴 장바구니 아이콘(공용 정적 이미지) */
 const BASKET_FILLED_SRC = '/assets/img/common/ui/basket_filled.png'
 
+/**
+ * 상단 레벨 카드(`ChildLevelStatsCard`)와 동일한 크레딧 코인 일러스트입니다.
+ * 마켓 선반 카드·하단 잔액·구매 팝업 가격 줄에서 스프라이트 `credit` 대신 이 PNG를 씁니다.
+ */
+const CREDIT_COIN_PNG_SRC = `/assets/img/common/ui/${encodeURIComponent('크레딧.png')}`
+
 /** 선반 카드 썸네일 크기 — 팝업 높이 안에서 스크롤 없이 3개 섹션이 모두 보이도록 줄임 */
 const SHELF_IMG_AREA_PX = 48
 const SHELF_SPRITE_H = 42
@@ -752,8 +758,8 @@ export default function MarketTab({
   }
 
   /**
-   * 마켓 본문: 지붕은 고정(shrink-0), 선반은 세로 스크롤(flex-1), 크레딧은 하단 고정 바(지갑·동전·숫자).
-   * 스프라이트는 `public/assets/img/common/ui/icons.png`(상수 `ICONS`)를 사용합니다.
+   * 마켓 본문: 지붕은 고정(shrink-0), 선반은 세로 스크롤(flex-1), 크레딧은 하단 고정 바(지갑·코인 PNG·숫자).
+   * 가격·잔액의 코인 그림은 레벨 카드와 같은 `크레딧.png`를 씁니다.
    */
   return (
     <div
@@ -865,13 +871,23 @@ export default function MarketTab({
                   onClick={() => handleItemClick(item, frameKey)}
                   disabled={isPending}
                   className={[
-                    'w-full rounded-2xl py-2 text-xs font-bold transition-colors active:scale-95',
+                    'flex w-full items-center justify-center gap-1.5 rounded-2xl py-2 transition-colors active:scale-95',
                     canAfford && !isPending
                       ? 'bg-yellow-400 text-yellow-900 active:bg-yellow-500'
                       : 'bg-gray-100 text-gray-400',
                   ].join(' ')}
                 >
-                  🪙 {item.credit_price}
+                  {/* eslint-disable-next-line @next/next/no-img-element — 레벨 카드와 동일 정적 코인 PNG */}
+                  <img
+                    src={CREDIT_COIN_PNG_SRC}
+                    alt=""
+                    width={18}
+                    height={18}
+                    className="h-[18px] w-[18px] shrink-0 object-contain select-none"
+                    draggable={false}
+                  />
+                  {/** 기존 text-xs(12px) 대비 약 2배 — 선반 카드 가격 가독성 */}
+                  <span className="text-2xl font-black tabular-nums leading-none">{item.credit_price}</span>
                 </button>
               </div>
             )
@@ -899,9 +915,18 @@ export default function MarketTab({
             draggable={false}
           />
         </span>
-        <div className="flex min-w-0 flex-1 items-baseline gap-1 text-gray-700">
-          <SpriteImage sheet={ICONS} frame="credit" width={14} clipRotated={false} />
-          <span className="truncate text-base font-black tabular-nums text-brand-blue">
+        <div className="flex min-w-0 flex-1 items-center gap-1.5 text-gray-700">
+          {/* eslint-disable-next-line @next/next/no-img-element — 레벨 카드와 동일 크레딧 코인 */}
+          <img
+            src={CREDIT_COIN_PNG_SRC}
+            alt=""
+            width={18}
+            height={18}
+            className="h-[18px] w-[18px] shrink-0 object-contain select-none"
+            draggable={false}
+          />
+          {/** 기존 text-base(16px)의 약 2배 */}
+          <span className="truncate text-[32px] font-black tabular-nums leading-none text-brand-blue">
             {currentWallet.toLocaleString()}
           </span>
         </div>
@@ -1013,10 +1038,18 @@ export default function MarketTab({
                 sizes="80px"
               />
             </div>
-            {/* 요청사항: 레벨 표시는 제거하고, 크레딧 가독성을 높이기 위해 숫자 크기를 키웁니다. */}
-            <div className="mt-2 text-center text-sm font-bold text-gray-500">
-              <SpriteImage sheet={ICONS} frame="credit" width={14} className="inline-block align-[-2px]" clipRotated={false} />{' '}
-              <span className="tabular-nums text-lg font-black text-brand-blue">
+            {/* 레벨 카드와 같은 코인 PNG + 가격 숫자(기존 text-lg 대비 약 2배) */}
+            <div className="mt-2 flex items-center justify-center gap-1.5 text-center font-bold text-gray-500">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={CREDIT_COIN_PNG_SRC}
+                alt=""
+                width={18}
+                height={18}
+                className="h-[18px] w-[18px] shrink-0 object-contain select-none"
+                draggable={false}
+              />
+              <span className="tabular-nums text-4xl font-black leading-none text-brand-blue">
                 {formatMarketCreditLabel(shelfActionFor.item.credit_price)}
               </span>
             </div>

@@ -1,12 +1,14 @@
 'use client'
 
 /**
- * 자녀 홈 상단 왼쪽 — 레벨·경험치·크레딧을 **한 장의 유리 카드** 안에 묶습니다.
+ * 자녀 홈 상단 왼쪽 — 레벨·경험치·크레딧·(선택)보유 하트를 **한 장의 유리 카드** 안에 묶습니다.
  *
  * 비개발자 설명:
- * - 물조리개·화분은 이 카드가 아니라, ChildScreen 에서 **아래에 따로** 두는 두 번째 블록에 넣습니다.
+ * - 식물 물주기용 **하트 개수**는 크레딧 줄 **바로 아래**에 같은 스타일로 넣을 수 있어요.
  */
 
+import SpriteImage from '@/components/common/SpriteImage'
+import { ICONS } from '@/constants/sprites'
 import type { ChildStats } from '@/types/database'
 import { CHILD_HOME_TOP_BAR_GLASS_CLASS, CHILD_HOME_TOP_BAR_GLASS_STYLE } from '@/lib/childHomeTopBarGlass'
 
@@ -15,6 +17,8 @@ interface ChildLevelStatsCardProps {
   creditRef?: React.RefObject<HTMLDivElement | null>
   shine?: boolean
   className?: string
+  /** 물주기에 쓸 보유 하트 — 넣으면 크레딧 아래에 아이콘+숫자 한 줄이 더 붙습니다. */
+  heartsCount?: number
 }
 
 function formatCredits(value: number): string {
@@ -27,6 +31,7 @@ export default function ChildLevelStatsCard({
   creditRef,
   shine = false,
   className = '',
+  heartsCount,
 }: ChildLevelStatsCardProps) {
   const { current_level, exp, exp_to_next_level, credits } = stats
 
@@ -54,7 +59,11 @@ export default function ChildLevelStatsCard({
           .join(' ')}
         style={CHILD_HOME_TOP_BAR_GLASS_STYLE}
         role="region"
-        aria-label={`레벨 ${current_level}, 크레딧 ${totalCredits.toLocaleString('ko-KR')}`}
+        aria-label={
+          typeof heartsCount === 'number'
+            ? `레벨 ${current_level}, 크레딧 ${totalCredits.toLocaleString('ko-KR')}, 보유 하트 ${heartsCount}`
+            : `레벨 ${current_level}, 크레딧 ${totalCredits.toLocaleString('ko-KR')}`
+        }
       >
         <div className="mb-1 flex w-full items-baseline justify-between gap-2">
           <span
@@ -113,6 +122,33 @@ export default function ChildLevelStatsCard({
             {formatCredits(totalCredits)}
           </span>
         </div>
+
+        {typeof heartsCount === 'number' ? (
+          <>
+            <div className="mt-2 h-px w-full" style={{ background: 'rgba(255,255,255,0.5)' }} />
+            <div className="mt-2 flex min-w-0 max-w-full items-center gap-1.5">
+              <span className="inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center">
+                <SpriteImage
+                  sheet={ICONS}
+                  frame="heart"
+                  width={18}
+                  clipRotated={false}
+                  className="h-[18px] w-[18px] shrink-0 select-none object-contain"
+                />
+              </span>
+              <span
+                className="min-w-0 shrink-0 truncate font-black tabular-nums leading-none"
+                style={{
+                  fontSize: 20,
+                  color: '#7A4F00',
+                  letterSpacing: '-0.5px',
+                }}
+              >
+                {heartsCount}
+              </span>
+            </div>
+          </>
+        ) : null}
       </div>
     </>
   )

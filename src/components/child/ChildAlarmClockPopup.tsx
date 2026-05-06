@@ -1,9 +1,7 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import SpriteImage from '@/components/common/SpriteImage'
-import { ICONS } from '@/constants/sprites'
 import {
   addSeoulCalendarDays,
   getSeoulDateString,
@@ -34,7 +32,28 @@ type NextAlarmResult = {
   atMs: number
 }
 
-const POMODORO_MINUTES = [1, 3, 5, 10, 15, 20, 25, 30] as const
+/** 뽀모도로 토마토·버튼 등 포인트 컬러(참고 UI와 유사한 테라코타 레드) */
+const POMODORO_RED = '#D9534F'
+
+/** 재생·정지 아래 버튼 — 탭할 때마다 해당 분만큼 **누적**(상한 99분, 토마토 ± 와 같은 목표 분·초) */
+const POMODORO_PRESET_MINUTES = [5, 10, 20, 30] as const
+
+/** 자산 경로 — `public` 기준, 검정 화면 안에 시간을 겹칩니다. */
+const POMODORO_IMAGE_SRC = '/assets/img/common/ui/pomodoro.png'
+
+/**
+ * PNG 속 검정 디스플레이 창 위치(이미지 전체 대비 %).
+ * 비개발자: 그림 파일이 바뀌면 숫자만 조정하면 검정 칸 안에 글자가 맞습니다.
+ */
+const POMODORO_DISPLAY_BOX_PCT = {
+  /** 가로 시작(왼쪽에서) — − 시간 + 가 들어가도록 영역을 넓힘 */
+  left: 14,
+  /** 세로 시작(위에서) — 값을 키우면 시계 숫자가 전체적으로 아래로 내려감 */
+  top: 53,
+  /** 검정 영역 너비·높이 */
+  width: 72,
+  height: 17,
+} as const
 
 /** 하단 알람 목록에서 숨길 기본 루틴 블록 라벨 */
 const HIDDEN_BOTTOM_ALARM_LABELS = ['기상', '하원·귀가', '잘 시간'] as const
@@ -62,6 +81,45 @@ function PomodoroIconStop({ className = 'h-7 w-7' }: { className?: string }) {
     <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
       <path d="M6 6h12v12H6V6z" />
     </svg>
+  )
+}
+
+/**
+ * `pomodoro.png` 일러스트 위에 검정 화면 영역을 맞춰 시간·± 버튼을 겹칩니다.
+ * 비개발자: 검정 칸 안에서 버튼은 탭할 수 있도록 안쪽만 클릭을 받습니다.
+ */
+function PomodoroTomatoFrame({
+  children,
+  className = '',
+}: {
+  children: ReactNode
+  className?: string
+}) {
+  const { left, top, width, height } = POMODORO_DISPLAY_BOX_PCT
+  return (
+    <div className={`relative mx-auto w-[min(230px,72vw)] shrink-0 ${className}`}>
+      {/* eslint-disable-next-line @next/next/no-img-element — 로컬 정적 PNG, 레이아웃은 부모 너비 기준 */}
+      <img
+        src={POMODORO_IMAGE_SRC}
+        alt=""
+        className="h-auto w-full select-none drop-shadow-md"
+        draggable={false}
+      />
+      <div
+        className="pointer-events-none absolute flex items-center justify-center"
+        style={{
+          left: `${left}%`,
+          top: `${top}%`,
+          width: `${width}%`,
+          height: `${height}%`,
+        }}
+      >
+        {/** gap·padding 최소화 → −/+ 가 검정 디스플레이 안쪽으로 더 모임 */}
+        <div className="pointer-events-auto flex max-h-full w-full max-w-full items-center justify-center gap-0.5 px-0">
+          {children}
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -96,17 +154,32 @@ function toSeoulDateTimeMs(isoDate: string, hhmm: string): number {
 }
 
 /**
- * 서울 기준 디지털 시계 — 시:분:초(24시) + 날짜 한 줄.
- * 비개발자: 숫자로만 된 시계(예: 14:05:09)와 아래에 날짜를 보여 줍니다.
+ * 서울 기준 시계 — 날짜 한 줄 + 오전/오후 구분(`AM`/`PM`)과 시:분(초 없음)을 분리해 반환합니다.
+ * 비개발자: 화면에서는 AM·PM만 글자 크기를 절반으로 줄일 수 있게 나눕니다.
  */
-function formatSeoulDigitalClockParts(now: Date): { timeLine: string; dateLine: string } {
-  const timeLine = new Intl.DateTimeFormat('en-GB', {
+function formatSeoulDigitalClockParts(now: Date): {
+  dateLine: string
+  dayPeriod: string
+  timeHm: string
+} {
+  const timeFmt = new Intl.DateTimeFormat('en-US', {
     timeZone: 'Asia/Seoul',
     hour: '2-digit',
     minute: '2-digit',
-    second: '2-digit',
-    hour12: false,
-  }).format(now)
+    hour12: true,
+  })
+
+  let hour = ''
+  let minute = ''
+  let dayPeriod = ''
+  for (const p of timeFmt.formatToParts(now)) {
+    if (p.type === 'hour') hour = p.value
+    if (p.type === 'minute') minute = p.value
+    if (p.type === 'dayPeriod') dayPeriod = p.value.toUpperCase().replace(/\./g, '').trim()
+  }
+
+  const timeHm = hour !== '' && minute !== '' ? `${hour}:${minute}` : timeFmt.format(now)
+
   const dateLine = new Intl.DateTimeFormat('ko-KR', {
     timeZone: 'Asia/Seoul',
     year: 'numeric',
@@ -117,7 +190,8 @@ function formatSeoulDigitalClockParts(now: Date): { timeLine: string; dateLine: 
     .format(now)
     .replace(/\./g, '')
     .trim()
-  return { timeLine, dateLine }
+
+  return { dateLine, dayPeriod, timeHm }
 }
 
 /** 아침 알람 팝업과 동일한 해 이미지를 작게 표시하는 조각 컴포넌트입니다. */
@@ -196,26 +270,25 @@ export default function ChildAlarmClockPopup({ open, onClose }: Props) {
   const [slideIndex, setSlideIndex] = useState(0)
   const touchStartXRef = useRef<number | null>(null)
 
-  /** 뽀모도로 상태 */
-  const [selectedMinutes, setSelectedMinutes] = useState<number>(5)
-  const [secondsLeft, setSecondsLeft] = useState<number>(5 * 60)
+  /** 뽀모도로 상태 — 기본 00:00, 토마토 안 ±로 분 단위(0~99) 설정 */
+  const [selectedMinutes, setSelectedMinutes] = useState<number>(0)
+  const [secondsLeft, setSecondsLeft] = useState<number>(0)
   const [running, setRunning] = useState(false)
   /**
-   * 자연 종료(00:00) 직후 — "확인"으로만 소리·화면을 정리하기 전 단계.
-   * 비개발자: 타이머가 끝난 뒤 빨간 깜빡임과 확인 버튼이 나오는 상태입니다.
+   * 자연 종료(00:00) 직후 — 종료 멜로디 재생 중·UI 강조 단계(정지 버튼으로 알람 끄고 리셋).
    */
   const [pomodoroAwaitingConfirm, setPomodoroAwaitingConfirm] = useState(false)
 
   /** 남은 10초 구간 알람 — 10초가 되는 순간 1회만 재생, 0초에서 끊음 */
   const pomodoroTenSecAlarmRef = useRef<HTMLAudioElement | null>(null)
-  /** 타이머 00:00 직후 종료 멜로디(`HAPPY_COUNTDOWN`) — 확인·초기화에서 끊기 위해 보관 */
+  /** 타이머 00:00 직후 종료 멜로디(`HAPPY_COUNTDOWN`) — 정지·팝업 닫기 등에서 끊기 위해 보관 */
   const pomodoroEndMelodyRef = useRef<HTMLAudioElement | null>(null)
   /** 이번 실행에서 10초 알람을 이미 시작했는지(매 초 재시작 방지) */
   const tenSecondAlarmStartedRef = useRef(false)
 
   /**
    * 뽀모도로 10초 경고음 + 종료 멜로디를 모두 멈추고 플래그를 초기화합니다.
-   * 비개발자: 정지(초기화)·확인·팝업 닫기에서 호출해 어떤 알람도 남지 않게 합니다.
+   * 비개발자: 정지(초기화)·팝업 닫기에서 호출해 어떤 알람도 남지 않게 합니다.
    */
   const stopPomodoroSounds = useCallback(() => {
     pomodoroTenSecAlarmRef.current?.pause()
@@ -259,7 +332,7 @@ export default function ChildAlarmClockPopup({ open, onClose }: Props) {
   /**
    * 뽀모도로 카운트다운(1초 단위)
    * - 남은 시간이 10초가 되는 순간: 틱 알람을 **처음부터 1번만** 재생
-   * - 0초: 10초 알람 끊음 → 종료 멜로디(`AUDIO.COUNTDOWN.HAPPY_COUNTDOWN`) 재생 → 00:00 UI + 확인
+   * - 0초: 10초 알람 끊음 → 종료 멜로디 재생 → 00:00 UI, 정지로 알람 끄고 리셋
    */
   useEffect(() => {
     if (!open || !running) return
@@ -312,10 +385,11 @@ export default function ChildAlarmClockPopup({ open, onClose }: Props) {
   }, [open, stopPomodoroSounds])
 
   const nextAlarm = useMemo(() => findNextAlarm(alarmRows, nowMs), [alarmRows, nowMs])
-  const { timeLine: seoulDigitalTime, dateLine: seoulDigitalDate } = useMemo(
-    () => formatSeoulDigitalClockParts(new Date(nowMs)),
-    [nowMs],
-  )
+  const {
+    dateLine: seoulDigitalDate,
+    dayPeriod: seoulDayPeriod,
+    timeHm: seoulTimeHm,
+  } = useMemo(() => formatSeoulDigitalClockParts(new Date(nowMs)), [nowMs])
   /** 하단 리스트는 요청사항에 따라 기본 루틴(기상/하원·귀가/잘 시간)을 제외합니다. */
   const visibleBottomAlarmRows = useMemo(
     () =>
@@ -327,8 +401,40 @@ export default function ChildAlarmClockPopup({ open, onClose }: Props) {
   )
   const minutesLeft = Math.floor(secondsLeft / 60)
   const remainSeconds = secondsLeft % 60
-  /** 00:00 도달 후 확인 전 — 빨간 깜빡임·확인 버튼 전용 */
+  /** 00:00 도달 후 멜로디 재생 중 — 빨간 깜빡임 등 */
   const pomodoroFinishedUi = pomodoroAwaitingConfirm && secondsLeft === 0
+
+  /** 타이머 가동 중에는 길이 조절만으로 남은 시간이 꼬이지 않게 ±·칩 비활성 */
+  const pomodoroDurationLocked = running || pomodoroAwaitingConfirm
+
+  /** 토마토 안 ± — 분 단위(0~99), 타이머 안 돌 때만; 남은 초를 항상 `분×60` 으로 맞춤 */
+  const bumpSelectedMinutes = useCallback(
+    (delta: number) => {
+      if (pomodoroDurationLocked) return
+      stopPomodoroSounds()
+      setSelectedMinutes((m) => {
+        const next = Math.min(99, Math.max(0, m + delta))
+        setSecondsLeft(next * 60)
+        return next
+      })
+    },
+    [pomodoroDurationLocked, stopPomodoroSounds],
+  )
+
+  /** 빠른 분 버튼 — 현재 설정 분에 `addMinutes` 만큼 더함(99분 넘으면 99에서 멈춤) */
+  const stackPresetMinutes = useCallback(
+    (addMinutes: number) => {
+      if (pomodoroDurationLocked) return
+      stopPomodoroSounds()
+      setRunning(false)
+      setSelectedMinutes((prev) => {
+        const next = Math.min(99, prev + addMinutes)
+        setSecondsLeft(next * 60)
+        return next
+      })
+    },
+    [pomodoroDurationLocked, stopPomodoroSounds],
+  )
 
   if (!open || !portalReady) return null
 
@@ -337,7 +443,7 @@ export default function ChildAlarmClockPopup({ open, onClose }: Props) {
       className="fixed inset-0 z-[160] flex items-center justify-center p-4"
       role="dialog"
       aria-modal="true"
-      aria-label="뽀모도로·알람"
+      aria-label="타이머·알람"
     >
       <button type="button" className="absolute inset-0 bg-black/45" aria-label="닫기" onClick={onClose} />
       {/**
@@ -346,15 +452,24 @@ export default function ChildAlarmClockPopup({ open, onClose }: Props) {
        */}
       <div className="relative z-[1] mx-auto flex h-auto max-h-[min(85dvh,calc(100vh-2rem))] w-full max-w-md flex-col overflow-hidden rounded-3xl bg-white shadow-2xl">
         <div className="border-b border-gray-100 px-4 pb-3 pt-4">
-          <p className="text-center text-sm font-black text-gray-900">뽀모도로 · 알람</p>
           {/**
-           * 서울 기준 디지털 시계 — 아날로그 원판 대신 큰 숫자(시:분:초)로 표시합니다.
+           * 서울 기준 — 맨 위에 오늘 날짜, 그 아래 AM/PM·시:분(초 없음).
            */}
-          <div className="mt-2 text-center" role="timer" aria-live="polite" aria-atomic="true">
-            <p className="text-3xl font-black tabular-nums tracking-tight text-slate-900 sm:text-4xl">{seoulDigitalTime}</p>
-            <p className="mt-1 text-[12px] font-bold text-gray-600">{seoulDigitalDate}</p>
+          <div
+            className="text-center"
+            role="timer"
+            aria-live="polite"
+            aria-atomic="true"
+            aria-label={`현재 시각 ${seoulDayPeriod ? `${seoulDayPeriod} ` : ''}${seoulTimeHm}`}
+          >
+            <p className="text-[12px] font-bold text-gray-600">{seoulDigitalDate}</p>
+            <p className="mt-2 flex items-baseline justify-center gap-1.5 text-3xl font-black tabular-nums tracking-tight text-slate-900 sm:text-4xl">
+              {seoulDayPeriod ? (
+                <span className="inline-block font-black leading-none text-[0.5em]">{seoulDayPeriod}</span>
+              ) : null}
+              <span>{seoulTimeHm}</span>
+            </p>
           </div>
-          <p className="mt-2 text-center text-[11px] text-gray-500">좌우로 밀어 루틴 알람 일정을 볼 수 있어요.</p>
         </div>
 
         <div
@@ -376,90 +491,68 @@ export default function ChildAlarmClockPopup({ open, onClose }: Props) {
             className="flex h-full w-[200%] transition-transform duration-300 ease-out"
             style={{ transform: `translateX(-${slideIndex * 50}%)` }}
           >
-            {/* 페이지 1: 뽀모도로(첫 화면) */}
+            {/* 페이지 1: 뽀모도로(첫 화면) — 토마토(안에 −/+)·재생/정지 */}
             <section className="h-full w-1/2 overflow-y-auto px-4 py-4" aria-label="뽀모도로 타이머">
-              <div className="mb-3 flex items-center gap-2">
-                <SpriteImage sheet={ICONS} frame="timer" width={24} className="shrink-0 select-none" />
+              <div className="mb-4 text-center">
                 <h3 className="text-sm font-black text-gray-800">뽀모도로 타이머</h3>
               </div>
 
               <div
-                className={`rounded-2xl px-4 py-4 text-center transition-colors ${
-                  pomodoroFinishedUi ? 'bg-rose-50 ring-2 ring-red-200/80' : 'bg-sky-50'
-                }`}
+                className={`flex flex-col items-center ${pomodoroFinishedUi ? 'rounded-2xl bg-rose-50/90 px-2 py-3 ring-2 ring-red-200/80' : ''}`}
               >
-                <p
-                  className={`text-[11px] font-bold ${pomodoroFinishedUi ? 'text-red-700' : 'text-sky-700'}`}
-                >
-                  남은 시간
-                </p>
-                <p
-                  className={`mt-1 text-3xl font-black tabular-nums ${
-                    pomodoroFinishedUi
-                      ? 'animate-pulse text-red-600 drop-shadow-[0_0_10px_rgba(220,38,38,0.55)]'
-                      : 'text-sky-900'
-                  }`}
-                >
-                  {String(minutesLeft).padStart(2, '0')}:{String(remainSeconds).padStart(2, '0')}
-                </p>
-              </div>
-
-              <div className="mt-3 grid grid-cols-4 gap-2">
-                {POMODORO_MINUTES.map((m) => {
-                  const selected = selectedMinutes === m
-                  return (
-                    <button
-                      key={m}
-                      type="button"
-                      disabled={pomodoroAwaitingConfirm}
-                      onClick={() => {
-                        stopPomodoroSounds()
-                        setSelectedMinutes(m)
-                        setSecondsLeft(m * 60)
-                        setRunning(false)
-                      }}
-                      className={`rounded-xl border px-2 py-2 text-xs font-bold disabled:cursor-not-allowed disabled:opacity-40 ${
-                        selected ? 'border-[#4A90E2] bg-[#4A90E2] text-white' : 'border-gray-200 bg-white text-gray-700'
-                      }`}
-                    >
-                      {m}분
-                    </button>
-                  )
-                })}
-              </div>
-
-              <div className="mt-3 flex gap-2">
-                <button
-                  type="button"
-                  disabled={pomodoroAwaitingConfirm}
-                  onClick={() => {
-                    setRunning((was) => {
-                      const next = !was
-                      if (next && tenSecondAlarmStartedRef.current && secondsLeft <= 10 && secondsLeft > 0) {
-                        const a = pomodoroTenSecAlarmRef.current
-                        if (a) void a.play().catch(() => {})
-                      }
-                      return next
-                    })
-                  }}
-                  className="flex flex-1 items-center justify-center rounded-xl bg-[#4A90E2] py-3 text-white disabled:cursor-not-allowed disabled:bg-gray-300"
-                  aria-label={running ? '일시정지' : '시작'}
-                >
-                  {running ? <PomodoroIconPause /> : <PomodoroIconPlay />}
-                </button>
-                {pomodoroAwaitingConfirm ? (
+                <PomodoroTomatoFrame>
                   <button
                     type="button"
-                    onClick={() => {
-                      stopPomodoroSounds()
-                      setSecondsLeft(selectedMinutes * 60)
-                    }}
-                    className="flex flex-1 items-center justify-center rounded-xl bg-red-500 py-3 text-sm font-black text-white shadow-sm"
-                    aria-label="뽀모도로 종료 확인 — 알람 끄고 시간 초기화"
+                    disabled={pomodoroDurationLocked || selectedMinutes <= 0}
+                    onClick={() => bumpSelectedMinutes(-1)}
+                    className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-white/35 bg-white/10 text-sm font-bold leading-none text-white shadow-sm transition active:scale-90 disabled:pointer-events-none disabled:opacity-25"
+                    aria-label="집중 시간 1분 줄이기"
                   >
-                    확인
+                    −
                   </button>
-                ) : (
+                  <p
+                    className={`shrink-0 px-0.5 text-center font-sans text-[clamp(1.45rem,7vw,2.35rem)] font-black tabular-nums tracking-tighter text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.95)] ${
+                      pomodoroFinishedUi ? 'animate-pulse opacity-95' : ''
+                    }`}
+                  >
+                    {String(minutesLeft).padStart(2, '0')}:{String(remainSeconds).padStart(2, '0')}
+                  </p>
+                  <button
+                    type="button"
+                    disabled={pomodoroDurationLocked || selectedMinutes >= 99}
+                    onClick={() => bumpSelectedMinutes(1)}
+                    className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-white/35 bg-white/10 text-sm font-bold leading-none text-white shadow-sm transition active:scale-90 disabled:pointer-events-none disabled:opacity-25"
+                    aria-label="집중 시간 1분 늘리기"
+                  >
+                    +
+                  </button>
+                </PomodoroTomatoFrame>
+
+                {/** 재생(일시정지) + 정지 — 종료 멜로디 중에도 정지로 알람 끄고 설정 분만큼 리셋 */}
+                <div className="mt-3 flex w-full max-w-[240px] items-center justify-center gap-6">
+                  <button
+                    type="button"
+                    disabled={pomodoroAwaitingConfirm || (!running && secondsLeft <= 0)}
+                    onClick={() => {
+                      setRunning((was) => {
+                        const next = !was
+                        if (next && tenSecondAlarmStartedRef.current && secondsLeft <= 10 && secondsLeft > 0) {
+                          const a = pomodoroTenSecAlarmRef.current
+                          if (a) void a.play().catch(() => {})
+                        }
+                        return next
+                      })
+                    }}
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white shadow transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-35"
+                    style={{ backgroundColor: POMODORO_RED }}
+                    aria-label={running ? '일시정지' : '재생'}
+                  >
+                    {running ? (
+                      <PomodoroIconPause className="h-5 w-5" />
+                    ) : (
+                      <PomodoroIconPlay className="ml-0.5 h-5 w-5" />
+                    )}
+                  </button>
                   <button
                     type="button"
                     onClick={() => {
@@ -467,12 +560,28 @@ export default function ChildAlarmClockPopup({ open, onClose }: Props) {
                       setRunning(false)
                       setSecondsLeft(selectedMinutes * 60)
                     }}
-                    className="flex flex-1 items-center justify-center rounded-xl bg-gray-100 py-3 text-gray-700"
-                    aria-label="초기화 — 타이머를 처음 시간으로 되돌리고 알람을 모두 멈춤"
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gray-200 text-gray-800 shadow transition active:scale-95"
+                    aria-label="정지 — 알람을 멈추고 설정한 길이로 시간 되돌림"
                   >
-                    <PomodoroIconStop />
+                    <PomodoroIconStop className="h-5 w-5" />
                   </button>
-                )}
+                </div>
+
+                {/** 빠른 분 프리셋 — 재생·정지 바로 아래 */}
+                <div className="mt-4 flex flex-wrap items-center justify-center gap-2 pb-1">
+                  {POMODORO_PRESET_MINUTES.map((m) => (
+                    <button
+                      key={m}
+                      type="button"
+                      disabled={pomodoroDurationLocked || selectedMinutes >= 99}
+                      onClick={() => stackPresetMinutes(m)}
+                      className="rounded-full border-2 border-gray-200 bg-white px-3 py-1.5 text-[11px] font-black text-gray-700 transition hover:border-gray-300 disabled:cursor-not-allowed disabled:opacity-40"
+                      aria-label={`집중 시간에 ${m}분 더하기`}
+                    >
+                      {m}분
+                    </button>
+                  ))}
+                </div>
               </div>
             </section>
 

@@ -8,7 +8,7 @@
  *
  * 비개발자 설명:
  * - 폰·패드 세로: 아이콘을 탭하면 패널이 아래에서 올라옵니다.
- * - 패드 가로(너비 md 이상 + 가로 모드): 같은 패널이 오른쪽에서 슬라이드되어 들어옵니다.
+ * - 패드 가로: 마켓만 계속 아래에서 슬라이드업(요청 반영). 코인·꾸미기는 오른쪽에서 슬라이드됩니다.
  * - 어두운 배경(딤)을 탭하거나 × 버튼을 누르면 닫힙니다.
  */
 
@@ -129,6 +129,9 @@ export default function ChildPanelOverlay({
   /** 슬라이드업 패널은 market/coins/dressup 전용 — sticker는 BearStickerSheet 가 자체 모달 관리 */
   const isSlideUpOpen = active !== null && active !== 'sticker'
 
+  /** 마켓만 태블릿 가로에서도 하단 시트 — 코인·꾸미기는 md 가로에서 우측 패널 유지 */
+  const marketBottomSheetLandscape = active === 'market'
+
   return (
     <>
     <div
@@ -141,12 +144,15 @@ export default function ChildPanelOverlay({
         aria-hidden
       />
 
-      {/* 패널 본체 — 세로: 하단 슬라이드업 / 패드 가로: 우측 슬라이드 */}
+      {/* 패널 본체 — 마켓: 항상 하단 슬라이드업 / 그 외: 세로·작은 화면은 하단, md 가로는 우측 슬라이드 */}
       <div
         className={[
           'absolute bottom-0 left-0 right-0',
-          'md:landscape:bottom-0 md:landscape:top-0 md:landscape:left-auto md:landscape:right-0 md:landscape:h-full md:landscape:w-full md:landscape:max-w-[420px]',
-          'bg-white rounded-t-3xl md:landscape:rounded-none md:landscape:rounded-l-3xl',
+          marketBottomSheetLandscape
+            ? ''
+            : 'md:landscape:bottom-0 md:landscape:top-0 md:landscape:left-auto md:landscape:right-0 md:landscape:h-full md:landscape:w-full md:landscape:max-w-[420px]',
+          'bg-white rounded-t-3xl',
+          marketBottomSheetLandscape ? '' : 'md:landscape:rounded-none md:landscape:rounded-l-3xl',
           'flex flex-col',
           /*
            * 꾸미기 패널: 68dvh 고정 — 아이템 수와 무관하게 일정한 높이.
@@ -155,16 +161,25 @@ export default function ChildPanelOverlay({
            *   480px+ 기기의 7열 2행(가장 많은 아이템인 배경 탭) = 약 150px → 여유 있음
            *   overflow-hidden 으로 스크롤바 원천 차단.
            * 나머지 패널: 85dvh 최대 (콘텐츠에 맞게 자동 확장).
-           * 패드 가로: 세로 높이 전체를 쓰므로 dressup 도 h-full.
+           * 패드 가로(코인·꾸미기): 세로 높이 전체를 쓰므로 dressup 도 h-full.
+           * 마켓은 가로에서도 하단 시트만 쓰므로 max-h-[85dvh] 유지.
            */
           active === 'dressup'
             ? 'h-[68dvh] md:landscape:h-full md:landscape:max-h-none'
-            : 'max-h-[85dvh] md:landscape:h-full md:landscape:max-h-none',
+            : marketBottomSheetLandscape
+              ? 'max-h-[85dvh]'
+              : 'max-h-[85dvh] md:landscape:h-full md:landscape:max-h-none',
           'transform transition-transform duration-300 ease-out',
           isSlideUpOpen
-            ? 'translate-y-0 md:landscape:translate-y-0 md:landscape:translate-x-0'
-            : 'translate-y-full md:landscape:translate-y-0 md:landscape:translate-x-full',
-        ].join(' ')}
+            ? marketBottomSheetLandscape
+              ? 'translate-y-0'
+              : 'translate-y-0 md:landscape:translate-y-0 md:landscape:translate-x-0'
+            : marketBottomSheetLandscape
+              ? 'translate-y-full'
+              : 'translate-y-full md:landscape:translate-y-0 md:landscape:translate-x-full',
+        ]
+          .filter(Boolean)
+          .join(' ')}
         role="dialog"
         aria-modal="true"
         aria-label={active && active !== 'sticker' ? PANEL_TITLES[active] : undefined}

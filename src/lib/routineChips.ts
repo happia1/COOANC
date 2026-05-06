@@ -53,6 +53,8 @@ export type RoutineFlowSortable = {
   title: string
   block: string | null
   scheduled_time: string | null
+  /** 0이면 기본 칩 순서. 부모가 순서를 저장한 뒤에는 10, 20, … 스텝을 씁니다. */
+  sort_order?: number | null
 }
 
 function minutesFromHHMMSafe(t: string | null | undefined): number {
@@ -97,10 +99,33 @@ export function routineMissionFlowRank(m: RoutineFlowSortable): number {
 }
 
 /**
- * 부모 루틴 탭 `sortMissionsByRoutineFlow` 와 자녀 미션 탭 슬라이더에서 **같은 순서 규칙**을 쓰기 위한 비교 함수입니다.
- * (기상→취침 칩 순위 → 같은 랭크면 scheduled_time → 제목)
+ * `splitMissionsAmPm` 과 동일하게 블록이 없으면 시각으로 오전/오후를 나눕니다.
+ * compareRoutineFlowSortable 에서 블록별 묶음 순서를 맞춥니다.
+ */
+export function routineMissionBlockOrder(m: RoutineFlowSortable): number {
+  if (m.block === 'morning') return 0
+  if (m.block === 'afternoon') return 1
+  if (m.block === 'evening') return 2
+  if (m.block === 'bedtime') return 3
+  if (m.scheduled_time && /^\d{2}:\d{2}$/.test(m.scheduled_time)) {
+    const h = parseInt(m.scheduled_time.slice(0, 2), 10)
+    return h < 12 ? 0 : 1
+  }
+  return 1
+}
+
+/**
+ * 부모 루틴 탭 `sortMissionsByRoutineFlow` 와 자녀 미션 탭 슬라이더에서 **같은 순서 규칙**을 씁니다.
+ * 순서: 시간대(블록 추정) → 부모 지정 sort_order → 칩 순위 → scheduled_time → 제목
  */
 export function compareRoutineFlowSortable(a: RoutineFlowSortable, b: RoutineFlowSortable): number {
+  const bo = routineMissionBlockOrder(a) - routineMissionBlockOrder(b)
+  if (bo !== 0) return bo
+
+  const soA = a.sort_order ?? 0
+  const soB = b.sort_order ?? 0
+  if (soA !== soB) return soA - soB
+
   const d = routineMissionFlowRank(a) - routineMissionFlowRank(b)
   if (d !== 0) return d
   const td = minutesFromHHMMSafe(a.scheduled_time) - minutesFromHHMMSafe(b.scheduled_time)

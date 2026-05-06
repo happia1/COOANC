@@ -3,7 +3,9 @@
 /**
  * 부모 앱 — 루틴 관리 탭
  * - 표시: 현재 자녀에만 연결된 미션(linked_child_id 일치)만 목록에 둡니다. 시스템 풀(공용 행)은 「추가」 시트에서만 고릅니다.
- * - 일상 미션은 기상→취침 순으로 정렬하고, 주간/주말 각각 한 카드 안에 오전·오후를 접을 수 있게 두며,
+ * - 일상·스페셜 가로 칩 줄은 카드 자체를 드래그해 순서를 바꿀 수 있고, DB `missions.sort_order`에
+ *   저장되며 자녀 앱 슬라이더 정렬(`compareRoutineFlowSortable`)과 맞춥니다.
+ * - 일상 미션은 기상→취침 흐름(블록) 안에서 정렬하며, 주간/주말 각각 한 카드 안에 오전·오후를 접을 수 있게 두며,
  *   펼친 목록은 스페셜 미션과 같이 가로 슬라이드(칩형 카드)로 표시합니다.
  * - 일상 미션 카드는 이모지·제목·시각만 표시합니다. 활성/비활성은 상단 연필(키워드 시트)에서 한 번에 설정합니다.
  * - 알람은 온보딩·상단 「루틴 알람」에서만 설정해 충돌을 막습니다.
@@ -49,6 +51,7 @@ import { PARENT_NEUTRAL_CARD_CLASSNAME, PARENT_NEUTRAL_CARD_OVERFLOW_X_CLASSNAME
 import { resolveRoutineMissionPngUrl } from '@/lib/routineMissionThumbnail'
 import { scaledMissionRewards } from '@/lib/missionRewardMultiplier'
 import { MissionRewardIconTriple } from '@/components/mission/MissionRewardIconTriple'
+import SortableHorizontalMissionStrip from '@/components/parent/SortableHorizontalMissionStrip'
 
 /**
  * 루틴·스페셜 카드 상단 그림을 그립니다.
@@ -86,6 +89,9 @@ const ROUTINE_CARD_REWARD_ICON_PX = 12
 
 function sortByTime(missions: Mission[]): Mission[] {
   return [...missions].sort((a, b) => {
+    const oa = a.sort_order ?? 0
+    const ob = b.sort_order ?? 0
+    if (oa !== ob) return oa - ob
     if (!a.scheduled_time && !b.scheduled_time) return 0
     if (!a.scheduled_time) return 1
     if (!b.scheduled_time) return -1
@@ -179,21 +185,37 @@ const ROUTINE_WEEKDAY_PM_CAPTION = '주중 오후 일정을 세팅'
 const ROUTINE_WEEKEND_AM_CAPTION = '주말／공휴일 오전 일정을 세팅'
 const ROUTINE_WEEKEND_PM_CAPTION = '주말／공휴일 오후 일정을 세팅'
 
-function renderRoutineMissionStrip(list: Mission[], emptyHint: string, onOpenRewardEditor: (m: Mission) => void) {
-  if (list.length === 0) {
-    return <p className={`px-3 py-3 text-center ${ROUTINE_DESC_TEXT_CLASS}`}>{emptyHint}</p>
-  }
+/**
+ * 일상 미션 가로 줄 — 카드 자체를 드래그해 순서를 바꾸면 `/api/mission/reorder` 로 저장됩니다.
+ */
+function RoutineMissionSortableStrip({
+  list,
+  emptyHint,
+  childId,
+  onOpenRewardEditor,
+  onReorderError,
+}: {
+  list: Mission[]
+  emptyHint: string
+  childId: string | null
+  onOpenRewardEditor: (m: Mission) => void
+  onReorderError: (msg: string) => void
+}) {
   return (
-    <div className="-mx-1 overflow-x-auto pb-0.5 [scrollbar-width:thin]">
-      {/* gap-0.5·px-1.5: 미션 카드 사이 가로 간격을 줄여 한 화면에 더 밀집되게 */}
-      <ul className="m-0 flex w-max min-w-full list-none snap-x snap-mandatory gap-0.5 px-1.5 pb-1 pt-1">
-        {list.map((m) => (
-          <li key={m.id} className="w-[min(25vw,88px)] shrink-0 snap-start py-px">
-            <RoutineMissionSlideCard mission={m} onOpenRewardEditor={onOpenRewardEditor} />
-          </li>
-        ))}
-      </ul>
-    </div>
+    <SortableHorizontalMissionStrip
+      childId={childId}
+      missions={list}
+      emptyHint={emptyHint}
+      onReorderError={onReorderError}
+      renderCard={(m, dragHandle) => (
+        <div className="relative flex h-full min-h-[4.25rem] w-full flex-col">
+          {dragHandle ? (
+            <div className="pointer-events-auto absolute -top-0.5 left-1/2 z-[2] -translate-x-1/2">{dragHandle}</div>
+          ) : null}
+          <RoutineMissionSlideCard mission={m} onOpenRewardEditor={onOpenRewardEditor} />
+        </div>
+      )}
+    />
   )
 }
 
@@ -214,6 +236,8 @@ function AmPmRoutineBlock({
   onOpenRewardEditor,
   amCaption,
   pmCaption,
+  childId,
+  onReorderError,
 }: {
   am: Mission[]
   pm: Mission[]
@@ -228,6 +252,9 @@ function AmPmRoutineBlock({
   amCaption?: string
   /** 오후 토글 줄 오른쪽 안내 문구 */
   pmCaption?: string
+  /** 순서 저장 시 대상 자녀 — 없으면 드래그 비활성 */
+  childId: string | null
+  onReorderError: (msg: string) => void
 }) {
   return (
     <div className={PARENT_NEUTRAL_CARD_OVERFLOW_X_CLASSNAME}>
@@ -245,7 +272,13 @@ function AmPmRoutineBlock({
       </button>
       {openAm ? (
         <div className={am.length === 0 ? 'border-t border-gray-100' : SLIDE_SECTION_WITH_CARDS}>
-          {renderRoutineMissionStrip(am, emptyAmHint, onOpenRewardEditor)}
+          <RoutineMissionSortableStrip
+            list={am}
+            emptyHint={emptyAmHint}
+            childId={childId}
+            onOpenRewardEditor={onOpenRewardEditor}
+            onReorderError={onReorderError}
+          />
         </div>
       ) : null}
       <button
@@ -262,7 +295,13 @@ function AmPmRoutineBlock({
       </button>
       {openPm ? (
         <div className={pm.length === 0 ? 'border-t border-gray-100' : SLIDE_SECTION_WITH_CARDS}>
-          {renderRoutineMissionStrip(pm, emptyPmHint, onOpenRewardEditor)}
+          <RoutineMissionSortableStrip
+            list={pm}
+            emptyHint={emptyPmHint}
+            childId={childId}
+            onOpenRewardEditor={onOpenRewardEditor}
+            onReorderError={onReorderError}
+          />
         </div>
       ) : null}
     </div>
@@ -288,6 +327,8 @@ function SpecialDailyEventBlock({
   onStartEventAssignWithBonus,
   onOpenDailyBonusSettings,
   onOpenRewardEditor,
+  childId,
+  onReorderError,
 }: {
   dailyMissions: Mission[]
   eventMissions: Mission[]
@@ -302,24 +343,30 @@ function SpecialDailyEventBlock({
   onOpenDailyBonusSettings: (m: Mission) => void
   /** 카드 탭으로 보상(크레딧·애정 하트·EXP) 편집 팝업을 엽니다. */
   onOpenRewardEditor: (m: Mission) => void
+  childId: string | null
+  onReorderError: (msg: string) => void
 }) {
   const renderHorizontalCards = (list: Mission[], isEventList: boolean) => (
-    <div className="-mx-1 overflow-x-auto pb-0.5 [scrollbar-width:thin]">
-      {/* 일상 슬라이드와 동일하게 카드 간 가로 간격·좌우 패딩 축소 */}
-      <ul className="m-0 flex w-max min-w-full list-none snap-x snap-mandatory gap-0.5 px-1.5 pb-0.5 pt-0.5">
-        {list.map((m) => (
-          <li key={m.id} className="w-[min(25vw,88px)] shrink-0 snap-start py-px">
-            <SpecialMissionRow
-              mission={m}
-              assigning={isEventList && assigningId === m.id}
-              onOpenRewardEditor={() => onOpenRewardEditor(m)}
-              onStartEventAssignWithBonus={isEventList ? () => onStartEventAssignWithBonus(m) : undefined}
-              onOpenDailyBonusSettings={!isEventList ? () => onOpenDailyBonusSettings(m) : undefined}
-            />
-          </li>
-        ))}
-      </ul>
-    </div>
+    <SortableHorizontalMissionStrip
+      childId={childId}
+      missions={list}
+      emptyHint="없음"
+      onReorderError={onReorderError}
+      renderCard={(m, dragHandle) => (
+        <div className="relative flex min-h-[5.5rem] w-full flex-col">
+          {dragHandle ? (
+            <div className="pointer-events-auto absolute -top-0.5 left-1/2 z-[2] -translate-x-1/2">{dragHandle}</div>
+          ) : null}
+          <SpecialMissionRow
+            mission={m}
+            assigning={isEventList && assigningId === m.id}
+            onOpenRewardEditor={() => onOpenRewardEditor(m)}
+            onStartEventAssignWithBonus={isEventList ? () => onStartEventAssignWithBonus(m) : undefined}
+            onOpenDailyBonusSettings={!isEventList ? () => onOpenDailyBonusSettings(m) : undefined}
+          />
+        </div>
+      )}
+    />
   )
 
   return (
@@ -803,6 +850,8 @@ export default function RoutineTab({
                       onOpenRewardEditor={setRewardEditMission}
                       amCaption={ROUTINE_WEEKDAY_AM_CAPTION}
                       pmCaption={ROUTINE_WEEKDAY_PM_CAPTION}
+                      childId={currentId}
+                      onReorderError={(msg) => showToast(msg, false)}
                     />
                   )}
                 </div>
@@ -826,6 +875,8 @@ export default function RoutineTab({
                       onOpenRewardEditor={setRewardEditMission}
                       amCaption={ROUTINE_WEEKEND_AM_CAPTION}
                       pmCaption={ROUTINE_WEEKEND_PM_CAPTION}
+                      childId={currentId}
+                      onReorderError={(msg) => showToast(msg, false)}
                     />
                   )}
                 </div>
@@ -851,6 +902,8 @@ export default function RoutineTab({
                     onOpenRewardEditor={setRewardEditMission}
                     amCaption={ROUTINE_WEEKDAY_AM_CAPTION}
                     pmCaption={ROUTINE_WEEKDAY_PM_CAPTION}
+                    childId={currentId}
+                    onReorderError={(msg) => showToast(msg, false)}
                   />
                 </div>
                 <div className="space-y-1.5">
@@ -867,6 +920,8 @@ export default function RoutineTab({
                     onOpenRewardEditor={setRewardEditMission}
                     amCaption={ROUTINE_WEEKEND_AM_CAPTION}
                     pmCaption={ROUTINE_WEEKEND_PM_CAPTION}
+                    childId={currentId}
+                    onReorderError={(msg) => showToast(msg, false)}
                   />
                 </div>
               </div>
@@ -927,6 +982,8 @@ export default function RoutineTab({
                   setBonusMission(m)
                 }}
                 onOpenRewardEditor={setRewardEditMission}
+                childId={currentId}
+                onReorderError={(msg) => showToast(msg, false)}
               />
             )}
           </section>

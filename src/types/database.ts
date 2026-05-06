@@ -77,6 +77,11 @@ export type ChildStats = {
   school_time_enabled?: boolean
   school_time_weekday?: boolean
   school_time_weekend?: boolean
+  /**
+   * 서울 달력 기준: 자녀가 그날 미션을 모두 끝내고 수면 모드로 들어간 날.
+   * 그날 배정된 미션은 부모 롤백이 막힙니다.
+   */
+  sleep_session_locked_date?: string | null
   /** 화분 성장 단계 0~6 (없으면 0 으로 간주) */
   pot_stage?: number
   /** 현재 단계에서 물주기로 쓴 하트 누적 */
@@ -109,6 +114,11 @@ export type Mission = {
   scheduled_time: string | null
   /** 이 템플릿이 귀속된 자녀(온보딩·루틴에서 생성). null 이면 전역 풀 */
   linked_child_id: string | null
+  /**
+   * 부모 루틴에서 드래그로 지정한 표시 순서(같은 block·같은 구간 내).
+   * 0이면 기존 칩 순위·시간 순을 씁니다. 구 DB·부분 조회에는 필드가 없을 수 있어 옵션입니다.
+   */
+  sort_order?: number
   is_active: boolean
   created_at: string
 }
@@ -139,6 +149,7 @@ export type DailyMissionWithTemplate = DailyMission & {
     | 'difficulty'
     | 'block'
     | 'repeat_type'
+    | 'sort_order'
   >
 }
 

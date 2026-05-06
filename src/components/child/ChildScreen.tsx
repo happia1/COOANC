@@ -7,20 +7,23 @@
  *
  * 비개발자 설명:
  * - 배경 이미지 위에 캐릭터가 서 있고, 하단에 오늘의 미션 카드가 가로로 스크롤됩니다.
- * - 상단 오른쪽(나가기 아래 스택) 아이콘을 탭하면 마켓/코인/스티커 패널이, 폰·패드 세로에선 아래에서, 패드 가로(md+landscape)에서는 오른쪽에서 열립니다.
+ * - 상단 오른쪽(나가기 아래 스택) 아이콘을 탭하면 마켓은 항상 아래에서 올라오고, 코인·꾸미기는 폰·패드 세로에선 아래에서, 패드 가로(md+landscape)에선 오른쪽에서 열립니다.
  * - 상단 오른쪽 나가기(유리 버튼)를 누르면 부모 화면으로 나갑니다.
  *
  * 레이아웃 레이어(아래 → 위):
  *   L1. 배경 이미지 (tablet_kidsroom_background_portrait.png)
  *   L2. 캐릭터 스프라이트 (앵커포인트 기반 배치)
- *   L3. UI 오버레이 (상단: 왼쪽 레벨·크레딧 카드 + 그 아래 식물 전용 유리 블록, 오른쪽 아이콘 열 + 미션 섹션)
- *   L4. 패널 오버레이 (마켓/코인/꾸미기/스티커 — 세로: 하단 슬라이드 / 패드 가로: 우측 슬라이드)
+ *   L3. UI 오버레이 (상단: 레벨·크레딧·하트 카드, 발 옆 화분·물조리개, 오른쪽 아이콘 열 + 미션 섹션)
+ *   L4. 패널 오버레이 (마켓: 항상 하단 슬라이드 / 코인·꾸미기: 세로는 하단·가로는 우측 / 스티커는 별도 시트)
  */
 
 import { useRef, useState, useCallback, useMemo, useEffect, memo } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import RapidTapConfirmModal from '@/components/child/RapidTapConfirmModal'
+import MissionHonestyBlockedModal, {
+  type MissionHonestyBlockReason,
+} from '@/components/child/MissionHonestyBlockedModal'
 import ParentMissionRedoNoticeModal from '@/components/child/ParentMissionRedoNoticeModal'
 import SpriteImage from '@/components/common/SpriteImage'
 import { CharacterSprite } from '@/components/sprites/CharacterSprite'
@@ -69,6 +72,7 @@ import AllMissionCompleteOverlay from '@/components/child/AllMissionCompleteOver
 import ChildAlarmClockPopup from '@/components/child/ChildAlarmClockPopup'
 import PlantPot from '@/components/child/PlantPot'
 import WateringCanButton from '@/components/child/WateringCanButton'
+import WaterHeartFlightOverlay from '@/components/child/WaterHeartFlightOverlay'
 import SeedSelectModal from '@/components/child/SeedSelectModal'
 import SleepModeScreen from '@/components/child/SleepModeScreen'
 import MorningWakeScreen from '@/components/child/MorningWakeScreen'
@@ -78,6 +82,11 @@ import { readRoutineAlarmPrefs } from '@/lib/routineAlarmLocalPrefs'
 import { resolveRoutineAlarmSoundUrl } from '@/lib/routineAlarmSounds'
 import { installChildRoutineAudioUnlockOnFirstGesture } from '@/lib/childAudio'
 import { toYyyyMmDdDbValue, dbValueMeansIncomplete, getSeoulTimeHHMM, getSeoulWeekdayShort } from '@/lib/koreaDate'
+import { isAfternoonMission } from '@/lib/missionAmPm'
+import {
+  isBedtimeMissionBlockedBeforeSleepReadyWindow,
+  isSeoulTimeBeforeNoon,
+} from '@/lib/missionHonestyTiming'
 
 /**
  * 상단 레벨 카드 반응형 배율 (최대 1.7배) — 실측 너비 기준.
@@ -101,6 +110,57 @@ const LEVEL_BLOCK_SCALE_MAX = 1.7
 const RIGHT_ICON_STACK_SCALE_BASE_W = LEVEL_BLOCK_SCALE_BASE_W
 const RIGHT_ICON_STACK_SCALE_FULL_W = LEVEL_BLOCK_SCALE_FULL_W
 const RIGHT_ICON_STACK_SCALE_MAX = 1.3
+
+/** 화분·물조리개(발 옆) — 레벨 카드와 같은 너비 구간, 최대 1.5배까지 확대 */
+const PLANT_FEET_UI_SCALE_MAX = 1.5
+
+/**
+ * 발 옆 화분·물조리개의 **표시 크기**와 **토끼와의 가로 간격(px)** 을 맞출 때 쓰는 기준 가로(px).
+ * 비개발자: 가로 885일 때 화분·물조리개 크기(배율)와, 토끼 발치 기준 가로 간격을 그대로 유지합니다.
+ */
+const PLANT_FEET_LAYOUT_REFERENCE_W = 885
+
+/**
+ * 토끼(러그 중심 `rugCenterX`)와 화분·물조리개 사이 **가로 거리(px)** 를 기준 너비에서의 값으로 고정합니다.
+ *
+ * 비개발자 설명:
+ * - 화분·물조리개만 컨테이너 가로의 몇 %에 두면, 화면이 좁아질수록 같은 %라도 실제 픽셀 간격은 줄어듭니다.
+ * - 그래서 “기준 너비(885px)에서 토끼 중심과 얼마나 떨어져 있었는지(px)”를 구해 두고,
+ *   현재 너비에서도 그 픽셀 거리가 되도록 % 좌표를 다시 계산합니다. → 좁아져도 토끼와의 간격이 줄지 않습니다.
+ */
+function plantFeetAnchorsKeepRugGapPx(
+  containerWidthPx: number,
+  rugCenterX: number,
+  plantPotBesideLeftFootX: number,
+  wateringCanBesideRightFootX: number,
+  referenceWidthPx: number,
+): { plantPct: number; canPct: number } {
+  if (!(containerWidthPx > 0) || !(referenceWidthPx > 0)) {
+    return {
+      plantPct: plantPotBesideLeftFootX * 100,
+      canPct: wateringCanBesideRightFootX * 100,
+    }
+  }
+  /** 기준 너비에서 토끼 중심 ↔ 화분·물조리개 **중심**까지 가로 거리(px) — 이 값을 모든 너비에서 유지 */
+  const gapPlantCenterPx = (rugCenterX - plantPotBesideLeftFootX) * referenceWidthPx
+  const gapCanCenterPx = (wateringCanBesideRightFootX - rugCenterX) * referenceWidthPx
+  /** 중심에서 위 거리만큼 떨어진 픽셀 위치 → 현재 너비로 나눈 비율(0~1) */
+  let plant = rugCenterX - gapPlantCenterPx / containerWidthPx
+  let can = rugCenterX + gapCanCenterPx / containerWidthPx
+  /** 매우 좁은 기기에서만 화면 밖으로 나가지 않게 자름(이때는 간격이 기준보다 좁아질 수 있음) */
+  plant = Math.max(0.06, Math.min(0.49, plant))
+  can = Math.min(0.94, Math.max(0.51, can))
+  return { plantPct: plant * 100, canPct: can * 100 }
+}
+
+function scaleForPlantFeetUi(containerWidthPx: number): number {
+  return scaleFromContainerWidth(
+    containerWidthPx,
+    LEVEL_BLOCK_SCALE_BASE_W,
+    LEVEL_BLOCK_SCALE_FULL_W,
+    PLANT_FEET_UI_SCALE_MAX,
+  )
+}
 
 /**
  * 화면(컨테이너) 가로 너비에 따라 1배~max 배율을 선형 보간합니다.
@@ -276,6 +336,7 @@ function dmToSortable(dm: DailyMissionWithTemplate): RoutineFlowSortable | null 
     title: dm.missions.title,
     block: dm.missions.block ?? null,
     scheduled_time: dm.scheduled_time ?? null,
+    sort_order: dm.missions.sort_order ?? 0,
   }
 }
 
@@ -293,6 +354,9 @@ function orderedMissionsForSlider(list: DailyMissionWithTemplate[]): DailyMissio
     }),
   )
   const sortedSpecial = [...specialRows].sort((a, b) => {
+    const oa = a.missions?.sort_order ?? 0
+    const ob = b.missions?.sort_order ?? 0
+    if (oa !== ob) return oa - ob
     const ta = a.scheduled_time
     const tb = b.scheduled_time
     if (!ta && !tb) return (a.missions?.title ?? '').localeCompare(b.missions?.title ?? '', 'ko')
@@ -333,6 +397,12 @@ export default function ChildScreen({
   const creditBadgeRef = useRef<HTMLDivElement>(null)
   /** Mission Complete 하트 5칸 ref — **애정 하트(미션 보상)** 파티클 목적지 */
   const missionHeartsRef = useRef<HTMLDivElement>(null)
+  /** 발 옆 화분 래퍼 — 물조리개에서 하트 날림 목표 좌표 */
+  const plantPotWrapRef = useRef<HTMLDivElement>(null)
+  /** 발 옆 물조리개 버튼 — 하트 날림 출발 좌표 */
+  const wateringCanBtnRef = useRef<HTMLButtonElement>(null)
+  /** 물조리개 탭 시 하트 비행 이펙트 재생 키 */
+  const [heartFlightTrigger, setHeartFlightTrigger] = useState(0)
 
   /** 현재 화면에 떠 있는 파티클 목록 */
   const [particles, setParticles] = useState<Particle[]>([])
@@ -407,6 +477,41 @@ export default function ChildScreen({
   const sleepReadyTimeWeekday = initialStats?.sleep_ready_time_weekday ?? true
   const sleepReadyTimeWeekend = initialStats?.sleep_ready_time_weekend ?? true
 
+  /**
+   * 서울 시각 기준으로 「오전에 오후 미션」「잠 준비 전 취침 미션」 탭을 막습니다.
+   * 서버 `/api/daily-mission/complete` 와 같은 규칙입니다.
+   */
+  const getHonestyBlockForMission = useCallback(
+    (dm: DailyMissionWithTemplate): MissionHonestyBlockReason | null => {
+      if (!dm.missions) return null
+      const nowStr = getSeoulTimeHHMM()
+      /** 취침(bedtime) 블록은 잠 준비 시각 가드를 먼저 적용(오전에 「오후 미션」만 뜨지 않게 함) */
+      if (
+        isBedtimeMissionBlockedBeforeSleepReadyWindow(dm.missions.block, {
+          sleepReadyHHMM: sleepReadyTimeHHMM,
+          sleepReadyEnabled: sleepReadyTimeEnabled,
+          sleepReadyWeekday: sleepReadyTimeWeekday,
+          sleepReadyWeekend: sleepReadyTimeWeekend,
+          seoulDateYmd: today,
+          seoulNowHHMM: nowStr,
+        })
+      ) {
+        return 'bedtime_before_sleep_ready'
+      }
+      if (isAfternoonMission(dm) && isSeoulTimeBeforeNoon(nowStr)) {
+        return 'afternoon_before_noon'
+      }
+      return null
+    },
+    [
+      today,
+      sleepReadyTimeHHMM,
+      sleepReadyTimeEnabled,
+      sleepReadyTimeWeekday,
+      sleepReadyTimeWeekend,
+    ],
+  )
+
   // ── 미션 완료 상태 ─────────────────────────────────────────────────────────
 
   const [done, setDone] = useState<Set<string>>(
@@ -442,6 +547,10 @@ export default function ChildScreen({
 
   /** 연속 탭 확인 팝업 표시 여부 */
   const [rapidTapModalOpen, setRapidTapModalOpen] = useState(false)
+
+  /** 시각 제한(오전·잠 준비 전)으로 탭이 막혔을 때 — 소리 없는 수달 안내 */
+  const [honestyModalOpen, setHonestyModalOpen] = useState(false)
+  const [honestyBlockReason, setHonestyBlockReason] = useState<MissionHonestyBlockReason | null>(null)
 
   /**
    * 연속 탭 취소 시 5번째(팝업 직전) 카드에만 `ChildMissionCard`의 탭 잠금(fired)을 풀기 위한 키.
@@ -1023,6 +1132,17 @@ export default function ChildScreen({
         return
       }
 
+      const honesty = getHonestyBlockForMission(dm)
+      if (honesty) {
+        setHonestyBlockReason(honesty)
+        setHonestyModalOpen(true)
+        setMissionTapUnblock((prev) => ({
+          ...prev,
+          [dm.id]: (prev[dm.id] ?? 0) + 1,
+        }))
+        return
+      }
+
       const now = Date.now()
 
       /**
@@ -1060,7 +1180,7 @@ export default function ChildScreen({
       /** 연속 탭 감지 통과 — 정상 완료 처리를 진행합니다 */
       commitMissionComplete(dm, cardRect, creditReward, heartReward)
     },
-    [done, commitMissionComplete],
+    [done, commitMissionComplete, getHonestyBlockForMission],
   )
 
   /**
@@ -1071,6 +1191,20 @@ export default function ChildScreen({
   const handleRapidTapConfirm = useCallback(() => {
     const p = pendingMissionRef.current
     if (p && !done.has(p.dm.id)) {
+      const honesty = getHonestyBlockForMission(p.dm)
+      if (honesty) {
+        setHonestyBlockReason(honesty)
+        setHonestyModalOpen(true)
+        setMissionTapUnblock((prev) => ({
+          ...prev,
+          [p.dm.id]: (prev[p.dm.id] ?? 0) + 1,
+        }))
+        pendingMissionRef.current = null
+        recentTapTimestamps.current = []
+        rapidBurstCommittedIdsRef.current = []
+        setRapidTapModalOpen(false)
+        return
+      }
       commitMissionComplete(p.dm, p.cardRect, p.creditReward, p.heartReward)
     }
     pendingMissionRef.current = null
@@ -1078,7 +1212,7 @@ export default function ChildScreen({
     /** 확인이면 버스트 구간이 끝난 것으로 보고, 다음 연속탭은 새로 셉니다 */
     rapidBurstCommittedIdsRef.current = []
     setRapidTapModalOpen(false)
-  }, [done, commitMissionComplete])
+  }, [done, commitMissionComplete, getHonestyBlockForMission])
 
   /**
    * 연속 탭 확인 팝업: "미안.. 다시 할게" 버튼 처리
@@ -1244,38 +1378,31 @@ export default function ChildScreen({
   /** 상단 오른쪽(문·타이머·스티커·장바구니·코인) — 같은 너비 기준, 최대 1.3배 */
   const rightIconStackScale = useMemo(() => scaleForRightIconStack(containerW), [containerW])
 
+  /** 발 옆 화분·물조리개 — 실제 컨테이너 너비가 아니라 885px 기준과 동일한 배율(최대 1.5배)로 고정 */
+  const plantFeetUiScale = useMemo(
+    () => scaleForPlantFeetUi(PLANT_FEET_LAYOUT_REFERENCE_W),
+    [],
+  )
+
   /**
-   * 물조리개 + 화분 **세로 스택**(위→아래) — 레벨 카드 아래 **별도 유리 블록**에 넣습니다.
-   * 비개발자: 스탯이 아직 없을 때는 카드가 없으므로, 그때만 예전처럼 발 옆 절대 위치로 따로 둡니다.
+   * 발 옆 화분·물조리개 가로 % — 토끼 중심과의 **픽셀 간격**을 885px 레이아웃과 동일하게 유지(좁은 화면에서 안 줄어듦)
    */
-  const plantStackInLevelBlock = useMemo(() => {
-    if (plantLoading || !pot) return null
-    return (
-      <>
-        <WateringCanButton
-          hearts={waterButtonHearts}
-          disabled={plantLoading || !pot}
-          onWater={water}
-          onNoHearts={() =>
-            setPlantHint('하트가 부족해요! 미션을 하면 하트를 받을 수 있어요.')
-          }
-          onCompleted={openSeedModal}
-          showHeartRow
-        />
-        {/*
-          비개발자: 물조리개와 화분 사이 — 부모 gap + 이 div 의 mt 를 줄이면 화분이 더 위로 옵니다.
-        */}
-        <div className="mt-0 flex flex-col items-center">
-          {plantHint ? (
-            <p className="mb-1 max-w-[10rem] rounded-lg bg-black/75 px-2 py-1 text-center text-[9px] font-bold text-white shadow-md">
-              {plantHint}
-            </p>
-          ) : null}
-          <PlantPot pot={pot} onRequestSeedSelect={openSeedModal} />
-        </div>
-      </>
-    )
-  }, [plantLoading, pot, waterButtonHearts, water, openSeedModal, plantHint])
+  const plantFeetAnchorsPct = useMemo(
+    () =>
+      plantFeetAnchorsKeepRugGapPx(
+        containerW,
+        anchor.rugCenterX,
+        anchor.plantPotBesideLeftFootX,
+        anchor.wateringCanBesideRightFootX,
+        PLANT_FEET_LAYOUT_REFERENCE_W,
+      ),
+    [
+      containerW,
+      anchor.rugCenterX,
+      anchor.plantPotBesideLeftFootX,
+      anchor.wateringCanBesideRightFootX,
+    ],
+  )
 
   // ─────────────────────────────────────────────────────────────────────────
   // 렌더링
@@ -1337,7 +1464,7 @@ export default function ChildScreen({
         <div className="absolute inset-0 z-20 flex flex-col pointer-events-none">
 
           {/*
-            상단: 왼쪽은 레벨 카드 + 그 아래 식물 유리 블록(간격 mt-3, 가로는 grid 로 레벨 카드와 동일 너비) / 오른쪽은 아이콘 열.
+            상단: 왼쪽 레벨·크레딧·하트 카드 / 발 옆 화분·물조리개 / 오른쪽 아이콘 열.
           */}
           <div
             className="flex w-full items-start justify-between gap-3 px-4"
@@ -1352,20 +1479,12 @@ export default function ChildScreen({
                     transform: `scale(${levelBlockScale})`,
                   }}
                 >
-                  <ChildLevelStatsCard stats={stats} creditRef={creditBadgeRef} shine={badgeShine} />
-                  {plantStackInLevelBlock ? (
-                    <div
-                      className={[
-                        CHILD_HOME_TOP_BAR_GLASS_CLASS,
-                        'pointer-events-auto mt-3 flex w-full min-w-0 flex-col items-center gap-3 overflow-visible px-3 py-3',
-                      ].join(' ')}
-                      style={CHILD_HOME_TOP_BAR_GLASS_STYLE}
-                      role="group"
-                      aria-label="화분과 물 주기"
-                    >
-                      {plantStackInLevelBlock}
-                    </div>
-                  ) : null}
+                  <ChildLevelStatsCard
+                    stats={stats}
+                    creditRef={creditBadgeRef}
+                    shine={badgeShine}
+                    heartsCount={waterButtonHearts}
+                  />
                 </div>
               ) : null}
               {badgeShine && creditBadgeRef.current ? (
@@ -1462,19 +1581,69 @@ export default function ChildScreen({
           </div>
 
           {/*
-            스탯 카드가 아직 없을 때만 — 물조리개·화분을 발 옆 절대 위치에 둡니다(평소는 레벨 카드 footer 안).
+            발 옆 — 왼발 쪽 화분, 오른발 쪽 물조리개.
+            가로: 토끼 중심과의 거리(px)를 기준 너비(885px)와 동일하게 유지해 좁은 화면에서 간격이 줄지 않게 함.
+            스케일: 885px 기준과 동일(최대 1.5배)으로 고정.
           */}
-          {!stats && plantStackInLevelBlock ? (
-            <div
-              className="pointer-events-auto absolute z-[21]"
-              style={{
-                left: '14%',
-                top: `${anchor.characterFootY * 100}%`,
-                transform: 'translateY(calc(-90% - 18px))',
-              }}
-            >
-              <div className="flex flex-col items-center gap-3">{plantStackInLevelBlock}</div>
-            </div>
+          {!plantLoading && pot ? (
+            <>
+              <WaterHeartFlightOverlay
+                trigger={heartFlightTrigger}
+                fromRef={wateringCanBtnRef}
+                toRef={plantPotWrapRef}
+              />
+              <div
+                className="pointer-events-auto absolute z-[21]"
+                style={{
+                  left: `${plantFeetAnchorsPct.plantPct}%`,
+                  top: `${anchor.characterFootY * 100}%`,
+                  transform: 'translate(-50%, calc(-90% - 28px))',
+                }}
+              >
+                <div
+                  ref={plantPotWrapRef}
+                  className="flex flex-col items-center"
+                  style={{
+                    transform: `scale(${plantFeetUiScale})`,
+                    transformOrigin: 'center bottom',
+                  }}
+                >
+                  {plantHint ? (
+                    <p className="mb-1 max-w-[10rem] rounded-lg bg-black/75 px-2 py-1 text-center text-[9px] font-bold text-white shadow-md">
+                      {plantHint}
+                    </p>
+                  ) : null}
+                  <PlantPot pot={pot} onRequestSeedSelect={openSeedModal} />
+                </div>
+              </div>
+              <div
+                className="pointer-events-auto absolute z-[21]"
+                style={{
+                  left: `${plantFeetAnchorsPct.canPct}%`,
+                  top: `${anchor.characterFootY * 100}%`,
+                  transform: 'translate(-50%, calc(-90% - 28px))',
+                }}
+              >
+                <div
+                  style={{
+                    transform: `scale(${plantFeetUiScale})`,
+                    transformOrigin: 'center bottom',
+                  }}
+                >
+                  <WateringCanButton
+                    ref={wateringCanBtnRef}
+                    hearts={waterButtonHearts}
+                    disabled={plantLoading || !pot}
+                    onWater={water}
+                    onNoHearts={() =>
+                      setPlantHint('하트가 부족해요! 미션을 하면 하트를 받을 수 있어요.')
+                    }
+                    onCompleted={openSeedModal}
+                    onPourVisual={() => setHeartFlightTrigger((n) => n + 1)}
+                  />
+                </div>
+              </div>
+            </>
           ) : null}
 
           {/* ── 스페이서 ────────────────────────────────────────────────── */}
@@ -1564,6 +1733,15 @@ export default function ChildScreen({
       />
 
       {/* ── L6: 연속 탭 확인 팝업 ─────────────────────────────────────────── */}
+      <MissionHonestyBlockedModal
+        open={honestyModalOpen}
+        reason={honestyBlockReason}
+        onClose={() => {
+          setHonestyModalOpen(false)
+          setHonestyBlockReason(null)
+        }}
+      />
+
       <RapidTapConfirmModal
         open={rapidTapModalOpen}
         onConfirm={handleRapidTapConfirm}
@@ -1605,6 +1783,7 @@ export default function ChildScreen({
           onSleep={() => {
             setShowCelebration(false)
             setIsSleeping(true)
+            void fetch('/api/child/sleep-session-lock', { method: 'POST' }).catch(() => {})
           }}
         />
       )}

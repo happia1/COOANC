@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { addSeoulCalendarDays } from '@/lib/koreaDate'
+import { addSeoulCalendarDays, getSeoulDateString, getSeoulTimeHHMM } from '@/lib/koreaDate'
+import {
+  isAfternoonMissionFields,
+  isBedtimeMissionBlockedBeforeSleepReadyWindow,
+  isSeoulTimeBeforeNoon,
+} from '@/lib/missionHonestyTiming'
 import { scaledMissionRewards } from '@/lib/missionRewardMultiplier'
 import { resolveApiActorChildId } from '@/lib/resolveApiActorChildId'
 import { readChildStatInt } from '@/lib/childCreditsSplit'
@@ -65,7 +70,7 @@ export async function POST(req: NextRequest) {
   const { data: mission } = await supabase
     .from('missions')
     .select(
-      'credit_reward, heart_reward, exp_reward, reward_multiplier, is_active, level_required, title, icon_emoji',
+      'credit_reward, heart_reward, exp_reward, reward_multiplier, is_active, level_required, title, icon_emoji, block, scheduled_time',
     )
     .eq('id', dm.mission_template_id)
     .maybeSingle()
@@ -112,6 +117,43 @@ export async function POST(req: NextRequest) {
       .maybeSingle(),
     supabase.from('child_stats').select('*').eq('child_id', childId).maybeSingle(),
   ])
+
+  const { data: actorProfile } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle()
+  const peekStats = statsPeek.data
+  if (actorProfile?.role === 'child' && mission && peekStats) {
+    const seoulNow = getSeoulTimeHHMM()
+    const seoulToday = getSeoulDateString()
+    const rawSr = typeof peekStats.sleep_ready_time === 'string' ? peekStats.sleep_ready_time.trim() : ''
+    let sleepReadyNorm: string | null = null
+    if (rawSr && /^\d{1,2}:\d{2}$/.test(rawSr)) {
+      const [sh, sm] = rawSr.split(':')
+      sleepReadyNorm = `${sh.padStart(2, '0')}:${sm.padStart(2, '0')}`
+    }
+    if (
+      isBedtimeMissionBlockedBeforeSleepReadyWindow(mission.block, {
+        sleepReadyHHMM: sleepReadyNorm,
+        sleepReadyEnabled: peekStats.sleep_ready_time_enabled !== false,
+        sleepReadyWeekday: peekStats.sleep_ready_time_weekday !== false,
+        sleepReadyWeekend: peekStats.sleep_ready_time_weekend !== false,
+        seoulDateYmd: seoulToday,
+        seoulNowHHMM: seoulNow,
+      })
+    ) {
+      return NextResponse.json(
+        { error: '잠 준비 시간이 되기 전에는 이 미션을 끝낼 수 없어요.', code: 'honesty_bedtime' },
+        { status: 403 },
+      )
+    }
+    if (
+      isAfternoonMissionFields(mission.block, mission.scheduled_time) &&
+      isSeoulTimeBeforeNoon(seoulNow)
+    ) {
+      return NextResponse.json(
+        { error: '오후 미션은 정오 이후에 완료할 수 있어요.', code: 'honesty_afternoon' },
+        { status: 403 },
+      )
+    }
+  }
 
   const { error: dmCompleteErr } = await supabase
     .from('daily_missions')

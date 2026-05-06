@@ -78,12 +78,32 @@ export async function POST(req: NextRequest) {
 
   const { data: stats, error: statsErr } = await supabase
     .from('child_stats')
-    .select('credits, hearts, exp, current_level, exp_to_next_level, total_credits_earned')
+    .select('credits, hearts, exp, current_level, exp_to_next_level, total_credits_earned, sleep_session_locked_date')
     .eq('child_id', log.child_id)
     .maybeSingle()
 
   if (statsErr || !stats) {
     return NextResponse.json({ error: '스탯 정보를 찾을 수 없어요' }, { status: 404 })
+  }
+
+  /**
+   * 자녀가 그날 전부 완주 후 수면 모드에 들어간 날이면, 같은 날짜의 미션은 되돌릴 수 없습니다.
+   */
+  const lockedDay =
+    typeof stats.sleep_session_locked_date === 'string'
+      ? stats.sleep_session_locked_date.slice(0, 10)
+      : stats.sleep_session_locked_date != null
+        ? String(stats.sleep_session_locked_date).slice(0, 10)
+        : null
+  if (lockedDay && lockedDay === assignedDay) {
+    return NextResponse.json(
+      {
+        error:
+          '자녀가 그날 미션을 모두 끝내고 수면 모드로 들어가서, 이 미션은 더 이상 되돌릴 수 없어요.',
+        code: 'sleep_session_locked',
+      },
+      { status: 403 },
+    )
   }
 
   // 지급됐던 만큼만 빼 줍니다(미션 탭 클라이언트 롤백과 동일한 단순 차감).

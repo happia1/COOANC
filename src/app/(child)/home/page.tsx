@@ -43,6 +43,15 @@ export const preferredRegion = 'hnd1'
 type RoutineType = 'weekday' | 'weekend' | 'holiday' | 'vacation'
 
 /**
+ * DB에 `missions.sort_order` 컬럼이 아직 반영되지 않은 환경(마이그레이션 미적용)에서도
+ * 자녀 홈이 깨지지 않도록, 에러 메시지로 컬럼 부재 여부를 판단합니다.
+ */
+function isMissingSortOrderColumn(message: string | undefined): boolean {
+  if (!message) return false
+  return /missions\.sort_order/i.test(message) && /does not exist/i.test(message)
+}
+
+/**
  * 오늘 routine_type·휴일 루틴 모드에 맞는 이 자녀 전용 템플릿 풀 — `mission/page.tsx` 와 동일 규칙
  * (주말 + `custom` 이면 weekly 만, 평일은 daily 만)
  */
@@ -112,14 +121,32 @@ export default async function ChildHomePage() {
   /**
    * 미션 템플릿은 캐시 없이 매 요청 조회합니다(루틴 저장 직후에도 최신 id 로 백필되게).
    */
+  /**
+   * 미션 JOIN 필드:
+   * - 기본 필드는 항상 요청
+   * - sort_order는 컬럼이 있는 환경에서만 요청(없으면 자동 폴백)
+   */
+  const missionJoinBase =
+    'title, icon_emoji, description, credit_reward, heart_reward, exp_reward, reward_multiplier, difficulty, block, repeat_type'
+  const missionJoinWithSort = `${missionJoinBase}, sort_order`
+
   const templatesQuery =
     serviceRoleClient != null
       ? getMissionTemplatesForChildMissionPage()
-      : missionDb.from('missions').select('*').order('scheduled_time', { ascending: true, nullsFirst: false })
+      : (async () => {
+          const withSort = await missionDb
+            .from('missions')
+            .select('*')
+            .order('sort_order', { ascending: true })
+            .order('scheduled_time', { ascending: true, nullsFirst: false })
+          if (!isMissingSortOrderColumn(withSort.error?.message)) return withSort
 
-  /** missions JOIN 필드 — 미션 완료 API 와 같은 필드를 요청해 캐시를 공유합니다 */
-  const missionJoin =
-    'title, icon_emoji, description, credit_reward, heart_reward, exp_reward, reward_multiplier, difficulty, block, repeat_type'
+          console.warn('[child/home] sort_order missing, fallback templates query')
+          return missionDb
+            .from('missions')
+            .select('*')
+            .order('scheduled_time', { ascending: true, nullsFirst: false })
+        })()
 
   /**
    * 1단계: childId 만 알면 되는 병렬 조회
@@ -208,7 +235,7 @@ export default async function ChildHomePage() {
   /**
    * 2단계: 오늘 맞는 calendar_events 와 오늘 daily_missions 를 병렬 조회
    */
-  const [calEvents, dailyMissionsRes] = await Promise.all([
+  const [calEvents, dailyMissionsResWithSort] = await Promise.all([
     fetchCalendarEventsForChildRoutine(missionDb, {
       today,
       childId,
@@ -217,11 +244,19 @@ export default async function ChildHomePage() {
     }),
     missionDb
       .from('daily_missions')
-      .select(`*, missions:mission_template_id(${missionJoin})`)
+      .select(`*, missions:mission_template_id(${missionJoinWithSort})`)
       .eq('child_id', childId)
       .eq('date', today)
       .order('scheduled_time', { ascending: true, nullsFirst: false }),
   ])
+  const dailyMissionsRes = isMissingSortOrderColumn(dailyMissionsResWithSort.error?.message)
+    ? await missionDb
+        .from('daily_missions')
+        .select(`*, missions:mission_template_id(${missionJoinBase})`)
+        .eq('child_id', childId)
+        .eq('date', today)
+        .order('scheduled_time', { ascending: true, nullsFirst: false })
+    : dailyMissionsResWithSort
 
   const routineType: RoutineType = resolveRoutineTypeFromCalEvents(today, calEvents)
 
@@ -265,12 +300,21 @@ export default async function ChildHomePage() {
     )
     const refetch = await missionDb
       .from('daily_missions')
-      .select(`*, missions:mission_template_id(${missionJoin})`)
+      .select(`*, missions:mission_template_id(${missionJoinWithSort})`)
       .eq('child_id', childId)
       .eq('date', today)
       .order('scheduled_time', { ascending: true, nullsFirst: false })
-    if (refetch.error) console.error('[child/home] daily_missions refetch', refetch.error.message)
-    existing = (refetch.data ?? []) as DailyMissionWithTemplate[]
+    const refetchResolved = isMissingSortOrderColumn(refetch.error?.message)
+      ? await missionDb
+          .from('daily_missions')
+          .select(`*, missions:mission_template_id(${missionJoinBase})`)
+          .eq('child_id', childId)
+          .eq('date', today)
+          .order('scheduled_time', { ascending: true, nullsFirst: false })
+      : refetch
+    if (refetchResolved.error)
+      console.error('[child/home] daily_missions refetch', refetchResolved.error.message)
+    existing = (refetchResolved.data ?? []) as DailyMissionWithTemplate[]
   }
 
   const dailyMissions = existing

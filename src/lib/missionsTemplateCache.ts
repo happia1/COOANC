@@ -18,6 +18,7 @@ export async function getMissionTemplatesForChildMissionPage() {
   const res = await missionDb
     .from('missions')
     .select('*')
+    .order('sort_order', { ascending: true })
     .order('scheduled_time', { ascending: true, nullsFirst: false })
   return {
     data: (res.data ?? null) as Mission[] | null,
@@ -39,6 +40,7 @@ export async function getMissionTemplatesForParentRoutinePage(_parentUserId: str
   const res = await supabase
     .from('missions')
     .select('*')
+    .order('sort_order', { ascending: true })
     .order('level_required', { ascending: true })
     .order('created_at', { ascending: false })
   return {
