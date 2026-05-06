@@ -71,6 +71,7 @@ import { fireMissionCardConfetti } from '@/lib/missionCardConfetti'
 import { tryApplyCompletePayload } from '@/lib/applyDailyMissionCompleteStats'
 import AllMissionCompleteOverlay from '@/components/child/AllMissionCompleteOverlay'
 import ChildAlarmClockPopup from '@/components/child/ChildAlarmClockPopup'
+import ChildMusicPopup from '@/components/child/ChildMusicPopup'
 import PlantPot from '@/components/child/PlantPot'
 import WateringCanButton from '@/components/child/WateringCanButton'
 import WaterHeartFlightOverlay from '@/components/child/WaterHeartFlightOverlay'
@@ -673,6 +674,8 @@ export default function ChildScreen({
    * 비개발자 설명: 상단 우측 타이머(유리 버튼)를 누르면 true 가 되고, 닫기로 false 가 됩니다.
    */
   const [clockPopupOpen, setClockPopupOpen] = useState(false)
+  /** 상단 우측 음악 아이콘 전용 팝업 열림 여부 */
+  const [musicPopupOpen, setMusicPopupOpen] = useState(false)
 
   /** 전체 미션 완주 축하 오버레이 표시 여부 */
   const [showCelebration, setShowCelebration] = useState(false)
@@ -1654,7 +1657,7 @@ export default function ChildScreen({
 
             <div className="flex shrink-0 flex-col items-end gap-3 pointer-events-auto">
               {/*
-                문·뽀모도로·스티커·장바구니만 한 묶음으로 스케일 — 레벨 카드와 같은 가로폭 규칙으로 최대 1.8배.
+                문·음악·뽀모도로·스티커·장바구니를 한 묶음으로 스케일 — 레벨 카드와 같은 가로폭 규칙으로 최대 1.8배.
               */}
               <div
                 className="flex flex-col items-end gap-3"
@@ -1678,6 +1681,22 @@ export default function ChildScreen({
                     className="h-6 w-6 object-contain drop-shadow-md"
                   />
                 </a>
+                <button
+                  type="button"
+                  onClick={() => setMusicPopupOpen(true)}
+                  className={`${CHILD_HOME_RIGHT_ICON_GLASS_CLASS} border-0 bg-transparent p-0 transition-transform active:scale-90`}
+                  style={CHILD_HOME_TOP_BAR_GLASS_STYLE}
+                  aria-label="하루를 돕는 음악 팝업 열기"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src="/assets/img/common/ui/music.png"
+                    alt=""
+                    width={22}
+                    height={22}
+                    className="h-[22px] w-[22px] object-contain drop-shadow-md"
+                  />
+                </button>
                 <button
                   type="button"
                   onClick={() => setClockPopupOpen(true)}
@@ -2091,6 +2110,7 @@ export default function ChildScreen({
        * 비개발자 설명: 루틴 알람·뽀모도로(부모 LocalStorage 설정 반영)를 여는 중앙 팝업입니다.
        */}
       <ChildAlarmClockPopup open={clockPopupOpen} onClose={() => setClockPopupOpen(false)} />
+      <ChildMusicPopup open={musicPopupOpen} onClose={() => setMusicPopupOpen(false)} />
     </>
   )
 }

@@ -32,19 +32,6 @@ type NextAlarmResult = {
   atMs: number
 }
 
-/**
- * 타이머 팝업 안에서 재생할 "상황별 키워드 + 영상" 목록입니다.
- * 비개발자: 여기의 `label`/`url`만 바꾸면 버튼 문구와 재생 영상이 함께 바뀝니다.
- */
-const TIMER_KEYWORD_VIDEOS = [
-  { label: '차분한 아침', url: 'https://youtu.be/u1AVP1pjCgo?si=GM10EwWwpPELrQmE' },
-  { label: '빠른 기상', url: 'https://youtu.be/sOX5x-C335o?si=pOjStvOwnhQFU-G8' },
-  { label: '식사시간', url: 'https://youtu.be/OxVeowNwyFw?si=uMOJi03Hw7r4qkV1' },
-  { label: '놀이시간', url: 'https://youtu.be/yBanUW7ja8M?si=j5COdu4hKoAfHzgl' },
-  { label: '모두 제자리', url: 'https://youtu.be/ZChTK8th_ps?si=7DKiV4XGLi6_kWku' },
-  { label: '잠잘 준비', url: 'https://youtu.be/bdjyo0qsejI?si=XvMWVjb16aW91Hj4' },
-] as const
-
 /** 뽀모도로 토마토·버튼 등 포인트 컬러(참고 UI와 유사한 테라코타 레드) */
 const POMODORO_RED = '#D9534F'
 
@@ -162,40 +149,6 @@ function isWeekendSeoulDate(isoDate: string): boolean {
  */
 function toSeoulDateTimeMs(isoDate: string, hhmm: string): number {
   return new Date(`${isoDate}T${hhmm}:00+09:00`).getTime()
-}
-
-/**
- * 유튜브 링크를 팝업 내부에서 재생 가능한 embed URL로 변환합니다.
- * - 지원: `youtu.be/<id>`, `youtube.com/watch?v=<id>`, `youtube.com/shorts/<id>`
- * - 비개발자: 링크가 바뀌어도 "영상 ID"만 추출되면 자동으로 재생이 됩니다.
- */
-function toYouTubeEmbedUrl(rawUrl: string, { autoplay = true }: { autoplay?: boolean } = {}): string | null {
-  try {
-    const u = new URL(rawUrl)
-    let videoId: string | null = null
-
-    if (u.hostname === 'youtu.be') {
-      videoId = u.pathname.replace(/^\//, '') || null
-    } else if (u.hostname.endsWith('youtube.com')) {
-      if (u.pathname === '/watch') videoId = u.searchParams.get('v')
-      const shortsMatch = u.pathname.match(/^\/shorts\/([^/]+)/)
-      if (!videoId && shortsMatch) videoId = shortsMatch[1] ?? null
-      const embedMatch = u.pathname.match(/^\/embed\/([^/]+)/)
-      if (!videoId && embedMatch) videoId = embedMatch[1] ?? null
-    }
-
-    if (!videoId) return null
-
-    const params = new URLSearchParams()
-    params.set('rel', '0')
-    params.set('modestbranding', '1')
-    params.set('playsinline', '1')
-    if (autoplay) params.set('autoplay', '1')
-
-    return `https://www.youtube.com/embed/${encodeURIComponent(videoId)}?${params.toString()}`
-  } catch {
-    return null
-  }
 }
 
 /**
@@ -375,8 +328,6 @@ export default function ChildAlarmClockPopup({ open, onClose }: Props) {
   const [portalReady, setPortalReady] = useState(false)
   const [slideIndex, setSlideIndex] = useState(0)
   const touchStartXRef = useRef<number | null>(null)
-  /** 키워드에서 고른 영상 embed URL(팝업 내부 iframe 재생용) */
-  const [selectedKeywordEmbedUrl, setSelectedKeywordEmbedUrl] = useState<string | null>(null)
 
   /** 뽀모도로 상태 — 기본 00:00, 토마토 안 ±로 분 단위(0~99) 설정 */
   const [selectedMinutes, setSelectedMinutes] = useState<number>(0)
@@ -443,9 +394,8 @@ export default function ChildAlarmClockPopup({ open, onClose }: Props) {
       })
     }
     setExtraPopupRows(extras.filter((r) => /^\d{2}:\d{2}$/.test(r.time)))
-    /** 첫 화면 = 뽀모도로(slide 0). 알람 목록은 slide 1. 키워드 영상은 slide 2. */
+    /** 첫 화면 = 뽀모도로(slide 0). 알람 목록은 slide 1. */
     setSlideIndex(0)
-    setSelectedKeywordEmbedUrl(null)
   }, [open])
 
   /** 헤더 디지털 시계(초 단위) — 팝업이 열린 동안 1초마다 갱신합니다. */
@@ -509,16 +459,7 @@ export default function ChildAlarmClockPopup({ open, onClose }: Props) {
     if (open) return
     setRunning(false)
     stopPomodoroSounds()
-    setSelectedKeywordEmbedUrl(null)
   }, [open, stopPomodoroSounds])
-
-  /**
-   * 영상 재생 중 다른 페이지로 이동하면 iframe을 내려(언마운트) 재생을 즉시 멈춥니다.
-   * 비개발자: 유튜브 재생 상태를 따로 제어하지 않아도 화면 이동 시 소리가 남지 않습니다.
-   */
-  useEffect(() => {
-    if (slideIndex !== 2 && selectedKeywordEmbedUrl) setSelectedKeywordEmbedUrl(null)
-  }, [slideIndex, selectedKeywordEmbedUrl])
 
   const nextAlarm = useMemo(() => findNextAlarm(alarmRows, nowMs), [alarmRows, nowMs])
   /** 알람 리스트는 요청사항에 맞춰 시간(HH:mm) 오름차순으로 정렬합니다. */
@@ -616,16 +557,16 @@ export default function ChildAlarmClockPopup({ open, onClose }: Props) {
             touchStartXRef.current = null
             if (startX == null || endX == null) return
             const delta = endX - startX
-            if (delta <= -40) setSlideIndex((prev) => Math.min(2, prev + 1))
+            if (delta <= -40) setSlideIndex((prev) => Math.min(1, prev + 1))
             if (delta >= 40) setSlideIndex((prev) => Math.max(0, prev - 1))
           }}
         >
           <div
-            className="flex h-full w-[300%] transition-transform duration-300 ease-out"
-            style={{ transform: `translateX(-${slideIndex * (100 / 3)}%)` }}
+            className="flex h-full w-[200%] transition-transform duration-300 ease-out"
+            style={{ transform: `translateX(-${slideIndex * (100 / 2)}%)` }}
           >
             {/* 페이지 1: 뽀모도로(첫 화면) — 토마토(안에 −/+)·재생/정지 */}
-            <section className="h-full w-1/3 overflow-y-auto px-4 py-4" aria-label="뽀모도로 타이머">
+            <section className="h-full w-1/2 overflow-y-auto px-4 py-4" aria-label="뽀모도로 타이머">
               <div className="mb-4 text-center">
                 <h3 className="text-sm font-black text-gray-800">뽀모도로 타이머</h3>
               </div>
@@ -719,7 +660,7 @@ export default function ChildAlarmClockPopup({ open, onClose }: Props) {
             </section>
 
             {/* 페이지 2: 루틴 알람 */}
-            <section className="h-full w-1/3 overflow-y-auto px-4 py-4" aria-label="루틴 알람 정보">
+            <section className="h-full w-1/2 overflow-y-auto px-4 py-4" aria-label="루틴 알람 정보">
               <h3 className="mb-2 text-center text-sm font-black text-gray-800">알람시간</h3>
               {allVisibleAlarmRows.length > 0 ? (
                 <ul className="mt-3 space-y-2">
@@ -771,59 +712,6 @@ export default function ChildAlarmClockPopup({ open, onClose }: Props) {
               ) : null}
             </section>
 
-            {/* 페이지 3: 키워드 영상(클릭 시 팝업 내부 재생) */}
-            <section className="h-full w-1/3 overflow-y-auto px-4 py-4" aria-label="키워드 영상">
-              <h3 className="text-center text-sm font-black text-gray-800">하루를 돕는 음악</h3>
-              <p className="mt-1 text-center text-[12px] font-bold text-gray-500">키워드를 누르면 아래에서 영상이 재생돼요.</p>
-
-              <div className="mt-3 grid grid-cols-3 gap-1.5">
-                {TIMER_KEYWORD_VIDEOS.map((video) => {
-                  const embedUrl = toYouTubeEmbedUrl(video.url, { autoplay: true })
-                  return (
-                    <button
-                      key={video.label}
-                      type="button"
-                      disabled={!embedUrl}
-                      onClick={() => setSelectedKeywordEmbedUrl(embedUrl)}
-                      className="rounded-xl border border-gray-100 bg-white px-2 py-2 text-center shadow-sm transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
-                      aria-label={`${video.label} 영상 재생`}
-                    >
-                      <p className="text-[11px] font-black leading-tight text-gray-900">{video.label}</p>
-                    </button>
-                  )
-                })}
-              </div>
-
-              <div className="mt-4 overflow-hidden rounded-2xl border border-gray-100 bg-black">
-                {selectedKeywordEmbedUrl ? (
-                  <>
-                    <div className="relative w-full" style={{ paddingTop: '56.25%' }}>
-                      <iframe
-                        title="키워드 영상 재생"
-                        src={selectedKeywordEmbedUrl}
-                        className="absolute inset-0 h-full w-full"
-                        allow="autoplay; encrypted-media; picture-in-picture"
-                        allowFullScreen
-                      />
-                    </div>
-                    <div className="flex items-center justify-end bg-white px-3 py-2">
-                      <button
-                        type="button"
-                        onClick={() => setSelectedKeywordEmbedUrl(null)}
-                        className="rounded-lg bg-gray-100 px-2.5 py-1.5 text-[12px] font-bold text-gray-700"
-                        aria-label="영상 닫기"
-                      >
-                        영상 닫기
-                      </button>
-                    </div>
-                  </>
-                ) : (
-                  <div className="flex h-[160px] items-center justify-center bg-gray-50 px-3 text-center">
-                    <p className="text-[12px] font-bold text-gray-500">재생할 키워드를 먼저 선택해 주세요.</p>
-                  </div>
-                )}
-              </div>
-            </section>
           </div>
         </div>
 
@@ -840,12 +728,6 @@ export default function ChildAlarmClockPopup({ open, onClose }: Props) {
               onClick={() => setSlideIndex(1)}
               className={`h-2.5 w-2.5 rounded-full ${slideIndex === 1 ? 'bg-[#4A90E2]' : 'bg-gray-300'}`}
               aria-label="루틴 알람 화면으로 이동"
-            />
-            <button
-              type="button"
-              onClick={() => setSlideIndex(2)}
-              className={`h-2.5 w-2.5 rounded-full ${slideIndex === 2 ? 'bg-[#4A90E2]' : 'bg-gray-300'}`}
-              aria-label="키워드 영상 화면으로 이동"
             />
           </div>
           <button type="button" onClick={onClose} className="w-full rounded-xl bg-gray-100 py-2.5 text-sm font-bold text-gray-700">
