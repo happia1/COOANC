@@ -19,11 +19,9 @@ import { resolveRoutineMissionPngUrl } from '@/lib/routineMissionThumbnail'
 import { isAfternoonMission } from '@/lib/missionAmPm'
 import {
   CHILD_HOME_MISSION_CARD_AM_BG_CLASSNAME,
-  CHILD_HOME_MISSION_CARD_IMAGE_BOX_CLAMP_CLASS,
   CHILD_HOME_MISSION_CARD_PM_BG_CLASSNAME,
   CHILD_HOME_MISSION_CARD_SPECIAL_BG_CLASSNAME,
   CHILD_HOME_MISSION_CARD_SPECIAL_REWARD_PILL_BG_CLASSNAME,
-  CHILD_HOME_MISSION_CARD_WIDTH_CLAMP_CLASS,
   CHILD_HOME_MISSION_FLUID_VW,
   childHomeMissionRewardIconSizePx,
   childHomeMissionSpriteWidthPx,
@@ -90,8 +88,29 @@ export default function ChildMissionCard({ mission, onComplete, tapResetKey = 0 
   /** 카드 DOM 참조 — 파티클·컨페티 출발 좌표(getBoundingClientRect) 계산에 사용 */
   const cardRef = useRef<HTMLButtonElement>(null)
 
-  const spriteW = childHomeMissionSpriteWidthPx(vw)
-  const rewardIconPx = childHomeMissionRewardIconSizePx(vw)
+  /** 태블릿/PC(768px 이상)에서는 카드 전체를 현재 대비 1.5배로 확대합니다. */
+  const tabletDesktopScale = vw >= 768 ? 1.5 : 1
+  /** 카드 폭 기준(기존 clamp와 동일 구간 360→900 선형 보간): 150px → 255px */
+  const baseCardWidthPx =
+    vw <= CHILD_HOME_MISSION_FLUID_VW.minPx
+      ? 150
+      : vw >= CHILD_HOME_MISSION_FLUID_VW.maxPx
+        ? 255
+        : 150 + ((255 - 150) * (vw - CHILD_HOME_MISSION_FLUID_VW.minPx)) / (CHILD_HOME_MISSION_FLUID_VW.maxPx - CHILD_HOME_MISSION_FLUID_VW.minPx)
+  /** 이미지 박스 기준(기존 clamp와 동일 구간 360→900 선형 보간): 116px → 197.2px */
+  const baseImageBoxPx =
+    vw <= CHILD_HOME_MISSION_FLUID_VW.minPx
+      ? 116
+      : vw >= CHILD_HOME_MISSION_FLUID_VW.maxPx
+        ? 197.2
+        : 116 +
+          ((197.2 - 116) * (vw - CHILD_HOME_MISSION_FLUID_VW.minPx)) /
+            (CHILD_HOME_MISSION_FLUID_VW.maxPx - CHILD_HOME_MISSION_FLUID_VW.minPx)
+
+  const cardWidthPx = Math.round(baseCardWidthPx * tabletDesktopScale)
+  const imageBoxPx = Math.round(baseImageBoxPx * tabletDesktopScale)
+  const spriteW = Math.round(childHomeMissionSpriteWidthPx(vw) * tabletDesktopScale)
+  const rewardIconPx = Math.round(childHomeMissionRewardIconSizePx(vw) * tabletDesktopScale)
 
   const m = mission.missions
   if (!m) return null
@@ -155,9 +174,9 @@ export default function ChildMissionCard({ mission, onComplete, tapResetKey = 0 
           // 스페셜은 `.child-mission-card-gold` 안에서 테두리까지 그리므로 공통 `border` 를 빼 색이 덮이지 않게 함
           'flex flex-col items-center gap-[clamp(0.75rem,calc(0.55rem+0.55vw),1.125rem)] rounded-2xl px-3 pt-4 pb-3 transition-all duration-300 focus:outline-none active:scale-[0.97]',
           special ? '' : 'border',
-          CHILD_HOME_MISSION_CARD_WIDTH_CLAMP_CLASS,
           cardBg,
         ].join(' ')}
+        style={{ width: `${cardWidthPx}px` }}
       >
         {/**
          * 이미지 컨테이너 — 치수만 잡고 배경색은 두지 않음(카드 본문 배경이 그대로 비침).
@@ -166,8 +185,8 @@ export default function ChildMissionCard({ mission, onComplete, tapResetKey = 0 
         <div
           className={[
             'flex shrink-0 items-center justify-center overflow-hidden rounded-2xl',
-            CHILD_HOME_MISSION_CARD_IMAGE_BOX_CLAMP_CLASS,
           ].join(' ')}
+          style={{ width: `${imageBoxPx}px`, height: `${imageBoxPx}px` }}
         >
           {routineImagePath ? (
             // eslint-disable-next-line @next/next/no-img-element
