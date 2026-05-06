@@ -67,8 +67,12 @@ export default function ChildMissionCard({ mission, onComplete, tapResetKey = 0 
    * `setVw(window.innerWidth)`에 `number`를 넣을 수 없다는 타입 오류가 납니다 — 초깃값을 `number`로 한 번 맞춥니다.
    */
   const [vw, setVw] = useState<number>(CHILD_HOME_MISSION_FLUID_VW.minPx)
+  const [vh, setVh] = useState<number>(CHILD_HOME_MISSION_FLUID_VW.maxPx)
   useLayoutEffect(() => {
-    const onResize = () => setVw(window.innerWidth)
+    const onResize = () => {
+      setVw(window.innerWidth)
+      setVh(window.innerHeight)
+    }
     onResize()
     window.addEventListener('resize', onResize)
     return () => window.removeEventListener('resize', onResize)
@@ -106,15 +110,23 @@ export default function ChildMissionCard({ mission, onComplete, tapResetKey = 0 
           ? mobileScaleMax
           : 1 + ((vw - mobileScaleBaseW) * (mobileScaleMax - 1)) / (mobileScaleFullW - mobileScaleBaseW)
 
+  /**
+   * 태블릿 세로형(가로 768px 이상 + 세로가 더 긴 화면)에서 카드가 작아 보이지 않도록
+   * 추가 배율을 살짝 얹습니다.
+   */
+  const isTallTablet = vw >= 768 && vw <= 1200 && vh / Math.max(vw, 1) >= 1.25
+  const tabletPortraitBoost = isTallTablet ? 1.1 : 1
+  const finalCardScale = mobileCardScale * tabletPortraitBoost
+
   const baseCardWidthPx = 150
   const baseImageBoxPx = 116
   const baseSpriteW = Math.round(childHomeMissionSpriteWidthPx(CHILD_HOME_MISSION_FLUID_VW.minPx))
   const baseRewardIconPx = Math.round(childHomeMissionRewardIconSizePx(CHILD_HOME_MISSION_FLUID_VW.minPx))
 
-  const cardWidthPx = Math.round(baseCardWidthPx * mobileCardScale)
-  const imageBoxPx = Math.round(baseImageBoxPx * mobileCardScale)
-  const spriteW = Math.round(baseSpriteW * mobileCardScale)
-  const rewardIconPx = Math.round(baseRewardIconPx * mobileCardScale)
+  const cardWidthPx = Math.round(baseCardWidthPx * finalCardScale)
+  const imageBoxPx = Math.round(baseImageBoxPx * finalCardScale)
+  const spriteW = Math.round(baseSpriteW * finalCardScale)
+  const rewardIconPx = Math.round(baseRewardIconPx * finalCardScale)
 
   const m = mission.missions
   if (!m) return null

@@ -230,12 +230,19 @@ function scaleForLevelBlock(containerWidthPx: number): number {
 
 /** 나가기·타이머·스티커·마켓 바구니 — 넓은 화면에서 최대 1.8배 */
 function scaleForRightIconPrimary(containerWidthPx: number): number {
-  return scaleFromContainerWidth(
-    containerWidthPx,
-    RIGHT_ICON_PRIMARY_SCALE_BASE_W,
-    RIGHT_ICON_PRIMARY_SCALE_FULL_W,
-    RIGHT_ICON_PRIMARY_SCALE_MAX,
-  )
+  /**
+   * 요청사항:
+   * - 최소 아이콘 크기를 기존 1배에서 1.2배로 올립니다.
+   * - 최대값(1.8배)은 유지합니다.
+   */
+  const base = 1.2
+  if (!(containerWidthPx > 0)) return base
+  const span = RIGHT_ICON_PRIMARY_SCALE_FULL_W - RIGHT_ICON_PRIMARY_SCALE_BASE_W
+  if (span <= 0) return base
+  if (containerWidthPx <= RIGHT_ICON_PRIMARY_SCALE_BASE_W) return base
+  if (containerWidthPx >= RIGHT_ICON_PRIMARY_SCALE_FULL_W) return RIGHT_ICON_PRIMARY_SCALE_MAX
+  const t = (containerWidthPx - RIGHT_ICON_PRIMARY_SCALE_BASE_W) / span
+  return base + t * (RIGHT_ICON_PRIMARY_SCALE_MAX - base)
 }
 
 /** 코인 버튼만 — 최대 1.3배 */
@@ -1715,11 +1722,6 @@ export default function ChildScreen({
                     transformOrigin: 'center bottom',
                   }}
                 >
-                  {plantHint ? (
-                    <p className="mb-1 max-w-[10rem] rounded-lg bg-black/75 px-2 py-1 text-center text-[9px] font-bold text-white shadow-md">
-                      {plantHint}
-                    </p>
-                  ) : null}
                   <PlantPot pot={pot} onRequestSeedSelect={openSeedModal} />
                 </div>
               </div>
@@ -1752,14 +1754,63 @@ export default function ChildScreen({
               </div>
             </>
           ) : null}
+
+          {plantHint ? (
+            /**
+             * 하트 부족 안내:
+             * - 화면 중앙에 메시지를 띄우고
+             * - 손가락 이미지가 아래 "오늘의 미션" 카드 영역을 가리키도록 배치합니다.
+             */
+            <div className="pointer-events-none absolute inset-0 z-[30]">
+              <style>{`
+                @keyframes missionHintSweep {
+                  0% { top: -34%; opacity: 0; }
+                  20% { opacity: 0.5; }
+                  80% { opacity: 0.5; }
+                  100% { top: 100%; opacity: 0; }
+                }
+                @keyframes pointerBounceVertical {
+                  0%, 100% { transform: translateY(0); }
+                  50% { transform: translateY(10px); }
+                }
+              `}</style>
+              <div className="absolute left-1/2 top-[44%] -translate-x-1/2 -translate-y-1/2">
+                <p className="max-w-[15rem] rounded-xl bg-black/75 px-3 py-2 text-center text-[12px] font-black leading-snug text-white shadow-lg">
+                  {plantHint}
+                </p>
+              </div>
+              <div
+                className="absolute left-1/2 top-[56%] -translate-x-1/2 rotate-90"
+                style={{ animation: 'pointerBounceVertical 0.9s ease-in-out infinite' }}
+              >
+                <Image
+                  src="/assets/img/characters/pointing/pointing_under.png"
+                  alt="아래 미션 카드를 가리키는 손가락"
+                  width={76}
+                  height={110}
+                  className="h-auto w-[58px] object-contain drop-shadow-[10px_12px_12px_rgba(0,0,0,0.35)]"
+                  priority
+                />
+              </div>
+            </div>
+          ) : null}
           {/* ── 스페이서 ────────────────────────────────────────────────── */}
           <div className="flex-1" />
 
           {/* ── 하단: 미션 섹션 (max-h로 화면 45% 이내로 제한) ─────────── */}
           <div
-            className="pointer-events-auto max-h-[45vh] flex flex-col"
+            className="pointer-events-auto relative max-h-[45vh] flex flex-col"
             style={{ paddingBottom: 'max(20px, env(safe-area-inset-bottom))' }}
           >
+            {plantHint ? (
+              <div className="pointer-events-none absolute inset-0 z-[2] overflow-hidden rounded-2xl">
+                <div className="absolute inset-0 rounded-2xl ring-2 ring-pink-300/70 animate-pulse" />
+                <div
+                  className="absolute left-0 h-[34%] w-full bg-gradient-to-b from-transparent via-white/45 to-transparent"
+                  style={{ animation: 'missionHintSweep 1.4s ease-in-out infinite' }}
+                />
+              </div>
+            ) : null}
             {/* 미션 헤더 — 오른쪽: 완주 하트 5칸 → 완료 수/전체(예: 10/19) */}
             <div className="mb-2 flex shrink-0 items-center justify-between gap-2 px-5 min-[400px]:px-6">
               <p className="min-w-0 text-[clamp(0.875rem,calc(0.8rem+0.2vw),1.125rem)] font-black text-white drop-shadow">

@@ -34,16 +34,35 @@ const WateringCanButton = forwardRef<HTMLButtonElement, Props>(function Watering
   ref,
 ) {
   const [busy, setBusy] = useState(false)
-  const canImg = getWateringCanImage(hearts)
+  /** 물줄 때 기울기 모션(하트 충분할 때만) */
+  const [isPouring, setIsPouring] = useState(false)
+  /** 하트 부족 시 빈 물조리개 떨림 모션 */
+  const [emptyShake, setEmptyShake] = useState(false)
+  const canImg = getWateringCanImage(hearts <= 0 || emptyShake ? 0 : hearts)
 
   async function handleClick() {
     if (busy || disabled) return
+    if (hearts <= 0) {
+      setEmptyShake(true)
+      onNoHearts()
+      window.setTimeout(() => setEmptyShake(false), 420)
+      return
+    }
     setBusy(true)
-    onPourVisual?.()
+    setIsPouring(true)
+    window.setTimeout(() => setIsPouring(false), 280)
     try {
       const result = await onWater()
-      if (result === 'no_hearts') onNoHearts()
-      else if (typeof result === 'object' && result.type === 'grew') {
+      if (result === 'no_hearts') {
+        /** 서버/상태 타이밍으로 하트 부족이 뒤늦게 확인된 경우도 떨림만 처리 */
+        setEmptyShake(true)
+        onNoHearts()
+        window.setTimeout(() => setEmptyShake(false), 420)
+      } else {
+        /** 하트가 실제로 소모될 때만 하트 1개 포물선 비행 이펙트 발사 */
+        onPourVisual?.()
+      }
+      if (typeof result === 'object' && result.type === 'grew') {
         onGrowthCelebrate?.(result.newStage)
       }
     } finally {
@@ -52,25 +71,48 @@ const WateringCanButton = forwardRef<HTMLButtonElement, Props>(function Watering
   }
 
   return (
-    // 누르는 동안: 아래쪽 축으로 살짝 왼쪽(화분 쪽) 기울임 + 약한 축소 — `active:` + `origin-bottom`
-    <button
-      ref={ref}
-      type="button"
-      onClick={() => void handleClick()}
-      disabled={disabled || busy}
-      className="relative flex shrink-0 origin-bottom items-center justify-center overflow-visible border-0 bg-transparent p-0 transition-transform duration-150 ease-out active:scale-[0.94] active:-rotate-[14deg] disabled:opacity-50"
-      aria-label={`물 주기 — 보유 하트 ${hearts}개`}
-    >
-      <div className="relative shrink-0 overflow-visible" style={{ width: 32, height: 32 }}>
-        {/**
-         * 비개발자 설명:
-         * - 화면에서는 부모 `scale()`로 32px보다 크게 보일 수 있습니다.
-         * - `sizes`를 너무 작게(32px) 주면 저해상도 원본을 선택해 확대 시 흐릿해질 수 있어,
-         *   최대 표시 크기를 고려한 값(96px)으로 올려 선명도를 유지합니다.
-         */}
-        <Image src={canImg} alt="물조리개" fill className="object-contain" sizes="96px" priority />
-      </div>
-    </button>
+    <>
+      <style>{`
+        @keyframes canPourTilt {
+          0%   { transform: rotate(0deg) scale(1); }
+          35%  { transform: rotate(-14deg) scale(0.95); }
+          100% { transform: rotate(0deg) scale(1); }
+        }
+        @keyframes canEmptyShake {
+          0%   { transform: rotate(0deg) translateX(0); }
+          20%  { transform: rotate(-7deg) translateX(-1px); }
+          40%  { transform: rotate(7deg) translateX(1px); }
+          60%  { transform: rotate(-6deg) translateX(-1px); }
+          80%  { transform: rotate(6deg) translateX(1px); }
+          100% { transform: rotate(0deg) translateX(0); }
+        }
+      `}</style>
+      <button
+        ref={ref}
+        type="button"
+        onClick={() => void handleClick()}
+        disabled={disabled || busy}
+        className="relative flex shrink-0 origin-bottom items-center justify-center overflow-visible border-0 bg-transparent p-0 transition-transform duration-150 ease-out active:scale-[0.96] disabled:opacity-50"
+        style={{
+          animation: emptyShake
+            ? 'canEmptyShake 0.42s ease-in-out'
+            : isPouring
+              ? 'canPourTilt 0.28s ease-out'
+              : undefined,
+        }}
+        aria-label={`물 주기 — 보유 하트 ${hearts}개`}
+      >
+        <div className="relative shrink-0 overflow-visible" style={{ width: 32, height: 32 }}>
+          {/**
+           * 비개발자 설명:
+           * - 화면에서는 부모 `scale()`로 32px보다 크게 보일 수 있습니다.
+           * - `sizes`를 너무 작게(32px) 주면 저해상도 원본을 선택해 확대 시 흐릿해질 수 있어,
+           *   최대 표시 크기를 고려한 값(96px)으로 올려 선명도를 유지합니다.
+           */}
+          <Image src={canImg} alt="물조리개" fill className="object-contain" sizes="96px" priority />
+        </div>
+      </button>
+    </>
   )
 })
 
