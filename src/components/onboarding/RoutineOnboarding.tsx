@@ -5,7 +5,7 @@
  *
  * 1단계 — 연령·기관·「일정별 알람」: 부모 루틴 알람 시트와 동일하게 기상·등원·하원·귀가·잘 준비·잘 시간(주중·주말 토글 + 소리)
  *    「알람 소리 선택」팝업은 소리 목록을 **기상 / 등원 / 취침 / 기타** 네 구역 카드로 나눠 보여 줍니다(온보딩 전용 강조 UI).
- * 2단계 — 평일·휴일 루틴 한 화면: 평일 오전·오후 칩 + 휴일은 「평일과 같음」/「휴일만 따로」(후자 선택 시 휴일 오전·오후 블록 표시) 후 완료
+ * 2단계 — 평일·휴일 루틴 한 화면: 평일 오전·오후·저녁 칩(한 줄) + 휴일은 「평일과 같음」/「휴일만 따로」(후자 선택 시 휴일 블록 표시) 후 완료
  *
  * (구) 4단계 요약 화면은 없습니다. 키워드는 미리 정의된 목록만 쓰며, 새 미션은 설정의 「미션 추가 제안」으로 안내합니다.
  */
@@ -21,70 +21,15 @@ import RoutineAlarmSoundToggleList, {
   type AlarmSoundPickRow,
 } from '@/components/common/RoutineAlarmSoundToggleList'
 import { DEFAULT_ROUTINE_ALARM_SOUND_IDS, mergeRoutineAlarmPickListFromApi } from '@/lib/routineAlarmSounds'
-
-// ── 미션 API가 받는 블록 타입 (DB 정렬·아이콘 매칭용, 화면은 오전/오후 두 덩어리만 노출)
-type ApiBlock = 'morning' | 'afternoon' | 'evening' | 'bedtime'
-type ChipType = 'fixed' | 'recommended' | 'optional'
-
-type ChipDef = {
-  /** 목록 내 고유 id (선택 배열에 저장) */
-  id: string
-  title: string
-  emoji: string
-  type: ChipType
-  hideWhenNoSchool?: boolean
-  apiBlock: ApiBlock
-}
-
-/**
- * 오전 루틴: 일어나서 등원(또는 집)까지 흔한 순서
- */
-const AM_CHIPS: ChipDef[] = [
-  { id: 'am-wake', title: '기상', emoji: '', type: 'fixed', apiBlock: 'morning' },
-  { id: 'am-wash', title: '세수하기', emoji: '', type: 'recommended', apiBlock: 'morning' },
-  { id: 'am-brush', title: '양치', emoji: '', type: 'recommended', apiBlock: 'morning' },
-  { id: 'am-meal', title: '아침식사', emoji: '', type: 'recommended', apiBlock: 'morning' },
-  { id: 'am-water', title: '물마시기', emoji: '', type: 'recommended', apiBlock: 'morning' },
-  { id: 'am-dress', title: '옷 갈아입기', emoji: '', type: 'recommended', apiBlock: 'morning' },
-  { id: 'am-bag', title: '가방 챙기기', emoji: '', type: 'optional', apiBlock: 'morning' },
-  { id: 'am-school', title: '등원하기', emoji: '', type: 'optional', hideWhenNoSchool: true, apiBlock: 'morning' },
-]
-
-/**
- * 오후 루틴: 귀가 후 ~ 잘 시간까지 흔한 순서 (API 블록만 오후/저녁/잠자리로 나눔)
- */
-const PM_CHIPS: ChipDef[] = [
-  { id: 'pm-hands', title: '손씻기', emoji: '', type: 'recommended', apiBlock: 'afternoon' },
-  { id: 'pm-water', title: '물마시기', emoji: '', type: 'recommended', apiBlock: 'afternoon' },
-  { id: 'pm-out', title: '야외놀이', emoji: '', type: 'optional', apiBlock: 'afternoon' },
-  { id: 'pm-in', title: '실내놀이', emoji: '', type: 'optional', apiBlock: 'afternoon' },
-  { id: 'pm-read', title: '독서활동', emoji: '', type: 'optional', apiBlock: 'afternoon' },
-  { id: 'pm-hw', title: '숙제하기', emoji: '', type: 'optional', apiBlock: 'afternoon' },
-  { id: 'pm-dinner', title: '저녁식사', emoji: '', type: 'recommended', apiBlock: 'evening' },
-  { id: 'pm-tidy', title: '모두 제자리', emoji: '', type: 'recommended', apiBlock: 'evening' },
-  { id: 'pm-bath', title: '목욕/샤워', emoji: '', type: 'optional', apiBlock: 'evening' },
-  { id: 'pm-brush', title: '잠자리 양치', emoji: '', type: 'recommended', apiBlock: 'bedtime' },
-  { id: 'pm-pajama', title: '잠옷 갈아입기', emoji: '', type: 'recommended', apiBlock: 'bedtime' },
-  { id: 'pm-bedread', title: '잠자리 독서', emoji: '', type: 'optional', apiBlock: 'bedtime' },
-  /** 마지막 고정 블록: 잠자리 — 제목과 루틴 「잘 시간」 알람 라벨을 맞춤 */
-  { id: 'pm-sleep', title: '잘 시간', emoji: '', type: 'fixed', apiBlock: 'bedtime' },
-]
-
-/** 고정·추천만 기본 선택 (학교 안 다니면 등원 칩 제외) */
-function defaultSelectedIds(pool: ChipDef[], forSchool: boolean): string[] {
-  return pool
-    .filter((c) => (!c.hideWhenNoSchool || forSchool) && (c.type === 'fixed' || c.type === 'recommended'))
-    .map((c) => c.id)
-}
-
-/** 풀에 나온 순서대로, 선택된 id만 남김 */
-function toggleChipId(pool: ChipDef[], selectedIds: string[], id: string, isFixed: boolean): string[] {
-  if (isFixed) return selectedIds
-  const set = new Set(selectedIds)
-  if (set.has(id)) set.delete(id)
-  else set.add(id)
-  return pool.filter((c) => set.has(c.id)).map((c) => c.id)
-}
+import {
+  AM_CHIPS,
+  PM_CHIPS,
+  defaultSelectedIds,
+  toggleChipId,
+  type ApiBlock,
+  type ChipDef,
+} from '@/lib/routineChips'
+import { routineMissionIconEmojiForCreate } from '@/lib/routineMissionThumbnail'
 
 /**
  * 알림용 scheduled_time (HH:MM). 끄면 null → 그 시각 푸시에 안 씀.
@@ -620,7 +565,7 @@ export default function RoutineOnboarding({ onComplete, linkedChildId }: Props) 
         body: JSON.stringify({
           title: chip.title,
           description,
-          icon_emoji: chip.emoji.trim() || '·',
+          icon_emoji: routineMissionIconEmojiForCreate(chip.title),
           block: chip.apiBlock,
           scheduled_time: time,
           credit_reward: 10,
@@ -1095,7 +1040,7 @@ export default function RoutineOnboarding({ onComplete, linkedChildId }: Props) 
                 onToggle={(id, fixed) => setWeekdayAm((prev) => toggleChipId(AM_CHIPS, prev, id, fixed))}
               />
             </BlockSection>
-            <BlockSection label="오후">
+            <BlockSection label="오후·저녁">
               <HorizontalChips
                 pool={PM_CHIPS}
                 selectedIds={weekdayPm}
@@ -1132,7 +1077,7 @@ export default function RoutineOnboarding({ onComplete, linkedChildId }: Props) 
                     onToggle={(id, fixed) => setHolidayAm((prev) => toggleChipId(AM_CHIPS, prev, id, fixed))}
                   />
                 </BlockSection>
-                <BlockSection label="오후 (휴일)">
+                <BlockSection label="오후·저녁 (휴일)">
                   <HorizontalChips
                     pool={PM_CHIPS}
                     selectedIds={holidayPm}

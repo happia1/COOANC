@@ -12,7 +12,7 @@
 
 import { forwardRef, useState } from 'react'
 import Image from 'next/image'
-import { getWateringCanImage } from '@/constants/plantTrees'
+import { getWateringCanImage, type PlantStage } from '@/constants/plantTrees'
 import type { WaterResult } from '@/hooks/usePlantPot'
 
 type Props = {
@@ -20,14 +20,17 @@ type Props = {
   disabled?: boolean
   onWater: () => Promise<WaterResult>
   onNoHearts: () => void
-  onCompleted: () => void
-  onLevelUp?: () => void
+  /**
+   * 한 단계(또는 최종 7단계) 성장 직후 — 팝업·콘페티는 부모에서 처리.
+   * 비개발자: 물을 준 뒤 화분 그림이 바뀌는 단계에 도달하면 여기로 알려 줍니다.
+   */
+  onGrowthCelebrate?: (newStage: PlantStage) => void
   /** 탭 직후 — 하트가 화분으로 날아가는 시각 효과용 */
   onPourVisual?: () => void
 }
 
 const WateringCanButton = forwardRef<HTMLButtonElement, Props>(function WateringCanButton(
-  { hearts, disabled, onWater, onNoHearts, onCompleted, onLevelUp, onPourVisual },
+  { hearts, disabled, onWater, onNoHearts, onGrowthCelebrate, onPourVisual },
   ref,
 ) {
   const [busy, setBusy] = useState(false)
@@ -40,8 +43,9 @@ const WateringCanButton = forwardRef<HTMLButtonElement, Props>(function Watering
     try {
       const result = await onWater()
       if (result === 'no_hearts') onNoHearts()
-      else if (result === 'completed') onCompleted()
-      else if (result === 'leveled_up') onLevelUp?.()
+      else if (typeof result === 'object' && result.type === 'grew') {
+        onGrowthCelebrate?.(result.newStage)
+      }
     } finally {
       window.setTimeout(() => setBusy(false), 420)
     }

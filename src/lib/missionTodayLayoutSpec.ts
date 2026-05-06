@@ -20,8 +20,9 @@ import type { CSSProperties } from 'react'
  *   - 카드 간 gap-0.5(조밀), 스크롤 안쪽 pl-2 pr-2 (= 제목 래퍼와 동일, 그림자 잘림 방지)
  *
  * ── 미션 카드 본문 비율·간격 ──
- * • 카드 버튼 `MISSION_CARD_BUTTON_BASE_CLASSNAME`
- *   - 너비·바깥 그림자는 `CHILD_TODAY_MISSION_CARD_AM_SHADOW_CLASSNAME` / `_PM_` 을 오전·오후에 따라 버튼에 붙임. 링 동일. 안쪽 좌우 px-1.5·상하 py-1. 카드·이미지 영역 min-h 는 일러스트(px 상수)에 맞춤. **(그림+제목) 묶음** ↔ **보상 줄** 은 gap-y-1.5
+ * • 카드 버튼 `MISSION_CARD_BUTTON_BASE_CLASSNAME` + 자녀 통합 화면(`ChildMissionCard`) 배경
+ *   - 오전·오후·스페셜은 바깥 그림자 대신 `CHILD_HOME_MISSION_CARD_AM_BG_CLASSNAME` / `_PM_` / `_SPECIAL_` 배경·테두리 틴트로 처리합니다.
+ *   - 안쪽 좌우 px·상하 py 는 컴포넌트와 맞춤. 카드·이미지 영역 min-h 는 일러스트(px 상수)에 맞춤.
  * • 그림↔제목 간격: `MISSION_CARD_IMAGE_TEXT_STACK_CLASSNAME` (gap-y-0 — 이미지 바로 아래에 글 붙임)
  * • 이미지 영역 `MISSION_CARD_IMAGE_AREA_CLASSNAME` + `MISSION_CARD_ROUTINE_SPRITE_WIDTH_PX` (=78, 42의 2배 84에서 살짝 축소)
  * • 텍스트 `MISSION_CARD_TEXT_BLOCK/TITLE/SUBTITLE` — 줄 수·글자 크기(8px/7px)·space-y-0.5
@@ -136,13 +137,23 @@ export function childHomeMissionRewardIconSizePx(viewportWidth: number): number 
 }
 
 /**
- * 자녀 앱 「오늘의 미션」 카드 — 오전 루틴: 연한 노란 그림자 / 오후 루틴: 연한 파란 그림자.
- * (`isAfternoonMission` 과 함께 쓰며, 부모 앱 루틴 편집 UI에는 사용하지 않습니다.)
+ * 자녀 앱 「오늘의 미션」 카드 배경·테두리 (단일 스타일 출처).
+ * - 오전: 은은한 분홍 (`rose` 계열 — 채도를 낮춘 핑크 느낌)
+ * - 오후: 은은한 파랑 (`blue` 계열 — 하늘색보다 무난한 블루 틴트)
+ * - 스페셜: `globals.css` 의 `.child-mission-card-gold`(대각선 골드 + 반짝임 애니메이션)
+ * (`isAfternoonMission`·`isSpecialSectionMission` 과 함께 쓰며, 부모 앱 루틴 편집 UI에는 사용하지 않습니다.)
  */
-export const CHILD_TODAY_MISSION_CARD_AM_SHADOW_CLASSNAME =
-  'shadow-[0_4px_18px_-4px_rgba(253,224,71,0.38),0_2px_8px_-2px_rgba(250,204,21,0.22)]' as const
-export const CHILD_TODAY_MISSION_CARD_PM_SHADOW_CLASSNAME =
-  'shadow-[0_4px_18px_-4px_rgba(147,197,253,0.42),0_2px_8px_-2px_rgba(96,165,250,0.26)]' as const
+export const CHILD_HOME_MISSION_CARD_AM_BG_CLASSNAME =
+  'border-rose-200/45 bg-rose-50/90 backdrop-blur-sm' as const
+export const CHILD_HOME_MISSION_CARD_PM_BG_CLASSNAME =
+  'border-blue-200/45 bg-blue-50/90 backdrop-blur-sm' as const
+
+/** 스페셜 미션 카드 — 테두리는 CSS 클래스에서 통합 처리(Tailwind `border` 와 색 충돌 방지) */
+export const CHILD_HOME_MISSION_CARD_SPECIAL_BG_CLASSNAME = 'child-mission-card-gold' as const
+
+/** 스페셜 카드 하단 보상 알약 — `.child-mission-card-gold-reward-pill` 로 카드와 톤 맞춤 */
+export const CHILD_HOME_MISSION_CARD_SPECIAL_REWARD_PILL_BG_CLASSNAME =
+  'child-mission-card-gold-reward-pill' as const
 
 /**
  * 미션 카드 버튼 본체 — gap·텍스트·보상 알약·패딩(px-1.5 py-1) 유지.

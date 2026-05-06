@@ -75,7 +75,7 @@ function buildMissions(s: SurveyState): MissionTemplate[] {
       // 등원
       return [
         ...base,
-        { title: '가방 챙기기', icon_emoji: '', scheduled_time: addMinutes(wake, 40), credit_reward: 10, exp_reward: 10, difficulty: 'easy' },
+        { title: '옷 갈아입기', icon_emoji: '', scheduled_time: addMinutes(wake, 40), credit_reward: 10, exp_reward: 10, difficulty: 'easy' },
         { title: '귀가 후 손 씻기', icon_emoji: '', scheduled_time: '16:00', credit_reward: 10, exp_reward: 10, difficulty: 'easy' },
         { title: '취침 준비', icon_emoji: '', scheduled_time: bed, credit_reward: 5, exp_reward: 5, difficulty: 'easy' },
       ]
@@ -84,7 +84,7 @@ function buildMissions(s: SurveyState): MissionTemplate[] {
     // 학령기
     return [
       ...base,
-      { title: '가방 챙기기', icon_emoji: '', scheduled_time: addMinutes(wake, 40), credit_reward: 10, exp_reward: 10, difficulty: 'easy' },
+      { title: '등원하기', icon_emoji: '', scheduled_time: addMinutes(wake, 40), credit_reward: 10, exp_reward: 10, difficulty: 'easy' },
       { title: '숙제하기', icon_emoji: '', scheduled_time: '15:30', credit_reward: 20, exp_reward: 20, difficulty: 'normal' },
       { title: '취침 준비', icon_emoji: '', scheduled_time: bed, credit_reward: 5, exp_reward: 5, difficulty: 'easy' },
     ]

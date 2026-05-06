@@ -18,6 +18,25 @@ export const STAGE_LABELS: Record<PlantStage, string> = {
   7: '다 익은 열매',
 }
 
+/**
+ * 물 주기로 단계가 1단계 오를 때마다 팝업에 보여 줄 짧은 축하 문구(도달한 단계 번호 기준).
+ * 비개발자: 씨앗(0)에서는 팝업을 쓰지 않고, 1부터 7까지 각각 다른 문장을 띄웁니다.
+ */
+const CELEBRATION_BY_STAGE: Partial<Record<PlantStage, string>> = {
+  1: '싹이 나왔어요!',
+  2: '어린 나무가 되었어요!',
+  3: '꽃봉오리가 생겼어요!',
+  4: '예쁜 꽃이 폈어요!',
+  5: '작은 열매가 맺혔어요!',
+  6: '열매가 빨개지고 있어요!',
+  7: '사과가 다 익었어요!',
+}
+
+/** 축하 팝업 메인 카피 — 알 수 없는 단계면 보수적 한 줄 */
+export function getPlantStageCelebrationTitle(stage: PlantStage): string {
+  return CELEBRATION_BY_STAGE[stage] ?? '식물이 한 단계 자랐어요!'
+}
+
 /** 이미지 경로 — /public/assets/img/missions/routine/plant/ */
 const PLANT_BASE = '/assets/img/missions/routine/plant'
 

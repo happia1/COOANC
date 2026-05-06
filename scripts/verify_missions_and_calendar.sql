@@ -24,3 +24,30 @@ from public.calendar_events
 group by family_link_id
 order by 일정수 desc
 limit 30;
+
+-- 4) 자녀( child )별 휴일 루틴 모드 — 주말에 weekly 만 쓸지(`custom`) / 평일과 같음(`as_weekday`)
+select id::text, name, holiday_routine_mode::text
+from public.profiles
+where role = 'child'
+order by name nulls last;
+
+-- 5) 자녀 전용 일상 미션 — repeat_type 별 개수 (주말 풀은 보통 weekly)
+--    linked_child_id 가 null 이면 자녀 홈 템플릿 풀에 절대 안 들어갑니다(부모「추가」복제만).
+select
+  linked_child_id::text as 자녀_id,
+  repeat_type::text,
+  count(*)::int as 개수
+from public.missions
+where linked_child_id is not null
+  and is_active = true
+  and repeat_type in ('daily', 'weekly')
+group by 1, 2
+order by 1, 2;
+
+-- 6) 제목별 시드 — 카드 PNG 매칭 점검용(고정 제목은 `src/lib/routineMissionThumbnail.ts` PNG_BY_TITLE 과 대조)
+select title, repeat_type::text, icon_emoji
+from public.missions
+where linked_child_id is not null
+  and is_active = true
+  and repeat_type in ('daily', 'weekly')
+order by linked_child_id, sort_order nulls last, title;

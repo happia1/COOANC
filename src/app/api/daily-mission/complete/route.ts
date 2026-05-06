@@ -7,6 +7,7 @@ import {
   isSeoulTimeBeforeNoon,
 } from '@/lib/missionHonestyTiming'
 import { scaledMissionRewards } from '@/lib/missionRewardMultiplier'
+import { isSpecialSectionMission } from '@/lib/specialMissionChips'
 import { resolveApiActorChildId } from '@/lib/resolveApiActorChildId'
 import { readChildStatInt } from '@/lib/childCreditsSplit'
 import type { Mission } from '@/types/database'
@@ -70,7 +71,7 @@ export async function POST(req: NextRequest) {
   const { data: mission } = await supabase
     .from('missions')
     .select(
-      'credit_reward, heart_reward, exp_reward, reward_multiplier, is_active, level_required, title, icon_emoji, block, scheduled_time',
+      'credit_reward, heart_reward, exp_reward, reward_multiplier, is_active, level_required, title, icon_emoji, block, scheduled_time, repeat_type, difficulty',
     )
     .eq('id', dm.mission_template_id)
     .maybeSingle()
@@ -123,6 +124,8 @@ export async function POST(req: NextRequest) {
   if (actorProfile?.role === 'child' && mission && peekStats) {
     const seoulNow = getSeoulTimeHHMM()
     const seoulToday = getSeoulDateString()
+    /** 스페셜은 「정오 전 오후」 완료 제한만 면제 — 잠 준비 전 취침 미션 제한은 동일 */
+    const skipAfternoonHonesty = isSpecialSectionMission(mission as Mission)
     const rawSr = typeof peekStats.sleep_ready_time === 'string' ? peekStats.sleep_ready_time.trim() : ''
     let sleepReadyNorm: string | null = null
     if (rawSr && /^\d{1,2}:\d{2}$/.test(rawSr)) {
@@ -145,6 +148,7 @@ export async function POST(req: NextRequest) {
       )
     }
     if (
+      !skipAfternoonHonesty &&
       isAfternoonMissionFields(mission.block, mission.scheduled_time) &&
       isSeoulTimeBeforeNoon(seoulNow)
     ) {

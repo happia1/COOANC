@@ -5,6 +5,10 @@
  * [functions.generate-daily-missions]
  * schedule = "0 0 * * *"
  *
+ * ⚠️ Next 자녀 홈(`src/app/(child)/home/page.tsx`)과 완전히 같지 않습니다.
+ * 여기서는 repeat_type(daily/weekly)·자녀 전용 템플릿 연결 등을 거치지 않고
+ * 활성 미션 전부를 넣을 수 있습니다. 실제 카드 노출은 앱 쪽 템플릿 풀 필터가 최종입니다.
+ *
  * 로직:
  * 1. 모든 family_links에서 활성 자녀 ID 조회
  * 2. 오늘 날짜 기준 calendar_events 조회
@@ -42,6 +46,17 @@ interface FamilyLink {
   parent_id: string
 }
 
+/** 앱 `getSeoulWeekdayShort` 과 같이 YYYY-MM-DD 를 한국 달력 요일로 해석 (UTC 자정 파싱 버그 방지) */
+function weekdayIndexKstYmd(ymd: string): number {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd.trim())
+  if (!m) return 1
+  const y = Number(m[1])
+  const mo = Number(m[2])
+  const d = Number(m[3])
+  const utcNoonKst = Date.UTC(y, mo - 1, d, 3, 0, 0)
+  return new Date(utcNoonKst).getUTCDay()
+}
+
 function getRoutineType(today: string, events: CalendarEvent[], childId: string, parentId: string): RoutineType {
   const ev = events.find(e =>
     today >= e.start_date && today <= e.end_date &&
@@ -53,7 +68,7 @@ function getRoutineType(today: string, events: CalendarEvent[], childId: string,
     if (ev.routine_override === 'weekday') return 'weekday'
     return 'vacation'
   }
-  const dow = new Date(today).getDay()
+  const dow = weekdayIndexKstYmd(today)
   return dow === 0 || dow === 6 ? 'weekend' : 'weekday'
 }
 
@@ -64,7 +79,13 @@ Deno.serve(async (_req) => {
     { auth: { autoRefreshToken: false, persistSession: false } },
   )
 
-  const today = new Date().toISOString().split('T')[0]
+  /** UTC `toISOString` 날짜는 한국 밤에 하루 어긋날 수 있음 — 앱은 Asia/Seoul 달력 사용 */
+  const today = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Seoul',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date())
 
   // 1. 모든 family_links 조회
   const { data: links, error: linksErr } = await supabase

@@ -6,6 +6,7 @@
  * 비개발자 설명:
  * - 「물 주기」를 누르면 보유 하트가 1 줄고, 식물 진행 바가 조금 찹니다.
  * - 단계는 0(씨앗)부터 7(다 익은 열매)까지예요.
+ * - 한 단계 오를 때마다 `water()` 가 `{ type: 'grew', newStage }` 를 돌려주고, 화면(`PlantStageCelebrationModal`)에서 팝업·콘페티를 띄웁니다.
  * - 완성(7단계) 이후에는 물 주기 탭 시 초기화되거나, 「씨앗 고르기」에서 `resetPot`으로 나무를 다시 정합니다.
  */
 
@@ -22,7 +23,11 @@ export type PotState = {
   completed: boolean
 }
 
-export type WaterResult = 'ok' | 'leveled_up' | 'completed' | 'no_hearts'
+/**
+ * 물 주기 결과
+ * - `grew`: 하트 소모 후 **새 성장 단계**에 도달(중간 레벨업이든 최종 완성이든 동일 — `newStage` 확인)
+ */
+export type WaterResult = 'ok' | 'no_hearts' | { type: 'grew'; newStage: PlantStage }
 
 const DEFAULT_TREE: PlantTreeId = 'apple'
 
@@ -116,8 +121,7 @@ export function usePlantPot(childId: string) {
 
     await refresh()
 
-    if (isCompleted) return 'completed'
-    if (levelUp) return 'leveled_up'
+    if (levelUp) return { type: 'grew', newStage }
     return 'ok'
   }, [pot, hearts, childId, supabase, refresh])
 

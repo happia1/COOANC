@@ -18,13 +18,15 @@ import { missionRoutineIconFrame } from '@/lib/missionRoutineIconFrame'
 import { resolveRoutineMissionPngUrl } from '@/lib/routineMissionThumbnail'
 import { isAfternoonMission } from '@/lib/missionAmPm'
 import {
+  CHILD_HOME_MISSION_CARD_AM_BG_CLASSNAME,
   CHILD_HOME_MISSION_CARD_IMAGE_BOX_CLAMP_CLASS,
+  CHILD_HOME_MISSION_CARD_PM_BG_CLASSNAME,
+  CHILD_HOME_MISSION_CARD_SPECIAL_BG_CLASSNAME,
+  CHILD_HOME_MISSION_CARD_SPECIAL_REWARD_PILL_BG_CLASSNAME,
   CHILD_HOME_MISSION_CARD_WIDTH_CLAMP_CLASS,
   CHILD_HOME_MISSION_FLUID_VW,
   childHomeMissionRewardIconSizePx,
   childHomeMissionSpriteWidthPx,
-  CHILD_TODAY_MISSION_CARD_AM_SHADOW_CLASSNAME,
-  CHILD_TODAY_MISSION_CARD_PM_SHADOW_CLASSNAME,
 } from '@/lib/missionTodayLayoutSpec'
 import { isSpecialSectionMission } from '@/lib/specialMissionChips'
 import type { DailyMissionWithTemplate } from '@/types/database'
@@ -96,12 +98,12 @@ export default function ChildMissionCard({ mission, onComplete, tapResetKey = 0 
 
   const rewards = scaledMissionRewards(m)
   const special = isSpecialSectionMission(m)
-  /** 오후 시간대 미션은 파란 그림자, 그 외(오전·미지정)는 노란 그림자 — 미션 탭과 동일 기준 */
-  const timeShadow = isAfternoonMission(mission)
-    ? CHILD_TODAY_MISSION_CARD_PM_SHADOW_CLASSNAME
-    : CHILD_TODAY_MISSION_CARD_AM_SHADOW_CLASSNAME
   const routineFrame = missionRoutineIconFrame(m.title, m.description)
-  const routineImagePath = resolveRoutineMissionPngUrl({ title: m.title, iconEmoji: m.icon_emoji })
+  const routineImagePath = resolveRoutineMissionPngUrl({
+    title: m.title,
+    iconEmoji: m.icon_emoji,
+    block: m.block,
+  })
 
   function handleTap() {
     if (firedRef.current) {
@@ -119,16 +121,20 @@ export default function ChildMissionCard({ mission, onComplete, tapResetKey = 0 
   }
 
   /**
-   * 카드 배경 — 특별 미션은 앰버 테두리, 일반은 연한 테두리(/80 투명도로 배경이 살짝 비침)
+   * 카드 배경 — 스페셜은 골드(`missionTodayLayoutSpec`), 일상은 오전 분홍 / 오후 파랑(`missionAmPm` 와 동일 기준).
    */
   const cardBg = special
-    ? 'border-amber-300 bg-gradient-to-b from-amber-50/80 via-amber-100/80 to-yellow-200/80 ring-2 ring-amber-200/60'
-    : 'border-[#ede9e0] bg-white/80 backdrop-blur-sm'
+    ? CHILD_HOME_MISSION_CARD_SPECIAL_BG_CLASSNAME
+    : isAfternoonMission(mission)
+      ? CHILD_HOME_MISSION_CARD_PM_BG_CLASSNAME
+      : CHILD_HOME_MISSION_CARD_AM_BG_CLASSNAME
 
-  /** 보상 알약·아이콘 행 클래스 — 한 곳에서만 조합해 스타일이 어긋나지 않게 함 */
+  /** 보상 알약·아이콘 행 클래스 — 스페셜은 골드 알약 전용 클래스(링은 CSS에서 처리) */
   const rewardPillClassName = [
-    '-mt-1.5 inline-flex max-w-full flex-wrap items-center justify-center gap-x-2 gap-y-0.5 rounded-full px-4 py-1 font-black tabular-nums tracking-tight text-[#888888] shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] ring-1 ring-black/[0.06] text-[clamp(0.8125rem,calc(0.75rem+0.14vw),1rem)]',
-    special ? 'bg-amber-100/90' : 'bg-stone-100/95',
+    '-mt-1.5 inline-flex max-w-full flex-wrap items-center justify-center gap-x-2 gap-y-0.5 rounded-full px-4 py-1 font-black tabular-nums tracking-tight text-[#888888] text-[clamp(0.8125rem,calc(0.75rem+0.14vw),1rem)]',
+    special
+      ? CHILD_HOME_MISSION_CARD_SPECIAL_REWARD_PILL_BG_CLASSNAME
+      : 'bg-stone-100/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] ring-1 ring-black/[0.06]',
   ].join(' ')
   const rewardTripleClassName =
     'flex flex-wrap items-center justify-center gap-x-2 gap-y-0.5'
@@ -141,10 +147,10 @@ export default function ChildMissionCard({ mission, onComplete, tapResetKey = 0 
         onClick={handleTap}
         aria-label={`${m.title} 미션 완료하기`}
         className={[
-          // 모바일 기준 너비 + 뷰포트가 넓어질수록 최대 1.3배( missionTodayLayoutSpec 의 clamp )
-          'flex flex-col items-center gap-[clamp(0.75rem,calc(0.55rem+0.55vw),1.125rem)] rounded-2xl border px-3 pt-4 pb-3 transition-all duration-300 focus:outline-none active:scale-[0.97]',
+          // 스페셜은 `.child-mission-card-gold` 안에서 테두리까지 그리므로 공통 `border` 를 빼 색이 덮이지 않게 함
+          'flex flex-col items-center gap-[clamp(0.75rem,calc(0.55rem+0.55vw),1.125rem)] rounded-2xl px-3 pt-4 pb-3 transition-all duration-300 focus:outline-none active:scale-[0.97]',
+          special ? '' : 'border',
           CHILD_HOME_MISSION_CARD_WIDTH_CLAMP_CLASS,
-          timeShadow,
           cardBg,
         ].join(' ')}
       >

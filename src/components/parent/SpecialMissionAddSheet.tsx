@@ -14,7 +14,7 @@ import { buildSpecialMissionDescription } from '@/lib/specialMissionDescription'
 import SpriteImage from '@/components/common/SpriteImage'
 import { MISSION_ROUTINES_ATLAS } from '@/constants/missionRoutineAtlas'
 import { missionRoutineIconFrame } from '@/lib/missionRoutineIconFrame'
-import { resolveRoutineMissionPngUrl } from '@/lib/routineMissionThumbnail'
+import { resolveRoutineMissionPngUrl, routineMissionIconEmojiForCreate } from '@/lib/routineMissionThumbnail'
 import {
   SPECIAL_MISSION_CHIPS,
   SPECIAL_MISSION_CHIP_CATEGORIES,
@@ -196,7 +196,7 @@ export default function SpecialMissionAddSheet({
           body: JSON.stringify({
             title: chip.title,
             description: desc,
-            icon_emoji: chip.emoji,
+            icon_emoji: routineMissionIconEmojiForCreate(chip.title),
             block: 'afternoon',
             scheduled_time: null,
             credit_reward: 15,

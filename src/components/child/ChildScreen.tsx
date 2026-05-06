@@ -7,17 +7,17 @@
  *
  * 비개발자 설명:
  * - 배경 이미지 위에 캐릭터가 서 있고, 하단에 오늘의 미션 카드가 가로로 스크롤됩니다.
- * - 상단 오른쪽(나가기 아래 스택) 아이콘을 탭하면 마켓은 항상 아래에서 올라오고, 코인·꾸미기는 폰·패드 세로에선 아래에서, 패드 가로(md+landscape)에선 오른쪽에서 열립니다.
+ * - 우측 상단 스택(나가기·뽀모도로·스티커·장바구니·코인)은 화면이 넓어질수록 문·타이머·스티커·장바구니는 최대 1.8배까지 커집니다. 마켓 패널은 아래에서 올라옵니다.
  * - 상단 오른쪽 나가기(유리 버튼)를 누르면 부모 화면으로 나갑니다.
  *
  * 레이아웃 레이어(아래 → 위):
  *   L1. 배경 이미지 (tablet_kidsroom_background_portrait.png)
  *   L2. 캐릭터 스프라이트 (앵커포인트 기반 배치)
- *   L3. UI 오버레이 (상단: 레벨·크레딧·하트 카드, 발 옆 화분·물조리개, 오른쪽 아이콘 열 + 미션 섹션)
+ *   L3. UI 오버레이 (상단: 레벨·크레딧·하트 카드, 발 옆 화분·물조리개, 우측 나가기~장바구니·코인 열 + 미션 섹션)
  *   L4. 패널 오버레이 (마켓: 항상 하단 슬라이드 / 코인·꾸미기: 세로는 하단·가로는 우측 / 스티커는 별도 시트)
  */
 
-import { useRef, useState, useCallback, useMemo, useEffect, memo } from 'react'
+import { Fragment, useRef, useState, useCallback, useMemo, useEffect, memo } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import RapidTapConfirmModal from '@/components/child/RapidTapConfirmModal'
@@ -57,6 +57,7 @@ import {
   CHILD_HOME_TOP_BAR_GLASS_STYLE,
 } from '@/lib/childHomeTopBarGlass'
 import { ASSETS, CHILD_HOME_BACKGROUND_CACHE_BUST } from '@/constants/assets'
+import type { PlantStage } from '@/constants/plantTrees'
 import type {
   ChildStats,
   DailyMissionWithTemplate,
@@ -74,6 +75,7 @@ import PlantPot from '@/components/child/PlantPot'
 import WateringCanButton from '@/components/child/WateringCanButton'
 import WaterHeartFlightOverlay from '@/components/child/WaterHeartFlightOverlay'
 import SeedSelectModal from '@/components/child/SeedSelectModal'
+import PlantStageCelebrationModal from '@/components/child/PlantStageCelebrationModal'
 import SleepModeScreen from '@/components/child/SleepModeScreen'
 import MorningWakeScreen from '@/components/child/MorningWakeScreen'
 import SleepReadyPopup from '@/components/child/SleepReadyPopup'
@@ -106,10 +108,15 @@ const LEVEL_BLOCK_SCALE_BASE_W = 400
 const LEVEL_BLOCK_SCALE_FULL_W = 820
 const LEVEL_BLOCK_SCALE_MAX = 1.7
 
-/** 문·타이머·스티커·장바구니(·코인) 스택 — 레벨 카드와 같은 너비 구간, 최대 1.3배까지만 키웁니다. */
-const RIGHT_ICON_STACK_SCALE_BASE_W = LEVEL_BLOCK_SCALE_BASE_W
-const RIGHT_ICON_STACK_SCALE_FULL_W = LEVEL_BLOCK_SCALE_FULL_W
-const RIGHT_ICON_STACK_SCALE_MAX = 1.3
+/** 문·뽀모도로·스티커·장바구니 네 버튼 — 레벨 카드와 같은 가로 구간에서 선형 확대, 최대 1.8배 */
+const RIGHT_ICON_PRIMARY_SCALE_BASE_W = LEVEL_BLOCK_SCALE_BASE_W
+const RIGHT_ICON_PRIMARY_SCALE_FULL_W = LEVEL_BLOCK_SCALE_FULL_W
+const RIGHT_ICON_PRIMARY_SCALE_MAX = 1.8
+
+/** 코인(💰)만 별도 — 같은 구간식이지만 최대 1.3배까지만(기존 상한 유지) */
+const RIGHT_ICON_COIN_SCALE_BASE_W = LEVEL_BLOCK_SCALE_BASE_W
+const RIGHT_ICON_COIN_SCALE_FULL_W = LEVEL_BLOCK_SCALE_FULL_W
+const RIGHT_ICON_COIN_SCALE_MAX = 1.3
 
 /** 화분·물조리개(발 옆) — 레벨 카드와 같은 너비 구간, 최대 1.5배까지 확대 */
 const PLANT_FEET_UI_SCALE_MAX = 1.5
@@ -190,19 +197,30 @@ function scaleForLevelBlock(containerWidthPx: number): number {
   )
 }
 
-function scaleForRightIconStack(containerWidthPx: number): number {
+/** 나가기·타이머·스티커·마켓 바구니 — 넓은 화면에서 최대 1.8배 */
+function scaleForRightIconPrimary(containerWidthPx: number): number {
   return scaleFromContainerWidth(
     containerWidthPx,
-    RIGHT_ICON_STACK_SCALE_BASE_W,
-    RIGHT_ICON_STACK_SCALE_FULL_W,
-    RIGHT_ICON_STACK_SCALE_MAX,
+    RIGHT_ICON_PRIMARY_SCALE_BASE_W,
+    RIGHT_ICON_PRIMARY_SCALE_FULL_W,
+    RIGHT_ICON_PRIMARY_SCALE_MAX,
+  )
+}
+
+/** 코인 버튼만 — 최대 1.3배 */
+function scaleForRightIconCoin(containerWidthPx: number): number {
+  return scaleFromContainerWidth(
+    containerWidthPx,
+    RIGHT_ICON_COIN_SCALE_BASE_W,
+    RIGHT_ICON_COIN_SCALE_FULL_W,
+    RIGHT_ICON_COIN_SCALE_MAX,
   )
 }
 
 /**
  * 우측 상단 나가기·타이머·스티커·장바구니(·코인) 버튼 셸 — 왼쪽 레벨 카드와 같은 유리 톤.
  * 비개발자: 레벨 블록과 똑같이 살짝 비치는 흰 배경, 흐림, 둥근 모서리로 맞춥니다.
- * 안 그림(문·시계·박스·바구니)은 그보다 한 단계 더 작게 넣어 전체가 덜 답답해 보이게 했습니다.
+ * 안 그림(문·타이머·스티커·바구니)은 같은 기본 크기(h-6/h-7)·화면이 넓으면 묶음 단위로 최대 1.8배까지 커집니다.
  */
 const CHILD_HOME_RIGHT_ICON_GLASS_CLASS = [
   CHILD_HOME_TOP_BAR_GLASS_CLASS,
@@ -422,10 +440,26 @@ export default function ChildScreen({
   const { pot, hearts: plantHearts, loading: plantLoading, water, resetPot } = usePlantPot(childId)
   /** 완성 후 씨앗 고르기 모달 */
   const [seedModalOpen, setSeedModalOpen] = useState(false)
+  /** 성장 단계 축하 팝업 — 도달한 단계 번호(null 이메 닫힘) */
+  const [plantCelebrateStage, setPlantCelebrateStage] = useState<PlantStage | null>(null)
+  /** 7단계 축하 팝업을 닫은 뒤에만 씨앗 선택 시트를 열지 표시 */
+  const openSeedAfterPlantCelebrateRef = useRef(false)
   /** 하트가 0일 때 물주기 시 잠깐 뜨는 안내 */
   const [plantHint, setPlantHint] = useState<string | null>(null)
 
   const openSeedModal = useCallback(() => setSeedModalOpen(true), [])
+
+  const handlePlantGrowthCelebrate = useCallback((newStage: PlantStage) => {
+    setPlantCelebrateStage(newStage)
+    if (newStage === 7) openSeedAfterPlantCelebrateRef.current = true
+  }, [])
+
+  const dismissPlantCelebrate = useCallback(() => {
+    setPlantCelebrateStage(null)
+    const needSeed = openSeedAfterPlantCelebrateRef.current
+    openSeedAfterPlantCelebrateRef.current = false
+    if (needSeed) openSeedModal()
+  }, [openSeedModal])
 
   /** 물줄 때 숫자는 상단 스탯과 맞추되, 스탯보다 훅이 먼저 갱신될 때를 대비해 둘 중 있는 값 사용 */
   const waterButtonHearts = stats?.hearts ?? plantHearts
@@ -480,6 +514,8 @@ export default function ChildScreen({
   /**
    * 서울 시각 기준으로 「오전에 오후 미션」「잠 준비 전 취침 미션」 탭을 막습니다.
    * 서버 `/api/daily-mission/complete` 와 같은 규칙입니다.
+   * 스페셜 미션(event·daily+special)은 「정오 전 오후 미션」 가드만 면제 — DB에 afternoon 블록이 있어도 오전에 완료 가능.
+   * 취침(bedtime) 블록 + 잠 준비 시각 가드는 스페셜도 동일하게 적용합니다.
    */
   const getHonestyBlockForMission = useCallback(
     (dm: DailyMissionWithTemplate): MissionHonestyBlockReason | null => {
@@ -498,7 +534,11 @@ export default function ChildScreen({
       ) {
         return 'bedtime_before_sleep_ready'
       }
-      if (isAfternoonMission(dm) && isSeoulTimeBeforeNoon(nowStr)) {
+      if (
+        !isSpecialSectionMission(dm.missions) &&
+        isAfternoonMission(dm) &&
+        isSeoulTimeBeforeNoon(nowStr)
+      ) {
         return 'afternoon_before_noon'
       }
       return null
@@ -1375,8 +1415,9 @@ export default function ChildScreen({
   /** 상단 왼쪽(레벨·크레딧 통합 카드) — 컨테이너 가로가 넓어질수록 최대 1.7배(글자·아이콘 동일 비율) */
   const levelBlockScale = useMemo(() => scaleForLevelBlock(containerW), [containerW])
 
-  /** 상단 오른쪽(문·타이머·스티커·장바구니·코인) — 같은 너비 기준, 최대 1.3배 */
-  const rightIconStackScale = useMemo(() => scaleForRightIconStack(containerW), [containerW])
+  /** 상단 우측: 문·타이머·스티커·장바구니 묶음 — 최대 1.8배 / 코인은 별도 1.3배 상한 */
+  const rightIconPrimaryScale = useMemo(() => scaleForRightIconPrimary(containerW), [containerW])
+  const rightIconCoinScale = useMemo(() => scaleForRightIconCoin(containerW), [containerW])
 
   /** 발 옆 화분·물조리개 — 실제 컨테이너 너비가 아니라 885px 기준과 동일한 배율(최대 1.5배)로 고정 */
   const plantFeetUiScale = useMemo(
@@ -1464,7 +1505,7 @@ export default function ChildScreen({
         <div className="absolute inset-0 z-20 flex flex-col pointer-events-none">
 
           {/*
-            상단: 왼쪽 레벨·크레딧·하트 카드 / 발 옆 화분·물조리개 / 오른쪽 아이콘 열.
+            상단: 왼쪽 레벨·크레딧·하트 카드 / 발 옆 화분·물조리개 / 우측 나가기·타이머·스티커·장바구니·코인 열.
           */}
           <div
             className="flex w-full items-start justify-between gap-3 px-4"
@@ -1492,90 +1533,102 @@ export default function ChildScreen({
               ) : null}
             </div>
 
-            <div
-              className="flex shrink-0 flex-col items-end gap-3 pointer-events-auto"
-              style={{
-                transformOrigin: 'top right',
-                transform: `scale(${rightIconStackScale})`,
-              }}
-            >
-              <a
-                href={exitHref}
-                className={`${CHILD_HOME_RIGHT_ICON_GLASS_CLASS} no-underline transition active:scale-95`}
-                style={CHILD_HOME_TOP_BAR_GLASS_STYLE}
-                aria-label="나가기"
+            <div className="flex shrink-0 flex-col items-end gap-3 pointer-events-auto">
+              {/*
+                문·뽀모도로·스티커·장바구니만 한 묶음으로 스케일 — 레벨 카드와 같은 가로폭 규칙으로 최대 1.8배.
+              */}
+              <div
+                className="flex flex-col items-end gap-3"
+                style={{
+                  transformOrigin: 'top right',
+                  transform: `scale(${rightIconPrimaryScale})`,
+                }}
               >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src="/assets/img/common/ui/exit.png"
-                  alt=""
-                  width={24}
-                  height={24}
-                  className="h-6 w-6 object-contain drop-shadow-md"
-                />
-              </a>
-              <button
-                type="button"
-                onClick={() => setClockPopupOpen(true)}
-                className={`${CHILD_HOME_RIGHT_ICON_GLASS_CLASS} border-0 bg-transparent p-0 transition-transform active:scale-90`}
-                style={CHILD_HOME_TOP_BAR_GLASS_STYLE}
-                aria-label="뽀모도로·알람 팝업 열기"
-              >
-                <SpriteImage
-                  sheet={ICONS}
-                  frame="timer"
-                  width={28}
-                  className="h-7 w-7 shrink-0 select-none object-contain drop-shadow-md"
-                />
-              </button>
-              {features.sticker && (
-                <button
-                  type="button"
-                  onClick={() => setActivePanel('sticker')}
-                  className={`${CHILD_HOME_RIGHT_ICON_GLASS_CLASS} border-0 bg-transparent p-0 transition active:scale-95`}
+                <a
+                  href={exitHref}
+                  className={`${CHILD_HOME_RIGHT_ICON_GLASS_CLASS} no-underline transition active:scale-95`}
                   style={CHILD_HOME_TOP_BAR_GLASS_STYLE}
-                  aria-label="칭찬 스티커 판 열기"
+                  aria-label="나가기"
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src="/assets/img/common/ui/luckybox.png"
+                    src="/assets/img/common/ui/exit.png"
                     alt=""
-                    width={28}
-                    height={28}
-                    className="h-7 w-7 object-contain drop-shadow-md"
+                    width={24}
+                    height={24}
+                    className="h-6 w-6 object-contain drop-shadow-md"
                   />
-                </button>
-              )}
-              {features.market && (
+                </a>
                 <button
                   type="button"
-                  onClick={() => setActivePanel('market')}
-                  className={`${CHILD_HOME_RIGHT_ICON_GLASS_CLASS} border-0 bg-transparent p-0 transition active:scale-95`}
+                  onClick={() => setClockPopupOpen(true)}
+                  className={`${CHILD_HOME_RIGHT_ICON_GLASS_CLASS} border-0 bg-transparent p-0 transition-transform active:scale-90`}
                   style={CHILD_HOME_TOP_BAR_GLASS_STYLE}
-                  aria-label="마켓 열기"
+                  aria-label="뽀모도로·알람 팝업 열기"
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src="/assets/img/common/ui/basket_filled.png"
-                    alt=""
+                  <SpriteImage
+                    sheet={ICONS}
+                    frame="timer"
                     width={28}
-                    height={28}
-                    className="h-7 w-7 object-contain drop-shadow-md"
+                    className="h-7 w-7 shrink-0 select-none object-contain drop-shadow-md"
                   />
                 </button>
-              )}
+                {features.sticker && (
+                  <button
+                    type="button"
+                    onClick={() => setActivePanel('sticker')}
+                    className={`${CHILD_HOME_RIGHT_ICON_GLASS_CLASS} border-0 bg-transparent p-0 transition active:scale-95`}
+                    style={CHILD_HOME_TOP_BAR_GLASS_STYLE}
+                    aria-label="칭찬 스티커 판 열기"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src="/assets/img/common/ui/luckybox.png"
+                      alt=""
+                      width={28}
+                      height={28}
+                      className="h-7 w-7 object-contain drop-shadow-md"
+                    />
+                  </button>
+                )}
+                {features.market && (
+                  <button
+                    type="button"
+                    onClick={() => setActivePanel('market')}
+                    className={`${CHILD_HOME_RIGHT_ICON_GLASS_CLASS} border-0 bg-transparent p-0 transition active:scale-95`}
+                    style={CHILD_HOME_TOP_BAR_GLASS_STYLE}
+                    aria-label="마켓 열기"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src="/assets/img/common/ui/basket_filled.png"
+                      alt=""
+                      width={28}
+                      height={28}
+                      className="h-7 w-7 object-contain drop-shadow-md"
+                    />
+                  </button>
+                )}
+              </div>
               {features.coinPocket && (
-                <button
-                  type="button"
-                  onClick={() => setActivePanel('coins')}
-                  className={`${CHILD_HOME_RIGHT_ICON_GLASS_CLASS} border-0 bg-transparent p-0 transition active:scale-95`}
-                  style={CHILD_HOME_TOP_BAR_GLASS_STYLE}
-                  aria-label="내 크레딧 열기"
+                <div
+                  style={{
+                    transformOrigin: 'top right',
+                    transform: `scale(${rightIconCoinScale})`,
+                  }}
                 >
-                  <span className="text-lg leading-none" role="img" aria-hidden>
-                    💰
-                  </span>
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => setActivePanel('coins')}
+                    className={`${CHILD_HOME_RIGHT_ICON_GLASS_CLASS} border-0 bg-transparent p-0 transition active:scale-95`}
+                    style={CHILD_HOME_TOP_BAR_GLASS_STYLE}
+                    aria-label="내 크레딧 열기"
+                  >
+                    <span className="text-lg leading-none" role="img" aria-hidden>
+                      💰
+                    </span>
+                  </button>
+                </div>
               )}
             </div>
           </div>
@@ -1638,14 +1691,13 @@ export default function ChildScreen({
                     onNoHearts={() =>
                       setPlantHint('하트가 부족해요! 미션을 하면 하트를 받을 수 있어요.')
                     }
-                    onCompleted={openSeedModal}
+                    onGrowthCelebrate={handlePlantGrowthCelebrate}
                     onPourVisual={() => setHeartFlightTrigger((n) => n + 1)}
                   />
                 </div>
               </div>
             </>
           ) : null}
-
           {/* ── 스페이서 ────────────────────────────────────────────────── */}
           <div className="flex-1" />
 
@@ -1685,14 +1737,32 @@ export default function ChildScreen({
                 className="flex snap-x snap-mandatory flex-row overflow-x-auto px-5 pb-3 pt-1 min-[400px]:px-6 [scrollbar-width:none] [scroll-padding-left:1.25rem] [scroll-padding-right:1.25rem] min-[400px]:[scroll-padding-left:1.5rem] min-[400px]:[scroll-padding-right:1.5rem] [gap:clamp(0.75rem,calc(0.5rem+0.9vw),1.25rem)] [&::-webkit-scrollbar]:hidden"
                 style={{ WebkitOverflowScrolling: 'touch' }}
               >
-                {incompleteOrdered.map((mission) => (
-                  <ChildMissionCard
-                    key={mission.id}
-                    mission={mission}
-                    tapResetKey={missionTapUnblock[mission.id] ?? 0}
-                    onComplete={handleMissionComplete}
-                  />
-                ))}
+                {incompleteOrdered.map((mission, idx) => {
+                  /**
+                   * 부모 루틴과 같은 기준(`isAfternoonMission`): 오전 블록/morning·정오 전 시각 → 오후 블록 또는 12시 이후 시각.
+                   * 바로 앞 카드가 오전이고 현재 카드가 오후일 때만 세로 구분선을 넣어 가로 스크롤 줄에서 구역이 보이게 합니다.
+                   */
+                  const prev = idx > 0 ? incompleteOrdered[idx - 1] : null
+                  const showMorningAfternoonDivider =
+                    prev != null && !isAfternoonMission(prev) && isAfternoonMission(mission)
+
+                  return (
+                    <Fragment key={mission.id}>
+                      {showMorningAfternoonDivider ? (
+                        <div
+                          role="separator"
+                          aria-hidden
+                          className="pointer-events-none shrink-0 self-stretch w-px min-h-[5rem] bg-white/45 shadow-[1px_0_0_rgba(0,0,0,0.08)] mx-[clamp(2px,calc(0.25rem+0.2vw),6px)]"
+                        />
+                      ) : null}
+                      <ChildMissionCard
+                        mission={mission}
+                        tapResetKey={missionTapUnblock[mission.id] ?? 0}
+                        onComplete={handleMissionComplete}
+                      />
+                    </Fragment>
+                  )
+                })}
               </div>
             )}
           </div>
@@ -1741,6 +1811,8 @@ export default function ChildScreen({
           setHonestyBlockReason(null)
         }}
       />
+
+      <PlantStageCelebrationModal open={plantCelebrateStage !== null} stage={plantCelebrateStage} onClose={dismissPlantCelebrate} />
 
       <RapidTapConfirmModal
         open={rapidTapModalOpen}

@@ -3,7 +3,14 @@
  */
 
 import type { Mission } from '@/types/database'
+import { routineMissionIconEmojiForCreate } from '@/lib/routineMissionThumbnail'
+import {
+  canonicalRoutineChipMatchTitle,
+  MISSION_TITLE_ALIASES,
+} from '@/lib/routineMissionTitleCanon'
 import { isRoutineSectionMission, isSpecialSectionMission } from '@/lib/specialMissionChips'
+
+export { canonicalRoutineChipMatchTitle }
 
 export type ApiBlock = 'morning' | 'afternoon' | 'evening' | 'bedtime'
 export type ChipType = 'fixed' | 'recommended' | 'optional'
@@ -22,22 +29,31 @@ export const AM_CHIPS: ChipDef[] = [
   { id: 'am-wash', title: '세수하기', emoji: '', type: 'recommended', apiBlock: 'morning' },
   { id: 'am-brush', title: '양치', emoji: '', type: 'recommended', apiBlock: 'morning' },
   { id: 'am-meal', title: '아침식사', emoji: '', type: 'recommended', apiBlock: 'morning' },
+  /** 오전 물마시기 — 썸네일 `a.m/water.png` */
   { id: 'am-water', title: '물마시기', emoji: '', type: 'recommended', apiBlock: 'morning' },
+  /** 화장실 다녀오기 */
+  { id: 'am-toilet', title: '화장실', emoji: '', type: 'optional', apiBlock: 'morning' },
+  /** 마스크 챙기기·착용 */
+  { id: 'am-mask', title: '마스크', emoji: '', type: 'optional', apiBlock: 'morning' },
   { id: 'am-dress', title: '옷 갈아입기', emoji: '', type: 'recommended', apiBlock: 'morning' },
-  { id: 'am-bag', title: '가방 챙기기', emoji: '', type: 'optional', apiBlock: 'morning' },
   { id: 'am-school', title: '등원하기', emoji: '', type: 'optional', hideWhenNoSchool: true, apiBlock: 'morning' },
 ]
 
 export const PM_CHIPS: ChipDef[] = [
   { id: 'pm-hands', title: '손씻기', emoji: '', type: 'recommended', apiBlock: 'afternoon' },
-  { id: 'pm-water', title: '물마시기', emoji: '', type: 'recommended', apiBlock: 'afternoon' },
+  /**
+   * 오후·저녁을 한 줄(UI)로 묶되, 오전 「물마시기」와 이름이 겹치지 않게 구분합니다.
+   * 예전 DB 에 오후 블록으로 「물마시기」만 적혀 있어도 `canonicalRoutineChipMatchTitle` 로 이 칩에 연결됩니다.
+   */
+  { id: 'pm-water', title: '저녁 물마시기', emoji: '', type: 'recommended', apiBlock: 'afternoon' },
   { id: 'pm-out', title: '야외놀이', emoji: '', type: 'optional', apiBlock: 'afternoon' },
   { id: 'pm-in', title: '실내놀이', emoji: '', type: 'optional', apiBlock: 'afternoon' },
   { id: 'pm-read', title: '독서활동', emoji: '', type: 'optional', apiBlock: 'afternoon' },
   { id: 'pm-hw', title: '숙제하기', emoji: '', type: 'optional', apiBlock: 'afternoon' },
   { id: 'pm-dinner', title: '저녁식사', emoji: '', type: 'recommended', apiBlock: 'evening' },
   { id: 'pm-tidy', title: '모두 제자리', emoji: '', type: 'recommended', apiBlock: 'evening' },
-  { id: 'pm-bath', title: '목욕/샤워', emoji: '', type: 'optional', apiBlock: 'evening' },
+  /** 샤워만 따로 루틴에 넣을 때 — 썸네일 `p.m/shower.png` (`목욕/샤워` 옛 칩은 별칭으로 여기와 통합) */
+  { id: 'pm-shower', title: '샤워하기', emoji: '', type: 'optional', apiBlock: 'evening' },
   { id: 'pm-brush', title: '잠자리 양치', emoji: '', type: 'recommended', apiBlock: 'bedtime' },
   { id: 'pm-pajama', title: '잠옷 갈아입기', emoji: '', type: 'recommended', apiBlock: 'bedtime' },
   { id: 'pm-bedread', title: '잠자리 독서', emoji: '', type: 'optional', apiBlock: 'bedtime' },
@@ -45,7 +61,7 @@ export const PM_CHIPS: ChipDef[] = [
   { id: 'pm-sleep', title: '잘 시간', emoji: '', type: 'fixed', apiBlock: 'bedtime' },
 ]
 
-/** 기상 → 취침 순서(오전 칩 먼저, 이어서 오후~취침) — 정렬 시 같은 제목(물마시기 등)은 block 으로 구분 */
+/** 기상 → 취침 순서(오전 칩 먼저, 이어서 오후~취침). DB 의 afternoon/evening/bedtime 은 한 줄 슬라이더에 함께 보입니다. */
 const ALL_ROUTINE_FLOW_CHIPS: ChipDef[] = [...AM_CHIPS, ...PM_CHIPS]
 
 /** 미션 정렬용 최소 필드( DB Mission 과 호환 ) */
@@ -63,28 +79,12 @@ function minutesFromHHMMSafe(t: string | null | undefined): number {
 }
 
 /**
- * DB 미션 제목 → 칩 제목 정규화 별칭 테이블.
- * 마이그레이션 이전에 저장된 구버전 제목도 올바른 칩 순위를 받도록 합니다.
- * - '일어나기' → '기상': 046 마이그레이션 이전 전역 템플릿 제목
- * - '양치하기'  → '양치': 046 이전 전역 템플릿 제목
- */
-const MISSION_TITLE_ALIASES: Record<string, string> = {
-  '일어나기': '기상',
-  '양치하기': '양치',
-  /** 구 버전 미션 제목 — 칩 제목 「잘 시간」 과 동일한 슬롯으로 취급합니다. */
-  취침: '잘 시간',
-  /** 구 DB/시드 — 칩·정렬 키는 "세수하기" 로 통일 */
-  세수: '세수하기',
-}
-
-/**
  * 기상부터 취침까지 일상 루틴에 맞는 순서 점수(작을수록 앞).
  * 제목이 칩과 같으면 칩 순서를 쓰고, 아니면 block·시간으로 뒤에 배치합니다.
  * 별칭 테이블에 있는 제목도 해당 칩의 순위를 받습니다.
  */
 export function routineMissionFlowRank(m: RoutineFlowSortable): number {
-  const raw = m.title.trim()
-  const title = MISSION_TITLE_ALIASES[raw] ?? raw
+  const title = canonicalRoutineChipMatchTitle(m)
   const candidates = ALL_ROUTINE_FLOW_CHIPS.map((c, i) => ({ c, i })).filter((x) => x.c.title === title)
   if (candidates.length > 0) {
     if (candidates.length > 1 && m.block) {
@@ -148,6 +148,8 @@ export const ROUTINE_KEYWORD_CHIP_TITLES: string[] = [...AM_CHIPS, ...PM_CHIPS].
 const RETIRED_ROUTINE_MISSION_TITLES = new Set<string>([
   /** `세수하기`로 통일 — 구 템플릿 제목은 카드에서 숨김(065 마이그레이션·DB 삭제과 병행). `간식먹기`는 폐지 목록에서 제거(활성 미션). */
   '세수',
+  /** 키워드 칩에서 제거됨 — 남아 있는 템플릿 행은 카드에서 숨김 */
+  '가방 챙기기',
 ])
 
 /** 입력 제목이 폐지된 일상 미션인지 확인합니다. */
@@ -276,8 +278,8 @@ export function deriveRoutineKeywordUiState(params: {
   const daily = routine.filter((m) => m.repeat_type === 'daily')
   const weekly = routine.filter((m) => m.repeat_type === 'weekly')
 
-  const dailyActiveTitles = new Set(daily.filter((m) => m.is_active).map((m) => m.title.trim()))
-  const weeklyActiveTitles = new Set(weekly.filter((m) => m.is_active).map((m) => m.title.trim()))
+  const dailyActiveTitles = new Set(daily.filter((m) => m.is_active).map((m) => canonicalRoutineChipMatchTitle(m)))
+  const weeklyActiveTitles = new Set(weekly.filter((m) => m.is_active).map((m) => canonicalRoutineChipMatchTitle(m)))
 
   const weekdayAm = AM_CHIPS.filter(
     (c) => dailyActiveTitles.has(c.title) && (!c.hideWhenNoSchool || hasSchool),
@@ -418,7 +420,7 @@ async function createMissionsFromIds(
       body: JSON.stringify({
         title: chip.title,
         description,
-        icon_emoji: chip.emoji.trim() || '·',
+        icon_emoji: routineMissionIconEmojiForCreate(chip.title),
         block: chip.apiBlock,
         scheduled_time: time,
         credit_reward: 10,

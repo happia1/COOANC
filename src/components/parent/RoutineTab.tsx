@@ -59,7 +59,11 @@ import SortableHorizontalMissionStrip from '@/components/parent/SortableHorizont
  * - PNG 가 없으면 `routines_01` 아틀라스에서 제목·설명으로 프레임을 고릅니다.
  */
 function MissionIconThumb({ mission, size = 36 }: { mission: Mission; size?: number }) {
-  const png = resolveRoutineMissionPngUrl({ title: mission.title, iconEmoji: mission.icon_emoji })
+  const png = resolveRoutineMissionPngUrl({
+    title: mission.title,
+    iconEmoji: mission.icon_emoji,
+    block: mission.block,
+  })
   if (png) {
     return (
       // eslint-disable-next-line @next/next/no-img-element -- public 정적 경로, 미션 이미지 직접 표시
@@ -181,9 +185,9 @@ const ROUTINE_DESC_TEXT_CLASS = 'text-[10px] font-normal leading-snug text-gray-
 const ROUTINE_DESC_TRUNCATE_CLASS = `min-w-0 truncate ${ROUTINE_DESC_TEXT_CLASS}`
 
 const ROUTINE_WEEKDAY_AM_CAPTION = '주중 오전 일정을 세팅'
-const ROUTINE_WEEKDAY_PM_CAPTION = '주중 오후 일정을 세팅'
+const ROUTINE_WEEKDAY_PM_CAPTION = '주중 오후·저녁·잠자리까지 한 줄로 세팅'
 const ROUTINE_WEEKEND_AM_CAPTION = '주말／공휴일 오전 일정을 세팅'
-const ROUTINE_WEEKEND_PM_CAPTION = '주말／공휴일 오후 일정을 세팅'
+const ROUTINE_WEEKEND_PM_CAPTION = '주말／공휴일 오후·저녁·잠자리까지 한 줄로 세팅'
 
 /**
  * 일상 미션 가로 줄 — 카드 자체를 드래그해 순서를 바꾸면 `/api/mission/reorder` 로 저장됩니다.
@@ -288,7 +292,7 @@ function AmPmRoutineBlock({
         className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left transition-colors hover:bg-gray-50"
       >
         <span className="flex min-w-0 flex-1 items-center gap-2">
-          <span className="shrink-0 text-xs font-bold text-gray-700">오후</span>
+          <span className="shrink-0 text-xs font-bold text-gray-700">오후·저녁</span>
           {pmCaption ? <span className={`min-w-0 ${ROUTINE_DESC_TEXT_CLASS}`}>{pmCaption}</span> : null}
         </span>
         <ChevronToggleIcon open={openPm} className="shrink-0 text-gray-400" />
@@ -846,7 +850,7 @@ export default function RoutineTab({
                       onToggleAm={() => setOpenWeekdayAm((v) => !v)}
                       onTogglePm={() => setOpenWeekdayPm((v) => !v)}
                       emptyAmHint="오전 미션이 없어요"
-                      emptyPmHint="오후 미션이 없어요"
+                      emptyPmHint="오후·저녁 미션이 없어요"
                       onOpenRewardEditor={setRewardEditMission}
                       amCaption={ROUTINE_WEEKDAY_AM_CAPTION}
                       pmCaption={ROUTINE_WEEKDAY_PM_CAPTION}
@@ -871,7 +875,7 @@ export default function RoutineTab({
                       onToggleAm={() => setOpenWeekendAm((v) => !v)}
                       onTogglePm={() => setOpenWeekendPm((v) => !v)}
                       emptyAmHint="오전 미션이 없어요"
-                      emptyPmHint="오후 미션이 없어요"
+                      emptyPmHint="오후·저녁 미션이 없어요"
                       onOpenRewardEditor={setRewardEditMission}
                       amCaption={ROUTINE_WEEKEND_AM_CAPTION}
                       pmCaption={ROUTINE_WEEKEND_PM_CAPTION}

@@ -2,11 +2,12 @@
  * 루틴 탭 — 스페셜(이벤트성) 미션 키워드 칩 정의
  * - 「데일리 설정」이면 repeat_type: daily + difficulty: special (자녀 앱에서 매일 오늘 카드에 포함)
  * - 끄면 repeat_type: event + 오늘 배정 API로 하루만 넣기
+ * - 칩 옆 그림은 이모지 대신 `routineMissionThumbnail.resolveRoutineMissionPngUrl`(제목 기준 PNG)로 표시합니다.
  */
 
 import type { Mission } from '@/types/database'
 
-/** 칩 한 줄 정의 */
+/** 칩 한 줄 정의 — `emoji` 는 레거시 필드(비워 두고, UI 는 PNG 를 사용) */
 export type SpecialMissionChipDef = {
   id: string
   title: string
@@ -15,7 +16,7 @@ export type SpecialMissionChipDef = {
   defaultPopupMessage: string
 }
 
-/** 스페셜 미션 칩 카테고리(시트에서 섹션별로 묶어 표시) */
+/** 스페셜 미션 시트에서 보여줄 카테고리 순서 */
 export type SpecialMissionChipCategoryDef = {
   id: string
   label: string
@@ -26,99 +27,105 @@ export type SpecialMissionChipCategoryDef = {
 export const SPECIAL_MISSION_CHIPS: SpecialMissionChipDef[] = [
   {
     id: 'sp-meal',
-    title: '식사준비돕기',
-    emoji: '🥗',
+    /** 카드·칩에 보이는 짧은 이름 — 공백은 「준비」와 「돕기」만 구분 (PNG 매핑 키와 동일) */
+    title: '식사준비 돕기',
+    emoji: '',
     defaultPopupMessage: '식사 준비를 함께 도와주어요.',
   },
   {
     id: 'sp-greet',
     title: '인사잘하기',
-    emoji: '🙋',
+    emoji: '',
     defaultPopupMessage: '오늘은 밝게 인사해 보아요!',
+  },
+  {
+    id: 'sp-pray',
+    title: '기도',
+    emoji: '',
+    defaultPopupMessage: '오늘 하루를 작게 기도해 보아요.',
   },
   {
     id: 'sp-massage',
     title: '어깨마사지',
-    emoji: '💆',
+    emoji: '',
     defaultPopupMessage: '부모님 어깨를 살살 주물러 드려요.',
   },
   {
     id: 'sp-recycle',
     title: '분리수거',
-    emoji: '♻️',
+    emoji: '',
     defaultPopupMessage: '분리수거를 정확히 해보아요.',
   },
   {
     id: 'sp-exercise',
     title: '운동하기',
-    emoji: '🏃',
+    emoji: '',
     defaultPopupMessage: '오늘은 몸을 조금 움직여 보아요!',
   },
   {
     id: 'sp-water-plant',
     title: '화분 물주기',
-    emoji: '🪴',
+    emoji: '',
     defaultPopupMessage: '화분 흙 상태를 보고 알맞게 물을 주세요.',
   },
   {
     id: 'sp-saving',
     title: '저축하기',
-    emoji: '💰',
+    emoji: '',
     defaultPopupMessage: '오늘 쓴 돈을 확인하고 조금씩 저축해 보아요.',
   },
   {
     id: 'sp-fold-laundry',
     title: '빨래개기',
-    emoji: '👕',
+    emoji: '',
     defaultPopupMessage: '빨래한 옷을 가지런히 개어 정리해요.',
   },
   {
     id: 'sp-meditation',
     title: '명상하기',
-    emoji: '🧘',
+    emoji: '',
     defaultPopupMessage: '잠깐 눈을 감고 천천히 숨을 쉬어 보아요.',
   },
   {
     id: 'sp-homework',
     title: '숙제하기',
-    emoji: '📘',
+    emoji: '',
     defaultPopupMessage: '해야 할 숙제를 스스로 끝내 보아요.',
   },
   {
     id: 'sp-veggies',
     title: '야채먹기',
-    emoji: '🥬',
+    emoji: '',
     defaultPopupMessage: '야채를 맛있게 먹어 보아요.',
   },
   {
     id: 'sp-finish-meal',
-    /** 요청사항: 표시 문구를 '식사 후 정리'에서 '밥 다 먹기'로 변경 */
     title: '밥 다 먹기',
-    emoji: '🍽️',
-    defaultPopupMessage: '식사가 끝나면 자리와 그릇을 정리해요.',
+    emoji: '',
+    defaultPopupMessage: '오늘도 반찬을 골고루 먹어 보아요!',
+  },
+  {
+    id: 'sp-after-meal-clear',
+    title: '식사 후 정리하기',
+    emoji: '',
+    defaultPopupMessage: '식사가 끝나면 그릇과 식탁을 정리해요.',
   },
   {
     id: 'sp-laundry-basket',
     title: '빨래통에넣기',
-    emoji: '🧺',
+    emoji: '',
     defaultPopupMessage: '입었던 옷을 빨래통에 넣어 두어요.',
   },
   {
     id: 'sp-laundry-tidy',
     title: '외투걸어놓기',
-    emoji: '🧥',
+    emoji: '',
     defaultPopupMessage: '다녀온 외투를 옷걸이나 지정한 곳에 걸어 두어요.',
-  },
-  {
-    id: 'sp-bag-tidy',
-    title: '가방정리',
-    emoji: '🎒',
-    defaultPopupMessage: '가방 안을 깔끔하게 정리해요.',
   },
   {
     id: 'sp-nails',
     title: '손톱깎기',
-    emoji: '✂️',
+    emoji: '',
     defaultPopupMessage: '손톱을 깔끔하게 다듬어요.',
   },
 ]
@@ -134,14 +141,14 @@ export const SPECIAL_MISSION_CHIP_CATEGORIES: SpecialMissionChipCategoryDef[] = 
       'sp-laundry-tidy',
       'sp-meal',
       'sp-finish-meal',
-      'sp-bag-tidy',
+      'sp-after-meal-clear',
       'sp-recycle',
     ],
   },
   {
     id: 'manners',
     label: '예절',
-    chipIds: ['sp-greet', 'sp-massage'],
+    chipIds: ['sp-greet', 'sp-pray', 'sp-massage'],
   },
   {
     id: 'health-beauty',
@@ -155,9 +162,11 @@ export const SPECIAL_MISSION_CHIP_CATEGORIES: SpecialMissionChipCategoryDef[] = 
  * DB에 옛 짧은 이름(인사, 어깨)이 남아 있어도 시트·카드에서 새 이름으로 이어집니다.
  */
 const LEGACY_SPECIAL_TITLE_TO_SHORT: Record<string, string> = {
-  식사준비: '식사준비돕기',
-  식사준비하기: '식사준비돕기',
-  '식사준비 돕기': '식사준비돕기',
+  식사준비: '식사준비 돕기',
+  식사준비하기: '식사준비 돕기',
+  /** 예전 한 줄 표기 — 칩 제목과 맞춥니다 */
+  식사준비돕기: '식사준비 돕기',
+  '식사 준비 돕기': '식사준비 돕기',
   '인사 잘하기': '인사잘하기',
   인사: '인사잘하기',
   화분에물주기: '화분 물주기',
@@ -166,17 +175,17 @@ const LEGACY_SPECIAL_TITLE_TO_SHORT: Record<string, string> = {
   '부모님 어깨 주물러드리기': '어깨마사지',
   어깨: '어깨마사지',
   분리수거하기: '분리수거',
+  /** 폐지된 칩 — 매칭만 남기고 아래 RETIRED 에서 숨김 */
   가방정리하기: '가방정리',
   '빨래통에 넣기': '빨래통에넣기',
   '외투 걸어두기': '외투걸어놓기',
-  /** 예전 칩 이름 → 지금 시트에 맞는 짧은 제목(썸네일·시트 매칭) */
-  /** 과거 제목들은 새 표시명(밥 다 먹기)으로 통일 */
   '밥 다먹기': '밥 다 먹기',
   밥그릇비우기: '밥 다 먹기',
   '밥그릇 비우기': '밥 다 먹기',
-  식사후정리: '밥 다 먹기',
-  '식사후 정리': '밥 다 먹기',
-  '식사 후 정리': '밥 다 먹기',
+  /** 예전 「식사 후 정리」류는 그릇 정리 칩으로 통합 */
+  식사후정리: '식사 후 정리하기',
+  '식사후 정리': '식사 후 정리하기',
+  '식사 후 정리': '식사 후 정리하기',
   빨래정리: '외투걸어놓기',
   '빨래 정리': '외투걸어놓기',
 }
@@ -200,6 +209,8 @@ const RETIRED_SPECIAL_DISPLAY_TITLES = new Set<string>([
   /** 과거 시드/레거시 미션: 더 이상 사용하지 않음 */
   '스스로양말신기',
   '양말신기',
+  /** 스페셜 「가방정리」 칩 제거 — 구 템플릿만 남은 경우 숨김 */
+  '가방정리',
 ])
 
 /** 저장된 제목이 폐지된 스페셜 키워드인지 (레거시 별칭을 짧은 제목으로 푼 뒤에도 검사) */
@@ -209,16 +220,19 @@ export function isRetiredSpecialMissionTitle(storedTitle: string): boolean {
   return RETIRED_SPECIAL_DISPLAY_TITLES.has(raw) || RETIRED_SPECIAL_DISPLAY_TITLES.has(resolved)
 }
 
-/** 스페셜 UI·자녀 앱 스페셜 구역에 넣을 미션인지 (event 템플릿 또는 매일 자동 스페셜 키워드) */
+/**
+ * 스페셜 UI·자녀 앱 스페셜 구역 미션 여부.
+ * - 이벤트형(`repeat_type: event`) 또는 난이도 `special`(매일·주간 스페셜 모두 포함).
+ * 예전에는 주간(`weekly`) + `special` 만 두 면 일상으로 잘못 분류되던 경우가 있어 `difficulty` 로 통일합니다.
+ */
 export function isSpecialSectionMission(m: Pick<Mission, 'repeat_type' | 'difficulty'>): boolean {
-  return m.repeat_type === 'event' || (m.repeat_type === 'daily' && m.difficulty === 'special')
+  if (m.repeat_type === 'event') return true
+  return m.difficulty === 'special'
 }
 
-/** 일상 미션(주중·주말 블록)에 넣을 루틴 템플릿인지 — 스페셜 키워드 데일리는 제외 */
+/** 일상 미션(주중·주말 블록) 템플릿 여부 — 이벤트·special 난이도 제외 */
 export function isRoutineSectionMission(m: Pick<Mission, 'repeat_type' | 'difficulty'>): boolean {
-  if (m.repeat_type === 'event') return false
-  if (m.repeat_type === 'daily' && m.difficulty === 'special') return false
-  return true
+  return !isSpecialSectionMission(m)
 }
 
 /** 스페셜 시트용 — DB에 저장된 제목(레거시 긴 이름 포함)을 칩 id 로 바꿉니다. 없으면 null */

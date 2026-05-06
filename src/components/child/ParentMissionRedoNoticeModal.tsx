@@ -30,7 +30,11 @@ export default function ParentMissionRedoNoticeModal({ mission, onClose }: Props
   const m = mission.missions
   const special = isSpecialSectionMission(m)
   const routineFrame = missionRoutineIconFrame(m.title, m.description)
-  const routineImagePath = resolveRoutineMissionPngUrl({ title: m.title, iconEmoji: m.icon_emoji })
+  const routineImagePath = resolveRoutineMissionPngUrl({
+    title: m.title,
+    iconEmoji: m.icon_emoji,
+    block: m.block,
+  })
   const imgBg = special ? 'bg-amber-100' : 'bg-[#FFF0E8]'
 
   const modal = (

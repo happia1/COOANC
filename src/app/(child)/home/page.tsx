@@ -16,11 +16,15 @@ import { getCachedProfileRowById, getCachedFamilyLinksForChild } from '@/lib/chi
 import { getActorChildContext } from '@/lib/getActorChildContext'
 import { getMissionTemplatesForChildMissionPage } from '@/lib/missionsTemplateCache'
 import { getSeoulDateString } from '@/lib/koreaDate'
-import { uuidStringsEqual } from '@/lib/normalizeUuid'
 import { applyStoreItemCreditOverrides } from '@/lib/applyStoreItemCreditOverrides'
 import { readChildStatInt } from '@/lib/childCreditsSplit'
 import { isCategoryExcludedFromMarket } from '@/lib/parentMarketMenuSections'
 import { fetchCalendarEventsForChildRoutine, resolveRoutineTypeFromCalEvents } from '@/lib/childRoutineCalendar'
+import {
+  filterDailyMissionsByTemplatePool,
+  templatePoolForMissionDay,
+  type MissionDayRoutineType,
+} from '@/lib/missionDayTemplatePool'
 import ChildScreen from '@/components/child/ChildScreen'
 import type {
   ChildStats,
@@ -38,9 +42,7 @@ export const dynamic = 'force-dynamic'
 export const revalidate = 0
 export const preferredRegion = 'hnd1'
 
-// ─── 미션 관련 헬퍼 (mission/page.tsx 에서 이동) ────────────────────────────
-
-type RoutineType = 'weekday' | 'weekend' | 'holiday' | 'vacation'
+// ─── 미션 관련 헬퍼 ────────────────────────────────────────────────────────
 
 /**
  * DB에 `missions.sort_order` 컬럼이 아직 반영되지 않은 환경(마이그레이션 미적용)에서도
@@ -49,41 +51,6 @@ type RoutineType = 'weekday' | 'weekend' | 'holiday' | 'vacation'
 function isMissingSortOrderColumn(message: string | undefined): boolean {
   if (!message) return false
   return /missions\.sort_order/i.test(message) && /does not exist/i.test(message)
-}
-
-/**
- * 오늘 routine_type·휴일 루틴 모드에 맞는 이 자녀 전용 템플릿 풀 — `mission/page.tsx` 와 동일 규칙
- * (주말 + `custom` 이면 weekly 만, 평일은 daily 만)
- */
-function templatePoolForToday(
-  templates: Mission[],
-  childId: string,
-  level: number,
-  routineType: RoutineType,
-  holidayRoutineMode: 'as_weekday' | 'custom' | null,
-): Mission[] {
-  if (routineType === 'holiday') return []
-
-  const linked = templates.filter(
-    (m) =>
-      m.is_active &&
-      m.level_required <= level &&
-      uuidStringsEqual(m.linked_child_id, childId) &&
-      m.repeat_type !== 'event',
-  )
-
-  const dailyOrWeekly = linked.filter((m) => m.repeat_type === 'daily' || m.repeat_type === 'weekly')
-
-  if (routineType === 'weekday') {
-    return dailyOrWeekly.filter((m) => m.repeat_type === 'daily')
-  }
-
-  if (routineType === 'weekend' && holidayRoutineMode === 'custom') {
-    return dailyOrWeekly.filter((m) => m.repeat_type === 'weekly')
-  }
-
-  const weekly = dailyOrWeekly.filter((m) => m.repeat_type === 'weekly')
-  return weekly.length > 0 ? weekly : dailyOrWeekly.filter((m) => m.repeat_type === 'daily')
 }
 
 /**
@@ -258,13 +225,13 @@ export default async function ChildHomePage() {
         .order('scheduled_time', { ascending: true, nullsFirst: false })
     : dailyMissionsResWithSort
 
-  const routineType: RoutineType = resolveRoutineTypeFromCalEvents(today, calEvents)
+  const routineType: MissionDayRoutineType = resolveRoutineTypeFromCalEvents(today, calEvents)
 
   if (templatesRes.error) {
     console.error('[child/home] missions select', templatesRes.error.message)
   }
 
-  const pool = templatePoolForToday(
+  const pool = templatePoolForMissionDay(
     (templatesRes.data ?? []) as Mission[],
     childId,
     level,
@@ -317,7 +284,11 @@ export default async function ChildHomePage() {
     existing = (refetchResolved.data ?? []) as DailyMissionWithTemplate[]
   }
 
-  const dailyMissions = existing
+  /**
+   * 오늘의 일상 템플릿 풀에 맞지 않는 `daily_missions` 행은 카드에서 제외합니다.
+   * (크론·구버전 삽입으로 평일 템플릿이 주말 행에 남은 경우 등 — DB 행은 그대로 두고 표시만 정리)
+   */
+  const dailyMissions = filterDailyMissionsByTemplatePool(existing, pool, routineType)
 
   // ── 마켓 ─────────────────────────────────────────────────────────────────
 

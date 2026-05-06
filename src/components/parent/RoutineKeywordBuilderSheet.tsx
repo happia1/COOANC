@@ -285,7 +285,7 @@ export default function RoutineKeywordBuilderSheet({
                   onToggle={(id) => setWeekdayAm((prev) => toggleChipIdLoose(AM_CHIPS, prev, id))}
                 />
               </BlockSection>
-              <BlockSection label="오후">
+              <BlockSection label="오후·저녁">
                 <HorizontalChips
                   pool={PM_CHIPS}
                   selectedIds={weekdayPm}
@@ -343,7 +343,7 @@ export default function RoutineKeywordBuilderSheet({
                 onToggle={(id) => setHolidayAm((prev) => toggleChipIdLoose(AM_CHIPS, prev, id))}
               />
             </BlockSection>
-            <BlockSection label="오후 (휴일)">
+            <BlockSection label="오후·저녁 (휴일)">
               <HorizontalChips
                 pool={PM_CHIPS}
                 selectedIds={holidayPm}
@@ -369,7 +369,7 @@ export default function RoutineKeywordBuilderSheet({
                   onToggle={(id) => setWeekdayAm((prev) => toggleChipIdLoose(AM_CHIPS, prev, id))}
                 />
               </BlockSection>
-              <BlockSection label="오후">
+              <BlockSection label="오후·저녁">
                 <HorizontalChips
                   pool={PM_CHIPS}
                   selectedIds={weekdayPm}
@@ -407,7 +407,7 @@ export default function RoutineKeywordBuilderSheet({
                       onToggle={(id) => setHolidayAm((prev) => toggleChipIdLoose(AM_CHIPS, prev, id))}
                     />
                   </BlockSection>
-                  <BlockSection label="오후 (휴일)">
+                  <BlockSection label="오후·저녁 (휴일)">
                     <HorizontalChips
                       pool={PM_CHIPS}
                       selectedIds={holidayPm}
