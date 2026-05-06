@@ -474,7 +474,10 @@ export default function BearStickerSheet({
             scaleRatio: 1,
           }),
         })
-        const json = (await res.json()) as { placement?: PraiseStickerPlacement; error?: string }
+        const json = (await res.json().catch(() => ({}))) as {
+          placement?: PraiseStickerPlacement
+          error?: string
+        }
         if (!res.ok) {
           const msg = typeof json.error === 'string' && json.error.trim() ? json.error.trim() : res.statusText
           setPlaceSnapError(msg)

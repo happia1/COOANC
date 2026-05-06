@@ -58,7 +58,13 @@ export default function TodayWeatherBadge() {
           { cache: 'no-store' },
         )
         if (!response.ok) throw new Error(`weather api failed: ${response.status}`)
-        const json = (await response.json()) as { current?: OpenMeteoCurrent }
+        const txt = await response.text()
+        let json: { current?: OpenMeteoCurrent }
+        try {
+          json = JSON.parse(txt) as { current?: OpenMeteoCurrent }
+        } catch {
+          throw new Error('weather 비JSON 응답')
+        }
         if (!cancelled) {
           setCurrent(json.current ?? null)
           setFailed(false)

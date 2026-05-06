@@ -165,9 +165,9 @@ export const ASSETS = {
     ),
     /**
      * 공용 로딩(`loading.tsx`), 루트(`/`) 리다이렉트 등 — 미션 탭은 전면 배경 이미지를 쓰지 않습니다.
-     * (현재 파일: `public/assets/img/layouts/backgrounds/background_01.png`)
+     * `background_01.png` 는 저장소에 없어 404가 나므로, 동일 용도로 있는 첫 화면 배경 PNG 를 사용합니다.
      */
-    sharedAppBackground: assetImg('layouts', 'backgrounds', 'background_01.png'),
+    sharedAppBackground: assetImg('layouts', 'backgrounds', 'first_screen_background.png'),
   },
 } as const
 

@@ -173,7 +173,12 @@ export async function fetchAgentLatestReport(childId: string): Promise<AgentLate
     if (!res.ok) {
       return null
     }
-    return (await res.json()) as AgentLatestReportRow
+    const text = await res.text()
+    try {
+      return JSON.parse(text) as AgentLatestReportRow
+    } catch {
+      return null
+    }
   } catch {
     return null
   } finally {

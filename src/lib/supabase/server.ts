@@ -18,7 +18,9 @@ export const createClient = async () => {
         getAll() {
           return cookieStore.getAll()
         },
-        setAll(cookiesToSet) {
+        // 두 번째 인수: Supabase SSR 이 붙이는 무캐시 헤더입니다. 서버 컴포넌트에서는 `headers()` 를
+        // 임의로 못 고치므로 쿠키만 `cookieStore` 에 반영하고, 실제 헤더는 미들웨어·라우터가 처리합니다.
+        setAll(cookiesToSet, _cookieHeaders?: Record<string, string | undefined>) {
           try {
             cookiesToSet.forEach(({ name, value, options }) =>
               cookieStore.set(name, value, options),

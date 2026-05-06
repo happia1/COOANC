@@ -20,6 +20,7 @@ import {
 import { createClient } from '@/lib/supabase/client'
 import { useParentStore } from '@/store/parentStore'
 import { mergeRoutineAlarmPickListFromApi } from '@/lib/routineAlarmSounds'
+import { parseJsonFromResponse } from '@/lib/parseJsonResponse'
 import RoutineAlarmSoundToggleList, {
   type AlarmSoundPickRow,
 } from '@/components/common/RoutineAlarmSoundToggleList'
@@ -164,10 +165,12 @@ export default function RoutineAlarmSettingsSheet({ open, onClose }: Props) {
     setCustomAlarms(p.customAlarms.map((c) => ({ ...c })))
 
     let cancelled = false
-    fetch('/api/assets/alarm-sounds', { cache: 'no-store' })
-      .then((r) => r.json())
-      .then((j: { sounds?: SoundItem[] }) => {
+    void (async () => {
+      try {
+        const r = await fetch('/api/assets/alarm-sounds', { cache: 'no-store' })
+        const { data: j, parseError } = await parseJsonFromResponse<{ sounds?: SoundItem[] }>(r)
         if (cancelled) return
+        if (parseError || !j) throw new Error('alarm-sounds 비JSON 응답')
         const list = mergeRoutineAlarmPickListFromApi(Array.isArray(j.sounds) ? j.sounds : [])
         setAlarmSounds(list)
         setSoundWake((prev) => prev || CORE_DEFAULT_SOUND_BY_ROW.wake)
@@ -175,8 +178,7 @@ export default function RoutineAlarmSettingsSheet({ open, onClose }: Props) {
         setSoundSleep((prev) => prev || CORE_DEFAULT_SOUND_BY_ROW.sleep)
         setSoundSchool((prev) => prev || CORE_DEFAULT_SOUND_BY_ROW.school)
         setSoundSleepReady((prev) => prev || CORE_DEFAULT_SOUND_BY_ROW.sleepReady)
-      })
-      .catch(() => {
+      } catch {
         if (cancelled) return
         const list = mergeRoutineAlarmPickListFromApi([])
         setAlarmSounds(list)
@@ -185,7 +187,8 @@ export default function RoutineAlarmSettingsSheet({ open, onClose }: Props) {
         setSoundSleep((prev) => prev || CORE_DEFAULT_SOUND_BY_ROW.sleep)
         setSoundSchool((prev) => prev || CORE_DEFAULT_SOUND_BY_ROW.school)
         setSoundSleepReady((prev) => prev || CORE_DEFAULT_SOUND_BY_ROW.sleepReady)
-      })
+      }
+    })()
     return () => {
       cancelled = true
     }

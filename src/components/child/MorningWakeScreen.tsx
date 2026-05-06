@@ -16,7 +16,7 @@ interface Props {
   onStart: () => void
 }
 
-export default function MorningWakeScreen({ childName, onStart }: Props) {
+export default function MorningWakeScreen({ onStart }: Props) {
   // 화면이 열릴 때는 효과음 없이 컨페티만(기분좋게 시작 음은 아래 [시작] 버튼에서만 재생)
   useEffect(() => {
     const t = window.setTimeout(() => {
@@ -40,13 +40,18 @@ export default function MorningWakeScreen({ childName, onStart }: Props) {
     >
       <div
         style={{
-          fontSize: 100,
           animation: 'sunRise 1s ease-out',
           filter: 'drop-shadow(0 0 30px rgba(255,200,0,0.8))',
           marginBottom: 20,
         }}
       >
-        ☀️
+        {/* 좋은 아침 화면의 해 이미지는 고정 요청 경로의 morning.png 를 사용합니다. */}
+        <img
+          src="/assets/img/missions/routine/a.m/morning.png"
+          alt="아침 해 이미지"
+          className="h-[120px] w-[120px] select-none object-contain"
+          draggable={false}
+        />
       </div>
 
       <p
@@ -58,16 +63,7 @@ export default function MorningWakeScreen({ childName, onStart }: Props) {
           marginBottom: 8,
         }}
       >
-        좋은 아침이에요! 🌸
-      </p>
-      <p
-        style={{
-          fontSize: 18,
-          color: 'rgba(255,255,255,0.9)',
-          marginBottom: 48,
-        }}
-      >
-        오늘도 멋진 하루 시작해봐요, {childName}!
+        좋은 아침이에요!
       </p>
 
       <button
@@ -89,7 +85,7 @@ export default function MorningWakeScreen({ childName, onStart }: Props) {
           animation: 'popIn 0.5s cubic-bezier(0.34,1.56,0.64,1) 0.3s both',
         }}
       >
-        좋아! 오늘 하루도 시작해볼까? 🌟
+        미션하러가기
       </button>
     </div>
   )

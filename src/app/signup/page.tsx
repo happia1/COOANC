@@ -79,14 +79,16 @@ export default function SignupPage() {
     <div className="min-h-screen bg-gradient-to-b from-sky-100 via-white to-green-50 flex flex-col items-center justify-center px-6 py-10">
       <div className="flex flex-col items-center gap-3 mb-7">
         <BetaVersionMark />
-        {/* 로그인 화면과 동일 비율·로그인 대비 이전 960 기준 너비의 절반 이하 */}
+        {/* 로그인 화면과 동일 레이아웃; style 로 비율 경고(w/h 한쪽만 수정) 방지 */}
         <Image
           src={AUTH_LOGO_SRC}
           alt="COOANC"
           width={240}
           height={240}
-          className="rounded-2xl max-w-[min(240px,calc(100vw-3rem))] w-full h-auto"
+          sizes="(max-width: 480px) min(240px, calc(100vw - 3rem)), 240px"
+          className="rounded-2xl max-w-[min(240px,calc(100vw-3rem))] h-auto w-auto"
           priority
+          style={{ width: 'auto', height: 'auto' }}
         />
         <p className="text-sm text-gray-400">자녀 성장의 닻을 내리다</p>
       </div>

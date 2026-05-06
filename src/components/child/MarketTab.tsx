@@ -22,6 +22,7 @@ import {
 } from '@/lib/parentMarketMenuSections'
 import { BETA_MARKET_CONFIG } from '@/constants/betaMarketConfig'
 import { usesSingleBucket } from '@/constants/childAgeConfig'
+import { parseJsonFromResponse } from '@/lib/parseJsonResponse'
 
 type Props = {
   childId: string
@@ -538,12 +539,18 @@ export default function MarketTab({
           console.warn('[MarketTab] child-sync HTTP', res.status, await res.text().catch(() => ''))
           return
         }
-        const json = (await res.json()) as {
+        // 라우트가 아닌 HTML(에러 페이지)이 오면 `.json()` 이 "Unexpected token '<'" 로 터집니다.
+        type ChildSyncPayload = {
           hiddenStoreItemIds: string[]
           purchaseRequests: PurchaseRequest[]
           credits: number | null
           creditsWallet: number | null
           partial?: boolean
+        }
+        const { data: json, parseError } = await parseJsonFromResponse<ChildSyncPayload>(res)
+        if (parseError || !json) {
+          console.warn('[MarketTab] child-sync JSON 파싱 실패(HTML 응답 등)')
+          return
         }
         setHiddenStoreItemIds([...json.hiddenStoreItemIds].sort())
         const totalFromApi = json.credits != null ? readChildStatInt(json.credits) : null

@@ -1,6 +1,10 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { shouldClearAuthCookiesAfterError } from '@/lib/supabase/authSessionErrors'
+import {
+  applyCookieCacheHeaders,
+  type SupabaseCookieHeaders,
+} from '@/lib/supabase/supabaseSetAllCacheHeaders'
 import { requireSupabaseUrlAndAnonKey } from '@/lib/supabase/requireEnv'
 
 /**
@@ -16,10 +20,19 @@ import { requireSupabaseUrlAndAnonKey } from '@/lib/supabase/requireEnv'
  * ── 자녀 앱 `/home` 과 `PARENT_AS_CHILD_COOKIE` ──
  * 부모 계정인지·미리보기 쿠키가 있는지 판별하려면 `profiles.role` 조회가 필요합니다.
  * Edge 미들웨어에서 매 요청 DB 조회를 추가하면 오히려 부하가 늘고, JWT 만으로는 역할을 알 수 없습니다.
- * 따라서 「부모인데 미리보기 쿠키 없음 → /parent/home」 분기는
- * 서버 컴포넌트 `getActorChildContext` 에서 처리합니다. (탭 전환 시 `enter-child-ui` API 를 부르지 않음)
+ * 루트 `/` 에서 역할별 이동은 아래 에서 처리하고, 「부모가 자녀 UI 미리보기」등 세부 분기는
+ * `getActorChildContext` 등 서버 레이어를 따릅니다.
  */
 export async function middleware(request: NextRequest) {
+  // 로그인 API 는 방금 줄 새 세션과, 브라우저에 남은 깨진 리프레시 쿠키가 동시에 있을 수 있습니다.
+  // 이 구간에서 getUser→signOut 까지 타면 라우터 응답과 섞여 쿠키가 꼬이거나, 불필요한 정리만 반복할 수 있어 건너뜁니다.
+  if (
+    (request.nextUrl.pathname === '/api/auth/sign-in' && request.method === 'POST') ||
+    (request.nextUrl.pathname === '/api/auth/session' && request.method === 'GET')
+  ) {
+    return NextResponse.next({ request })
+  }
+
   const { url, anonKey } = requireSupabaseUrlAndAnonKey()
   let supabaseResponse = NextResponse.next({ request })
 
@@ -31,23 +44,94 @@ export async function middleware(request: NextRequest) {
         getAll() {
           return request.cookies.getAll()
         },
-        setAll(cookiesToSet) {
+        /** Supabase SSR 은 두 번째 인수로 무캐시 헤더까지 넘깁니다 (@supabase/ssr `applyServerStorage`). */
+        setAll(cookiesToSet, cookieHeaders?: SupabaseCookieHeaders) {
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
           supabaseResponse = NextResponse.next({ request })
           cookiesToSet.forEach(({ name, value, options }) =>
             supabaseResponse.cookies.set(name, value, options)
           )
+          applyCookieCacheHeaders(supabaseResponse.headers, cookieHeaders)
         },
       },
-    }
+    },
   )
 
   // 세션 검증·갱신 (만료 시 리프레시). 실패 시 error 로 내려옵니다.
-  const { error: authError } = await supabase.auth.getUser()
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
 
   if (authError && shouldClearAuthCookiesAfterError(authError)) {
     // 응답에 "쿠키 삭제" 지시를 붙여 클라이언트가 다시 로그인할 수 있게 합니다.
     await supabase.auth.signOut({ scope: 'local' })
+  }
+
+  const pathname = request.nextUrl.pathname
+  /** `/` 에서 SSR 이 쿠키를 못 따라가거나 지연될 때를 대비해, 미들웨어 단계에서 곧바로 분기합니다. */
+  if (pathname === '/') {
+    const effectiveUser = authError && shouldClearAuthCookiesAfterError(authError) ? null : user
+
+    const appendRefreshedSession = (r: NextResponse) => {
+      let appended = false
+      try {
+        const list = typeof supabaseResponse.headers.getSetCookie === 'function'
+          ? supabaseResponse.headers.getSetCookie()
+          : []
+        if (Array.isArray(list) && list.length > 0) {
+          list.forEach((cookie) => r.headers.append('Set-Cookie', cookie))
+          appended = list.length > 0
+        }
+      } catch {
+        /* 일부 Edge 런타임에서 getSetCookie 가 없거나 실패할 수 있음 */
+      }
+      if (!appended) {
+        try {
+          const all = typeof supabaseResponse.cookies?.getAll === 'function'
+            ? supabaseResponse.cookies.getAll()
+            : []
+          for (const c of all) {
+            const { name, value } = c
+            r.cookies.set(name, value)
+          }
+          if (all.length > 0) appended = true
+        } catch {
+          /* 무시 후 단일 헤더 시도 */
+        }
+      }
+      if (!appended) {
+        const fb = supabaseResponse.headers.get('set-cookie')
+        if (fb) r.headers.append('Set-Cookie', fb)
+      }
+      ;(['cache-control', 'expires', 'pragma'] as const).forEach((h) => {
+        const v = supabaseResponse.headers.get(h)
+        if (v) r.headers.set(h, v)
+      })
+      return r
+    }
+
+    if (!effectiveUser) {
+      return appendRefreshedSession(NextResponse.redirect(new URL('/login', request.url)))
+    }
+
+    const role = effectiveUser.user_metadata?.role as string | undefined
+
+    if (role === 'child') {
+      return appendRefreshedSession(NextResponse.redirect(new URL('/home', request.url)))
+    }
+
+    const { count, error: linkErr } = await supabase
+      .from('family_links')
+      .select('*', { count: 'exact', head: true })
+      .eq('parent_id', effectiveUser.id)
+
+    if (linkErr) {
+      console.error('[middleware /] family_links count:', linkErr.message)
+    }
+
+    const dest = count != null && count > 0 ? '/parent' : '/onboarding'
+    return appendRefreshedSession(NextResponse.redirect(new URL(dest, request.url)))
   }
 
   return supabaseResponse

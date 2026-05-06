@@ -98,13 +98,18 @@ export default function SleepModeScreen({ childName, alarmTime, onWake }: Props)
 
       <div
         style={{
-          fontSize: 120,
           animation: 'moonFloat 4s ease-in-out infinite',
           filter: 'drop-shadow(0 0 30px rgba(255,230,100,0.6))',
           marginBottom: 24,
         }}
       >
-        🌙
+        {/* 수면 모드의 달 이미지는 고정 요청 경로의 night.png 를 사용합니다. */}
+        <img
+          src="/assets/img/missions/routine/p.m/night.png"
+          alt="밤 달 이미지"
+          className="h-[140px] w-[140px] select-none object-contain"
+          draggable={false}
+        />
       </div>
 
       <p

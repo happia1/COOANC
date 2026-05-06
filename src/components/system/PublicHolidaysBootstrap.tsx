@@ -18,6 +18,15 @@ const SESSION_DONE_PREFIX = 'cooanc_public_holidays_bootstrap_done_'
 
 export function PublicHolidaysBootstrap() {
   useEffect(() => {
+    // `usePathname()` 을 의존성에 넣으면 개발(HMR) 환경에서 의존성 배열 길이 경고가 난 사례가 있어,
+    // 최초 마운트 시점의 경로만 `window.location` 으로 읽습니다.
+    // - 첫 화면이 `/login`·`/signup` 이면 공휴일 동기화를 건너뜁니다(GoTrue Lock 과 겹치기 쉬움).
+    // - 로그인 후에는 `window.location.href = '/'` 등 **전체 새로고침**이면 이 컴포넌트가 다시 마운트되어
+    //   그때 경로가 바뀐 뒤 동기화가 실행됩니다. (같은 레이아웃만의 소프트 네비게이션만으로는 재실행 안 될 수 있음)
+    if (typeof window === 'undefined') return
+    const p = window.location.pathname
+    if (p === '/login' || p.startsWith('/signup')) return
+
     const y = Number(getSeoulDateString().slice(0, 4))
     if (!Number.isFinite(y)) return
 
@@ -64,6 +73,7 @@ export function PublicHolidaysBootstrap() {
         /* 동기화 실패는 앱 사용을 막지 않음 */
       }
     })()
+    // 의존성 배열은 항상 비어 있어야 합니다(크기가 바뀌면 React 가 경고를 냅니다).
   }, [])
 
   return null

@@ -9,8 +9,8 @@ import type { ReactNode } from 'react'
 import { PublicHolidaysBootstrap } from '@/components/system/PublicHolidaysBootstrap'
 
 export const metadata: Metadata = {
-  title: 'COOANC - 아이의 올바른 경제 습관',
-  description: '미션을 수행하고 크레딧을 모으며 배우는 경제 교육 서비스',
+  title: 'COOANC - 자녀의 올바른 습관 형성 플랫폼',
+  description: '미션을 수행하고 크레딧을 모으며 터득하는 경제 교육 서비스',
   // public/site.webmanifest — PWA 아이콘은 web-app-manifest-*.png 를 참조합니다.
   manifest: '/site.webmanifest',
   icons: {

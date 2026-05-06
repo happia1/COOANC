@@ -198,7 +198,13 @@ export default function BunnyRunLoader({
       if (!jsonRes.ok) {
         throw new Error('bunny_run.json 응답 오류')
       }
-      const atlas = (await jsonRes.json()) as BunnyRunAtlas
+      const atlasText = await jsonRes.text()
+      let atlas: BunnyRunAtlas
+      try {
+        atlas = JSON.parse(atlasText) as BunnyRunAtlas
+      } catch {
+        throw new Error('bunny_run.json 형식 오류')
+      }
       if (cancelled) return
 
       atlasRef.current = atlas

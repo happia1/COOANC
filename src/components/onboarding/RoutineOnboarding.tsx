@@ -30,6 +30,7 @@ import {
   type ChipDef,
 } from '@/lib/routineChips'
 import { routineMissionIconEmojiForCreate } from '@/lib/routineMissionThumbnail'
+import { parseJsonFromResponse } from '@/lib/parseJsonResponse'
 
 /**
  * 알림용 scheduled_time (HH:MM). 끄면 null → 그 시각 푸시에 안 씀.
@@ -209,10 +210,15 @@ export default function RoutineOnboarding({ onComplete, linkedChildId }: Props) 
 
   useEffect(() => {
     let cancelled = false
-    fetch('/api/assets/alarm-sounds', { cache: 'no-store' })
-      .then((r) => r.json())
-      .then((j: { sounds?: AlarmSoundPickRow[] }) => {
+    void (async () => {
+      /** HTML 에러 페이지가 오면 r.json() 이 "Unexpected token '<'" 로 터짐 → 본문을 text 로만 읽고 파싱 */
+      try {
+        const r = await fetch('/api/assets/alarm-sounds', { cache: 'no-store' })
+        const { data: j, parseError } = await parseJsonFromResponse<{
+          sounds?: AlarmSoundPickRow[]
+        }>(r)
         if (cancelled) return
+        if (parseError || !j) throw new Error('alarm-sounds 비JSON 응답')
         const raw = Array.isArray(j.sounds) ? j.sounds : []
         const list = mergeRoutineAlarmPickListFromApi(raw)
         setAlarmSounds(list)
@@ -224,8 +230,7 @@ export default function RoutineOnboarding({ onComplete, linkedChildId }: Props) 
         setSoundSleepReady((p) => p || DEFAULT_ROUTINE_ALARM_SOUND_IDS.sleepReady || first)
         setSheetSound((p) => p || first)
         setPickerSound((p) => p || first)
-      })
-      .catch(() => {
+      } catch {
         if (cancelled) return
         const list = mergeRoutineAlarmPickListFromApi([])
         setAlarmSounds(list)
@@ -237,7 +242,8 @@ export default function RoutineOnboarding({ onComplete, linkedChildId }: Props) 
         setSoundSleepReady((p) => p || DEFAULT_ROUTINE_ALARM_SOUND_IDS.sleepReady || first)
         setSheetSound((p) => p || first)
         setPickerSound((p) => p || first)
-      })
+      }
+    })()
     return () => {
       cancelled = true
     }

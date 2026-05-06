@@ -727,12 +727,6 @@ export default function ChildScreen({
   /** 700ms 뒤 오버레이 표시 예약 — API 실패 롤백 시 clearTimeout */
   /** DOM 환경에서 setTimeout 은 `number` 핸들을 돌려줌(Node 의 Timeout 타입과 혼동 주의) */
   const celebrationShowTimerRef = useRef<number | null>(null)
-  /**
-   * 오늘(이 브라우저 세션에서) 미션 완료로 누적한 코인 합.
-   * 비개발자 설명: 화면에 다시 들어온 뒤 이미 끝낸 미션이 있으면 0에서 시작할 수 있습니다.
-   */
-  const [todayEarnedCredits, setTodayEarnedCredits] = useState(0)
-
   /** 미션 완주 후 수면 모드(잘자 화면) */
   const [isSleeping, setIsSleeping] = useState(false)
   /** 수면 모드 다음 아침 인사 화면 */
@@ -770,7 +764,7 @@ export default function ChildScreen({
   }, [])
 
   useEffect(() => {
-    /** 서버 배열로 목록을 맞추되, 방금 API 로 끝낸 행은 서버가 아직 `is_completed=false` 인 한 `done` 에 남깁니다. */
+    /** 서버 배열로 목록을 맞추되, 방금 완료 요청을 보낸 행(`optimisticDailyMissionCompleteIdsRef`)은 서버가 아직 `is_completed=false` 인 한 `done` 에 남깁니다. */
     setMissionList(dailyMissions)
     setDone(() => {
       const serverDone = new Set(dailyMissions.filter((dm) => dm.is_completed).map((dm) => dm.id))
@@ -792,7 +786,7 @@ export default function ChildScreen({
     })
   }, [dailyMissions, today])
 
-  /** 날짜(오늘)이 바뀌면 축하·누적 코인 상태를 초기화합니다. */
+  /** 날짜(오늘)이 바뀌면 축하 관련 상태를 초기화합니다. */
   useEffect(() => {
     celebrationShownRef.current = false
     if (celebrationShowTimerRef.current != null) {
@@ -800,7 +794,6 @@ export default function ChildScreen({
       celebrationShowTimerRef.current = null
     }
     setShowCelebration(false)
-    setTodayEarnedCredits(0)
     setIsSleeping(false)
     setShowMorningWake(false)
     sleepReadyShownRef.current = false
@@ -845,10 +838,6 @@ export default function ChildScreen({
         if (!wasDone && !wasCompletedOnRow) return prevDone
         if (!consumeRollbackUiCooldown(dmId)) return prevDone
 
-        if (snapshot.missions) {
-          const { credit } = scaledMissionRewards(snapshot.missions)
-          setTodayEarnedCredits((p) => Math.max(0, p - credit))
-        }
         pushParentRedoNotice(snapshot)
         setShowCelebration(false)
         celebrationShownRef.current = false
@@ -1142,8 +1131,13 @@ export default function ChildScreen({
       creditReward: number,
       heartReward: number,
     ) => {
-      /** 오늘(세션) 누적 코인 — 축하 팝업의 "+n"에 사용, API 실패 시 응답 분기에서 되돌립니다. */
-      setTodayEarnedCredits((prev) => prev + creditReward)
+      /**
+       * 미션 완료 API 가 끝나기 전에 `router.refresh()` 등으로 부모 페이지 데이터가 새로 들어오면,
+       * 아래 `useEffect([dailyMissions])` 가 서버 값(아직 미완료)만 보고 `done` 을 덮어쓸 수 있습니다.
+       * 그래서 **요청을 보내는 순간** 낙관적 id 를 ref 에 넣어, 완료 응답이 올 때까지 목록과 싱크가 깨지지 않게 합니다.
+       * 비개발자: "서버가 잠깐 늦어도 화면에서 완료한 카드는 사라진 채로 유지"됩니다.
+       */
+      optimisticDailyMissionCompleteIdsRef.current.add(dm.id)
       /**
        * 카드가 사라지는 순간 그 위치에서 컨페티(새로 추가).
        * 비개발자: “완료” 글자 화면 대신 색종이가 터지는 느낌으로 축하합니다.
@@ -1264,10 +1258,9 @@ export default function ChildScreen({
             /* 응답이 JSON이 아니면 stats 동기화 생략 */
           }
           if (res.ok) {
-            optimisticDailyMissionCompleteIdsRef.current.add(dm.id)
             setStats((prev) => tryApplyCompletePayload(prev, json) ?? prev)
           } else {
-            setTodayEarnedCredits((p) => Math.max(0, p - creditReward))
+            optimisticDailyMissionCompleteIdsRef.current.delete(dm.id)
             if (celebrationShowTimerRef.current != null) {
               clearTimeout(celebrationShowTimerRef.current)
               celebrationShowTimerRef.current = null
@@ -1281,7 +1274,7 @@ export default function ChildScreen({
             })
           }
         } catch {
-          setTodayEarnedCredits((p) => Math.max(0, p - creditReward))
+          optimisticDailyMissionCompleteIdsRef.current.delete(dm.id)
           if (celebrationShowTimerRef.current != null) {
             clearTimeout(celebrationShowTimerRef.current)
             celebrationShowTimerRef.current = null
@@ -1423,21 +1416,11 @@ export default function ChildScreen({
      * 즉시 로컬에서 카드·완료 집합을 되돌려 눈에 보이는 지연을 줄입니다.
      * 이후 `/api/daily-mission/undo-burst` 로 DB를 맞춥니다(전부 실패 시에만 `router.refresh()`).
      */
-    setMissionList((prev) => {
-      let creditSub = 0
-      for (const id of toUndo) {
-        const row = prev.find((m) => m.id === id)
-        if (row?.missions) creditSub += scaledMissionRewards(row.missions).credit
-      }
-      if (creditSub > 0) {
-        queueMicrotask(() => {
-          setTodayEarnedCredits((p) => Math.max(0, p - creditSub))
-        })
-      }
-      return prev.map((m) =>
+    setMissionList((prev) =>
+      prev.map((m) =>
         idSet.has(m.id) ? { ...m, is_completed: false, completed_at: null } : m,
-      )
-    })
+      ),
+    )
     setDone((prev) => {
       const next = new Set(prev)
       for (const id of toUndo) next.delete(id)
@@ -1990,31 +1973,31 @@ export default function ChildScreen({
                 </div>
               </div>
             ) : incompleteOrdered.length === 0 ? (
-              // 모든 미션 완료 상태에서 하단 미션 카드 영역에도 축하 배경/문구를 보여 줍니다.
+              // 모든 미션 완료 상태에서 하단 미션 카드 영역에 축하 문구·캐릭터 이미지만 보여 줍니다(박스 배경 사진 없음).
               <div className="shrink-0 px-5 min-[400px]:px-6">
                 <div
-                  className="relative flex min-h-[250px] items-center justify-center overflow-hidden rounded-2xl border border-white/65 px-4 py-6 text-center shadow-[0_10px_26px_rgba(0,0,0,0.18)]"
-                  style={{
-                    backgroundImage:
-                      'linear-gradient(to bottom, rgba(255,255,255,0.28), rgba(255,255,255,0.28)), url("/assets/img/characters/onboarding/congrats.png")',
-                    backgroundPosition: 'center',
-                    backgroundSize: 'cover',
-                    backgroundRepeat: 'no-repeat',
-                  }}
+                  // 캐릭터를 2배로 키운 뒤에도 여백이 남도록 최소 높이를 함께 늘립니다.
+                  className="relative flex min-h-[528px] items-center justify-center overflow-hidden rounded-2xl border border-gray-200/70 bg-white/85 px-4 py-6 text-center shadow-[0_10px_26px_rgba(0,0,0,0.18)] backdrop-blur-sm"
                   role="status"
                   aria-live="polite"
                 >
                   <div className="flex flex-col items-center justify-center gap-3">
-                    {/* 캐릭터 이미지를 박스 정중앙에 보이도록 별도 이미지로 한 번 더 배치합니다. */}
-                    <Image
-                      src="/assets/img/characters/onboarding/congrats.png"
-                      alt="모든 미션 완료 축하 캐릭터"
-                      width={168}
-                      height={168}
-                      className="h-auto w-[152px] select-none object-contain"
-                      priority
+                    {/*
+                     * 하단 블록은 `congrats_ready.png`(준비 완료 느낌 이미지), 미션 완료 팝업은 `congrats.png` 로 구분합니다.
+                     * 비개발자: 홈 탭에서는 이 그림만 보이도록 하고요, 같은 그림이라도 이름이 헷갈리지 않게 파일을 나눴어요.
+                     */}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src="/assets/img/characters/onboarding/congrats_ready.png"
+                      alt="모든 미션 완료 — 준비 완료 축하 이미지"
+                      width={336}
+                      height={336}
+                      className="relative z-[1] block h-auto w-[304px] max-w-full shrink-0 select-none object-contain"
+                      draggable={false}
+                      loading="eager"
+                      decoding="async"
                     />
-                    <p className="text-lg font-black text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.35)]">
+                    <p className="text-lg font-black text-gray-800 drop-shadow-none">
                       모든 미션을 완료했어요!
                     </p>
                   </div>
@@ -2138,7 +2121,6 @@ export default function ChildScreen({
 
       {showCelebration && (
         <AllMissionCompleteOverlay
-          todayCredits={todayEarnedCredits}
           onSleep={() => {
             setShowCelebration(false)
             setIsSleeping(true)
