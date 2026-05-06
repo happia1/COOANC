@@ -150,7 +150,8 @@ export function CompactChildProfileCard({
                 <AvatarWithShortcut
                   avatarUrl={avatarUrl}
                   stageName={stageName}
-                  boxClass="h-16 w-16"
+                  /** 부모 화면 자녀 프로필 원형 아바타를 기존(4rem) 대비 1.6배(6.4rem)로 확대 */
+                  boxClass="h-[6.4rem] w-[6.4rem]"
                   showShortcut={avatarEnterShortcut}
                 />
               </div>
@@ -164,7 +165,8 @@ export function CompactChildProfileCard({
             <AvatarWithShortcut
               avatarUrl={avatarUrl}
               stageName={stageName}
-              boxClass="h-16 w-16"
+              /** 부모 화면 자녀 프로필 원형 아바타를 기존(4rem) 대비 1.6배(6.4rem)로 확대 */
+              boxClass="h-[6.4rem] w-[6.4rem]"
               showShortcut={avatarEnterShortcut}
             />
           </div>
@@ -212,7 +214,7 @@ function AvatarWithShortcut({
       <AvatarCircle avatarUrl={avatarUrl} stageName={stageName} boxClass={boxClass} />
       {showShortcut ? (
         <span
-          className="pointer-events-none absolute bottom-[-1px] right-[-2px] z-[1] flex h-[1.375rem] w-[1.375rem] items-center justify-center rounded-full bg-white shadow-[0_1px_3px_rgba(15,23,42,0.12)] ring-1 ring-gray-200/90"
+          className="pointer-events-none absolute bottom-[-1px] right-[-2px] z-[1] flex h-[1.125rem] w-[1.125rem] items-center justify-center rounded-full bg-white shadow-[0_1px_3px_rgba(15,23,42,0.12)] ring-1 ring-gray-200/90"
           title="자녀 앱 화면으로 바로가기"
           aria-hidden
         >

@@ -46,9 +46,11 @@ type Props = {
 function SpecialMissionChipIcon({ title, fallbackEmoji }: { title: string; fallbackEmoji: string }) {
   const png = resolveRoutineMissionPngUrl({ title, iconEmoji: null })
   if (png) {
+    /** 「밥 다 먹기」 PNG 보정 — 다른 칩 그림과 톤을 맞추기 위해 밝기를 조금 올립니다 */
+    const fix = png.includes('clean_up_all.png') ? ({ filter: 'brightness(1.24) saturate(1.06)' } as const) : undefined
     return (
       // eslint-disable-next-line @next/next/no-img-element -- public 정적 미션 썸네일 직접 표시
-      <img src={png} alt="" className="h-6 w-6 object-contain" draggable={false} />
+      <img src={png} alt="" className="h-6 w-6 object-contain" style={fix} draggable={false} />
     )
   }
 

@@ -53,6 +53,9 @@ import { scaledMissionRewards } from '@/lib/missionRewardMultiplier'
 import { MissionRewardIconTriple } from '@/components/mission/MissionRewardIconTriple'
 import SortableHorizontalMissionStrip from '@/components/parent/SortableHorizontalMissionStrip'
 
+/** 롱프레스(길게 누르기)로 간주할 기준 시간(ms) — 드래그 시작 전 팝업 오픈 방지 */
+const LONG_PRESS_MS = 220
+
 /**
  * 루틴·스페셜 카드 상단 그림을 그립니다.
  * - `resolveRoutineMissionPngUrl`: **제목**으로 맞는 PNG 를 먼저 고릅니다(DB 에 잘못된 경로가 있어도 덮어씀).
@@ -63,15 +66,34 @@ function MissionIconThumb({ mission, size = 36 }: { mission: Mission; size?: num
     title: mission.title,
     iconEmoji: mission.icon_emoji,
     block: mission.block,
+    description: mission.description,
   })
   if (png) {
+    /** 「밥 다 먹기」 PNG 는 상대적으로 어두워 보여, 부모 루틴 카드에서도 밝기를 살짝 올려 보정합니다 */
+    const styleFix = png.includes('clean_up_all.png')
+      ? ({
+          width: size,
+          height: size,
+          filter: 'brightness(1.24) saturate(1.06)',
+          userSelect: 'none',
+          WebkitUserSelect: 'none',
+          WebkitTouchCallout: 'none',
+        } as const)
+      : ({
+          width: size,
+          height: size,
+          userSelect: 'none',
+          WebkitUserSelect: 'none',
+          WebkitTouchCallout: 'none',
+        } as const)
     return (
       // eslint-disable-next-line @next/next/no-img-element -- public 정적 경로, 미션 이미지 직접 표시
       <img
         src={png}
         alt=""
-        className="h-full w-full object-contain"
-        style={{ width: size, height: size }}
+        className="pointer-events-none h-full w-full object-contain"
+        style={styleFix}
+        onContextMenu={(e) => e.preventDefault()}
         draggable={false}
       />
     )
@@ -149,11 +171,39 @@ const SLIDE_SECTION_WITH_CARDS = 'border-t border-gray-100 pt-2 pb-2'
  * 일상 미션용 가로 슬라이드 카드(스페셜 SpecialMissionRow 와 같은 폭·스크롤 패턴)
  */
 function RoutineMissionSlideCard({ mission: m, onOpenRewardEditor }: { mission: Mission; onOpenRewardEditor: (m: Mission) => void }) {
+  const pressStartedAtRef = useRef<number | null>(null)
+  const suppressNextClickRef = useRef(false)
+
+  function markPointerDown() {
+    pressStartedAtRef.current = Date.now()
+    suppressNextClickRef.current = false
+  }
+
+  function markPointerEnd() {
+    const started = pressStartedAtRef.current
+    if (started == null) return
+    suppressNextClickRef.current = Date.now() - started >= LONG_PRESS_MS
+  }
+
+  function handleCardClick(e: React.MouseEvent<HTMLButtonElement>) {
+    if (suppressNextClickRef.current) {
+      e.preventDefault()
+      e.stopPropagation()
+      suppressNextClickRef.current = false
+      return
+    }
+    onOpenRewardEditor(m)
+  }
+
   return (
     // w-full: li 칸 폭(min(25vw,88px))을 꽉 채워, 카드 옆에 빈 여백이 생기지 않게 함(간격이 넓어 보이는 착시 방지)
     <button
       type="button"
-      onClick={() => onOpenRewardEditor(m)}
+      onClick={handleCardClick}
+      onPointerDown={markPointerDown}
+      onPointerUp={markPointerEnd}
+      onPointerCancel={markPointerEnd}
+      onContextMenu={(e) => e.preventDefault()}
       aria-label={`${m.title} 보상(크레딧·애정 하트) 수정`}
       className={`flex h-full w-full min-h-[4.25rem] flex-col items-center justify-center gap-1.5 rounded-xl bg-white px-1.5 py-2 text-center shadow-sm ring-1 ${
         m.is_active ? 'ring-gray-200' : 'ring-gray-100 opacity-80'
@@ -1085,13 +1135,41 @@ function SpecialMissionRow({
   /** 매일(daily) 스페셜 — 배율만 편집 */
   onOpenDailyBonusSettings?: () => void
 }) {
+  const pressStartedAtRef = useRef<number | null>(null)
+  const suppressNextClickRef = useRef(false)
+
+  function markPointerDown() {
+    pressStartedAtRef.current = Date.now()
+    suppressNextClickRef.current = false
+  }
+
+  function markPointerEnd() {
+    const started = pressStartedAtRef.current
+    if (started == null) return
+    suppressNextClickRef.current = Date.now() - started >= LONG_PRESS_MS
+  }
+
+  function handleCardClick(e: React.MouseEvent<HTMLDivElement>) {
+    if (suppressNextClickRef.current) {
+      e.preventDefault()
+      e.stopPropagation()
+      suppressNextClickRef.current = false
+      return
+    }
+    onOpenRewardEditor()
+  }
+
   const titleShort = displaySpecialMissionTitle(m.title)
   return (
     // w-full: 일상 슬라이드와 같이 li 폭을 채워 카드 사이 간격만 gap 으로 보이게 함
     <div
       role="button"
       tabIndex={0}
-      onClick={onOpenRewardEditor}
+      onClick={handleCardClick}
+      onPointerDown={markPointerDown}
+      onPointerUp={markPointerEnd}
+      onPointerCancel={markPointerEnd}
+      onContextMenu={(e) => e.preventDefault()}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault()

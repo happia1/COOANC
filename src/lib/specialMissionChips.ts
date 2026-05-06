@@ -40,7 +40,8 @@ export const SPECIAL_MISSION_CHIPS: SpecialMissionChipDef[] = [
   },
   {
     id: 'sp-pray',
-    title: '기도',
+    /** 일상에서 제거 후 스페셜 전용 — 옛 제목 「기도」는 레거시 매핑으로 같은 칩과 연결됩니다 */
+    title: '기도하기',
     emoji: '',
     defaultPopupMessage: '오늘 하루를 작게 기도해 보아요.',
   },
@@ -162,6 +163,8 @@ export const SPECIAL_MISSION_CHIP_CATEGORIES: SpecialMissionChipCategoryDef[] = 
  * DB에 옛 짧은 이름(인사, 어깨)이 남아 있어도 시트·카드에서 새 이름으로 이어집니다.
  */
 const LEGACY_SPECIAL_TITLE_TO_SHORT: Record<string, string> = {
+  /** 스페셜 칩 표기 통일 */
+  기도: '기도하기',
   식사준비: '식사준비 돕기',
   식사준비하기: '식사준비 돕기',
   /** 예전 한 줄 표기 — 칩 제목과 맞춥니다 */

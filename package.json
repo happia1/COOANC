@@ -8,8 +8,9 @@
   },
   "scripts": {
     "init:env": "node scripts/init-env-local.mjs",
-    "dev": "next dev",
-    "build": "NEXT_TELEMETRY_DISABLED=1 next build",
+    "dev": "next dev --webpack",
+    "dev:turbo": "next dev --turbo",
+    "build": "next build",
     "start": "next start",
     "lint": "next lint"
   },

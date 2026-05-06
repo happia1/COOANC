@@ -9,20 +9,51 @@ import { canonicalRoutineChipMatchTitle } from '@/lib/routineMissionTitleCanon'
 
 const BASE = '/assets/img/missions/routine'
 
+/**
+ * 야외·실내 놀이 PNG 캐시 무효화 버전입니다.
+ * - `next.config.mjs` 가 `/assets/**` 에 1년·immutable 캐시를 주므로, **같은 파일명으로 그림만 바꾼 뒤에도**
+ *   예전 그림이 보이면 이 숫자만 1 올리면 브라우저가 새 URL 로 다시 받습니다.
+ * - DB `icon_emoji` 는 구버전(쿼리 없음)일 수 있어도, 제목이 「야외놀이」·「실내놀이」면 여기서 고른 URL 이 우선입니다.
+ */
+const ROUTINE_PLAY_PNG_CACHE_BUST = '1'
+
+/**
+ * 스페셜 「식사준비 돕기」·「밥 다 먹기」 PNG 캐시 무효화 버전입니다.
+ * - 그림 파일을 교체했는데도 이전 그림이 보이면 숫자를 1 올려 URL 을 바꿉니다.
+ */
+const SPECIAL_MEAL_PNG_CACHE_BUST = '2'
+
+/**
+ * 일상 「저녁밥먹기」 PNG 캐시 무효화 버전입니다.
+ * - `next.config.mjs` 의 `/assets/**` immutable 캐시 때문에, 파일명은 그대로 두고 그림만 갈아끼우면 구버전이 남습니다.
+ * - 그럴 땐 이 숫자만 1 올려 URL 을 바꿔 주세요.
+ */
+const DINNER_PNG_CACHE_BUST = '1'
+
+/**
+ * 일상 「샤워하기」 PNG 캐시 무효화 버전입니다.
+ * - `next.config.mjs` 의 `/assets/**` immutable 캐시 때문에, 파일명은 그대로 두고 그림만 갈아끼우면 구버전이 남습니다.
+ * - 그럴 땐 이 숫자만 1 올려 URL 을 바꿔 주세요.
+ */
+const SHOWER_PNG_CACHE_BUST = '1'
+
 /** 샤워·씻기 루틴 공통 — `목욕/샤워` 옛 제목은 별칭으로 여기와 같은 파일을 씁니다 */
-const SHOWER_ROUTINE_PNG = `${BASE}/p.m/shower.png`
+const SHOWER_ROUTINE_PNG = `${BASE}/p.m/shower.png?v=${SHOWER_PNG_CACHE_BUST}`
 
 /** 「식사 준비 돕기」계열 전용 PNG — 제목 표기가 조금 달라도 같은 파일을 씁니다. */
-const MEAL_PREP_HELP_ROUTINE_PNG = `${BASE}/special/put_cutrary.png`
+const MEAL_PREP_HELP_ROUTINE_PNG = `${BASE}/special/put_cutrary.png?v=${SPECIAL_MEAL_PNG_CACHE_BUST}`
 
 /** 스페셜 칩 「밥 다 먹기」·레거시 `밥그릇비우기`(같은 칩으로 통합) 일러스트 */
-const FINISH_MEAL_ROUTINE_PNG = `${BASE}/special/clean_up_all.png`
+const FINISH_MEAL_ROUTINE_PNG = `${BASE}/special/clean_up_all.png?v=${SPECIAL_MEAL_PNG_CACHE_BUST}`
 
-/** 일상 칩 「야외놀이」— 파일명은 오타처럼 보여도(`paly`) 번들 자산 이름입니다 */
-const OUTDOOR_PLAY_ROUTINE_PNG = `${BASE}/p.m/paly_outside.png`
+/** 일상 칩 「저녁밥먹기」 전용 PNG */
+const DINNER_ROUTINE_PNG = `${BASE}/p.m/dinner.png?v=${DINNER_PNG_CACHE_BUST}`
+
+/** 일상 칩 「야외놀이」— 파일명의 `paly` 는 옛 오타처럼 보여도 현재 에셋 이름입니다 */
+const OUTDOOR_PLAY_ROUTINE_PNG = `${BASE}/p.m/paly_outside.png?v=${ROUTINE_PLAY_PNG_CACHE_BUST}`
 
 /** 일상 칩 「실내놀이」 */
-const INDOOR_PLAY_ROUTINE_PNG = `${BASE}/p.m/play_inside.png`
+const INDOOR_PLAY_ROUTINE_PNG = `${BASE}/p.m/play_inside.png?v=${ROUTINE_PLAY_PNG_CACHE_BUST}`
 
 /** DB 칼럼에 넣은 값이 루틴 전용 PNG 경로인지 여부 */
 export function isRoutineImagePath(icon: string | null | undefined): boolean {
@@ -77,7 +108,13 @@ const PNG_BY_TITLE: Record<string, string> = {
   '저녁 물마시기': `${BASE}/p.m/water.png`,
   /** 예전 표기 */
   '물마시기(저녁)': `${BASE}/p.m/water.png`,
+  /** 저녁 식사(일상) — 새 이름으로 통일 */
+  저녁밥먹기: DINNER_ROUTINE_PNG,
+  '저녁 밥먹기': DINNER_ROUTINE_PNG,
+  '저녁 밥 먹기': DINNER_ROUTINE_PNG,
   기도: `${BASE}/p.m/pray.png`,
+  /** 스페셜 칩 표기 */
+  기도하기: `${BASE}/p.m/pray.png`,
   장난감정리: `${BASE}/p.m/organize_toys.png`,
   잠옷갈아입기: `${BASE}/p.m/pajama.png`,
   '빨래통에 옷넣기': `${BASE}/p.m/roundrybasket.png`,
@@ -216,6 +253,36 @@ function titlesForRoutinePngLookup(title: string, block?: string | null): string
   return canon === raw ? [raw] : [canon, raw]
 }
 
+/**
+ * 표 매칭이 빠져도, 제목·설명 문장에서 「실내놀이」「야외놀이」「샤워」 등이 분명하면 PNG 를 고릅니다.
+ * `missionRoutineIconFrame` 과 같은 순서(실내 놀이를 야외보다 먼저)로 실내·야외가 바뀌지 않게 합니다.
+ */
+function routineKeywordsOverridePng(title: string, description?: string | null): string | null {
+  const ko = `${title ?? ''} ${description ?? ''}`.trim()
+  if (!ko) return null
+  const spaced = ko.replace(/\s+/gu, ' ')
+  if (/실내\s*놀이|실내놀이|실내.*놀이|놀이.*실내/i.test(spaced)) {
+    return INDOOR_PLAY_ROUTINE_PNG
+  }
+  if (
+    /야외\s*놀이|야외놀이|실외\s*놀이|실외놀이|바깥\s*놀이|바깥놀이/i.test(spaced) ||
+    (/밖에서/i.test(spaced) && /놀이|신나게|몸을/i.test(spaced))
+  ) {
+    return OUTDOOR_PLAY_ROUTINE_PNG
+  }
+  if (/샤워/i.test(spaced)) {
+    return SHOWER_ROUTINE_PNG
+  }
+  const bundleCompact = compactTitleNoSpaces(`${title ?? ''}${description ?? ''}`)
+  if (isMealPrepHelpMissionCompact(bundleCompact) || isMealPrepHelpMissionCompact(compactTitleNoSpaces(title ?? ''))) {
+    return MEAL_PREP_HELP_ROUTINE_PNG
+  }
+  if (isFinishMealMissionCompact(bundleCompact) || isFinishMealMissionCompact(compactTitleNoSpaces(title ?? ''))) {
+    return FINISH_MEAL_ROUTINE_PNG
+  }
+  return null
+}
+
 function uniqueLookupKeys(title: string): string[] {
   const raw = normalizeTitleForPngLookup(title)
   const normalized = raw.replace(/\s+/g, ' ')
@@ -258,10 +325,13 @@ export function resolveRoutineMissionPngUrl(params: {
   iconEmoji?: string | null
   /** daily_missions 조인 시 템플릿 블록 — 「물마시기」등 블록별 칩 이름 구분에 씁니다 */
   block?: string | null
+  /** 시드(S046)처럼 제목은 짧고 설명에만 단서가 있을 때 야외·실내 등을 잡습니다 */
+  description?: string | null
 }): string | null {
   for (const seqTitle of titlesForRoutinePngLookup(params.title, params.block)) {
     for (const key of uniqueLookupKeys(seqTitle)) {
-      if (ATLAS_ONLY_TITLES.has(key)) return null
+      /** 이 키만 아틀라스 전용이면 건너뛰고, 같은 제목의 다른 별칭 키는 계속 봅니다 */
+      if (ATLAS_ONLY_TITLES.has(key)) continue
       const mapped = PNG_BY_TITLE[key]
       if (mapped) return mapped
     }
@@ -284,6 +354,9 @@ export function resolveRoutineMissionPngUrl(params: {
   if (isIndoorPlayTitleHeuristic(compactPlay)) {
     return INDOOR_PLAY_ROUTINE_PNG
   }
+
+  const keywordPng = routineKeywordsOverridePng(params.title, params.description ?? null)
+  if (keywordPng) return keywordPng
 
   const icon = params.iconEmoji?.trim()
   if (icon && isRoutineImagePath(icon)) return icon

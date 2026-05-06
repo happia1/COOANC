@@ -11,6 +11,11 @@ const WALLET_IMAGE_CACHE_BUST = '4'
 const MARKET_ROOF_CACHE_BUST = '3'
 
 /**
+ * 일상 「야외놀이」·「실내놀이」 전용 PNG 캐시 버스트는 `src/lib/routineMissionThumbnail.ts` 의
+ * `ROUTINE_PLAY_PNG_CACHE_BUST` 와 함께 올립니다(URL 쿼리가 달라져야 immutable 캐시가 끊깁니다).
+ */
+
+/**
  * Supabase Storage 공개 URL — `store_items.image_url` 이 이 호스트 아래로 올 때 `next/image` 최적화 허용
  * (프로젝트마다 서브도메인이 달라 env 의 URL 에서 hostname 만 뽑습니다.)
  */

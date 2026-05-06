@@ -41,6 +41,12 @@ const DEFAULT_STAGE: HomeIslandStageSprite = {
 export const BUNNY_HOME_DISPLAY_SCALE = 1.09
 
 /**
+ * 요청사항: 자녀 앱(ChildScreen)의 수달(`otter`) 캐릭터만 더 크게 보이도록 하는 배율입니다.
+ * - 1이면 기존과 동일, 1.12면 키가 약 12% 정도 커집니다(다른 동물은 변경 없음).
+ */
+export const OTTER_HOME_DISPLAY_SCALE = 1.12
+
+/**
  * 곰 홈 캐릭터는 토끼 높이에 맞추지 않고, `bears.png`의 bear1(Bears (1)) 프레임 자체를 기준으로 계산합니다.
  * - rotated 프레임은 시각상 가로/세로가 뒤집히므로 natural width/height 를 보정합니다.
  * - 스케일은 곰 전용 상수로만 제어합니다.
@@ -83,9 +89,10 @@ export const CHICK_HOME_ISLAND_CLIP_LEFT_PX = 8
 /**
  * 수달 홈 무대 가로·세로:
  * - 기본 체급은 여우/토끼와 비슷하게 두되, 수달 시트 비율을 고려해 세로를 조금 줄여 답답하지 않게 보이게 합니다.
+ * - 요청 반영: 수달 캐릭터만 무대에서 더 크게 보이도록 가로·세로를 함께 확대합니다.
  */
-const OTTER_HOME_STAGE_WIDTH = 116
-const OTTER_HOME_STAGE_HEIGHT = 210
+const OTTER_HOME_STAGE_WIDTH = 132
+const OTTER_HOME_STAGE_HEIGHT = 238
 
 /** 프로필 URL → 홈 무대용 스프라이트(정면 프레임) */
 const STAGE_BY_AVATAR_URL: Record<string, HomeIslandStageSprite> = {

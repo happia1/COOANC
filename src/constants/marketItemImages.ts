@@ -46,7 +46,7 @@ export const MARKET_ITEM_IMAGE_URLS = {
   뮤즐리: H('뮤즐리.png'),
   젤리: H('젤리.png'),
   팝콘: H('팝콘.png'),
-  뽀로로: H('뽀로로.png'),
+  음료수: H('drink.png'),
   츄잉껌: H('chew.png'),
   초코우유: H('choco_milk.png'),
   딸기우유: H('strawberry_milk.png'),

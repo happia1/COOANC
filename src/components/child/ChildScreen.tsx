@@ -30,6 +30,7 @@ import { CharacterSprite } from '@/components/sprites/CharacterSprite'
 import {
   BUNNY_HOME_DISPLAY_SCALE,
   CHICK_HOME_ISLAND_CLIP_LEFT_PX,
+  OTTER_HOME_DISPLAY_SCALE,
   resolveHomeIslandStageSprite,
 } from '@/lib/childHomeCharacterFromAvatar'
 import { BACKGROUND_ANCHORS } from '@/constants/backgroundAnchors'
@@ -118,8 +119,13 @@ const RIGHT_ICON_COIN_SCALE_BASE_W = LEVEL_BLOCK_SCALE_BASE_W
 const RIGHT_ICON_COIN_SCALE_FULL_W = LEVEL_BLOCK_SCALE_FULL_W
 const RIGHT_ICON_COIN_SCALE_MAX = 1.3
 
-/** 화분·물조리개(발 옆) — 레벨 카드와 같은 너비 구간, 최대 1.5배까지 확대 */
-const PLANT_FEET_UI_SCALE_MAX = 1.5
+/** 캐릭터(무대) — 가로가 넓어질수록 최대 2배까지 확대 */
+const CHARACTER_UI_SCALE_MAX = 2
+/** 토끼 캐릭터만 별도 상한 — 요청 반영: 최대 1.7배 */
+const BUNNY_CHARACTER_UI_SCALE_MAX = 1.7
+
+/** 화분·물조리개(발 옆) — 레벨 카드와 같은 너비 구간, 최대 2배까지 확대 */
+const PLANT_FEET_UI_SCALE_MAX = 2
 
 /**
  * 발 옆 화분·물조리개의 **표시 크기**와 **토끼와의 가로 간격(px)** 을 맞출 때 쓰는 기준 가로(px).
@@ -166,6 +172,15 @@ function scaleForPlantFeetUi(containerWidthPx: number): number {
     LEVEL_BLOCK_SCALE_BASE_W,
     LEVEL_BLOCK_SCALE_FULL_W,
     PLANT_FEET_UI_SCALE_MAX,
+  )
+}
+
+function scaleForCharacterUi(containerWidthPx: number): number {
+  return scaleFromContainerWidth(
+    containerWidthPx,
+    LEVEL_BLOCK_SCALE_BASE_W,
+    LEVEL_BLOCK_SCALE_FULL_W,
+    CHARACTER_UI_SCALE_MAX,
   )
 }
 
@@ -1404,12 +1419,32 @@ export default function ChildScreen({
    * 비개발자: 여우·곰 등 다른 캐릭터 크기는 그대로 두고 토끼만 키웁니다.
    */
   const homeCharacterSizeMultiplier =
-    characterSprite.character === 'bunny' ? BUNNY_HOME_DISPLAY_SCALE : 1
+    characterSprite.character === 'bunny'
+      ? BUNNY_HOME_DISPLAY_SCALE
+      : characterSprite.character === 'otter'
+        ? OTTER_HOME_DISPLAY_SCALE
+        : 1
+
+  /** 비개발자: 토끼는 너무 커 보이지 않게 최대 1.7배, 그 외 캐릭터는 최대 2배까지 허용합니다. */
+  const characterUiMaxScale =
+    characterSprite.character === 'bunny'
+      ? BUNNY_CHARACTER_UI_SCALE_MAX
+      : CHARACTER_UI_SCALE_MAX
 
   /** 캐릭터 표시 높이 (px) — 배경 높이의 characterScale 비율(토끼는 추가 배율 적용) */
+  /**
+   * 캐릭터 배율(가로 반응형): 좁은 화면은 1배, 넓은 가로/전체화면으로 갈수록 커집니다.
+   * - 토끼/수달의 개별 보정(예: 1.09, 1.12)은 유지합니다.
+   * - 최종 상한은 토끼 1.7배, 그 외 캐릭터 2배입니다.
+   */
+  const characterUiScale = useMemo(
+    () => Math.min(characterUiMaxScale, homeCharacterSizeMultiplier * scaleForCharacterUi(containerW)),
+    [characterUiMaxScale, containerW, homeCharacterSizeMultiplier],
+  )
+
   const characterDisplayH =
     containerH > 0
-      ? Math.round(containerH * anchor.characterScale * homeCharacterSizeMultiplier)
+      ? Math.round(containerH * anchor.characterScale * characterUiScale)
       : 0
 
   /** 상단 왼쪽(레벨·크레딧 통합 카드) — 컨테이너 가로가 넓어질수록 최대 1.7배(글자·아이콘 동일 비율) */
@@ -1419,10 +1454,10 @@ export default function ChildScreen({
   const rightIconPrimaryScale = useMemo(() => scaleForRightIconPrimary(containerW), [containerW])
   const rightIconCoinScale = useMemo(() => scaleForRightIconCoin(containerW), [containerW])
 
-  /** 발 옆 화분·물조리개 — 실제 컨테이너 너비가 아니라 885px 기준과 동일한 배율(최대 1.5배)로 고정 */
+  /** 발 옆 화분·물조리개 — 화면 가로가 넓어질수록 최대 2배까지 확대 */
   const plantFeetUiScale = useMemo(
-    () => scaleForPlantFeetUi(PLANT_FEET_LAYOUT_REFERENCE_W),
-    [],
+    () => scaleForPlantFeetUi(containerW),
+    [containerW],
   )
 
   /**

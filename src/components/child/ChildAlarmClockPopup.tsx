@@ -32,6 +32,19 @@ type NextAlarmResult = {
   atMs: number
 }
 
+/**
+ * 타이머 팝업 안에서 재생할 "상황별 키워드 + 영상" 목록입니다.
+ * 비개발자: 여기의 `label`/`url`만 바꾸면 버튼 문구와 재생 영상이 함께 바뀝니다.
+ */
+const TIMER_KEYWORD_VIDEOS = [
+  { label: '차분한 아침', url: 'https://youtu.be/u1AVP1pjCgo?si=GM10EwWwpPELrQmE' },
+  { label: '빠른 기상', url: 'https://youtu.be/sOX5x-C335o?si=pOjStvOwnhQFU-G8' },
+  { label: '식사시간', url: 'https://youtu.be/OxVeowNwyFw?si=uMOJi03Hw7r4qkV1' },
+  { label: '놀이시간', url: 'https://youtu.be/yBanUW7ja8M?si=j5COdu4hKoAfHzgl' },
+  { label: '모두 제자리', url: 'https://youtu.be/ZChTK8th_ps?si=7DKiV4XGLi6_kWku' },
+  { label: '잠잘 준비', url: 'https://youtu.be/bdjyo0qsejI?si=XvMWVjb16aW91Hj4' },
+] as const
+
 /** 뽀모도로 토마토·버튼 등 포인트 컬러(참고 UI와 유사한 테라코타 레드) */
 const POMODORO_RED = '#D9534F'
 
@@ -54,9 +67,6 @@ const POMODORO_DISPLAY_BOX_PCT = {
   width: 72,
   height: 17,
 } as const
-
-/** 하단 알람 목록에서 숨길 기본 루틴 블록 라벨 */
-const HIDDEN_BOTTOM_ALARM_LABELS = ['기상', '하원·귀가', '잘 시간'] as const
 
 /**
  * 뽀모도로 컨트롤 아이콘 — 글자 대신 재생 / 일시정지 / 정지(초기화) 모양만 표시합니다.
@@ -132,6 +142,7 @@ const MODE_ATLAS = {
   w: 376,
   h: 175,
   morning: { x: 3, y: 3, w: 234, h: 169 },
+  sleep: { x: 241, y: 3, w: 132, h: 139 },
 } as const
 
 /**
@@ -151,6 +162,40 @@ function isWeekendSeoulDate(isoDate: string): boolean {
  */
 function toSeoulDateTimeMs(isoDate: string, hhmm: string): number {
   return new Date(`${isoDate}T${hhmm}:00+09:00`).getTime()
+}
+
+/**
+ * 유튜브 링크를 팝업 내부에서 재생 가능한 embed URL로 변환합니다.
+ * - 지원: `youtu.be/<id>`, `youtube.com/watch?v=<id>`, `youtube.com/shorts/<id>`
+ * - 비개발자: 링크가 바뀌어도 "영상 ID"만 추출되면 자동으로 재생이 됩니다.
+ */
+function toYouTubeEmbedUrl(rawUrl: string, { autoplay = true }: { autoplay?: boolean } = {}): string | null {
+  try {
+    const u = new URL(rawUrl)
+    let videoId: string | null = null
+
+    if (u.hostname === 'youtu.be') {
+      videoId = u.pathname.replace(/^\//, '') || null
+    } else if (u.hostname.endsWith('youtube.com')) {
+      if (u.pathname === '/watch') videoId = u.searchParams.get('v')
+      const shortsMatch = u.pathname.match(/^\/shorts\/([^/]+)/)
+      if (!videoId && shortsMatch) videoId = shortsMatch[1] ?? null
+      const embedMatch = u.pathname.match(/^\/embed\/([^/]+)/)
+      if (!videoId && embedMatch) videoId = embedMatch[1] ?? null
+    }
+
+    if (!videoId) return null
+
+    const params = new URLSearchParams()
+    params.set('rel', '0')
+    params.set('modestbranding', '1')
+    params.set('playsinline', '1')
+    if (autoplay) params.set('autoplay', '1')
+
+    return `https://www.youtube.com/embed/${encodeURIComponent(videoId)}?${params.toString()}`
+  } catch {
+    return null
+  }
 }
 
 /**
@@ -194,6 +239,47 @@ function formatSeoulDigitalClockParts(now: Date): {
   return { dateLine, dayPeriod, timeHm }
 }
 
+/**
+ * 24시간제 `HH:mm` 문자열을 상단 시계와 같은 12시간제 `AM/PM hh:mm`으로 바꿉니다.
+ * 비개발자: 알람 목록 시간도 위 시계 표기 방식과 통일하기 위해 사용합니다.
+ */
+function formatAlarmTimeToAmPm(hhmm: string): { dayPeriod: string; timeHm: string } {
+  const match = /^(\d{2}):(\d{2})$/.exec(hhmm)
+  if (!match) return { dayPeriod: '', timeHm: hhmm }
+  const hour24 = Number(match[1])
+  const minute = match[2]
+  const isPm = hour24 >= 12
+  const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12
+  return {
+    dayPeriod: isPm ? 'PM' : 'AM',
+    timeHm: `${String(hour12).padStart(2, '0')}:${minute}`,
+  }
+}
+
+/**
+ * 알람 라벨에 맞는 카드 보조 이미지 타입을 반환합니다.
+ * - 기상: 아침 해
+ * - 잘 시간/잘 준비: 수면(달)
+ * - 그 외: 이미지 없음
+ */
+function alarmVisualByLabel(label: string): 'morning' | 'sleep' | 'none' {
+  if (label === '기상') return 'morning'
+  if (label === '잘 시간' || label === '잘 준비') return 'sleep'
+  return 'none'
+}
+
+/**
+ * 알람 라벨별 전용 PNG 아이콘 경로.
+ * - 잘 준비: pajama
+ * - 등원 시간: bus
+ */
+function alarmImageSrcByLabel(label: string): string | null {
+  if (label === '잘 준비') return '/assets/img/missions/routine/p.m/pajama.png'
+  if (label === '등원 시간') return '/assets/img/missions/routine/a.m/bus.png'
+  if (label === '하원·귀가') return '/assets/img/common/ui/alarm.png'
+  return null
+}
+
 /** 아침 알람 팝업과 동일한 해 이미지를 작게 표시하는 조각 컴포넌트입니다. */
 function MorningAlarmSprite({ scale = 0.34 }: { scale?: number }) {
   const f = MODE_ATLAS.morning
@@ -201,6 +287,26 @@ function MorningAlarmSprite({ scale = 0.34 }: { scale?: number }) {
     <div
       role="img"
       aria-label="아침 알람 이미지"
+      className="shrink-0"
+      style={{
+        width: f.w * scale,
+        height: f.h * scale,
+        backgroundImage: `url(${MODE_ATLAS.url})`,
+        backgroundRepeat: 'no-repeat',
+        backgroundSize: `${MODE_ATLAS.w * scale}px ${MODE_ATLAS.h * scale}px`,
+        backgroundPosition: `${-f.x * scale}px ${-f.y * scale}px`,
+      }}
+    />
+  )
+}
+
+/** 잘 시간(수면) 알림에 쓰는 달 이미지를 작게 표시합니다. */
+function SleepAlarmSprite({ scale = 0.55 }: { scale?: number }) {
+  const f = MODE_ATLAS.sleep
+  return (
+    <div
+      role="img"
+      aria-label="수면 알람 이미지"
       className="shrink-0"
       style={{
         width: f.w * scale,
@@ -269,6 +375,8 @@ export default function ChildAlarmClockPopup({ open, onClose }: Props) {
   const [portalReady, setPortalReady] = useState(false)
   const [slideIndex, setSlideIndex] = useState(0)
   const touchStartXRef = useRef<number | null>(null)
+  /** 키워드에서 고른 영상 embed URL(팝업 내부 iframe 재생용) */
+  const [selectedKeywordEmbedUrl, setSelectedKeywordEmbedUrl] = useState<string | null>(null)
 
   /** 뽀모도로 상태 — 기본 00:00, 토마토 안 ±로 분 단위(0~99) 설정 */
   const [selectedMinutes, setSelectedMinutes] = useState<number>(0)
@@ -302,6 +410,8 @@ export default function ChildAlarmClockPopup({ open, onClose }: Props) {
 
   /** 루틴 알람 조회 상태 */
   const [alarmRows, setAlarmRows] = useState<RoutineAlarmRow[]>([])
+  /** ChildScreen 팝업 트리거 기준(잘 준비/등원 시간)도 알람 슬라이드에 함께 노출 */
+  const [extraPopupRows, setExtraPopupRows] = useState<RoutineAlarmRow[]>([])
   const [nowMs, setNowMs] = useState<number>(Date.now())
 
   useEffect(() => {
@@ -317,8 +427,25 @@ export default function ChildAlarmClockPopup({ open, onClose }: Props) {
     const prefs = readRoutineAlarmPrefs()
     const hasSchool = readRoutineHasSchoolFromStorage()
     setAlarmRows(buildRoutineAlarmRows(prefs, hasSchool))
-    /** 첫 화면 = 뽀모도로(slide 0). 알람 목록은 slide 1. */
+    const extras: RoutineAlarmRow[] = []
+    if (prefs.sleepReadyEnabled) {
+      extras.push({
+        label: '잘 준비',
+        time: prefs.sleepReadyTime,
+        onWeekend: prefs.sleepReadyWeekend,
+      })
+    }
+    if (prefs.schoolEnabled) {
+      extras.push({
+        label: '등원 시간',
+        time: prefs.schoolTime,
+        onWeekend: prefs.schoolWeekend,
+      })
+    }
+    setExtraPopupRows(extras.filter((r) => /^\d{2}:\d{2}$/.test(r.time)))
+    /** 첫 화면 = 뽀모도로(slide 0). 알람 목록은 slide 1. 키워드 영상은 slide 2. */
     setSlideIndex(0)
+    setSelectedKeywordEmbedUrl(null)
   }, [open])
 
   /** 헤더 디지털 시계(초 단위) — 팝업이 열린 동안 1초마다 갱신합니다. */
@@ -382,23 +509,29 @@ export default function ChildAlarmClockPopup({ open, onClose }: Props) {
     if (open) return
     setRunning(false)
     stopPomodoroSounds()
+    setSelectedKeywordEmbedUrl(null)
   }, [open, stopPomodoroSounds])
 
+  /**
+   * 영상 재생 중 다른 페이지로 이동하면 iframe을 내려(언마운트) 재생을 즉시 멈춥니다.
+   * 비개발자: 유튜브 재생 상태를 따로 제어하지 않아도 화면 이동 시 소리가 남지 않습니다.
+   */
+  useEffect(() => {
+    if (slideIndex !== 2 && selectedKeywordEmbedUrl) setSelectedKeywordEmbedUrl(null)
+  }, [slideIndex, selectedKeywordEmbedUrl])
+
   const nextAlarm = useMemo(() => findNextAlarm(alarmRows, nowMs), [alarmRows, nowMs])
+  /** 알람 리스트는 요청사항에 맞춰 시간(HH:mm) 오름차순으로 정렬합니다. */
+  const allVisibleAlarmRows = useMemo(
+    () => [...alarmRows, ...extraPopupRows].sort((a, b) => a.time.localeCompare(b.time)),
+    [alarmRows, extraPopupRows],
+  )
+  const nextAlarmVisual = nextAlarm ? alarmVisualByLabel(nextAlarm.label) : 'none'
   const {
     dateLine: seoulDigitalDate,
     dayPeriod: seoulDayPeriod,
     timeHm: seoulTimeHm,
   } = useMemo(() => formatSeoulDigitalClockParts(new Date(nowMs)), [nowMs])
-  /** 하단 리스트는 요청사항에 따라 기본 루틴(기상/하원·귀가/잘 시간)을 제외합니다. */
-  const visibleBottomAlarmRows = useMemo(
-    () =>
-      alarmRows.filter(
-        (row) =>
-          !HIDDEN_BOTTOM_ALARM_LABELS.includes(row.label as (typeof HIDDEN_BOTTOM_ALARM_LABELS)[number]),
-      ),
-    [alarmRows],
-  )
   const minutesLeft = Math.floor(secondsLeft / 60)
   const remainSeconds = secondsLeft % 60
   /** 00:00 도달 후 멜로디 재생 중 — 빨간 깜빡임 등 */
@@ -483,16 +616,16 @@ export default function ChildAlarmClockPopup({ open, onClose }: Props) {
             touchStartXRef.current = null
             if (startX == null || endX == null) return
             const delta = endX - startX
-            if (delta <= -40) setSlideIndex(1)
-            if (delta >= 40) setSlideIndex(0)
+            if (delta <= -40) setSlideIndex((prev) => Math.min(2, prev + 1))
+            if (delta >= 40) setSlideIndex((prev) => Math.max(0, prev - 1))
           }}
         >
           <div
-            className="flex h-full w-[200%] transition-transform duration-300 ease-out"
-            style={{ transform: `translateX(-${slideIndex * 50}%)` }}
+            className="flex h-full w-[300%] transition-transform duration-300 ease-out"
+            style={{ transform: `translateX(-${slideIndex * (100 / 3)}%)` }}
           >
             {/* 페이지 1: 뽀모도로(첫 화면) — 토마토(안에 −/+)·재생/정지 */}
-            <section className="h-full w-1/2 overflow-y-auto px-4 py-4" aria-label="뽀모도로 타이머">
+            <section className="h-full w-1/3 overflow-y-auto px-4 py-4" aria-label="뽀모도로 타이머">
               <div className="mb-4 text-center">
                 <h3 className="text-sm font-black text-gray-800">뽀모도로 타이머</h3>
               </div>
@@ -586,43 +719,110 @@ export default function ChildAlarmClockPopup({ open, onClose }: Props) {
             </section>
 
             {/* 페이지 2: 루틴 알람 */}
-            <section className="h-full w-1/2 overflow-y-auto px-4 py-4" aria-label="루틴 알람 정보">
-              <h3 className="text-sm font-black text-gray-800">알람</h3>
-
-              <div className="mt-3 rounded-2xl border border-gray-100 bg-gray-50 px-4 py-4">
-                {/** 카드 높이를 줄이기 위해 텍스트는 왼쪽, 알람 이미지는 오른쪽에 배치합니다. */}
-                <div className="flex items-center justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    {nextAlarm ? (
-                      <>
-                        {/**
-                         * 요청사항:
-                         * - "다음 알람" 문구 삭제
-                         * - 상단에는 알람 종류(기상/잘 시간/하원·귀가), 아래에는 시간만 표시
-                         */}
-                        <p className="text-sm font-black text-gray-900">{nextAlarm.label}</p>
-                        <p className="mt-1 text-xl font-black tabular-nums text-[#4A90E2]">{nextAlarm.time}</p>
-                      </>
-                    ) : (
-                      <p className="text-sm font-bold text-gray-500">설정된 알람이 없어요</p>
-                    )}
-                  </div>
-                  <div className="shrink-0">
-                    <MorningAlarmSprite />
-                  </div>
-                </div>
-              </div>
-
-              {visibleBottomAlarmRows.length > 0 ? (
+            <section className="h-full w-1/3 overflow-y-auto px-4 py-4" aria-label="루틴 알람 정보">
+              <h3 className="mb-2 text-center text-sm font-black text-gray-800">알람시간</h3>
+              {allVisibleAlarmRows.length > 0 ? (
                 <ul className="mt-3 space-y-2">
-                  {visibleBottomAlarmRows.map((row, idx) => (
-                    <li key={`${row.label}-${row.time}-${idx}`} className="rounded-xl border border-gray-100 bg-white px-3 py-2">
-                      <p className="text-xs font-bold text-gray-800">{row.label}</p>
-                      <p className="text-sm font-black tabular-nums text-gray-900">{row.time}</p>
+                  {allVisibleAlarmRows.map((row, idx) => {
+                    const ampm = formatAlarmTimeToAmPm(row.time)
+                    const isNext = !!nextAlarm && nextAlarm.label === row.label && nextAlarm.time === row.time
+                    const visual = alarmVisualByLabel(row.label)
+                    const imageSrc = alarmImageSrcByLabel(row.label)
+                    return (
+                    <li
+                      key={`${row.label}-${row.time}-${idx}`}
+                      className={`rounded-xl border bg-white px-3 py-1.5 transition ${
+                        isNext
+                          ? 'border-blue-200 bg-blue-50/50 shadow-sm scale-[1.02]'
+                          : 'border-gray-100'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className={`${isNext ? 'text-sm' : 'text-xs'} font-bold text-gray-800`}>{row.label}</p>
+                          <p className={`${isNext ? 'text-base text-[#4A90E2]' : 'text-sm text-gray-900'} font-black tabular-nums`}>
+                            {ampm.dayPeriod} {ampm.timeHm}
+                          </p>
+                        </div>
+                        {imageSrc ? (
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={imageSrc}
+                              alt=""
+                              className="h-7 w-7 object-contain"
+                              draggable={false}
+                            />
+                          </div>
+                        ) : visual !== 'none' ? (
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center">
+                            {visual === 'morning' ? (
+                              <MorningAlarmSprite scale={0.13} />
+                            ) : (
+                              <SleepAlarmSprite scale={0.2} />
+                            )}
+                          </div>
+                        ) : null}
+                      </div>
                     </li>
-                  ))}
+                    )
+                  })}
                 </ul>
               ) : null}
+            </section>
+
+            {/* 페이지 3: 키워드 영상(클릭 시 팝업 내부 재생) */}
+            <section className="h-full w-1/3 overflow-y-auto px-4 py-4" aria-label="키워드 영상">
+              <h3 className="text-center text-sm font-black text-gray-800">하루를 돕는 음악</h3>
+              <p className="mt-1 text-center text-[12px] font-bold text-gray-500">키워드를 누르면 아래에서 영상이 재생돼요.</p>
+
+              <div className="mt-3 grid grid-cols-3 gap-1.5">
+                {TIMER_KEYWORD_VIDEOS.map((video) => {
+                  const embedUrl = toYouTubeEmbedUrl(video.url, { autoplay: true })
+                  return (
+                    <button
+                      key={video.label}
+                      type="button"
+                      disabled={!embedUrl}
+                      onClick={() => setSelectedKeywordEmbedUrl(embedUrl)}
+                      className="rounded-xl border border-gray-100 bg-white px-2 py-2 text-center shadow-sm transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
+                      aria-label={`${video.label} 영상 재생`}
+                    >
+                      <p className="text-[11px] font-black leading-tight text-gray-900">{video.label}</p>
+                    </button>
+                  )
+                })}
+              </div>
+
+              <div className="mt-4 overflow-hidden rounded-2xl border border-gray-100 bg-black">
+                {selectedKeywordEmbedUrl ? (
+                  <>
+                    <div className="relative w-full" style={{ paddingTop: '56.25%' }}>
+                      <iframe
+                        title="키워드 영상 재생"
+                        src={selectedKeywordEmbedUrl}
+                        className="absolute inset-0 h-full w-full"
+                        allow="autoplay; encrypted-media; picture-in-picture"
+                        allowFullScreen
+                      />
+                    </div>
+                    <div className="flex items-center justify-end bg-white px-3 py-2">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedKeywordEmbedUrl(null)}
+                        className="rounded-lg bg-gray-100 px-2.5 py-1.5 text-[12px] font-bold text-gray-700"
+                        aria-label="영상 닫기"
+                      >
+                        영상 닫기
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex h-[160px] items-center justify-center bg-gray-50 px-3 text-center">
+                    <p className="text-[12px] font-bold text-gray-500">재생할 키워드를 먼저 선택해 주세요.</p>
+                  </div>
+                )}
+              </div>
             </section>
           </div>
         </div>
@@ -640,6 +840,12 @@ export default function ChildAlarmClockPopup({ open, onClose }: Props) {
               onClick={() => setSlideIndex(1)}
               className={`h-2.5 w-2.5 rounded-full ${slideIndex === 1 ? 'bg-[#4A90E2]' : 'bg-gray-300'}`}
               aria-label="루틴 알람 화면으로 이동"
+            />
+            <button
+              type="button"
+              onClick={() => setSlideIndex(2)}
+              className={`h-2.5 w-2.5 rounded-full ${slideIndex === 2 ? 'bg-[#4A90E2]' : 'bg-gray-300'}`}
+              aria-label="키워드 영상 화면으로 이동"
             />
           </div>
           <button type="button" onClick={onClose} className="w-full rounded-xl bg-gray-100 py-2.5 text-sm font-bold text-gray-700">

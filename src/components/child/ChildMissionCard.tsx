@@ -103,7 +103,12 @@ export default function ChildMissionCard({ mission, onComplete, tapResetKey = 0 
     title: m.title,
     iconEmoji: m.icon_emoji,
     block: m.block,
+    description: m.description,
   })
+  /** 비개발자: 저녁밥먹기 카드 이미지일 때만 아래로 아주 살짝 내리기 위한 조건입니다. */
+  const isDinnerMissionImage = routineImagePath?.includes('dinner.png') ?? false
+  /** 「밥 다 먹기」 PNG 는 그림이 상대적으로 어두워 보여, 카드에서는 밝기를 조금 올려 보정합니다 */
+  const brightPng = routineImagePath?.includes('clean_up_all.png') ? 'brightness(1.24) saturate(1.06)' : null
 
   function handleTap() {
     if (firedRef.current) {
@@ -169,7 +174,10 @@ export default function ChildMissionCard({ mission, onComplete, tapResetKey = 0 
             <img
               src={routineImagePath}
               alt=""
-              className="h-full w-full select-none object-contain"
+              className={['h-full w-full select-none object-contain', isDinnerMissionImage ? 'translate-y-1' : '']
+                .filter(Boolean)
+                .join(' ')}
+              style={brightPng ? { filter: brightPng } : undefined}
               draggable={false}
             />
           ) : (

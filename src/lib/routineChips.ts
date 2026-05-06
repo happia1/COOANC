@@ -48,9 +48,12 @@ export const PM_CHIPS: ChipDef[] = [
   { id: 'pm-water', title: '저녁 물마시기', emoji: '', type: 'recommended', apiBlock: 'afternoon' },
   { id: 'pm-out', title: '야외놀이', emoji: '', type: 'optional', apiBlock: 'afternoon' },
   { id: 'pm-in', title: '실내놀이', emoji: '', type: 'optional', apiBlock: 'afternoon' },
-  { id: 'pm-read', title: '독서활동', emoji: '', type: 'optional', apiBlock: 'afternoon' },
   { id: 'pm-hw', title: '숙제하기', emoji: '', type: 'optional', apiBlock: 'afternoon' },
-  { id: 'pm-dinner', title: '저녁식사', emoji: '', type: 'recommended', apiBlock: 'evening' },
+  /**
+   * 저녁 루틴 식사 카드: 기존 `저녁식사`는 삭제하고, `저녁밥먹기`로 통일합니다.
+   * 비개발자 설명: “같은 미션인데 이름이 달라서” 이미지/정렬/중복처리가 어긋나는 문제를 막기 위한 정리입니다.
+   */
+  { id: 'pm-dinner', title: '저녁밥먹기', emoji: '', type: 'recommended', apiBlock: 'evening' },
   { id: 'pm-tidy', title: '모두 제자리', emoji: '', type: 'recommended', apiBlock: 'evening' },
   /** 샤워만 따로 루틴에 넣을 때 — 썸네일 `p.m/shower.png` (`목욕/샤워` 옛 칩은 별칭으로 여기와 통합) */
   { id: 'pm-shower', title: '샤워하기', emoji: '', type: 'optional', apiBlock: 'evening' },
@@ -150,6 +153,11 @@ const RETIRED_ROUTINE_MISSION_TITLES = new Set<string>([
   '세수',
   /** 키워드 칩에서 제거됨 — 남아 있는 템플릿 행은 카드에서 숨김 */
   '가방 챙기기',
+  /** 키워드 칩에서 제거됨 — 남아 있는 템플릿 행은 카드에서 숨김 */
+  '독서활동',
+  '독서 활동',
+  /** 저녁 식사 카드 이름을 `저녁밥먹기` 로 통일 — 남아 있는 구 템플릿(`저녁식사`)은 카드에서 숨깁니다 */
+  '저녁식사',
 ])
 
 /** 입력 제목이 폐지된 일상 미션인지 확인합니다. */

@@ -240,7 +240,10 @@ export default async function ChildHomePage() {
   )
 
   /**
-   * 오늘 행이 없을 때만 백필 삽입합니다 (대부분의 요청은 건너뜀).
+   * 오늘 행 백필 삽입:
+   * - 예전: `daily_missions`가 0개일 때만 삽입 → 스페셜(이벤트/매일 스페셜) 1개라도 있으면
+   *   일상 루틴이 비어도 삽입이 안 되어 “스페셜만 보이는” 날이 생길 수 있습니다.
+   * - 개선: 오늘 풀(pool)에 있는 템플릿 중, 아직 오늘 `daily_missions`에 없는 것만 보충 삽입합니다.
    */
   let { data: existingRows, error: existingErr } = dailyMissionsRes
   if (existingErr) console.error('[child/home] daily_missions select', existingErr.message)
@@ -248,9 +251,14 @@ export default async function ChildHomePage() {
   let existing = (existingRows ?? []) as DailyMissionWithTemplate[]
   console.log('[home] today=', today, 'routineType=', routineType, 'existing=', existing.length, 'pool=', pool.length)
 
-  if (existing.length === 0 && pool.length > 0) {
+  const existingTemplateIds = new Set(
+    existing.filter((dm) => dm.missions != null).map((dm) => dm.mission_template_id),
+  )
+  const missingFromToday = pool.filter((m) => !existingTemplateIds.has(m.id))
+
+  if (pool.length > 0 && missingFromToday.length > 0) {
     await Promise.all(
-      pool.map(async (m) => {
+      missingFromToday.map(async (m) => {
         const row = {
           child_id: childId,
           mission_template_id: m.id,

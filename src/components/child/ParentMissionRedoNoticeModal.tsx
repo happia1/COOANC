@@ -34,7 +34,10 @@ export default function ParentMissionRedoNoticeModal({ mission, onClose }: Props
     title: m.title,
     iconEmoji: m.icon_emoji,
     block: m.block,
+    description: m.description,
   })
+  /** 「밥 다 먹기」 PNG 보정(카드와 동일) — 상대적으로 어두워 보여 밝기를 조금 올립니다 */
+  const brightPng = routineImagePath?.includes('clean_up_all.png') ? 'brightness(1.24) saturate(1.06)' : null
   const imgBg = special ? 'bg-amber-100' : 'bg-[#FFF0E8]'
 
   const modal = (
@@ -60,6 +63,7 @@ export default function ParentMissionRedoNoticeModal({ mission, onClose }: Props
               src={routineImagePath}
               alt=""
               className="h-full w-full select-none object-contain"
+              style={brightPng ? { filter: brightPng } : undefined}
               draggable={false}
             />
           ) : (

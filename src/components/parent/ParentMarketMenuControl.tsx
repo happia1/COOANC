@@ -289,8 +289,11 @@ export default function ParentMarketMenuControl({
     }
   }
 
-  /** 한 칸(썸네일·이름·크레딧·토글) — 가로 스크롤 줄에서 재사용합니다. */
-  function renderMenuItemTile(it: StoreItem) {
+  /**
+   * 한 칸(썸네일·이름·크레딧·토글) — 기본은 가로 스크롤 타일.
+   * - 이벤트 섹션은 요청사항으로 1열 리스트로 따로 렌더링합니다.
+   */
+  function renderMenuItemTile(it: StoreItem, sectionKey: string) {
     const hidden = hiddenItemIds.has(it.id)
     const visible = !hidden
     const spriteFrame = marketFrameKeyForItemId(it.id, it.name)
@@ -301,7 +304,12 @@ export default function ParentMarketMenuControl({
      * 기능 자체(토글·크레딧 수정)는 살아있어 미리 설정해 둘 수 있습니다.
      */
     const isBeta = isBetaActive(it.name, it.category ?? '')
-    const isBlocked = !isBeta
+    /**
+     * 요청사항:
+     * - 이벤트 옆 준비중 표시는 제거 (이벤트 항목은 베타 준비중 처리도 하지 않음)
+     * - 장난감은 목록을 노출하고 준비중이라고 표기(타일 오버레이 유지)
+     */
+    const isBlocked = sectionKey === 'event' ? false : !isBeta
 
     return (
       <div key={it.id} className="relative flex min-w-0 snap-start flex-col items-center gap-0.5">
@@ -467,8 +475,8 @@ export default function ParentMarketMenuControl({
                     <span className="shrink-0 text-[9px] font-extralight tabular-nums tracking-tight text-gray-400">
                       {block.items.length}개
                     </span>
-                    {/* 장난감·이벤트 구역은 베타에서 준비중 배지 표시 */}
-                    {(block.sectionKey === 'toy' || block.sectionKey === 'event') && (
+                    {/* 요청사항: 이벤트 옆 준비중 배지는 제거, 장난감만 표시 */}
+                    {block.sectionKey === 'toy' && (
                       <span className="shrink-0 rounded-full bg-gray-100 px-1.5 py-px text-[8px] font-bold text-gray-400">
                         준비중
                       </span>
@@ -490,10 +498,10 @@ export default function ParentMarketMenuControl({
                   <div className="-mx-1 snap-x snap-mandatory overflow-x-auto overflow-y-hidden pb-1 pt-1 [scrollbar-width:thin] [-ms-overflow-style:none] [&::-webkit-scrollbar]:h-1">
                     <div
                       className={`grid w-max grid-flow-col gap-x-1.5 gap-y-2.5 px-1 auto-cols-[minmax(3.25rem,3.5rem)] sm:auto-cols-[minmax(3.5rem,3.75rem)] ${
-                        useTwoRows ? 'grid-rows-2' : 'grid-rows-1'
+                        block.sectionKey === 'event' ? 'grid-rows-1' : useTwoRows ? 'grid-rows-2' : 'grid-rows-1'
                       }`}
                     >
-                      {block.items.map((it) => renderMenuItemTile(it))}
+                      {block.items.map((it) => renderMenuItemTile(it, block.sectionKey))}
                     </div>
                   </div>
                 ) : null}

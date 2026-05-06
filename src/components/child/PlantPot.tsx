@@ -82,6 +82,7 @@ export default function PlantPot({ pot, onRequestSeedSelect }: Props) {
 
   const imgSrc = STAGE_IMAGE[pot.stage]
   const label = STAGE_LABELS[pot.stage]
+  const isSeedStage = pot.stage === 0
 
   return (
     <>
@@ -140,7 +141,15 @@ export default function PlantPot({ pot, onRequestSeedSelect }: Props) {
             ? Array.from({ length: 8 }, (_, i) => <StarParticle key={i} index={i} />)
             : null}
 
-          <Image src={imgSrc} alt={label} fill className="object-contain" sizes="56px" priority />
+          <Image
+            src={imgSrc}
+            alt={label}
+            fill
+            // 비개발자: 씨앗(0단계) 그림만 작게(50%) + 아래로 살짝 내려서 위치를 맞춥니다.
+            className={['object-contain', isSeedStage ? 'scale-50 translate-y-4' : ''].filter(Boolean).join(' ')}
+            sizes="56px"
+            priority
+          />
         </div>
 
         {pot.completed && pot.stage === 7 && typeof onRequestSeedSelect === 'function' ? (
