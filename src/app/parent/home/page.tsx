@@ -10,9 +10,6 @@
  * 「일정 브리핑」용으로 오늘~오늘+6일 구간의 `calendar_events`와 동일 구간 `public_holidays` 를 함께 불러 `HomeTab` 에 넘깁니다(캘린더 빨간 공휴일과 동일 테이블).
  */
 
-export const dynamic = 'force-dynamic'
-/** 부모 홈 서버 쿼리 재실행을 60초 단위로 제한해 과도한 RLS 조회를 줄입니다. */
-export const revalidate = 60
 export const preferredRegion = 'hnd1'
 
 
@@ -65,6 +62,35 @@ const getCachedChildProfilesForParentHome = unstable_cache(
   },
 )
 
+/**
+ * 부모 홈의 주간 `daily_missions` 조회를 60초 캐시합니다.
+ * 세션 검증은 요청마다 유지하고, 무거운 집계 원본 데이터만 재사용해 DB IO를 줄입니다.
+ */
+const getCachedDailyMissionsForParentHome = unstable_cache(
+  async (childIdsKey: string, weekStart: string, weekEnd: string) => {
+    const childIds = childIdsKey.split(',').filter(Boolean)
+    if (childIds.length === 0) return [] as { child_id: string; date: string; is_completed: boolean }[]
+    const svc = createServiceRoleClient()
+    if (!svc) return [] as { child_id: string; date: string; is_completed: boolean }[]
+    const { data, error } = await svc
+      .from('daily_missions')
+      .select('child_id, date, is_completed')
+      .in('child_id', childIds)
+      .gte('date', weekStart)
+      .lte('date', weekEnd)
+    if (error) {
+      console.error('[parent home] cached daily_missions:', error.message)
+      return [] as { child_id: string; date: string; is_completed: boolean }[]
+    }
+    return (data ?? []) as { child_id: string; date: string; is_completed: boolean }[]
+  },
+  ['parent-home-daily-missions'],
+  {
+    revalidate: 60,
+    tags: ['parent-home-daily-missions'],
+  },
+)
+
 export default async function ParentHomePage() {
   const auth = await getCachedParentAuth()
   if (!auth?.user) redirect('/login')
@@ -89,12 +115,11 @@ export default async function ParentHomePage() {
   const [
     cachedProfilesRes,
     statsRes,
-    weekDailyRes,
+    weekDailyRows,
     recentLogsRes,
     calendarEventsRes,
     /** 루틴 캘린더의 빨간 법정공휴일과 같은 출처(`public_holidays`)를 브리핑에도 포함합니다 */
     publicHolidaysBriefingRes,
-    weeklyMissionDaysRes,
     agentReportsRes,
   ] = await Promise.all([
     getCachedChildProfilesForParentHome(childIdsKey),
@@ -103,13 +128,8 @@ export default async function ParentHomePage() {
       .select('child_id, credits, credits_wallet, credits_piggy, hearts, current_level, exp, exp_to_next_level, streak_days, eq_delay_score, eq_routine_rate, eq_save_ratio')
       .in('child_id', childIds),
 
-    // 경제 EQ 카드 — 이번 주 월~일(서울) 배정 미션
-    supabase
-      .from('daily_missions')
-      .select('child_id, date, is_completed')
-      .in('child_id', childIds)
-      .gte('date', weekStart)
-      .lte('date', weekEnd),
+    // 경제 EQ 카드 + AI 준비도에 공용으로 쓰는 주간 배정 미션 원본(60초 캐시)
+    getCachedDailyMissionsForParentHome(childIdsKey, weekStart, weekEnd),
 
     supabase
       .from('mission_logs')
@@ -138,17 +158,6 @@ export default async function ParentHomePage() {
       .lte('date', briefingEndInclusive)
       .order('date', { ascending: true }),
 
-    // AI 리포트 준비 진행도:
-    // "완료 이력"이 아니라 데일리 카드가 실제로 존재하는 날짜 수를 사용합니다.
-    // 기준 구간은 "이번 주 월~일(시작일 포함)" 7일이며,
-    // 날짜별로 daily_missions 행이 1개라도 있으면 해당 날짜를 누적으로 인정합니다.
-    supabase
-      .from('daily_missions')
-      .select('child_id, date')
-      .in('child_id', childIds)
-      .gte('date', weekStart)
-      .lte('date', weekEnd),
-
     // 최신 리포트 1건 조회: 자동 실행 필요 여부 판단용
     supabase
       .from('agent_reports')
@@ -176,11 +185,7 @@ export default async function ParentHomePage() {
   // 자녀별 이번 주 daily_missions → 월~일 막대 데이터
   const weekRowsByChild: Record<string, DailyMissionCompletionRow[]> = {}
   for (const cid of childIds) weekRowsByChild[cid] = []
-  for (const row of (weekDailyRes.data ?? []) as {
-    child_id: string
-    date: string
-    is_completed: boolean
-  }[]) {
+  for (const row of weekDailyRows as { child_id: string; date: string; is_completed: boolean }[]) {
     const bucket = weekRowsByChild[row.child_id]
     if (!bucket) continue
     bucket.push({ date: row.date, is_completed: row.is_completed })
@@ -276,7 +281,7 @@ export default async function ParentHomePage() {
   for (const cid of childIds) daysWithDataByChild[cid] = 0
   const daysSetByChild: Record<string, Set<string>> = {}
   for (const cid of childIds) daysSetByChild[cid] = new Set<string>()
-  for (const row of (weeklyMissionDaysRes.data ?? []) as { child_id: string; date: string | null }[]) {
+  for (const row of weekDailyRows as { child_id: string; date: string | null }[]) {
     if (!row.child_id) continue
     const day =
       typeof row.date === 'string'

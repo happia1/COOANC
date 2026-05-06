@@ -266,12 +266,24 @@ function AvatarCircle({
   stageName: string
   boxClass: string
 }) {
+  /**
+   * 부모 앱 자녀 프로필 블록에서 햄스터 얼굴이 과하게 크게 보이는 문제를 줄이기 위해,
+   * 햄스터 아바타일 때만 이미지 표시 크기를 살짝(약 88%) 축소합니다.
+   */
+  const isHamsterAvatar = /hamster/i.test(avatarUrl ?? '')
   return (
     <div className={`relative shrink-0 overflow-hidden rounded-full border border-gray-200 bg-white ${boxClass}`}>
       {avatarUrl ? (
         <div className="flex h-full w-full items-center justify-center p-0.5">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={avatarUrl} alt="" className="h-full w-full translate-y-1 object-contain object-center" />
+          <img
+            src={avatarUrl}
+            alt=""
+            className={[
+              'translate-y-1 object-contain object-center',
+              isHamsterAvatar ? 'h-[88%] w-[88%]' : 'h-full w-full',
+            ].join(' ')}
+          />
         </div>
       ) : (
         <span className="flex h-full w-full items-center justify-center px-1 text-center text-[11px] font-black leading-tight text-gray-700">
