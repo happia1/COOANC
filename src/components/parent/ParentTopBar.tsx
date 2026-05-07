@@ -1,13 +1,14 @@
 'use client'
 
 import Image from 'next/image'
-import Link from 'next/link'
 import { TOPBAR_LOGO_CLASSNAME, TOPBAR_LOGO_HEIGHT, TOPBAR_LOGO_SRC, TOPBAR_LOGO_WIDTH } from '@/constants/branding'
 import ParentRoutineAlarmButton from '@/components/parent/ParentRoutineAlarmButton'
 
 type TopBarProps = {
   /** 가족 연결 자녀 기준 구매 승인 대기 건수 — 종 게시판·흔들림에만 사용 (별도 공지 버튼 없음) */
   pendingApprovalCount: number
+  /** 설정 아이콘 — 페이지 이동 없이 우측·하단 시트만 엽니다 */
+  onOpenSettings: () => void
 }
 
 /**
@@ -15,7 +16,7 @@ type TopBarProps = {
  * - 좌: 앱 파비콘과 동일한 마크(브라우저 탭 아이콘과 같은 이미지)
  * - 우: 종(알림·공지) + 알람시계(루틴 알람 바로가기) + 설정
  */
-export default function ParentTopBar({ pendingApprovalCount }: TopBarProps) {
+export default function ParentTopBar({ pendingApprovalCount, onOpenSettings }: TopBarProps) {
   return (
     <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-sm border-b border-gray-100 shadow-sm md:h-16">
       <div className="flex h-full items-center justify-between px-4 py-3 md:px-8 md:py-0">
@@ -32,14 +33,14 @@ export default function ParentTopBar({ pendingApprovalCount }: TopBarProps) {
         />
         <div className="flex items-center gap-2 md:gap-4">
           <ParentRoutineAlarmButton initialPendingApprovalCount={pendingApprovalCount} />
-          <Link
-            href="/settings"
-            prefetch={false}
+          <button
+            type="button"
+            onClick={onOpenSettings}
             className="flex h-8 w-8 items-center justify-center transition-opacity hover:opacity-80 md:h-9 md:w-9"
             aria-label="설정"
           >
             <Image src="/assets/img/common/ui/setting.png" alt="" width={20} height={20} className="h-5 w-5 object-contain md:h-6 md:w-6" />
-          </Link>
+          </button>
         </div>
       </div>
     </header>

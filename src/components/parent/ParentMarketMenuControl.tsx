@@ -521,7 +521,7 @@ export default function ParentMarketMenuControl({
             role="dialog"
             aria-modal="true"
             aria-labelledby="add-store-item-title"
-            className="w-full max-w-md max-h-[min(88dvh,calc(100vh-0.5rem))] overflow-y-auto rounded-t-3xl bg-white p-6 shadow-2xl"
+            className="w-full max-w-none max-h-[min(88dvh,calc(100vh-0.5rem))] overflow-y-auto rounded-t-3xl bg-white p-6 shadow-2xl"
             style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom, 0px))' }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -655,7 +655,7 @@ export default function ParentMarketMenuControl({
             role="dialog"
             aria-modal="true"
             aria-labelledby="credit-edit-title"
-            className="w-full max-w-md max-h-[min(70dvh,calc(100vh-0.5rem))] overflow-y-auto rounded-t-3xl bg-white p-6 shadow-2xl"
+            className="w-full max-w-none max-h-[min(70dvh,calc(100vh-0.5rem))] overflow-y-auto rounded-t-3xl bg-white p-6 shadow-2xl"
             style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom, 0px))' }}
             onClick={(e) => e.stopPropagation()}
           >

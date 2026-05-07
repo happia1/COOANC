@@ -62,13 +62,13 @@ function EqDelayExplainModal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[95] flex items-end justify-center bg-black/45 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:items-center sm:p-4"
+      className="fixed inset-0 z-[95] flex items-end justify-center bg-black/45 px-0 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-0 sm:items-center sm:p-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby="eq-delay-modal-title"
     >
       <button type="button" className="absolute inset-0 cursor-default" aria-label="닫기" onClick={onClose} />
-      <div className="relative z-[1] flex max-h-[min(88dvh,32rem)] w-full max-w-md flex-col overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-black/[0.06] sm:rounded-3xl">
+      <div className="relative z-[1] flex max-h-[min(88dvh,32rem)] w-full max-w-none flex-col overflow-hidden rounded-t-2xl bg-white shadow-2xl ring-1 ring-black/[0.06] sm:mx-auto sm:max-w-md sm:rounded-3xl">
         <div className="shrink-0 border-b border-gray-100 px-4 py-3">
           <h2 id="eq-delay-modal-title" className="text-center text-sm font-bold text-gray-900">
             저축 습관

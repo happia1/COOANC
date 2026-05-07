@@ -170,7 +170,7 @@ export default function ChildProfileEditModal({ open, child, onClose, onSaved }:
       aria-labelledby="child-edit-title"
     >
       <button type="button" className="absolute inset-0 cursor-default" aria-label="닫기" onClick={onClose} />
-      <div className="relative z-10 flex max-h-[min(92dvh,100vh)] w-full max-w-md flex-col rounded-t-3xl bg-white shadow-2xl sm:max-h-[85vh] sm:rounded-3xl">
+      <div className="relative z-10 flex max-h-[min(92dvh,100vh)] w-full max-w-none flex-col rounded-t-3xl bg-white shadow-2xl sm:max-h-[85vh] sm:max-w-md sm:rounded-3xl">
         <div className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-gray-200 sm:hidden" aria-hidden />
         <div className="shrink-0 border-b border-gray-100 px-5 pb-3 pt-4">
           <h2 id="child-edit-title" className="text-center text-sm font-black text-gray-900">

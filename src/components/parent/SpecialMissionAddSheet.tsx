@@ -252,7 +252,7 @@ export default function SpecialMissionAddSheet({
   const card = (
     <div
       className={`relative flex min-h-0 flex-col overflow-hidden bg-white shadow-2xl ${
-        embedded ? 'h-full max-h-full rounded-xl border border-gray-100' : 'max-h-[88vh] rounded-t-2xl'
+        embedded ? 'h-full max-h-full rounded-xl border border-gray-100' : 'max-h-[88vh] w-full rounded-t-2xl'
       }`}
     >
         {embedded && embeddedMinimalChrome ? (

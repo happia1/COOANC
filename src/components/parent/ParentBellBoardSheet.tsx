@@ -2,15 +2,14 @@
 
 /**
  * 부모 상단 「알림·공지」버튼용 게시판 시트입니다.
- * - 구매 승인 대기 「알림」은 부모가 행을 눌러 확인하면 사라지며, 안내 「공지」목록은 그대로 둡니다.
+ * - 구매 승인 대기 「알림」은 부모가 행을 눌러 확인하면 사라지며, 「공지」는 Supabase notices 와 연동된 접기·펼치기 블록 목록입니다.
  * - 루틴 알람은 상단바의 알람시계 아이콘에서만 엽니다.
  */
 
 import { useEffect, useLayoutEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { PARENT_BELL_NOTICE_ITEMS } from '@/lib/parentBellNoticeItems'
+import ParentNoticeSlides from '@/components/parent/ParentNoticeSlides'
 
 type RapidTapAlert = {
   id: string
@@ -40,7 +39,6 @@ export default function ParentBellBoardSheet({
   rapidTapAlerts = [],
   onAcknowledgeRapidTapAlerts,
 }: Props) {
-  const router = useRouter()
   const [portalReady, setPortalReady] = useState(false)
   const [sheetEntered, setSheetEntered] = useState(false)
 
@@ -66,12 +64,12 @@ export default function ParentBellBoardSheet({
     <div className="fixed inset-0 z-[100]" role="dialog" aria-modal="true" aria-labelledby="parent-bell-board-title">
       <button type="button" className="absolute inset-0 bg-black/45" aria-label="닫기" onClick={onClose} />
       {/*
-        모바일·패드 세로: 아래에서 올라오는 시트.
-        패드 가로(md + landscape): 화면 오른쪽에서 밀려 들어오는 패널(캘린더 일정 시트와 같은 패턴).
+        모바일·패드 세로: 아래 시트 — 가로 전폭(max-w 없음).
+        패드 가로(md+landscape): 우측 패널, 최대 폭 max-w-md.
       */}
       <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center md:landscape:inset-x-0 md:landscape:inset-y-0 md:landscape:bottom-0 md:landscape:left-auto md:landscape:right-0 md:landscape:top-0 md:landscape:justify-end">
         <section
-          className={`pointer-events-auto flex max-h-[min(85dvh,100vh-1rem)] w-full max-w-md flex-col rounded-t-2xl bg-white shadow-2xl transition-transform duration-300 ease-out md:landscape:h-full md:landscape:max-h-none md:landscape:rounded-none md:landscape:rounded-l-2xl ${
+          className={`pointer-events-auto flex max-h-[min(85dvh,100vh-1rem)] w-full max-w-none flex-col rounded-t-2xl bg-white shadow-2xl transition-transform duration-300 ease-out md:landscape:h-full md:landscape:max-h-none md:landscape:max-w-md md:landscape:rounded-none md:landscape:rounded-l-2xl ${
             sheetEntered
               ? 'translate-y-0 md:landscape:translate-y-0 md:landscape:translate-x-0'
               : 'translate-y-full md:landscape:translate-y-0 md:landscape:translate-x-full'
@@ -154,26 +152,7 @@ export default function ParentBellBoardSheet({
               </div>
             ) : null}
 
-            <div>
-              <p className="mb-2 px-0.5 text-[10px] font-black uppercase tracking-wide text-gray-500">공지</p>
-              <ul className="space-y-2">
-                {PARENT_BELL_NOTICE_ITEMS.map((item) => (
-                  <li key={item.id}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onClose()
-                        router.push(item.href)
-                      }}
-                      className="w-full rounded-xl border border-gray-200 bg-white px-3 py-3 text-left transition-colors hover:bg-gray-50"
-                    >
-                      <p className="text-xs font-extrabold text-gray-900">{item.title}</p>
-                      <p className="mt-1 text-[11px] leading-relaxed text-gray-600">{item.summary}</p>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </div>
+            <ParentNoticeSlides active={open} onClose={onClose} />
           </div>
         </section>
       </div>

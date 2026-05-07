@@ -209,7 +209,7 @@ export default function RoutineKeywordBuilderSheet({
   const card = (
     <div
       className={`relative flex min-h-0 flex-col overflow-hidden bg-white shadow-2xl ${
-        embedded ? 'h-full max-h-full rounded-xl border border-gray-100' : 'max-h-[88vh] rounded-t-2xl'
+        embedded ? 'h-full max-h-full rounded-xl border border-gray-100' : 'max-h-[88vh] w-full rounded-t-2xl'
       }`}
     >
       {/* 하단 시트일 때만 손잡이 — 패널 임베드는 상단 여백만 최소로 둡니다 */}

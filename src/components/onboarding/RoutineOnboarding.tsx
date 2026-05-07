@@ -911,7 +911,7 @@ export default function RoutineOnboarding({ onComplete, linkedChildId }: Props) 
               aria-label="닫기"
               onClick={() => setSheet({ open: false })}
             />
-            <div className="relative max-h-[85vh] overflow-y-auto rounded-t-2xl bg-white px-4 pb-6 pt-3 shadow-xl">
+            <div className="relative w-full max-h-[85vh] overflow-y-auto rounded-t-2xl bg-white px-4 pb-6 pt-3 shadow-xl">
               {sheet.mode === 'add' && (
                 <>
                   <p className="text-center text-sm font-black text-brand-text mb-3">알람 일정 추가</p>
@@ -1129,7 +1129,7 @@ export default function RoutineOnboarding({ onComplete, linkedChildId }: Props) 
               aria-label="닫기"
               onClick={() => setMissionSuggestOpen(false)}
             />
-            <div className="relative max-h-[88vh] overflow-y-auto rounded-t-2xl bg-white px-4 pb-6 pt-3 shadow-xl">
+            <div className="relative w-full max-h-[88vh] overflow-y-auto rounded-t-2xl bg-white px-4 pb-6 pt-3 shadow-xl">
               <p id="mission-suggest-title" className="text-left text-sm font-black text-brand-text mb-1">
                 미션 추가 제안하기
               </p>

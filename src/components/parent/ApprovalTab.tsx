@@ -869,7 +869,7 @@ export default function ApprovalTab({
                 onClick={() => setPurchaseHistorySheetOpen(false)}
               />
               <div
-                className="relative z-[1] flex max-h-[min(78dvh,560px)] flex-col rounded-t-3xl bg-white shadow-2xl"
+                className="relative z-[1] flex w-full max-h-[min(78dvh,560px)] flex-col rounded-t-3xl bg-white shadow-2xl"
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="purchase-history-sheet-title"
@@ -968,7 +968,7 @@ export default function ApprovalTab({
                 onClick={() => setRollbackSheetOpen(false)}
               />
               <div
-                className="relative z-[1] flex max-h-[min(78dvh,560px)] flex-col rounded-t-3xl bg-white shadow-2xl"
+                className="relative z-[1] flex w-full max-h-[min(78dvh,560px)] flex-col rounded-t-3xl bg-white shadow-2xl"
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="rollback-sheet-title"

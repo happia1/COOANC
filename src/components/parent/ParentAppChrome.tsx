@@ -1,12 +1,15 @@
 'use client'
 
 import type { ReactNode } from 'react'
+import { Suspense, useCallback, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import { PARENT_TABS_MAIN_SCROLL_EL_ID } from '@/lib/parentTabsMainScrollId'
 import ParentNavBar from '@/components/parent/ParentNavBar'
 import ParentTopBar from '@/components/parent/ParentTopBar'
 import ParentNewPurchaseRequestModal from '@/components/parent/ParentNewPurchaseRequestModal'
 import ParentStickerBoardCompleteModal from '@/components/parent/ParentStickerBoardCompleteModal'
+import ParentSettingsSheet from '@/components/parent/ParentSettingsSheet'
+import ParentSettingsDeepLink from '@/components/parent/ParentSettingsDeepLink'
 
 type Props = {
   /**
@@ -34,6 +37,10 @@ export default function ParentAppChrome({ pendingApprovalCount, children }: Prop
   /** 끝의 `/` 를 없애서 `/parent` 와 `/parent/` 를 같은 것으로 봅니다 */
   const normalized = (pathname.replace(/\/$/, '') || '/')
 
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const openSettings = useCallback(() => setSettingsOpen(true), [])
+  const closeSettings = useCallback(() => setSettingsOpen(false), [])
+
   if (normalized === '/parent') {
     /** 진입 전용: 리다이렉트 페이지만 그대로 보여 줍니다 */
     return <>{children}</>
@@ -41,7 +48,10 @@ export default function ParentAppChrome({ pendingApprovalCount, children }: Prop
 
   return (
     <div className="flex h-screen flex-col bg-gradient-to-b from-sky-50 via-white to-blue-50">
-      <ParentTopBar pendingApprovalCount={pendingApprovalCount} />
+      <Suspense fallback={null}>
+        <ParentSettingsDeepLink onOpenSettings={openSettings} />
+      </Suspense>
+      <ParentTopBar pendingApprovalCount={pendingApprovalCount} onOpenSettings={openSettings} />
       {/* 모바일: flex-col(하단 독바 fixed) / md+: flex-row(좌측 사이드 독바 + 본문) */}
       <div className="flex flex-1 flex-col overflow-hidden md:flex-row">
         <ParentNavBar />
@@ -54,6 +64,7 @@ export default function ParentAppChrome({ pendingApprovalCount, children }: Prop
       </div>
       <ParentNewPurchaseRequestModal />
       <ParentStickerBoardCompleteModal />
+      <ParentSettingsSheet open={settingsOpen} onClose={closeSettings} />
     </div>
   )
 }

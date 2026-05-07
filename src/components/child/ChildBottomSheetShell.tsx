@@ -25,7 +25,7 @@ type Props = {
 
 /**
  * 자녀 화면 공통 시트 껍데기(딤 + 슬라이드)
- * - 세로·좁은 가로: 아래에서 슬라이드 + 핸들 막대.
+ * - 세로·좁은 가로: 아래에서 슬라이드 + 핸들 막대(시트 가로는 뷰포트 전폭).
  * - 패드 가로(md+landscape): 오른쪽 전체 높이 패널로 슬라이드(다른 부모·자녀 시트와 통일).
  * - 지도(항해지도)는 `SHEET_ENTER_MS` 로 천천히 올라오도록 속도를 맞춥니다.
  */
@@ -77,7 +77,7 @@ export default function ChildBottomSheetShell({
 
   return (
     <div
-      className="fixed inset-0 z-[100] mx-auto w-full max-w-md md:landscape:mx-0 md:landscape:max-w-none"
+      className="fixed inset-0 z-[100] w-full"
       role="dialog"
       aria-modal
       aria-labelledby={titleId}

@@ -82,7 +82,7 @@ export default function SpecialMissionBonusSheet({ mission, onClose, onSaved, sh
       <button type="button" className="absolute inset-0 bg-black/45" aria-label="닫기" onClick={onClose} />
       <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center">
         <div
-          className={`pointer-events-auto flex max-h-[min(88dvh,100vh-1rem)] w-full max-w-md flex-col rounded-t-2xl bg-white shadow-2xl transition-transform duration-300 ease-out ${
+          className={`pointer-events-auto flex max-h-[min(88dvh,100vh-1rem)] w-full max-w-none flex-col rounded-t-2xl bg-white shadow-2xl transition-transform duration-300 ease-out ${
             sheetEntered ? 'translate-y-0' : 'translate-y-full'
           }`}
         >

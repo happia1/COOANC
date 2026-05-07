@@ -162,7 +162,7 @@ export default function ChildProfileAddSheet({ open, onClose, onRegistered }: Ch
       />
       <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center px-0 pb-0">
         <div
-          className={`pointer-events-auto flex max-h-[min(94dvh,100vh)] w-full max-w-md flex-col overflow-hidden rounded-t-3xl bg-white shadow-2xl transition-transform duration-300 ease-out ${
+          className={`pointer-events-auto flex max-h-[min(94dvh,100vh)] w-full max-w-none flex-col overflow-hidden rounded-t-3xl bg-white shadow-2xl transition-transform duration-300 ease-out ${
             sheetEntered ? 'translate-y-0' : 'translate-y-full'
           }`}
         >

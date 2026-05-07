@@ -49,7 +49,7 @@ export default function ParentAgentBottomSheet({ open, title, onClose, children,
             role="dialog"
             aria-modal="true"
             aria-labelledby="parent-agent-sheet-title"
-            className="relative z-[1] flex max-h-[min(88dvh,34rem)] w-full max-w-md flex-col overflow-hidden rounded-t-3xl bg-white shadow-2xl ring-1 ring-sky-100 sm:mx-4 sm:max-h-[min(80dvh,32rem)] sm:rounded-3xl"
+            className="relative z-[1] flex max-h-[min(88dvh,34rem)] w-full max-w-none flex-col overflow-hidden rounded-t-3xl bg-white shadow-2xl ring-1 ring-sky-100 sm:mx-4 sm:max-h-[min(80dvh,32rem)] sm:max-w-md sm:rounded-3xl"
             initial={{ y: '110%' }}
             animate={{ y: 0 }}
             exit={{ y: '110%' }}

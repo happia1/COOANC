@@ -367,7 +367,7 @@ export default function RoutineAlarmSettingsSheet({ open, onClose }: Props) {
       */}
       <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center md:landscape:inset-x-0 md:landscape:inset-y-0 md:landscape:bottom-0 md:landscape:left-auto md:landscape:right-0 md:landscape:top-0 md:landscape:justify-end">
         <div
-          className={`pointer-events-auto flex max-h-[min(90dvh,100vh-1rem)] w-full max-w-md overflow-x-hidden flex-col rounded-t-2xl bg-white shadow-2xl transition-transform duration-300 ease-out md:landscape:h-full md:landscape:max-h-none md:landscape:rounded-none md:landscape:rounded-l-2xl ${
+          className={`pointer-events-auto flex max-h-[min(90dvh,100vh-1rem)] w-full max-w-none overflow-x-hidden flex-col rounded-t-2xl bg-white shadow-2xl transition-transform duration-300 ease-out md:landscape:h-full md:landscape:max-h-none md:landscape:max-w-md md:landscape:rounded-none md:landscape:rounded-l-2xl ${
             sheetEntered
               ? 'translate-y-0 md:landscape:translate-y-0 md:landscape:translate-x-0'
               : 'translate-y-full md:landscape:translate-y-0 md:landscape:translate-x-full'
@@ -518,7 +518,7 @@ export default function RoutineAlarmSettingsSheet({ open, onClose }: Props) {
             소리 선택 보조 시트: 메인과 같이 패드 가로에서는 오른쪽 전면 패널 형태가 자연스럽습니다.
           */}
           <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center md:landscape:inset-x-0 md:landscape:inset-y-0 md:landscape:bottom-0 md:landscape:left-auto md:landscape:right-0 md:landscape:top-0 md:landscape:justify-end">
-            <div className="pointer-events-auto max-h-[70vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white px-4 pb-6 pt-3 shadow-xl md:landscape:h-full md:landscape:max-h-none md:landscape:rounded-none md:landscape:rounded-l-2xl md:landscape:shadow-2xl">
+            <div className="pointer-events-auto max-h-[70vh] w-full max-w-none overflow-y-auto rounded-t-2xl bg-white px-4 pb-6 pt-3 shadow-xl md:landscape:h-full md:landscape:max-h-none md:landscape:max-w-md md:landscape:rounded-none md:landscape:rounded-l-2xl md:landscape:shadow-2xl">
               <p className="mb-1 text-center text-sm font-black text-gray-900">알람 소리 선택</p>
               <div className="mb-2 flex justify-end">
                 <button
@@ -569,7 +569,7 @@ export default function RoutineAlarmSettingsSheet({ open, onClose }: Props) {
             onClick={() => setAddOpen(false)}
           />
           <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center md:landscape:inset-x-0 md:landscape:inset-y-0 md:landscape:bottom-0 md:landscape:left-auto md:landscape:right-0 md:landscape:top-0 md:landscape:justify-end">
-            <div className="pointer-events-auto max-h-[80vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white px-4 pb-6 pt-3 shadow-xl md:landscape:h-full md:landscape:max-h-none md:landscape:rounded-none md:landscape:rounded-l-2xl md:landscape:shadow-2xl">
+            <div className="pointer-events-auto max-h-[80vh] w-full max-w-none overflow-y-auto rounded-t-2xl bg-white px-4 pb-6 pt-3 shadow-xl md:landscape:h-full md:landscape:max-h-none md:landscape:max-w-md md:landscape:rounded-none md:landscape:rounded-l-2xl md:landscape:shadow-2xl">
               <p className="mb-3 text-center text-sm font-black text-gray-900">추가 알림</p>
               <label className="mb-1 block text-[10px] font-bold text-gray-500">이름</label>
               <input
