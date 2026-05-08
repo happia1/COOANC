@@ -96,9 +96,10 @@ export default function LoginPage() {
     const supabase = createClient()
 
     // 2) API 가 없거나 실패했을 때만 브라우저 SDK 로 재시도합니다.
-    let data: Awaited<ReturnType<typeof supabase.auth.signInWithPassword>>['data']
+    type SignInWithPasswordResult = Awaited<ReturnType<typeof supabase.auth.signInWithPassword>>
+    let data: SignInWithPasswordResult['data']
     try {
-      const res = await runSerializedBrowserAuthOp(() =>
+      const res = await runSerializedBrowserAuthOp<SignInWithPasswordResult>(() =>
         supabase.auth.signInWithPassword({ email, password }),
       )
       if (res.error) {
