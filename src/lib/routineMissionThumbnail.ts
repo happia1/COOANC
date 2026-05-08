@@ -18,10 +18,26 @@ const BASE = '/assets/img/missions/routine'
 const ROUTINE_PLAY_PNG_CACHE_BUST = '1'
 
 /**
- * 스페셜 「식사준비 돕기」·「밥 다 먹기」 PNG 캐시 무효화 버전입니다.
+ * 스페셜 「식사준비 돕기」(`put_cutrary.png`) PNG 캐시 무효화 버전입니다.
  * - 그림 파일을 교체했는데도 이전 그림이 보이면 숫자를 1 올려 URL 을 바꿉니다.
+ * - 비개발자: `/assets/**` 에 1년 immutable 캐시가 걸려 있어, 같은 파일명으로 그림만 갈면
+ *   브라우저가 이전 그림을 계속 보여줍니다. 그래서 URL 끝의 `?v=숫자` 만 올려도
+ *   새 그림으로 즉시 갱신됩니다.
  */
-const SPECIAL_MEAL_PNG_CACHE_BUST = '2'
+const MEAL_PREP_PNG_CACHE_BUST = '2'
+
+/**
+ * 스페셜 「밥 다 먹기」(`clean_up_all.png`) 전용 PNG 캐시 무효화 버전입니다.
+ * - 식사준비 돕기와 별개 파일이라 캐시 버스트도 따로 둬, 한쪽 그림만 갈아도
+ *   다른 한쪽 파일이 무의미하게 다시 받아지는 일이 없습니다.
+ */
+const FINISH_MEAL_PNG_CACHE_BUST = '3'
+
+/**
+ * 스페셜 「빨래개기 / 옷정리」(`organize_cloth.png`) PNG 캐시 무효화 버전입니다.
+ * - 같은 파일명에 새 그림으로 덮어쓰는 경우, 이 숫자를 1 올려야 브라우저가 새로 받습니다.
+ */
+const ORGANIZE_CLOTH_PNG_CACHE_BUST = '1'
 
 /**
  * 일상 「저녁밥먹기」 PNG 캐시 무효화 버전입니다.
@@ -41,10 +57,13 @@ const SHOWER_PNG_CACHE_BUST = '1'
 const SHOWER_ROUTINE_PNG = `${BASE}/p.m/shower.png?v=${SHOWER_PNG_CACHE_BUST}`
 
 /** 「식사 준비 돕기」계열 전용 PNG — 제목 표기가 조금 달라도 같은 파일을 씁니다. */
-const MEAL_PREP_HELP_ROUTINE_PNG = `${BASE}/special/put_cutrary.png?v=${SPECIAL_MEAL_PNG_CACHE_BUST}`
+const MEAL_PREP_HELP_ROUTINE_PNG = `${BASE}/special/put_cutrary.png?v=${MEAL_PREP_PNG_CACHE_BUST}`
 
 /** 스페셜 칩 「밥 다 먹기」·레거시 `밥그릇비우기`(같은 칩으로 통합) 일러스트 */
-const FINISH_MEAL_ROUTINE_PNG = `${BASE}/special/clean_up_all.png?v=${SPECIAL_MEAL_PNG_CACHE_BUST}`
+const FINISH_MEAL_ROUTINE_PNG = `${BASE}/special/clean_up_all.png?v=${FINISH_MEAL_PNG_CACHE_BUST}`
+
+/** 스페셜 칩 「빨래개기/옷 개키기」 — DB 별칭 「옷정리하기」도 키워드 매칭으로 같은 그림을 씁니다. */
+const ORGANIZE_CLOTH_ROUTINE_PNG = `${BASE}/special/organize_cloth.png?v=${ORGANIZE_CLOTH_PNG_CACHE_BUST}`
 
 /** 일상 칩 「저녁밥먹기」 전용 PNG */
 const DINNER_ROUTINE_PNG = `${BASE}/p.m/dinner.png?v=${DINNER_PNG_CACHE_BUST}`
@@ -150,8 +169,13 @@ const PNG_BY_TITLE: Record<string, string> = {
   '밥먹고 정리하기': FINISH_MEAL_ROUTINE_PNG,
   분리수거하기: `${BASE}/special/sort_recycle.png`,
   장난감정리하기: `${BASE}/special/organize_toys.png`,
-  '옷 개키기': `${BASE}/special/organize_cloth.png`,
-  빨래개기: `${BASE}/special/organize_cloth.png`,
+  '옷 개키기': ORGANIZE_CLOTH_ROUTINE_PNG,
+  빨래개기: ORGANIZE_CLOTH_ROUTINE_PNG,
+  /** DB·사용자 입력 별칭(공백/표현 차이 흡수) — 모두 같은 옷 정리 일러스트로 매칭 */
+  옷정리: ORGANIZE_CLOTH_ROUTINE_PNG,
+  '옷 정리': ORGANIZE_CLOTH_ROUTINE_PNG,
+  옷정리하기: ORGANIZE_CLOTH_ROUTINE_PNG,
+  '옷 정리하기': ORGANIZE_CLOTH_ROUTINE_PNG,
   명상하기: `${BASE}/special/meditation.png`,
   저금하기: `${BASE}/special/saving.png`,
   저축하기: `${BASE}/special/saving.png`,
@@ -279,6 +303,13 @@ function routineKeywordsOverridePng(title: string, description?: string | null):
   }
   if (isFinishMealMissionCompact(bundleCompact) || isFinishMealMissionCompact(compactTitleNoSpaces(title ?? ''))) {
     return FINISH_MEAL_ROUTINE_PNG
+  }
+  /**
+   * 「옷 정리」류 — 빨래개기·옷 개키기 칩과 동일 일러스트 사용.
+   * 비개발자: 「옷장 정리」「옷정리하기」 등 표에 정확히 없는 표기도 옷 개는 그림으로 맞춥니다.
+   */
+  if (/옷\s*정리|정리\s*옷|옷장/i.test(spaced)) {
+    return ORGANIZE_CLOTH_ROUTINE_PNG
   }
   return null
 }

@@ -52,18 +52,6 @@ export const STAGE_IMAGE: Record<PlantStage, string> = {
   7: `${PLANT_BASE}/7.png`,
 }
 
-/**
- * 물조리개 이미지 — 보유 하트 수에 따라 3단계
- * 0~99: 100.png (비어있는 느낌)
- * 100~199: 200.png (중간)
- * 200+: 300.png (꽉 찬 느낌)
- */
-export function getWateringCanImage(hearts: number): string {
-  if (hearts >= 200) return `${PLANT_BASE}/300.png`
-  if (hearts >= 100) return `${PLANT_BASE}/200.png`
-  return `${PLANT_BASE}/100.png`
-}
-
 /** 완성 팝업 등에 쓸 사과 이미지 */
 export const APPLE_REWARD_IMAGE = `${PLANT_BASE}/apple.png`
 /** 씨앗 선택 등에 쓸 씨앗 이미지 */

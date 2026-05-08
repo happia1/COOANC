@@ -81,6 +81,62 @@ export function usePlantPot(childId: string) {
     void refresh()
   }, [refresh])
 
+  /**
+   * Realtime: 미션 완료 등으로 `child_stats` 가 바뀌면 즉시 반영합니다.
+   * 비개발자 설명: 새로 받은 하트가 훅 안에 잠시 누락되는 사이 「물 없어요」 가 잘못 뜨던 문제 방지.
+   */
+  useEffect(() => {
+    const channel = supabase
+      .channel(`use-plant-pot-stats-${childId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'child_stats',
+          filter: `child_id=eq.${childId}`,
+        },
+        (payload) => {
+          const row = (payload.new ?? {}) as Record<string, unknown>
+          if (Object.prototype.hasOwnProperty.call(row, 'hearts')) {
+            setHearts(readChildStatInt(row.hearts))
+          }
+          /** pot 진행도도 함께 들어왔으면 같이 갱신 — 부모가 DB 에서 화분을 손봐도 자녀 화면 동기화 */
+          const hasPotField =
+            Object.prototype.hasOwnProperty.call(row, 'pot_stage') ||
+            Object.prototype.hasOwnProperty.call(row, 'pot_hearts_used') ||
+            Object.prototype.hasOwnProperty.call(row, 'pot_completed')
+          if (hasPotField) {
+            setPot((prev) => {
+              if (!prev) return prev
+              const stageRaw = Object.prototype.hasOwnProperty.call(row, 'pot_stage')
+                ? readChildStatInt(row.pot_stage)
+                : prev.stage
+              const stage = Math.min(7, Math.max(0, stageRaw)) as PlantStage
+              const heartsUsed = Object.prototype.hasOwnProperty.call(row, 'pot_hearts_used')
+                ? readChildStatInt(row.pot_hearts_used)
+                : prev.heartsUsed
+              const completed = Object.prototype.hasOwnProperty.call(row, 'pot_completed')
+                ? Boolean(row.pot_completed)
+                : prev.completed
+              return {
+                ...prev,
+                stage,
+                heartsUsed,
+                heartsNeeded: HEARTS_PER_STAGE[stage],
+                completed,
+              }
+            })
+          }
+        },
+      )
+      .subscribe()
+
+    return () => {
+      void supabase.removeChannel(channel)
+    }
+  }, [childId, supabase])
+
   const water = useCallback(async (): Promise<WaterResult> => {
     if (!pot) return 'ok'
 
@@ -94,7 +150,22 @@ export function usePlantPot(childId: string) {
       return 'ok'
     }
 
-    if (hearts <= 0) return 'no_hearts'
+    /**
+     * Realtime 이 잠깐 늦거나 미션 완료 응답이 stats 만 갱신했을 때
+     * 훅 내부 `hearts` 가 잠시 0 으로 보일 수 있어, 항상 최신 DB 값을 한 번 더 확인합니다.
+     * 비개발자: 하트가 분명히 있는데 「물이 없어요」 라고 잘못 뜨던 현상을 막습니다.
+     */
+    const { data: freshRow, error: freshErr } = await supabase
+      .from('child_stats')
+      .select('hearts')
+      .eq('child_id', childId)
+      .maybeSingle()
+    const freshHearts = freshErr || !freshRow ? hearts : readChildStatInt(freshRow.hearts)
+
+    if (freshHearts <= 0) {
+      if (freshHearts !== hearts) setHearts(freshHearts)
+      return 'no_hearts'
+    }
 
     const newHeartsUsed = pot.heartsUsed + 1
     const needed = HEARTS_PER_STAGE[pot.stage]
@@ -107,7 +178,7 @@ export function usePlantPot(childId: string) {
     const { error } = await supabase
       .from('child_stats')
       .update({
-        hearts: hearts - 1,
+        hearts: freshHearts - 1,
         pot_stage: newStage,
         pot_hearts_used: newHeartsUsedAfter,
         pot_completed: isCompleted,

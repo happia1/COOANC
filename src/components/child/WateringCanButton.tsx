@@ -7,13 +7,16 @@
  * - 탭하면 보유 하트 1개를 써서 화분 진행도를 올립니다.
  * - 하트 개수는 레벨 카드 안에 표시되므로 여기에는 **물조리개 그림만** 둡니다.
  * - 탭하는 순간 물조리개가 살짝 기울어 보이며, 부모에서 하트가 화분으로 날아가는 효과를 띄웁니다(`onPourVisual`).
- * - 하트 구간에 따라 물조리개 PNG 가 바뀝니다(100 / 200 / 300).
+ * - 물조리개 그림은 하트 수와 상관없이 한 장(`300.png`)으로 고정합니다.
  */
 
 import { forwardRef, useState } from 'react'
 import Image from 'next/image'
-import { getWateringCanImage, type PlantStage } from '@/constants/plantTrees'
+import type { PlantStage } from '@/constants/plantTrees'
 import type { WaterResult } from '@/hooks/usePlantPot'
+
+/** 물조리개 PNG — 하트 수와 무관하게 같은 그림을 씁니다 */
+const WATERING_CAN_IMAGE_SRC = '/assets/img/missions/routine/plant/300.png' as const
 
 type Props = {
   hearts: number
@@ -38,7 +41,6 @@ const WateringCanButton = forwardRef<HTMLButtonElement, Props>(function Watering
   const [isPouring, setIsPouring] = useState(false)
   /** 하트 부족 시 빈 물조리개 떨림 모션 */
   const [emptyShake, setEmptyShake] = useState(false)
-  const canImg = getWateringCanImage(hearts <= 0 || emptyShake ? 0 : hearts)
 
   async function handleClick() {
     if (busy || disabled) return
@@ -109,7 +111,7 @@ const WateringCanButton = forwardRef<HTMLButtonElement, Props>(function Watering
            * - `sizes`를 너무 작게(32px) 주면 저해상도 원본을 선택해 확대 시 흐릿해질 수 있어,
            *   최대 표시 크기를 고려한 값(96px)으로 올려 선명도를 유지합니다.
            */}
-          <Image src={canImg} alt="물조리개" fill className="object-contain" sizes="96px" priority />
+          <Image src={WATERING_CAN_IMAGE_SRC} alt="물조리개" fill className="object-contain" sizes="96px" priority />
         </div>
       </button>
     </>
