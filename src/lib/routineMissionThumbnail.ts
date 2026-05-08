@@ -31,7 +31,7 @@ const MEAL_PREP_PNG_CACHE_BUST = '2'
  * - 식사준비 돕기와 별개 파일이라 캐시 버스트도 따로 둬, 한쪽 그림만 갈아도
  *   다른 한쪽 파일이 무의미하게 다시 받아지는 일이 없습니다.
  */
-const FINISH_MEAL_PNG_CACHE_BUST = '3'
+const FINISH_MEAL_PNG_CACHE_BUST = '4'
 
 /**
  * 스페셜 「빨래개기 / 옷정리」(`organize_cloth.png`) PNG 캐시 무효화 버전입니다.
@@ -44,7 +44,7 @@ const ORGANIZE_CLOTH_PNG_CACHE_BUST = '1'
  * - `next.config.mjs` 의 `/assets/**` immutable 캐시 때문에, 파일명은 그대로 두고 그림만 갈아끼우면 구버전이 남습니다.
  * - 그럴 땐 이 숫자만 1 올려 URL 을 바꿔 주세요.
  */
-const DINNER_PNG_CACHE_BUST = '1'
+const DINNER_PNG_CACHE_BUST = '2'
 
 /**
  * 일상 「샤워하기」 PNG 캐시 무효화 버전입니다.

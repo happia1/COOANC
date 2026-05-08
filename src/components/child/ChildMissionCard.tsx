@@ -141,6 +141,14 @@ export default function ChildMissionCard({ mission, onComplete, tapResetKey = 0 
     block: m.block,
     description: m.description,
   })
+  /**
+   * 비개발자: 서버의 파일 경로가 틀리거나 CDN 반영 지연으로 PNG 로딩이 실패하면,
+   * 카드가 빈칸이 되지 않도록 아틀라스(기본 그림)로 자동 전환합니다.
+   */
+  const [useSpriteFallback, setUseSpriteFallback] = useState(false)
+  useLayoutEffect(() => {
+    setUseSpriteFallback(false)
+  }, [routineImagePath])
   /** 비개발자: 저녁밥먹기 카드 이미지일 때만 아래로 아주 살짝 내리기 위한 조건입니다. */
   const isDinnerMissionImage = routineImagePath?.includes('dinner.png') ?? false
   /** 「밥 다 먹기」 PNG 는 그림이 상대적으로 어두워 보여, 카드에서는 밝기를 조금 올려 보정합니다 */
@@ -205,7 +213,7 @@ export default function ChildMissionCard({ mission, onComplete, tapResetKey = 0 
           ].join(' ')}
           style={{ width: `${imageBoxPx}px`, height: `${imageBoxPx}px` }}
         >
-          {routineImagePath ? (
+          {routineImagePath && !useSpriteFallback ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={routineImagePath}
@@ -214,6 +222,8 @@ export default function ChildMissionCard({ mission, onComplete, tapResetKey = 0 
                 .filter(Boolean)
                 .join(' ')}
               style={brightPng ? { filter: brightPng } : undefined}
+              /** PNG 로드 실패 시 즉시 스프라이트 폴백으로 전환 */
+              onError={() => setUseSpriteFallback(true)}
               draggable={false}
             />
           ) : (
