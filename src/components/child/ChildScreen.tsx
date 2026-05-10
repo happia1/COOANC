@@ -7,13 +7,13 @@
  *
  * 비개발자 설명:
  * - 배경 이미지 위에 캐릭터가 서 있고, 하단에 오늘의 미션 카드가 가로로 스크롤됩니다.
- * - 우측 상단 스택(나가기·뽀모도로·스티커·장바구니·코인)은 화면이 넓어질수록 문·타이머·스티커·장바구니는 최대 1.8배까지 커집니다. 마켓 패널은 아래에서 올라옵니다.
- * - 상단 오른쪽 나가기(유리 버튼)를 누르면 부모 화면으로 나갑니다.
+ * - 우측 상단 스택(나가기·새로고침·음악·뽀모도로·스티커·장바구니·코인)은 화면이 넓어질수록 문·새로고침·음표·타이머·스티커·장바구니는 최대 1.8배까지 커집니다. 마켓 패널은 아래에서 올라옵니다.
+ * - 상단 오른쪽 나가기(유리 버튼)를 누르면 부모 화면으로 나갑니다. 새로고침은 화면·데이터가 꼬였을 때 브라우저 전체를 다시 불러옵니다.
  *
  * 레이아웃 레이어(아래 → 위):
  *   L1. 배경 이미지 (tablet_kidsroom_background_portrait.png)
  *   L2. 캐릭터 스프라이트 (앵커포인트 기반 배치)
- *   L3. UI 오버레이 (상단: 레벨·크레딧·하트 카드, 발 옆 화분·물조리개, 우측 나가기~장바구니·코인 열 + 미션 섹션)
+ *   L3. UI 오버레이 (상단: 레벨·크레딧·하트 카드, 발 옆 화분·물조리개, 우측 나가기·새로고침~장바구니·코인 열 + 미션 섹션)
  *   L4. 패널 오버레이 (마켓: 항상 하단 슬라이드 / 코인·꾸미기: 세로는 하단·가로는 우측 / 스티커는 별도 시트)
  */
 
@@ -268,7 +268,7 @@ function scaleForLevelBlock(containerWidthPx: number): number {
   )
 }
 
-/** 나가기·타이머·스티커·마켓 바구니 — 넓은 화면에서 최대 1.8배 */
+/** 나가기·새로고침·타이머·스티커·마켓 바구니 — 넓은 화면에서 최대 1.8배 */
 function scaleForRightIconPrimary(containerWidthPx: number): number {
   /**
    * 요청사항:
@@ -296,9 +296,9 @@ function scaleForRightIconCoin(containerWidthPx: number): number {
 }
 
 /**
- * 우측 상단 나가기·타이머·스티커·장바구니(·코인) 버튼 셸 — 왼쪽 레벨 카드와 같은 유리 톤.
+ * 우측 상단 나가기·새로고침·타이머·스티커·장바구니(·코인) 버튼 셸 — 왼쪽 레벨 카드와 같은 유리 톤.
  * 비개발자: 레벨 블록과 똑같이 살짝 비치는 흰 배경, 흐림, 둥근 모서리로 맞춥니다.
- * 안 그림(문·타이머·스티커·바구니)은 같은 기본 크기(h-6/h-7)·화면이 넓으면 묶음 단위로 최대 1.8배까지 커집니다.
+ * 안 그림(문·새로고침 화살표·타이머·스티커·바구니)은 같은 기본 크기(h-6/h-7)·화면이 넓으면 묶음 단위로 최대 1.8배까지 커집니다.
  */
 const CHILD_HOME_RIGHT_ICON_GLASS_CLASS = [
   CHILD_HOME_TOP_BAR_GLASS_CLASS,
@@ -524,6 +524,15 @@ export default function ChildScreen({
   const [badgeShine, setBadgeShine] = useState(false)
 
   const router = useRouter()
+
+  /**
+   * 우측 상단 「새로고침」에서 호출합니다.
+   * - `router.refresh()`만 쓰면 서버에서 내려준 props는 갱신되지만, 이 화면 안의 `useState` 등은 그대로일 수 있습니다.
+   * - 그래서 꼬임·버그를 풀 때는 브라우저 전체 새로고침과 같은 `location.reload()`로 한 번에 맞춥니다.
+   */
+  const handleChildHomeRefresh = useCallback(() => {
+    window.location.reload()
+  }, [])
 
   // ── 통계(크레딧/하트) ──────────────────────────────────────────────────────
 
@@ -1662,7 +1671,7 @@ export default function ChildScreen({
         <div className="absolute inset-0 z-20 flex flex-col pointer-events-none">
 
           {/*
-            상단: 왼쪽 레벨·크레딧·하트 카드 / 발 옆 화분·물조리개 / 우측 나가기·타이머·스티커·장바구니·코인 열.
+            상단: 왼쪽 레벨·크레딧·하트 카드 / 발 옆 화분·물조리개 / 우측 나가기·새로고침·음악·타이머·스티커·장바구니·코인 열.
           */}
           <div
             className="flex w-full items-start justify-between gap-3 px-4"
@@ -1718,6 +1727,33 @@ export default function ChildScreen({
                     className="h-6 w-6 translate-x-[1px] object-contain drop-shadow-md"
                   />
                 </a>
+                {/*
+                  새로고침: 전체 페이지를 다시 불러 미션·상점·로컬 상태가 꼬였을 때 빠르게 초기화합니다.
+                  아이콘은 별도 PNG가 없어 SVG(원형 화살표)로 표시합니다.
+                */}
+                <button
+                  type="button"
+                  onClick={handleChildHomeRefresh}
+                  className={`${CHILD_HOME_RIGHT_ICON_GLASS_CLASS} border-0 bg-transparent p-0 transition-transform active:scale-90`}
+                  style={CHILD_HOME_TOP_BAR_GLASS_STYLE}
+                  aria-label="화면 새로고침"
+                >
+                  <svg
+                    className="h-6 w-6 shrink-0 text-slate-800 drop-shadow-md"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden
+                  >
+                    <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                    <path d="M3 3v5h5" />
+                    <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
+                    <path d="M16 16h5v5" />
+                  </svg>
+                </button>
                 <button
                   type="button"
                   onClick={() => setMusicPopupOpen(true)}
