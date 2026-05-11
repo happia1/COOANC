@@ -131,8 +131,14 @@ export default function ApprovalTab({
   hiddenItemIdsByChild: initialHidden,
   initialCreditOverridesByChild,
 }: Props) {
-  /** 승인 탭은 Realtime 대신 주기적 조회(polling)로 안정성을 우선합니다. */
-  const supabaseRef = useRef(createClient())
+  /**
+   * `useRef(createClient())`는 매 렌더마다 `createClient()`가 호출됩니다.
+   * 첫 마운트에서 한 번만 클라이언트를 넣습니다(`HomeTab` 과 동일 패턴).
+   */
+  const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null)
+  if (supabaseRef.current === null) {
+    supabaseRef.current = createClient()
+  }
 
   const pathname = usePathname()
   const { selectedChildId, setSelectedChildId } = useParentStore()
@@ -360,6 +366,7 @@ export default function ApprovalTab({
   const refreshChildMissionLogs = useCallback(async () => {
     if (!currentId) return
     const supabase = supabaseRef.current
+    if (!supabase) return
     const { data, error } = await supabase
       .from('mission_logs')
       .select(MISSION_LOG_SELECT_FOR_LIST)
@@ -416,6 +423,7 @@ export default function ApprovalTab({
     const childIds = childrenProfiles.map((c) => c.id)
     if (childIds.length === 0) return
     const supabase = supabaseRef.current
+    if (!supabase) return
     const [pendingRes, historyRes] = await Promise.all([
       supabase
         .from('purchase_requests')

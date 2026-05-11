@@ -124,8 +124,15 @@ type Props = {
 
 export default function HomeTab({ childrenData, upcomingEvents, daysWithDataByChild }: Props) {
   const { selectedChildId, setSelectedChildId } = useParentStore()
-  /** 부모 홈 데이터는 이벤트성 갱신보다 안정성이 우선이라 일반 조회(fetch)만 사용합니다. */
-  const supabaseRef = useRef(createClient())
+  /**
+   * `useRef(createClient())`는 **매 렌더마다** `createClient()`가 실행됩니다(JS는 인자를 먼저 계산).
+   * Supabase 브라우저 클라이언트가 그때마다 초기화되면 경고·청크 로드 지연을 유발할 수 있어,
+   * 첫 렌더에서 한 번만 만드는 ref 패턴을 씁니다.
+   */
+  const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null)
+  if (supabaseRef.current === null) {
+    supabaseRef.current = createClient()
+  }
 
   const currentId = selectedChildId ?? childrenData[0]?.id
   const child = childrenData.find((c) => c.id === currentId) ?? childrenData[0]
@@ -317,6 +324,7 @@ export default function HomeTab({ childrenData, upcomingEvents, daysWithDataByCh
     if (!child) return
 
     const supabase = supabaseRef.current
+    if (!supabase) return
 
     const loadWeek = async () => {
       const today = getSeoulDateString()

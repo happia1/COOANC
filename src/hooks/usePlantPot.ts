@@ -10,7 +10,7 @@
  * - 완성(7단계) 이후에는 물 주기 탭 시 초기화되거나, 「씨앗 고르기」에서 `resetPot`으로 나무를 다시 정합니다.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { HEARTS_PER_STAGE, type PlantStage, type PlantTreeId } from '@/constants/plantTrees'
 import { createClient } from '@/lib/supabase/client'
 import { readChildStatInt } from '@/lib/childCreditsSplit'
@@ -32,7 +32,13 @@ export type WaterResult = 'ok' | 'no_hearts' | { type: 'grew'; newStage: PlantSt
 const DEFAULT_TREE: PlantTreeId = 'apple'
 
 export function usePlantPot(childId: string) {
-  const supabase = createClient()
+  /**
+   * 렌더마다 `createClient()`를 호출하면 안 됩니다.
+   * - 인자로 `createClient()`를 넘기는 `useRef(createClient())`와 같이, 매번 새 브라우저 클라이언트를 만들면
+   *   Supabase 내부 구독·상태가 꼬이고 React 가 「아직 마운트되지 않았는데 상태를 갱신한다」고 경고할 수 있습니다.
+   * - 싱글톤이어도 **호출 자체가 매 프레임 실행**되는 것은 부담이므로 `useMemo`로 한 번만 만듭니다.
+   */
+  const supabase = useMemo(() => createClient(), [])
   const [pot, setPot] = useState<PotState | null>(null)
   const [hearts, setHearts] = useState(0)
   const [loading, setLoading] = useState(true)

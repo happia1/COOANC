@@ -7,13 +7,16 @@
  *
  * 비개발자 설명:
  * - 배경 이미지 위에 캐릭터가 서 있고, 하단에 오늘의 미션 카드가 가로로 스크롤됩니다.
- * - 우측 상단 스택(나가기·새로고침·음악·뽀모도로·스티커·장바구니·코인)은 화면이 넓어질수록 문·새로고침·음표·타이머·스티커·장바구니는 최대 1.8배까지 커집니다. 마켓 패널은 아래에서 올라옵니다.
- * - 상단 오른쪽 나가기(유리 버튼)를 누르면 부모 화면으로 나갑니다. 새로고침은 화면·데이터가 꼬였을 때 브라우저 전체를 다시 불러옵니다.
- *
+ * - 우측 상단 스택(나가기·스티커·장바구니·코인)은 화면이 넓어질수록 문·스티커·장바구니는 최대 1.8배까지 커집니다. 마켓 패널은 아래에서 올라옵니다.
+ * - 상단 오른쪽 나가기(유리 버튼)를 누르면 부모 화면으로 나갑니다.
+ * - 새로고침은 레벨·크레딧 유리 카드 **안 오른쪽 아래** 아주 연한 회색 아이콘으로만 둡니다(전체 페이지를 다시 불러 꼬임을 풀 때 씁니다).
+ * - 뽀모도로(왼쪽)·음악(오른쪽)은 레벨 블록 바로 아래 한 줄에 배치합니다.
+ * - 발 옆: **저금통**은 예전 화분 자리(`plantPct`), **화분**은 예전 물조리개 자리(`canPct`) — 간격은 과거 화분·물조리개 간격과 동일 규칙입니다.
+ * - 물조리개는 화분 팝업 안으로 들어 갔습니다.
  * 레이아웃 레이어(아래 → 위):
  *   L1. 배경 이미지 (tablet_kidsroom_background_portrait.png)
  *   L2. 캐릭터 스프라이트 (앵커포인트 기반 배치)
- *   L3. UI 오버레이 (상단: 레벨·크레딧·하트 카드, 발 옆 화분·물조리개, 우측 나가기·새로고침~장바구니·코인 열 + 미션 섹션)
+ *   L3. UI 오버레이 (상단: 레벨 카드·카드 안 새로고침·크레딧·하트, 발 옆 저금통·화분, 우측 나가기~장바구니·코인 열 + 미션 섹션)
  *   L4. 패널 오버레이 (마켓: 항상 하단 슬라이드 / 코인·꾸미기: 세로는 하단·가로는 우측 / 스티커는 별도 시트)
  */
 
@@ -41,7 +44,9 @@ import { useContainerSize } from '@/hooks/useContainerSize'
 import ChildMissionCard from '@/components/child/ChildMissionCard'
 import ChildPanelOverlay, { type PanelType } from '@/components/child/ChildPanelOverlay'
 import ChildLevelStatsCard from '@/components/child/ChildLevelStatsCard'
-import { normalizeChildStatsCreditsSplit, mergeChildStatsPatch } from '@/lib/childCreditsSplit'
+import ChildHomePiggyBank from '@/components/child/ChildHomePiggyBank'
+import { normalizeChildStatsCreditsSplit, mergeChildStatsPatch, readChildStatInt } from '@/lib/childCreditsSplit'
+import { usesSingleBucket } from '@/constants/childAgeConfig'
 import { completionRateToHearts } from '@/lib/missionHeartCount'
 import { scaledMissionRewards } from '@/lib/missionRewardMultiplier'
 import { isSpecialSectionMission, isRetiredSpecialMissionTitle } from '@/lib/specialMissionChips'
@@ -73,8 +78,6 @@ import AllMissionCompleteOverlay from '@/components/child/AllMissionCompleteOver
 import ChildAlarmClockPopup from '@/components/child/ChildAlarmClockPopup'
 import ChildMusicPopup from '@/components/child/ChildMusicPopup'
 import PlantPot from '@/components/child/PlantPot'
-import WateringCanButton from '@/components/child/WateringCanButton'
-import WaterHeartFlightOverlay from '@/components/child/WaterHeartFlightOverlay'
 import SeedSelectModal from '@/components/child/SeedSelectModal'
 import PlantStageCelebrationModal from '@/components/child/PlantStageCelebrationModal'
 import SleepModeScreen from '@/components/child/SleepModeScreen'
@@ -90,6 +93,10 @@ import {
   isBedtimeMissionBlockedBeforeSleepReadyWindow,
   isSeoulTimeBeforeNoon,
 } from '@/lib/missionHonestyTiming'
+
+/** 화분 단계 상승(물주기로 stage+1) 시 재생할 효과음 */
+const PLANT_STAGE_UP_SOUND_SRC =
+  '/assets/audio/missions/get_badge-christmas-reveal-tones-2988.wav' as const
 
 /**
  * 상단 레벨 카드 반응형 배율 (최대 1.7배) — 실측 너비 기준.
@@ -146,20 +153,19 @@ const PLANT_FEET_UI_SCALE_MAX = 1.5
 const PLANT_FEET_LAYOUT_REFERENCE_W = 885
 /** 데스크톱/태블릿에서 화분·물조리개를 토끼 기준으로 벌리는 배율(1=기존, 1.35=35% 더 멀게) */
 const PLANT_FEET_GAP_SPREAD_MULTIPLIER = 1.35
-/** 모바일에서 화분·물조리개 간격 배율(1=기존, 1.15=15% 더 멀게) */
-const PLANT_FEET_GAP_SPREAD_MULTIPLIER_MOBILE = 1.15
-/** 초소형 모바일(<=300px)에서 화분·물조리개 간격 배율(1=기존, 1.10=10% 더 멀게) */
-const PLANT_FEET_GAP_SPREAD_MULTIPLIER_TINY_MOBILE = 1.1
-/** 물조리개만 화분보다 살짝 크게 보이도록 하는 추가 배율 */
-const WATERING_CAN_EXTRA_SCALE = 1.08
+/** 아주 좁은 화면(<640px)에서 발 옆 간격 배율 — 낮출수록 토끼 양옆으로 더 붙습니다. 640px 이상은 데스크톱 배율을 씁니다(예: 760px 창에서 저금통·화분이 넓게). */
+const PLANT_FEET_GAP_SPREAD_MULTIPLIER_MOBILE = 1.07
+/** 초소형 모바일(<=300px)에서 화분·물조리개 간격 배율 */
+const PLANT_FEET_GAP_SPREAD_MULTIPLIER_TINY_MOBILE = 1.02
 
 /**
- * 토끼(러그 중심 `rugCenterX`)와 화분·물조리개 사이 **가로 거리(px)** 를 기준 너비에서의 값으로 고정합니다.
+ * 토끼(러그 중심 `rugCenterX`)와 발 옆 오브젝트(저금통·화분) 사이 **가로 거리(px)** 를 기준 너비에서의 값으로 고정합니다.
  *
  * 비개발자 설명:
  * - 화분·물조리개만 컨테이너 가로의 몇 %에 두면, 화면이 좁아질수록 같은 %라도 실제 픽셀 간격은 줄어듭니다.
  * - 그래서 “기준 너비(885px)에서 토끼 중심과 얼마나 떨어져 있었는지(px)”를 구해 두고,
  *   현재 너비에서도 그 픽셀 거리가 되도록 % 좌표를 다시 계산합니다. → 좁아져도 토끼와의 간격이 줄지 않습니다.
+ * - `spreadMultiplier` 를 1에 가깝게 낮추면(아주 좁은 폭), 저금통과 화분이 서로 더 붙어 보입니다.
  */
 function plantFeetAnchorsKeepRugGapPx(
   containerWidthPx: number,
@@ -177,7 +183,7 @@ function plantFeetAnchorsKeepRugGapPx(
   const spreadMultiplier =
     containerWidthPx <= 300
       ? PLANT_FEET_GAP_SPREAD_MULTIPLIER_TINY_MOBILE
-      : containerWidthPx < 768
+      : containerWidthPx < 640
       ? PLANT_FEET_GAP_SPREAD_MULTIPLIER_MOBILE
       : PLANT_FEET_GAP_SPREAD_MULTIPLIER
   /** 기준 너비에서 토끼 중심 ↔ 화분·물조리개 **중심**까지 가로 거리(px) — 이 값을 모든 너비에서 유지 */
@@ -268,7 +274,7 @@ function scaleForLevelBlock(containerWidthPx: number): number {
   )
 }
 
-/** 나가기·새로고침·타이머·스티커·마켓 바구니 — 넓은 화면에서 최대 1.8배 */
+/** 나가기·타이머·스티커·마켓 바구니 — 넓은 화면에서 최대 1.8배 */
 function scaleForRightIconPrimary(containerWidthPx: number): number {
   /**
    * 요청사항:
@@ -296,9 +302,9 @@ function scaleForRightIconCoin(containerWidthPx: number): number {
 }
 
 /**
- * 우측 상단 나가기·새로고침·타이머·스티커·장바구니(·코인) 버튼 셸 — 왼쪽 레벨 카드와 같은 유리 톤.
+ * 우측 상단 나가기·타이머·스티커·장바구니(·코인) 버튼 셸 — 왼쪽 레벨 카드와 같은 유리 톤.
  * 비개발자: 레벨 블록과 똑같이 살짝 비치는 흰 배경, 흐림, 둥근 모서리로 맞춥니다.
- * 안 그림(문·새로고침 화살표·타이머·스티커·바구니)은 같은 기본 크기(h-6/h-7)·화면이 넓으면 묶음 단위로 최대 1.8배까지 커집니다.
+ * 안 그림(문·타이머·스티커·바구니)은 같은 기본 크기(h-6/h-7)·화면이 넓으면 묶음 단위로 최대 1.8배까지 커집니다.
  */
 const CHILD_HOME_RIGHT_ICON_GLASS_CLASS = [
   CHILD_HOME_TOP_BAR_GLASS_CLASS,
@@ -501,6 +507,22 @@ export default function ChildScreen({
   initialUnlockedItemIndexes,
   exitHref,
 }: Props) {
+  /**
+   * 효과음 공통 재생기:
+   * - 파일이 없거나 브라우저 정책으로 실패해도 앱 흐름은 계속됩니다.
+   */
+  const playUiSound = useCallback((src: string, volume = 0.9) => {
+    try {
+      const audio = new Audio(src)
+      audio.volume = volume
+      void audio.play().catch(() => {
+        /* noop */
+      })
+    } catch {
+      /* noop */
+    }
+  }, [])
+
   /** 전체 화면을 감싸는 컨테이너 ref — 캐릭터 높이 + 파티클 좌표 기준 계산에 사용 */
   const containerRef = useRef<HTMLDivElement>(null)
   /** 레벨 카드 배율에 가로·캐릭터 높이에 세로 — 같은 전체 화면 컨테이너 실측값 사용 */
@@ -510,13 +532,6 @@ export default function ChildScreen({
   const creditBadgeRef = useRef<HTMLDivElement>(null)
   /** Mission Complete 하트 5칸 ref — **애정 하트(미션 보상)** 파티클 목적지 */
   const levelHeartsRef = useRef<HTMLDivElement>(null)
-  /** 발 옆 화분 래퍼 — 물조리개에서 하트 날림 목표 좌표 */
-  const plantPotWrapRef = useRef<HTMLDivElement>(null)
-  /** 발 옆 물조리개 버튼 — 하트 날림 출발 좌표 */
-  const wateringCanBtnRef = useRef<HTMLButtonElement>(null)
-  /** 물조리개 탭 시 하트 비행 이펙트 재생 키 */
-  const [heartFlightTrigger, setHeartFlightTrigger] = useState(0)
-
   /** 현재 화면에 떠 있는 파티클 목록 */
   const [particles, setParticles] = useState<Particle[]>([])
 
@@ -526,7 +541,7 @@ export default function ChildScreen({
   const router = useRouter()
 
   /**
-   * 우측 상단 「새로고침」에서 호출합니다.
+   * 레벨 카드 오른쪽 아래 새로고침에서 호출합니다.
    * - `router.refresh()`만 쓰면 서버에서 내려준 props는 갱신되지만, 이 화면 안의 `useState` 등은 그대로일 수 있습니다.
    * - 그래서 꼬임·버그를 풀 때는 브라우저 전체 새로고침과 같은 `location.reload()`로 한 번에 맞춥니다.
    */
@@ -554,9 +569,11 @@ export default function ChildScreen({
   const openSeedModal = useCallback(() => setSeedModalOpen(true), [])
 
   const handlePlantGrowthCelebrate = useCallback((newStage: PlantStage) => {
+    // 화분이 실제로 한 단계 올라간 시점에만 단계업 효과음을 재생합니다.
+    playUiSound(PLANT_STAGE_UP_SOUND_SRC, 0.9)
     setPlantCelebrateStage(newStage)
     if (newStage === 7) openSeedAfterPlantCelebrateRef.current = true
-  }, [])
+  }, [playUiSound])
 
   const dismissPlantCelebrate = useCallback(() => {
     setPlantCelebrateStage(null)
@@ -1530,8 +1547,8 @@ export default function ChildScreen({
   const anchor = BACKGROUND_ANCHORS.kids_background
 
   /**
-   * 토끼(기본/토끼 프로필)일 때만 홈에서 살짝 더 크게 — `BUNNY_HOME_DISPLAY_SCALE` 배율을 곱합니다.
-   * 비개발자: 여우·곰 등 다른 캐릭터 크기는 그대로 두고 토끼만 키웁니다.
+   * 토끼·수달 프로필일 때 홈 무대 배율을 곱합니다.
+   * 비개발자: 토끼는 `BUNNY_HOME_DISPLAY_SCALE`(좁은 화면 최소 크기 조정), 수달은 `OTTER_HOME_DISPLAY_SCALE` 을 씁니다.
    */
   const homeCharacterSizeMultiplier =
     characterSprite.character === 'bunny'
@@ -1582,7 +1599,7 @@ export default function ChildScreen({
   const rightIconPrimaryScale = useMemo(() => scaleForRightIconPrimary(containerW), [containerW])
   const rightIconCoinScale = useMemo(() => scaleForRightIconCoin(containerW), [containerW])
 
-  /** 발 옆 화분·물조리개 — 768px 경계에서도 작아지지 않도록 전체 구간에서 현재 계산값의 1.5배 유지 */
+  /** 발 옆 저금통·화분 UI 크기 — `scaleForPlantFeetUi` 결과에 1.5를 곱해, 좁은 폭에서도 너무 작아 보이지 않게 합니다 */
   const plantFeetUiScale = useMemo(
     () => {
       const base = scaleForPlantFeetUi(containerW)
@@ -1611,9 +1628,28 @@ export default function ChildScreen({
     ],
   )
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // 렌더링
-  // ─────────────────────────────────────────────────────────────────────────
+  /**
+   * 저금통(왼쪽)·화분(오른쪽) 추가 벌림(%):
+   * - 640px 이하에서는 0% (좁은 폰에서만 기본 앵커만 사용)
+   * - 그보다 넓어질수록 최대 3.2%까지 양쪽으로 더 벌립니다(쌍둥이 간격 = 2배 체감).
+   * - 램프 끝 1200px로 두어 중간 폭에서 t가 빨리 오릅니다.
+   */
+  const piggyPotExtraSpreadPct = useMemo(() => {
+    if (!(containerW > 0) || containerW <= 640) return 0
+    const t = Math.min(1, (containerW - 640) / (1200 - 640))
+    return 3.2 * t
+  }, [containerW])
+
+  /** 레벨·나이 기준으로 지갑/저금통 분리(멀티 버킷) 여부 — 단일 버킷이면 저금 API 를 막습니다. */
+  const multiBucketMode = useMemo(
+    () => !usesSingleBucket(stats?.current_level ?? 0, ageYears),
+    [stats?.current_level, ageYears],
+  )
+
+  /** 저금통 팝업에서 지갑·저금 잔액만 반영합니다. */
+  const patchWalletPiggyFromHome = useCallback((p: { credits_wallet: number; credits_piggy: number }) => {
+    setStats((prev) => (prev ? mergeChildStatsPatch(prev, p) : prev))
+  }, [])
 
   return (
     <>
@@ -1634,7 +1670,7 @@ export default function ChildScreen({
           src={`${ASSETS.layouts.childHomeBackgroundSecondScreen}?v=${CHILD_HOME_BACKGROUND_CACHE_BUST}`}
           alt=""
           className="absolute inset-0 h-full w-full object-cover brightness-[1.1] pointer-events-none select-none"
-          style={{ objectPosition: `${anchor.imageObjectPositionX}% 50%` }}
+          style={{ objectPosition: `${anchor.imageObjectPositionX + 2}% 50%` }}
           draggable={false}
           fetchPriority="high"
           loading="eager"
@@ -1671,7 +1707,7 @@ export default function ChildScreen({
         <div className="absolute inset-0 z-20 flex flex-col pointer-events-none">
 
           {/*
-            상단: 왼쪽 레벨·크레딧·하트 카드 / 발 옆 화분·물조리개 / 우측 나가기·새로고침·음악·타이머·스티커·장바구니·코인 열.
+            상단: 왼쪽 레벨 카드(카드 아래: 뽀모도로·음악) / 발 옆 저금통·화분 / 우측 나가기·스티커…
           */}
           <div
             className="flex w-full items-start justify-between gap-3 px-4"
@@ -1679,21 +1715,76 @@ export default function ChildScreen({
           >
             <div className="pointer-events-none relative flex min-w-0 flex-1 flex-col items-start gap-2">
               {stats ? (
-                <div
-                  className="pointer-events-none grid w-max min-w-0 max-w-full grid-cols-1 gap-0"
-                  style={{
-                    transformOrigin: 'top left',
-                    transform: `scale(${levelBlockScale})`,
-                  }}
-                >
-                  <ChildLevelStatsCard
-                    stats={stats}
-                    creditRef={creditBadgeRef}
-                    heartRef={levelHeartsRef}
-                    shine={badgeShine}
-                    heartsCount={waterButtonHearts}
-                  />
-                </div>
+                <>
+                  <div
+                    className="pointer-events-none grid w-max min-w-0 max-w-full grid-cols-1 gap-0"
+                    style={{
+                      transformOrigin: 'top left',
+                      transform: `scale(${levelBlockScale})`,
+                    }}
+                  >
+                    <ChildLevelStatsCard
+                      stats={stats}
+                      creditRef={creditBadgeRef}
+                      heartRef={levelHeartsRef}
+                      shine={badgeShine}
+                      heartsCount={waterButtonHearts}
+                      onRefresh={handleChildHomeRefresh}
+                    />
+                    {/*
+                      레벨 블록 아래 한 줄: 왼쪽 뽀모도로, 오른쪽 음악.
+                      카드와 같은 스케일 컨테이너 안에 넣어, 화면이 넓어져도 서로 겹치지 않게 유지합니다.
+                    */}
+                    <div className="pointer-events-auto mt-2 w-[168px] max-w-full translate-x-1 translate-y-1">
+                      <div className="grid grid-cols-2 gap-1">
+                        <button
+                          type="button"
+                          onClick={() => setClockPopupOpen(true)}
+                        className={`${CHILD_HOME_RIGHT_ICON_GLASS_CLASS} scale-[1.2] border-0 bg-transparent p-0 transition-transform active:scale-90`}
+                          style={CHILD_HOME_TOP_BAR_GLASS_STYLE}
+                          aria-label="뽀모도로·알람 팝업 열기"
+                        >
+                          <SpriteImage
+                            sheet={ICONS}
+                            frame="timer"
+                            width={28}
+                            className="h-7 w-7 shrink-0 translate-x-[2px] select-none object-contain drop-shadow-md"
+                          />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setMusicPopupOpen(true)}
+                        className={`${CHILD_HOME_RIGHT_ICON_GLASS_CLASS} -ml-8 translate-x-1 scale-[1.2] border-0 bg-transparent p-0 transition-transform active:scale-90`}
+                          style={CHILD_HOME_TOP_BAR_GLASS_STYLE}
+                          aria-label="하루를 돕는 음악 팝업 열기"
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src="/assets/img/common/ui/music.png"
+                            alt=""
+                            width={21}
+                            height={21}
+                            className="h-[21px] w-[21px] -translate-x-[2px] object-contain drop-shadow-md"
+                          />
+                        </button>
+                      </div>
+                    </div>
+                    {/*
+                      화분 로딩 전·실패 시: 카드 아래에 저금통만 잠깐 둡니다(발 옆 자리로 옮기기 전).
+                    */}
+                    {stats && (plantLoading || !pot) ? (
+                      <div className="pointer-events-auto mt-6 flex w-max max-w-full justify-start">
+                        <ChildHomePiggyBank
+                          walletCredits={readChildStatInt(stats.credits_wallet)}
+                          piggyCredits={readChildStatInt(stats.credits_piggy)}
+                          childId={childId}
+                          multiBucket={multiBucketMode}
+                          onWalletPiggyUpdate={patchWalletPiggyFromHome}
+                        />
+                      </div>
+                    ) : null}
+                  </div>
+                </>
               ) : null}
               {badgeShine && creditBadgeRef.current ? (
                 <BadgeStarBurst badgeRef={creditBadgeRef} />
@@ -1702,7 +1793,7 @@ export default function ChildScreen({
 
             <div className="flex shrink-0 flex-col items-end gap-3 pointer-events-auto">
               {/*
-                문·음악·뽀모도로·스티커·장바구니를 한 묶음으로 스케일 — 레벨 카드와 같은 가로폭 규칙으로 최대 1.8배.
+                문·스티커·장바구니를 한 묶음으로 스케일 — 레벨 카드와 같은 가로폭 규칙으로 최대 1.8배.
               */}
               <div
                 className="flex flex-col items-end gap-3"
@@ -1727,66 +1818,6 @@ export default function ChildScreen({
                     className="h-6 w-6 translate-x-[1px] object-contain drop-shadow-md"
                   />
                 </a>
-                {/*
-                  새로고침: 전체 페이지를 다시 불러 미션·상점·로컬 상태가 꼬였을 때 빠르게 초기화합니다.
-                  아이콘은 별도 PNG가 없어 SVG(원형 화살표)로 표시합니다.
-                */}
-                <button
-                  type="button"
-                  onClick={handleChildHomeRefresh}
-                  className={`${CHILD_HOME_RIGHT_ICON_GLASS_CLASS} border-0 bg-transparent p-0 transition-transform active:scale-90`}
-                  style={CHILD_HOME_TOP_BAR_GLASS_STYLE}
-                  aria-label="화면 새로고침"
-                >
-                  <svg
-                    className="h-6 w-6 shrink-0 text-slate-800 drop-shadow-md"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth={2}
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden
-                  >
-                    <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-                    <path d="M3 3v5h5" />
-                    <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
-                    <path d="M16 16h5v5" />
-                  </svg>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setMusicPopupOpen(true)}
-                  className={`${CHILD_HOME_RIGHT_ICON_GLASS_CLASS} border-0 bg-transparent p-0 transition-transform active:scale-90`}
-                  style={CHILD_HOME_TOP_BAR_GLASS_STYLE}
-                  aria-label="하루를 돕는 음악 팝업 열기"
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src="/assets/img/common/ui/music.png"
-                    alt=""
-                    // 기존 28px의 3/4인 21px로 축소해 음표 아이콘만 작게 보이게 합니다.
-                    width={21}
-                    height={21}
-                    // 버튼 블록은 고정하고, 음표 아이콘 그림만 왼쪽으로 조금 더(2px) 이동합니다.
-                    className="h-[21px] w-[21px] -translate-x-[2px] object-contain drop-shadow-md"
-                  />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setClockPopupOpen(true)}
-                  className={`${CHILD_HOME_RIGHT_ICON_GLASS_CLASS} border-0 bg-transparent p-0 transition-transform active:scale-90`}
-                  style={CHILD_HOME_TOP_BAR_GLASS_STYLE}
-                  aria-label="뽀모도로·알람 팝업 열기"
-                >
-                  <SpriteImage
-                    sheet={ICONS}
-                    frame="timer"
-                    width={28}
-                    // 버튼 블록은 고정하고, 타이머 아이콘 그림만 오른쪽으로 조금 더(2px) 이동합니다.
-                    className="h-7 w-7 shrink-0 translate-x-[2px] select-none object-contain drop-shadow-md"
-                  />
-                </button>
                 {features.sticker && (
                   <button
                     type="button"
@@ -1848,60 +1879,60 @@ export default function ChildScreen({
           </div>
 
           {/*
-            발 옆 — 왼발 쪽 화분, 오른발 쪽 물조리개.
-            가로: 토끼 중심과의 거리(px)를 기준 너비(885px)와 동일하게 유지해 좁은 화면에서 간격이 줄지 않게 함.
-            스케일: 885px 기준과 동일(최대 1.5배)으로 고정.
+            발 옆 — 저금통(`plantPct`), 화분(`canPct`). 간격은 과거 화분·물조리개와 같은 앵커 쌍입니다.
+            물조리개는 화분 팝업 안에서만 사용합니다.
           */}
-          {!plantLoading && pot ? (
+          {!plantLoading && pot && stats ? (
             <>
-              <WaterHeartFlightOverlay
-                trigger={heartFlightTrigger}
-                fromRef={wateringCanBtnRef}
-                toRef={plantPotWrapRef}
-              />
               <div
                 className="pointer-events-auto absolute z-[21]"
                 style={{
-                  left: `${plantFeetAnchorsPct.plantPct}%`,
+                  left: `${plantFeetAnchorsPct.plantPct - piggyPotExtraSpreadPct}%`,
                   top: `${anchor.characterFootY * 100}%`,
                   transform: 'translate(-50%, calc(-90% - 28px))',
                 }}
               >
                 <div
-                  ref={plantPotWrapRef}
                   className="flex flex-col items-center"
                   style={{
                     transform: `scale(${plantFeetUiScale})`,
                     transformOrigin: 'center bottom',
                   }}
                 >
-                  <PlantPot pot={pot} onRequestSeedSelect={openSeedModal} />
+                  <ChildHomePiggyBank
+                    walletCredits={readChildStatInt(stats.credits_wallet)}
+                    piggyCredits={readChildStatInt(stats.credits_piggy)}
+                    childId={childId}
+                    multiBucket={multiBucketMode}
+                    onWalletPiggyUpdate={patchWalletPiggyFromHome}
+                  />
                 </div>
               </div>
               <div
                 className="pointer-events-auto absolute z-[21]"
                 style={{
-                  left: `${plantFeetAnchorsPct.canPct}%`,
+                  left: `${plantFeetAnchorsPct.canPct + piggyPotExtraSpreadPct}%`,
                   top: `${anchor.characterFootY * 100}%`,
                   transform: 'translate(-50%, calc(-90% - 28px))',
                 }}
               >
                 <div
+                  className="flex flex-col items-center"
                   style={{
-                    transform: `scale(${plantFeetUiScale * WATERING_CAN_EXTRA_SCALE})`,
+                    transform: `scale(${plantFeetUiScale})`,
                     transformOrigin: 'center bottom',
                   }}
                 >
-                  <WateringCanButton
-                    ref={wateringCanBtnRef}
-                    hearts={waterButtonHearts}
-                    disabled={plantLoading || !pot}
-                    onWater={water}
-                    onNoHearts={() =>
-                      setPlantHint('하트가 부족해요! 미션을 하면 하트를 받을 수 있어요.')
-                    }
-                    onGrowthCelebrate={handlePlantGrowthCelebrate}
-                    onPourVisual={() => setHeartFlightTrigger((n) => n + 1)}
+                  <PlantPot
+                    pot={pot}
+                    onRequestSeedSelect={openSeedModal}
+                    waterActions={{
+                      hearts: waterButtonHearts,
+                      water,
+                      onNoHearts: () =>
+                        setPlantHint('하트가 부족해요! 미션을 하면 하트를 받을 수 있어요.'),
+                      onGrowthCelebrate: handlePlantGrowthCelebrate,
+                    }}
                   />
                 </div>
               </div>
@@ -1951,8 +1982,14 @@ export default function ChildScreen({
           <div className="flex-1" />
 
           {/* ── 하단: 미션 섹션 (max-h로 화면 45% 이내로 제한) ─────────── */}
+          {/**
+           * 비개발자: 카드 크기는 가로(폭)를 기준으로 키워지는데, 이 블록은 세로로 화면의 약 절반만 씁니다.
+           * 가로모드·짧은 화면에서는 카드가 이 박스보다 더 길어질 수 있어요. 그때 밖으로 넘치면
+           * 바깥 전체 화면이 `overflow-hidden` 이라 **아래가 잘려 깨져 보일** 수 있습니다.
+           * `overflow-y-auto` 로 이 구역 안에서만 위아래로 살짝 움직이게 해 잘림을 막습니다.
+           */}
           <div
-            className="pointer-events-auto relative max-h-[45vh] flex flex-col"
+            className="pointer-events-auto relative flex max-h-[45vh] min-h-0 flex-col overflow-x-hidden overflow-y-auto overscroll-y-contain"
             style={{ paddingBottom: 'max(20px, env(safe-area-inset-bottom))' }}
           >
             {plantHint ? (

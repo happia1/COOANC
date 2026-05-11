@@ -14,7 +14,12 @@ import { buildSpecialMissionDescription } from '@/lib/specialMissionDescription'
 import SpriteImage from '@/components/common/SpriteImage'
 import { MISSION_ROUTINES_ATLAS } from '@/constants/missionRoutineAtlas'
 import { missionRoutineIconFrame } from '@/lib/missionRoutineIconFrame'
-import { resolveRoutineMissionPngUrl, routineMissionIconEmojiForCreate } from '@/lib/routineMissionThumbnail'
+import {
+  FINISH_MEAL_ROUTINE_PNG_CSS_FILTER,
+  isFinishMealRoutinePngUrl,
+  resolveRoutineMissionPngUrl,
+  routineMissionIconEmojiForCreate,
+} from '@/lib/routineMissionThumbnail'
 import {
   SPECIAL_MISSION_CHIPS,
   SPECIAL_MISSION_CHIP_CATEGORIES,
@@ -46,8 +51,10 @@ type Props = {
 function SpecialMissionChipIcon({ title, fallbackEmoji }: { title: string; fallbackEmoji: string }) {
   const png = resolveRoutineMissionPngUrl({ title, iconEmoji: null })
   if (png) {
-    /** 「밥 다 먹기」 PNG 보정 — 다른 칩 그림과 톤을 맞추기 위해 밝기를 조금 올립니다 */
-    const fix = png.includes('clean_up_all.png') ? ({ filter: 'brightness(1.24) saturate(1.06)' } as const) : undefined
+    /** 「밥 다 먹기」 PNG — 자녀 카드와 같은 필터로 살짝 어둡게 */
+    const fix = isFinishMealRoutinePngUrl(png)
+      ? ({ filter: FINISH_MEAL_ROUTINE_PNG_CSS_FILTER } as const)
+      : undefined
     return (
       // eslint-disable-next-line @next/next/no-img-element -- public 정적 미션 썸네일 직접 표시
       <img src={png} alt="" className="h-6 w-6 object-contain" style={fix} draggable={false} />

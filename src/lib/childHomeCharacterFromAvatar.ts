@@ -36,15 +36,16 @@ const DEFAULT_STAGE: HomeIslandStageSprite = {
 
 /**
  * 홈 화면(자녀 방 배경)에서 토끼만 살짝 더 크게 보이게 할 때 쓰는 배율입니다.
- * 비개발자 설명: 1이면 기존과 같습니다.
+ * 비개발자 설명: 1이면 기본(앵커) 크기와 같고, 1보다 작으면 줄어듭니다.
+ * 좁은 폰에서 `scaleForCharacterUi` 가 1일 때 곱해지는 값이라, 여기를 올리면 **토끼 최소 크기**가 커집니다.
  */
-export const BUNNY_HOME_DISPLAY_SCALE = 0.85
+export const BUNNY_HOME_DISPLAY_SCALE = 1.05
 
 /**
- * 자녀 앱(ChildScreen)에서 수달(`otter`) 캐릭터는 토끼와 같은 배율로 맞춥니다.
- * 비개발자 설명: 전체 화면에서도 수달 키가 토끼와 비슷하게 보이게 합니다.
+ * 자녀 앱(ChildScreen)에서 수달(`otter`) 홈 표시 배율입니다.
+ * 비개발자 설명: 토끼와 동일하게 키우면 수달이 과하게 커질 수 있어, 기존 0.85 를 유지합니다.
  */
-export const OTTER_HOME_DISPLAY_SCALE = BUNNY_HOME_DISPLAY_SCALE
+export const OTTER_HOME_DISPLAY_SCALE = 0.85
 
 /**
  * 곰 홈 캐릭터는 토끼 높이에 맞추지 않고, `bears.png`의 bear1(Bears (1)) 프레임 자체를 기준으로 계산합니다.

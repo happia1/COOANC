@@ -15,7 +15,11 @@ import { MISSION_ROUTINES_ATLAS } from '@/constants/missionRoutineAtlas'
 import { scaledMissionRewards } from '@/lib/missionRewardMultiplier'
 import { MissionRewardIconTriple } from '@/components/mission/MissionRewardIconTriple'
 import { missionRoutineIconFrame } from '@/lib/missionRoutineIconFrame'
-import { resolveRoutineMissionPngUrl } from '@/lib/routineMissionThumbnail'
+import {
+  FINISH_MEAL_ROUTINE_PNG_CSS_FILTER,
+  isFinishMealRoutinePngUrl,
+  resolveRoutineMissionPngUrl,
+} from '@/lib/routineMissionThumbnail'
 import { isAfternoonMission } from '@/lib/missionAmPm'
 import {
   CHILD_HOME_MISSION_CARD_AM_BG_CLASSNAME,
@@ -151,8 +155,10 @@ export default function ChildMissionCard({ mission, onComplete, tapResetKey = 0 
   }, [routineImagePath])
   /** 비개발자: 저녁밥먹기 카드 이미지일 때만 아래로 아주 살짝 내리기 위한 조건입니다. */
   const isDinnerMissionImage = routineImagePath?.includes('dinner.png') ?? false
-  /** 「밥 다 먹기」 PNG 는 그림이 상대적으로 어두워 보여, 카드에서는 밝기를 조금 올려 보정합니다 */
-  const brightPng = routineImagePath?.includes('clean_up_all.png') ? 'brightness(1.24) saturate(1.06)' : null
+  /** 「밥 다 먹기」(`clean_up_all.png`) — 공통 필터로 살짝 어둡게 보이게 합니다 */
+  const finishMealImageFilter = isFinishMealRoutinePngUrl(routineImagePath)
+    ? FINISH_MEAL_ROUTINE_PNG_CSS_FILTER
+    : null
 
   function handleTap() {
     if (firedRef.current) {
@@ -221,7 +227,7 @@ export default function ChildMissionCard({ mission, onComplete, tapResetKey = 0 
               className={['h-full w-full select-none object-contain', isDinnerMissionImage ? 'translate-y-1' : '']
                 .filter(Boolean)
                 .join(' ')}
-              style={brightPng ? { filter: brightPng } : undefined}
+              style={finishMealImageFilter ? { filter: finishMealImageFilter } : undefined}
               /** PNG 로드 실패 시 즉시 스프라이트 폴백으로 전환 */
               onError={() => setUseSpriteFallback(true)}
               draggable={false}

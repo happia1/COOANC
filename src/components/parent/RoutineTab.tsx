@@ -48,7 +48,11 @@ import { TOPBAR_LOGO_SRC } from '@/constants/branding'
 import { MISSION_ROUTINES_ATLAS } from '@/constants/missionRoutineAtlas'
 import { missionRoutineIconFrame } from '@/lib/missionRoutineIconFrame'
 import { PARENT_NEUTRAL_CARD_CLASSNAME, PARENT_NEUTRAL_CARD_OVERFLOW_X_CLASSNAME } from '@/lib/parentNeutralBlockStyle'
-import { resolveRoutineMissionPngUrl } from '@/lib/routineMissionThumbnail'
+import {
+  FINISH_MEAL_ROUTINE_PNG_CSS_FILTER,
+  isFinishMealRoutinePngUrl,
+  resolveRoutineMissionPngUrl,
+} from '@/lib/routineMissionThumbnail'
 import { scaledMissionRewards } from '@/lib/missionRewardMultiplier'
 import { MissionRewardIconTriple } from '@/components/mission/MissionRewardIconTriple'
 import SortableHorizontalMissionStrip from '@/components/parent/SortableHorizontalMissionStrip'
@@ -69,12 +73,12 @@ function MissionIconThumb({ mission, size = 36 }: { mission: Mission; size?: num
     description: mission.description,
   })
   if (png) {
-    /** 「밥 다 먹기」 PNG 는 상대적으로 어두워 보여, 부모 루틴 카드에서도 밝기를 살짝 올려 보정합니다 */
-    const styleFix = png.includes('clean_up_all.png')
+    /** 「밥 다 먹기」(`clean_up_all.png`) — 자녀 미션 카드와 같은 필터로 살짝 어둡게 */
+    const styleFix = isFinishMealRoutinePngUrl(png)
       ? ({
           width: size,
           height: size,
-          filter: 'brightness(1.24) saturate(1.06)',
+          filter: FINISH_MEAL_ROUTINE_PNG_CSS_FILTER,
           userSelect: 'none',
           WebkitUserSelect: 'none',
           WebkitTouchCallout: 'none',

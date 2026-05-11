@@ -12,7 +12,11 @@ import { createPortal } from 'react-dom'
 import SpriteImage from '@/components/common/SpriteImage'
 import { MISSION_ROUTINES_ATLAS } from '@/constants/missionRoutineAtlas'
 import { missionRoutineIconFrame } from '@/lib/missionRoutineIconFrame'
-import { resolveRoutineMissionPngUrl } from '@/lib/routineMissionThumbnail'
+import {
+  FINISH_MEAL_ROUTINE_PNG_CSS_FILTER,
+  isFinishMealRoutinePngUrl,
+  resolveRoutineMissionPngUrl,
+} from '@/lib/routineMissionThumbnail'
 import type { DailyMissionWithTemplate } from '@/types/database'
 
 type Props = {
@@ -34,8 +38,10 @@ export default function ParentMissionRedoNoticeModal({ mission, onClose }: Props
     block: m.block,
     description: m.description,
   })
-  /** 「밥 다 먹기」 PNG 보정(카드와 동일) — 상대적으로 어두워 보여 밝기를 조금 올립니다 */
-  const brightPng = routineImagePath?.includes('clean_up_all.png') ? 'brightness(1.24) saturate(1.06)' : null
+  /** 「밥 다 먹기」 PNG 보정 — 자녀 미션 카드와 동일한 필터(살짝 어둡게) */
+  const finishMealImageFilter = isFinishMealRoutinePngUrl(routineImagePath)
+    ? FINISH_MEAL_ROUTINE_PNG_CSS_FILTER
+    : null
 
   const modal = (
     <div
@@ -59,7 +65,7 @@ export default function ParentMissionRedoNoticeModal({ mission, onClose }: Props
               src={routineImagePath}
               alt=""
               className="h-full w-full select-none object-contain"
-              style={brightPng ? { filter: brightPng } : undefined}
+              style={finishMealImageFilter ? { filter: finishMealImageFilter } : undefined}
               draggable={false}
             />
           ) : (

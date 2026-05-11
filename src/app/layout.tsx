@@ -6,7 +6,7 @@
 import './globals.css'
 import type { Metadata } from 'next'
 import type { ReactNode } from 'react'
-import { PublicHolidaysBootstrap } from '@/components/system/PublicHolidaysBootstrap'
+import { PublicHolidaysBootstrapLazy } from '@/components/system/PublicHolidaysBootstrapLazy'
 
 export const metadata: Metadata = {
   title: 'COOANC - 자녀의 올바른 습관 형성 플랫폼',
@@ -36,8 +36,8 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="ko">
       <body>
-        {/* 앱 로드 시 올해 공휴일을 백그라운드로 DB 동기화(연도당 1회) */}
-        <PublicHolidaysBootstrap />
+        {/* 앱 로드 시 올해 공휴일을 백그라운드로 DB 동기화(연도당 1회) — `ssr: false` 는 클라이언트 래퍼에서만 사용 */}
+        <PublicHolidaysBootstrapLazy />
         {children}
       </body>
     </html>

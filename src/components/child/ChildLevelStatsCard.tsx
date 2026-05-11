@@ -5,6 +5,7 @@
  *
  * 비개발자 설명:
  * - 식물 물주기용 **하트 개수**는 크레딧 줄 **바로 아래**에 같은 스타일로 넣을 수 있어요.
+ * - `onRefresh` 를 넘기면 카드 **오른쪽 아래 모서리**에 작은 회색 새로고침만 붙습니다(유리 버튼 박스 없음).
  */
 
 import SpriteImage from '@/components/common/SpriteImage'
@@ -21,6 +22,11 @@ interface ChildLevelStatsCardProps {
   className?: string
   /** 물주기에 쓸 보유 하트 — 넣으면 크레딧 아래에 아이콘+숫자 한 줄이 더 붙습니다. */
   heartsCount?: number
+  /**
+   * 전체 화면 새로고침(예: `location.reload`) — 넘기면 카드 오른쪽 아래에만 작은 회색 아이콘을 그립니다.
+   * 별도 유리 버튼 블록은 두지 않습니다.
+   */
+  onRefresh?: () => void
 }
 
 function formatCredits(value: number): string {
@@ -35,6 +41,7 @@ export default function ChildLevelStatsCard({
   shine = false,
   className = '',
   heartsCount,
+  onRefresh,
 }: ChildLevelStatsCardProps) {
   const { current_level, exp, exp_to_next_level, credits } = stats
 
@@ -55,7 +62,7 @@ export default function ChildLevelStatsCard({
       <div
         className={[
           CHILD_HOME_TOP_BAR_GLASS_CLASS,
-          'pointer-events-none max-w-full min-w-0 w-fit px-3 pt-2.5 pb-2.5',
+          'relative pointer-events-none max-w-full min-w-0 w-fit px-3 pt-2.5 pb-2.5',
           className,
         ]
           .filter(Boolean)
@@ -151,6 +158,37 @@ export default function ChildLevelStatsCard({
               </span>
             </div>
           </>
+        ) : null}
+
+        {/*
+          새로고침: 유리 버튼 없이 SVG만 — 기존 우측 아이콘(h-6)의 절반(h-3), 아주 연한 회색(text-gray-300).
+          `bottom-2.5` — 직전에 `bottom-1` 으로 올린 것보다, 그때 늘린 하단 여백(0.125rem)을 세 번 더한 만큼 위로 띄웁니다.
+          버튼에만 얇은 padding(배경·테두리 없음). 부모 카드는 pointer-events-none 이라 이 버튼만 pointer-events-auto 로 탭을 받습니다.
+        */}
+        {onRefresh ? (
+          <button
+            type="button"
+            onClick={onRefresh}
+            className="pointer-events-auto absolute bottom-2.5 right-0.5 z-10 border-0 bg-transparent p-1 transition-opacity active:opacity-70"
+            aria-label="화면 새로고침"
+            title="화면 새로고침"
+          >
+            <svg
+              className="h-3 w-3 shrink-0 text-gray-300"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden
+            >
+              <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+              <path d="M3 3v5h5" />
+              <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
+              <path d="M16 16h5v5" />
+            </svg>
+          </button>
         ) : null}
       </div>
     </>

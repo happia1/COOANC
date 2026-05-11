@@ -62,6 +62,18 @@ const MEAL_PREP_HELP_ROUTINE_PNG = `${BASE}/special/put_cutrary.png?v=${MEAL_PRE
 /** 스페셜 칩 「밥 다 먹기」·레거시 `밥그릇비우기`(같은 칩으로 통합) 일러스트 */
 const FINISH_MEAL_ROUTINE_PNG = `${BASE}/special/clean_up_all.png?v=${FINISH_MEAL_PNG_CACHE_BUST}`
 
+/**
+ * 「밥 다 먹기」일러스트(`clean_up_all.png`)에만 씌우는 CSS `filter` 값입니다.
+ * 비개발자: 예전에는 카드에서 어둡다고 밝기를 많이 올렸는데, 요청에 따라 **전체적으로 한 단계 어둡게** 보이도록
+ * `brightness` 를 1보다 낮춥니다. 자녀 미션 카드·부모 루틴·스페셜 시트가 모두 이 값을 공유합니다.
+ */
+export const FINISH_MEAL_ROUTINE_PNG_CSS_FILTER = 'brightness(0.88) saturate(0.98)' as const
+
+/** URL 이 「밥 다 먹기」전용 PNG 인지 — 끝에 `?v=캐시`가 붙어도 파일명으로 판별합니다 */
+export function isFinishMealRoutinePngUrl(src: string | null | undefined): boolean {
+  return typeof src === 'string' && src.includes('clean_up_all.png')
+}
+
 /** 스페셜 칩 「빨래개기/옷 개키기」 — DB 별칭 「옷정리하기」도 키워드 매칭으로 같은 그림을 씁니다. */
 const ORGANIZE_CLOTH_ROUTINE_PNG = `${BASE}/special/organize_cloth.png?v=${ORGANIZE_CLOTH_PNG_CACHE_BUST}`
 
