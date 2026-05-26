@@ -21,7 +21,6 @@ import {
   type ParentMarketSectionId,
 } from '@/lib/parentMarketMenuSections'
 import { BETA_MARKET_CONFIG } from '@/constants/betaMarketConfig'
-import { usesSingleBucket } from '@/constants/childAgeConfig'
 import { parseJsonFromResponse } from '@/lib/parseJsonResponse'
 
 type Props = {
@@ -34,18 +33,11 @@ type Props = {
   /** 서버에서 읽은 숨김 상품 id — 탭에서 주기적으로 다시 읽어 반영합니다 */
   initialHiddenStoreItemIds: string[]
   requests: PurchaseRequest[]
-  /**
-   * 멀티 버킷: 지갑(credits_wallet) — 마켓에서 바로 쓰는 잔액
-   * 단일 버킷: 이 값은 무시되고 `creditsTotal`로 표시·판단
-   */
-  creditsWallet: number
   /** 총 보유 `child_stats.credits` — 단일 버킷일 때 마켓 잔액·구매 기준 */
   creditsTotal: number
   /** 장바구니(서버 `market_wishlist_items`) 초기 목록(상품별 수량 포함) */
   initialWishlistEntries: { storeItemId: string; quantity: number }[]
   level: number
-  /** null 이면(나이 모름) 레벨만으로 단일/멀티 구분 — 서버 API와 동일 */
-  ageYears: number | null
 }
 
 type SelectedInfo = {
@@ -100,17 +92,15 @@ export default function MarketTab({
   marketEligibleItems,
   initialHiddenStoreItemIds,
   requests,
-  creditsWallet,
   creditsTotal,
   initialWishlistEntries,
   level,
-  ageYears,
 }: Props) {
-  /** 실제로 선반·구매에 쓰는 “낼 수 있는” 코인(단일: 총액, 멀티: 지갑) */
-  const marketSpendable = useMemo(
-    () => (usesSingleBucket(level, ageYears) ? creditsTotal : creditsWallet),
-    [creditsTotal, creditsWallet, level, ageYears],
-  )
+  /**
+   * 마켓 결제 기준은 레벨 블록(총 코인)과 동일하게 맞춥니다.
+   * 비개발자: 화면 상단 레벨 카드에 보이는 크레딧 숫자 그대로 마켓에서 사용됩니다.
+   */
+  const marketSpendable = useMemo(() => creditsTotal, [creditsTotal])
   const [currentWallet, setCurrentWallet] = useState(marketSpendable)
   /**
    * 마켓탭 지갑도 미션탭과 같이 9단계 PNG를 쓰고, 잔액 변화 시 한 단계씩 따라가게 합니다.
@@ -554,14 +544,7 @@ export default function MarketTab({
         }
         setHiddenStoreItemIds([...json.hiddenStoreItemIds].sort())
         const totalFromApi = json.credits != null ? readChildStatInt(json.credits) : null
-        const wFromApi = json.creditsWallet != null ? readChildStatInt(json.creditsWallet) : null
-        if (usesSingleBucket(level, ageYears)) {
-          if (totalFromApi != null) setCurrentWallet(totalFromApi)
-        } else if (wFromApi != null) {
-          setCurrentWallet(wFromApi)
-        } else if (totalFromApi != null) {
-          setCurrentWallet(totalFromApi)
-        }
+        if (totalFromApi != null) setCurrentWallet(totalFromApi)
         const next = json.purchaseRequests
         const prev = prevPurchaseRequestsRef.current
         for (const row of next) {
@@ -601,7 +584,7 @@ export default function MarketTab({
       document.removeEventListener('visibilitychange', onVisibleOrFocus)
       window.removeEventListener('focus', onVisibleOrFocus)
     }
-  }, [childId, onRequestApproved, level, ageYears])
+  }, [childId, onRequestApproved])
 
   /** 「배송 중」단계가 잠시 지나면 낙하산 도착 단계로 넘깁니다 */
   useEffect(() => {
@@ -678,14 +661,8 @@ export default function MarketTab({
         showToast(json.error ?? '요청에 실패했어요', false)
         return false
       }
-      if (usesSingleBucket(level, ageYears)) {
-        if (typeof json.credits === 'number') setCurrentWallet(readChildStatInt(json.credits))
-        else setCurrentWallet((w) => w - item.credit_price)
-      } else if ('credits_wallet' in json && json.credits_wallet != null) {
-        setCurrentWallet(readChildStatInt(json.credits_wallet as number))
-      } else {
-        setCurrentWallet((w) => w - item.credit_price)
-      }
+      if (typeof json.credits === 'number') setCurrentWallet(readChildStatInt(json.credits))
+      else setCurrentWallet((w) => w - item.credit_price)
       if (json.request) setMyRequests((prev) => [json.request as PurchaseRequest, ...prev])
       /** 축하 오버레이에서 안내하므로 별도 토스트는 띄우지 않음(문구 겹침 방지) */
       return true

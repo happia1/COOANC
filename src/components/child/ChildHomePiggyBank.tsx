@@ -172,7 +172,7 @@ export default function ChildHomePiggyBank({
               />
             </div>
             <span className="text-[11px] font-black text-gray-600">
-              {multiBucket ? '저금통을 눌러 저금 (1씩)' : '레벨 5부터 열려요'}
+              {multiBucket ? '저금통을 눌러 크레딧을 모아요' : '레벨 5부터 열려요'}
             </span>
           </button>
 

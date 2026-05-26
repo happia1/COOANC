@@ -7,7 +7,7 @@
  *
  * 비개발자 설명:
  * - 배경 이미지 위에 캐릭터가 서 있고, 하단에 오늘의 미션 카드가 가로로 스크롤됩니다.
- * - 우측 상단 스택(나가기·스티커·장바구니·코인)은 문·스티커·장바구니가 조금 더 큰 타일(44px)과 그림(28~32px)에, 화면이 넓어질수록 묶음 스케일이 더 커집니다(코인은 별도 배율). 마켓 패널은 아래에서 올라옵니다.
+ * - 우측 상단 스택(나가기·스티커·장바구니)은 문·스티커·장바구니가 조금 더 큰 타일(44px)과 그림(28~32px)으로 보입니다. 마켓 패널은 아래에서 올라옵니다.
  * - 상단 오른쪽 나가기(유리 버튼)를 누르면 부모 화면으로 나갑니다.
  * - 새로고침은 레벨·크레딧 유리 카드 **안 오른쪽 아래** 아주 연한 회색 아이콘으로만 둡니다(전체 페이지를 다시 불러 꼬임을 풀 때 씁니다).
  * - 뽀모도로(왼쪽)·음악(오른쪽)은 레벨 블록 바로 아래 한 줄에 배치합니다.
@@ -16,8 +16,8 @@
  * 레이아웃 레이어(아래 → 위):
  *   L1. 배경 이미지 (tablet_kidsroom_background_portrait.png)
  *   L2. 캐릭터 스프라이트 (앵커포인트 기반 배치)
- *   L3. UI 오버레이 (상단: 레벨 카드·카드 안 새로고침·크레딧·하트, 발 옆 저금통·화분, 우측 나가기~장바구니·코인 열 + 미션 섹션)
- *   L4. 패널 오버레이 (마켓: 항상 하단 슬라이드 / 코인·꾸미기: 세로는 하단·가로는 우측 / 스티커는 별도 시트)
+ *   L3. UI 오버레이 (상단: 레벨 카드·카드 안 새로고침·크레딧·하트, 발 옆 저금통·화분, 우측 나가기~장바구니 + 미션 섹션)
+ *   L4. 패널 오버레이 (마켓: 항상 하단 슬라이드 / 꾸미기: 세로는 하단·가로는 우측 / 스티커는 별도 시트)
  */
 
 import { Fragment, useRef, useState, useCallback, useMemo, useEffect, memo } from 'react'
@@ -165,10 +165,6 @@ const RIGHT_ICON_PRIMARY_SCALE_BASE_W = LEVEL_BLOCK_SCALE_BASE_W
 const RIGHT_ICON_PRIMARY_SCALE_FULL_W = LEVEL_BLOCK_SCALE_FULL_W
 const RIGHT_ICON_PRIMARY_SCALE_MAX = 1.95
 
-/** 코인(💰)만 별도 — 같은 구간식이지만 최대 1.3배까지만(기존 상한 유지) */
-const RIGHT_ICON_COIN_SCALE_BASE_W = LEVEL_BLOCK_SCALE_BASE_W
-const RIGHT_ICON_COIN_SCALE_FULL_W = LEVEL_BLOCK_SCALE_FULL_W
-const RIGHT_ICON_COIN_SCALE_MAX = 1.3
 
 /** 캐릭터(무대) — 가로가 넓어질수록 최대 2배까지 확대 */
 const CHARACTER_UI_SCALE_MAX = 2
@@ -334,18 +330,8 @@ function scaleForRightIconPrimary(containerWidthPx: number): number {
   return base + t * (RIGHT_ICON_PRIMARY_SCALE_MAX - base)
 }
 
-/** 코인 버튼만 — 최대 1.3배 */
-function scaleForRightIconCoin(containerWidthPx: number): number {
-  return scaleFromContainerWidth(
-    containerWidthPx,
-    RIGHT_ICON_COIN_SCALE_BASE_W,
-    RIGHT_ICON_COIN_SCALE_FULL_W,
-    RIGHT_ICON_COIN_SCALE_MAX,
-  )
-}
-
 /**
- * 유리 톤 버튼 셸(기본 40×40) — 뽀모도로·음악·코인(💰) 등에 사용합니다.
+ * 유리 톤 버튼 셸(기본 40×40) — 뽀모도로·음악 등에 사용합니다.
  * 비개발자: 레벨 카드와 같은 반투명·둥근 유리 느낌의 버튼 테두리 박스입니다.
  */
 const CHILD_HOME_RIGHT_ICON_GLASS_CLASS = [
@@ -673,13 +659,6 @@ export default function ChildScreen({
   useEffect(() => {
     setStats(initialStats ? normalizeChildStatsCreditsSplit(initialStats) : null)
   }, [initialStats])
-
-  const handleStatsUpdate = useCallback(
-    (patch: { credits: number; credits_wallet: number; credits_piggy: number }) => {
-      setStats((prev) => normalizeChildStatsCreditsSplit(mergeChildStatsPatch(prev, patch)))
-    },
-    [],
-  )
 
   /** 총 크레딧 (지갑+저금통+돈바구니 합산) */
   const totalCredits = stats?.credits ?? 0
@@ -1760,9 +1739,8 @@ export default function ChildScreen({
   /** 상단 왼쪽(레벨·크레딧 통합 카드) — 컨테이너 가로가 넓어질수록 최대 1.7배(글자·아이콘 동일 비율) */
   const levelBlockScale = useMemo(() => scaleForLevelBlock(containerW), [containerW])
 
-  /** 상단 우측: 나가기·스티커·장바구니 묶음 — 반응형 스케일 상한은 `RIGHT_ICON_PRIMARY_SCALE_MAX` / 코인은 별도 1.3배 상한 */
+  /** 상단 우측: 나가기·스티커·장바구니 묶음 — 반응형 스케일 상한은 `RIGHT_ICON_PRIMARY_SCALE_MAX` */
   const rightIconPrimaryScale = useMemo(() => scaleForRightIconPrimary(containerW), [containerW])
-  const rightIconCoinScale = useMemo(() => scaleForRightIconCoin(containerW), [containerW])
 
   /** 발 옆 저금통·화분 UI 크기 — `scaleForPlantFeetUi` 결과에 1.5를 곱해, 좁은 폭에서도 너무 작아 보이지 않게 합니다 */
   const plantFeetUiScale = useMemo(
@@ -2079,26 +2057,6 @@ export default function ChildScreen({
                   </button>
                 )}
               </div>
-              {features.coinPocket && (
-                <div
-                  style={{
-                    transformOrigin: 'top right',
-                    transform: `scale(${rightIconCoinScale})`,
-                  }}
-                >
-                  <button
-                    type="button"
-                    onClick={() => setActivePanel('coins')}
-                    className={`${CHILD_HOME_RIGHT_ICON_GLASS_CLASS} border-0 bg-transparent p-0 transition active:scale-95`}
-                    style={CHILD_HOME_TOP_BAR_GLASS_STYLE}
-                    aria-label="내 크레딧 열기"
-                  >
-                    <span className="text-lg leading-none" role="img" aria-hidden>
-                      💰
-                    </span>
-                  </button>
-                </div>
-              )}
             </div>
           </div>
 
@@ -2359,12 +2317,8 @@ export default function ChildScreen({
         initialHiddenStoreItemIds={initialHiddenStoreItemIds}
         marketRequests={marketRequests}
         initialWishlistEntries={initialWishlistEntries}
-        creditsWallet={stats?.credits_wallet ?? 0}
         creditsTotal={totalCredits}
         level={stats?.current_level ?? 0}
-        ageYears={ageYears}
-        childStats={stats}
-        onStatsUpdate={handleStatsUpdate}
         unlockedItemIndexes={initialUnlockedItemIndexes}
         praiseGrants={grants}
         praisePlacements={placements}

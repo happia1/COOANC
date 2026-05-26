@@ -4,27 +4,20 @@
  * ChildPanelOverlay
  *
  * 자녀 단일 화면(ChildScreen)에서 하단에서 슬라이드업 되는 패널 오버레이.
- * activePanel에 따라 마켓/코인/꾸미기/스티커 중 하나를 표시합니다.
+ * activePanel에 따라 마켓/꾸미기/스티커 중 하나를 표시합니다.
  *
  * 비개발자 설명:
  * - 폰·패드 세로: 아이콘을 탭하면 패널이 아래에서 올라옵니다.
- * - 패드 가로: 마켓만 계속 아래에서 슬라이드업(요청 반영). 코인·꾸미기는 오른쪽에서 슬라이드됩니다.
+ * - 패드 가로: 마켓만 계속 아래에서 슬라이드업(요청 반영). 꾸미기는 오른쪽에서 슬라이드됩니다.
  * - 어두운 배경(딤)을 탭하거나 × 버튼을 누르면 닫힙니다.
  */
 
 import { useState, useCallback, useEffect } from 'react'
 import dynamic from 'next/dynamic'
 import Image from 'next/image'
-import type { StoreItem, PurchaseRequest, ChildStats, PraiseStickerGrant, PraiseStickerPlacement } from '@/types/database'
+import type { StoreItem, PurchaseRequest, PraiseStickerGrant, PraiseStickerPlacement } from '@/types/database'
 import type { UnlockedFeatures } from '@/constants/childScreenFeatures'
-import MissionCreditCards from '@/components/child/MissionCreditCards'
 import { ASSETS } from '@/constants/assets'
-import {
-  normalizeChildStatsCreditsSplit,
-  mergeChildStatsPatch,
-  creditsFloating,
-} from '@/lib/childCreditsSplit'
-import type { CreditTransferApiSuccess, CreditTransferKind } from '@/components/child/MissionCreditMoveDialog'
 import { praiseAssetStickerUrl } from '@/lib/praiseAssetStickers'
 import { praiseUiKindFromSpriteKey } from '@/lib/praiseStickerUi'
 import PraiseUiIcon from '@/components/common/PraiseUiIcon'
@@ -36,20 +29,7 @@ const MarketTab = dynamic(() => import('@/components/child/MarketTab'), { ssr: f
 /** BearStickerSheet — 곰돌이 스티커판 (자체 오버레이 모달) */
 const BearStickerSheet = dynamic(() => import('@/components/child/BearStickerSheet'), { ssr: false })
 
-/** 크레딧 이동 다이얼로그 — 사용 시 동적으로 불러옵니다 */
-const MissionCreditMoveDialog = dynamic(
-  () => import('@/components/child/MissionCreditMoveDialog'),
-  { ssr: false },
-)
-const MissionCreditActionSheet = dynamic(
-  () =>
-    import('@/components/child/MissionCreditMoveDialog').then((m) => ({
-      default: m.MissionCreditActionSheet,
-    })),
-  { ssr: false },
-)
-
-export type PanelType = 'market' | 'coins' | 'dressup' | 'sticker' | null
+export type PanelType = 'market' | 'dressup' | 'sticker' | null
 
 type Props = {
   /** 현재 열린 패널 종류 (null = 닫힘) */
@@ -67,21 +47,9 @@ type Props = {
   initialHiddenStoreItemIds: string[]
   marketRequests: PurchaseRequest[]
   initialWishlistEntries: { storeItemId: string; quantity: number }[]
-  /**
-   * 지갑(`credits_wallet`) 분 — 멀티 버킷 모드 마켓 구매·표시에 사용
-   * 단일 버킷이면 `creditsTotal`과 별도로 내려도 됨( MarketTab이 통합 )
-   */
-  creditsWallet: number
   /** 총 보유 코인 `child_stats.credits` — 단일 버킷 모드 마켓 잔액에 사용 */
   creditsTotal: number
   level: number
-  /** 자녀 만 나이(세). null 이면 서버 API와 같이 레벨만으로 단일/멀티를 구분 */
-  ageYears: number | null
-
-  /* ── 코인 패널 props ── */
-  childStats: ChildStats | null
-  /** stats가 변경되면 ChildScreen에 알립니다 */
-  onStatsUpdate: (patch: { credits: number; credits_wallet: number; credits_piggy: number }) => void
 
   /* ── 꾸미기 패널 props ── */
   unlockedItemIndexes: number[]
@@ -98,7 +66,6 @@ type Props = {
 /** 패널 제목 매핑 */
 const PANEL_TITLES: Record<NonNullable<PanelType>, string> = {
   market: '마켓',
-  coins: '내 크레딧',
   dressup: '캐릭터 꾸미기',
   sticker: '칭찬 스티커 판',
 }
@@ -112,12 +79,8 @@ export default function ChildPanelOverlay({
   initialHiddenStoreItemIds,
   marketRequests,
   initialWishlistEntries,
-  creditsWallet,
   creditsTotal,
   level,
-  ageYears,
-  childStats,
-  onStatsUpdate,
   unlockedItemIndexes,
   praiseGrants,
   praisePlacements,
@@ -126,7 +89,7 @@ export default function ChildPanelOverlay({
   praiseGrantsRevision,
   onInventoryChange,
 }: Props) {
-  /** 슬라이드업 패널은 market/coins/dressup 전용 — sticker는 BearStickerSheet 가 자체 모달 관리 */
+  /** 슬라이드업 패널은 market/dressup 전용 — sticker는 BearStickerSheet 가 자체 모달 관리 */
   const isSlideUpOpen = active !== null && active !== 'sticker'
 
   /** 마켓만 태블릿 가로에서도 하단 시트 — 코인·꾸미기는 md 가로에서 우측 패널 유지 */
@@ -204,7 +167,7 @@ export default function ChildPanelOverlay({
          * - 마켓: MarketTab이 flex-1 + 내부 스크롤을 직접 관리하므로
          *         이 div도 flex-col + overflow-hidden 으로 고정합니다.
          *         overflow-y-auto 를 쓰면 이중 스크롤바가 생깁니다.
-         * - 코인/꾸미기: 기존대로 overflow-y-auto 스크롤 허용
+         * - 꾸미기: 기존대로 overflow-y-auto 스크롤 허용
          */}
         <div className={[
           'min-h-0',
@@ -218,18 +181,9 @@ export default function ChildPanelOverlay({
               marketEligibleItems={marketEligibleItems}
               initialHiddenStoreItemIds={initialHiddenStoreItemIds}
               requests={marketRequests}
-              creditsWallet={creditsWallet}
               creditsTotal={creditsTotal}
               initialWishlistEntries={initialWishlistEntries}
               level={level}
-              ageYears={ageYears}
-            />
-          )}
-          {active === 'coins' && features.coinPocket && (
-            <CoinsPanel
-              childId={childId}
-              childStats={childStats}
-              onStatsUpdate={onStatsUpdate}
             />
           )}
           {active === 'dressup' && (
@@ -254,119 +208,6 @@ export default function ChildPanelOverlay({
       onInventoryChange={onInventoryChange}
     />
     </>
-  )
-}
-
-// ─── 코인 패널 ──────────────────────────────────────────────────────────────
-
-/**
- * 코인 패널 — 돈바구니/저금통/지갑 이체 UI
- *
- * 비개발자 설명:
- * - 코인(크레딧)을 세 통(돈바구니·저금통·지갑) 사이에서 옮길 수 있습니다.
- * - 통을 탭하면 어디로 옮길지 선택할 수 있습니다.
- */
-function CoinsPanel({
-  childId,
-  childStats,
-  onStatsUpdate,
-}: {
-  childId: string
-  childStats: ChildStats | null
-  onStatsUpdate: (patch: { credits: number; credits_wallet: number; credits_piggy: number }) => void
-}) {
-  const [creditSheetBucket, setCreditSheetBucket] = useState<'center' | 'wallet' | 'piggy' | null>(null)
-  const [creditMoveKind, setCreditMoveKind] = useState<CreditTransferKind | null>(null)
-
-  const stNorm = childStats ? normalizeChildStatsCreditsSplit(childStats) : null
-  const walletCredits = stNorm?.credits_wallet ?? 0
-  const piggyCredits = stNorm?.credits_piggy ?? 0
-  const floatingCredits = stNorm ? creditsFloating(stNorm) : 0
-
-  const applyCreditTransferSuccess = useCallback(
-    (result: CreditTransferApiSuccess) => {
-      onStatsUpdate({
-        credits: result.credits,
-        credits_wallet: result.credits_wallet,
-        credits_piggy: result.credits_piggy,
-      })
-      setCreditSheetBucket(null)
-    },
-    [onStatsUpdate],
-  )
-
-  /** 이동 종류별 최대 금액 */
-  function maxAmountForKind(kind: CreditTransferKind): number {
-    switch (kind) {
-      case 'float_to_wallet':
-      case 'float_to_piggy':
-        return floatingCredits
-      case 'wallet_to_float':
-      case 'wallet_to_piggy':
-        return walletCredits
-      case 'piggy_to_float':
-      case 'piggy_to_wallet':
-        return piggyCredits
-      default:
-        return 0
-    }
-  }
-
-  /** 코인 이동 팝업 제목 */
-  const transferCopy: Record<CreditTransferKind, { title: string }> = {
-    float_to_wallet: { title: '지갑으로 옮기기' },
-    float_to_piggy: { title: '저금통으로 옮기기' },
-    wallet_to_float: { title: '돈바구니로 꺼내기' },
-    piggy_to_float: { title: '돈바구니로 꺼내기' },
-    wallet_to_piggy: { title: '저금통으로 옮기기' },
-    piggy_to_wallet: { title: '지갑으로 옮기기' },
-  }
-
-  return (
-    <div className="p-4">
-      {/* 크레딧 카드 (저금통/돈바구니/지갑) */}
-      <div className="w-full max-w-[19.5rem] mx-auto">
-        <MissionCreditCards
-          piggy={piggyCredits}
-          floating={floatingCredits}
-          wallet={walletCredits}
-          onPiggyTap={() => setCreditSheetBucket('piggy')}
-          onCenterTap={() => { if (floatingCredits > 0) setCreditSheetBucket('center') }}
-          onWalletTap={() => setCreditSheetBucket('wallet')}
-        />
-      </div>
-
-      {/* 크레딧 이동 액션 시트 (어떤 방향으로?) — creditSheetBucket 이 null 이면 닫힘 */}
-      {creditSheetBucket && (
-        <MissionCreditActionSheet
-          open={true}
-          bucket={creditSheetBucket}
-          floating={floatingCredits}
-          wallet={walletCredits}
-          piggy={piggyCredits}
-          onPick={(kind) => {
-            setCreditMoveKind(kind)
-            setCreditSheetBucket(null)
-          }}
-          onClose={() => setCreditSheetBucket(null)}
-        />
-      )}
-
-      {/* 크레딧 이동 다이얼로그 (수량 입력) */}
-      {creditMoveKind && (
-        <MissionCreditMoveDialog
-          open={true}
-          title={transferCopy[creditMoveKind].title}
-          kind={creditMoveKind}
-          maxAmount={maxAmountForKind(creditMoveKind)}
-          childId={childId}
-          piggyBalance={piggyCredits}
-          walletBalance={walletCredits}
-          onSuccess={applyCreditTransferSuccess}
-          onClose={() => setCreditMoveKind(null)}
-        />
-      )}
-    </div>
   )
 }
 

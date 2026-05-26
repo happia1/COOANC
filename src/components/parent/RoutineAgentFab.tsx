@@ -41,11 +41,9 @@ export default function RoutineAgentFab({ disabled = false, unreadCount = 0, onC
           </span>
           {safeUnread > 0 ? (
             <span
-              className="absolute -right-0.5 -top-0.5 flex h-[1.25rem] min-w-[1.25rem] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-black tabular-nums leading-none text-white shadow ring-2 ring-white"
+              className="absolute left-1.5 top-1.5 h-2.5 w-2.5 rounded-full bg-rose-500 shadow ring-2 ring-white"
               aria-hidden
-            >
-              {safeUnread > 99 ? '99+' : safeUnread}
-            </span>
+            />
           ) : null}
         </button>
       </div>

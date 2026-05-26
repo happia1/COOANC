@@ -2039,9 +2039,12 @@ export default function RoutineAgentSchedulePanel({
                 })}
                 {loading ? (
                   <li className="flex justify-start">
-                    <div className="flex items-center gap-2 rounded-2xl rounded-bl-md bg-sky-100/80 px-3 py-2 text-xs text-gray-600">
+                    <div className="flex items-start gap-2 rounded-2xl rounded-bl-md bg-sky-100/80 px-3 py-2 text-xs text-gray-600">
                       <span className="h-4 w-4 animate-spin rounded-full border-2 border-sky-300 border-t-sky-700" />
-                      분석 중…
+                      <p className="whitespace-pre-line leading-relaxed">
+                        {`분석중...
+분석이 완료되면 알려드릴게요!`}
+                      </p>
                     </div>
                   </li>
                 ) : null}

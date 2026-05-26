@@ -4,7 +4,6 @@ import { resolveApiActorChildId } from '@/lib/resolveApiActorChildId'
 import { readChildStatInt } from '@/lib/childCreditsSplit'
 import { isCategoryExcludedFromMarket } from '@/lib/parentMarketMenuSections'
 import { fireGameTrigger } from '@/lib/gameLayer/fireGameTrigger'
-import { usesSingleBucket, ageYearsFromProfileRow } from '@/constants/childAgeConfig'
 
 /**
  * POST /api/market/request
@@ -46,7 +45,7 @@ export async function POST(req: NextRequest) {
    * 상품·스탯·가격 덮어쓰기를 한 번에 병렬 조회해 왕복 지연을 줄입니다.
    * (이전에는 순차 await 로 네트워크 왕복이 여러 번 이어졌음)
    */
-  const [itemRes, statsRes, creditOvRes, existingPendingRes, profileRes] = await Promise.all([
+  const [itemRes, statsRes, creditOvRes, existingPendingRes] = await Promise.all([
     supabase.from('store_items').select('*').eq('id', itemId).eq('is_active', true).maybeSingle(),
     supabase
       .from('child_stats')
@@ -66,7 +65,6 @@ export async function POST(req: NextRequest) {
       .eq('item_id', itemId)
       .eq('status', 'pending')
       .maybeSingle(),
-    supabase.from('profiles').select('age, birth_date').eq('id', childId).maybeSingle(),
   ])
 
   const item = itemRes.data
@@ -100,63 +98,35 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: '이미 요청 중인 상품이에요' }, { status: 409 })
   }
 
-  const level = stats.current_level ?? 0
-  const ageYears = ageYearsFromProfileRow(profileRes.data)
-  const singleBucket = usesSingleBucket(level, ageYears)
   const piggy = typeof stats.credits_piggy === 'number' ? stats.credits_piggy : 0
   const wallet = readChildStatInt(stats.credits_wallet)
   const totalCredits = readChildStatInt(stats.credits)
 
-  let nextCredits: number
-  let nextWallet: number
+  if (totalCredits < effectivePrice) {
+    return NextResponse.json(
+      { error: '코인이 부족해요. 미션을 더 완료해서 코인을 모아보세요!' },
+      { status: 400 },
+    )
+  }
 
   /**
-   * 단일 버킷(어린 연령): 총 코인 `credits`만 차감.
-   * 3버킷(지갑+돈바구니+저금통): `credits`·`credits_wallet`를 함께 맞춤(지갑에서 결제).
-   * 아래 if/else는 “어디서 얼마를 빼느냐”만 다르고, 그 다음 `purchase_requests` INSERT는
-   * 두 모드 모두에서 한 번씩만 실행됩니다(부모 승인 대기 행).
+   * 마켓 결제는 레벨 블록 총 코인(`credits`)을 기준으로 통일합니다.
+   * 비개발자: 화면에 보이는 총 크레딧만 충분하면 구매가 되며, 결제 후 그 숫자에서 차감됩니다.
    */
-  if (singleBucket) {
-    if (totalCredits < effectivePrice) {
-      return NextResponse.json(
-        { error: '코인이 부족해요. 미션을 더 완료해서 코인을 모아보세요!' },
-        { status: 400 },
-      )
-    }
-    nextCredits = totalCredits - effectivePrice
-    nextWallet = wallet
-    const { error: deductErr } = await supabase
-      .from('child_stats')
-      .update({
-        credits: nextCredits,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('child_id', childId)
-    if (deductErr) {
-      return NextResponse.json({ error: '크레딧 차감에 실패했어요' }, { status: 500 })
-    }
-  } else {
-    if (wallet < effectivePrice) {
-      return NextResponse.json(
-        { error: '지갑 크레딧이 부족해요. 미션 탭에서 돈바구니의 크레딧을 지갑으로 옮겨 주세요.' },
-        { status: 400 },
-      )
-    }
-    nextWallet = wallet - effectivePrice
-    nextCredits = totalCredits - effectivePrice
-    // 총액·지갑에서 동시 차감(돈바구니·저금통에 둔 분량은 그대로)
-    const { error: deductErr } = await supabase
-      .from('child_stats')
-      .update({
-        credits: nextCredits,
-        credits_wallet: nextWallet,
-        credits_piggy: piggy,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('child_id', childId)
-    if (deductErr) {
-      return NextResponse.json({ error: '크레딧 차감에 실패했어요' }, { status: 500 })
-    }
+  const nextCredits = totalCredits - effectivePrice
+  // 총액보다 지갑이 커지지 않도록 안전하게 맞춥니다.
+  const nextWallet = Math.min(wallet, nextCredits)
+  const { error: deductErr } = await supabase
+    .from('child_stats')
+    .update({
+      credits: nextCredits,
+      credits_wallet: nextWallet,
+      credits_piggy: piggy,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('child_id', childId)
+  if (deductErr) {
+    return NextResponse.json({ error: '크레딧 차감에 실패했어요' }, { status: 500 })
   }
 
   // 차감이 끝난 뒤, 단일/3버킷 구분 없이 동일한 구매 요청(pending) 레코드를 남깁니다.
@@ -176,24 +146,14 @@ export async function POST(req: NextRequest) {
     .single()
 
   if (insertErr) {
-    if (singleBucket) {
-      await supabase
-        .from('child_stats')
-        .update({
-          credits: totalCredits,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('child_id', childId)
-    } else {
-      await supabase
-        .from('child_stats')
-        .update({
-          credits: stats.credits,
-          credits_wallet: wallet,
-          credits_piggy: piggy,
-        })
-        .eq('child_id', childId)
-    }
+    await supabase
+      .from('child_stats')
+      .update({
+        credits: stats.credits,
+        credits_wallet: wallet,
+        credits_piggy: piggy,
+      })
+      .eq('child_id', childId)
     return NextResponse.json({ error: '요청 생성에 실패했어요. 다시 시도해 주세요.' }, { status: 500 })
   }
 
