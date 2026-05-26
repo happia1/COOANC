@@ -12,6 +12,8 @@ import { resolveApiActorChildId } from '@/lib/resolveApiActorChildId'
 import { readChildStatInt } from '@/lib/childCreditsSplit'
 import type { Mission } from '@/types/database'
 import { fireGameTrigger } from '@/lib/gameLayer/fireGameTrigger'
+import { createServiceRoleClient } from '@/lib/supabase/admin'
+import { PRAISE_ASSET_STICKER_KEYS } from '@/lib/praiseAssetStickers'
 
 /**
  * POST /api/daily-mission/complete
@@ -185,10 +187,14 @@ export async function POST(req: NextRequest) {
   let newLevel = stats.current_level
   let newExpToNext = stats.exp_to_next_level
 
-  if (newExp >= newExpToNext && newLevel < 5) {
+  /**
+   * 레벨업은 1회 if 가 아니라 while 로 처리합니다.
+   * 비개발자: 보상을 크게 받아 경험치가 여러 칸을 넘겨도, 한 번에 정확히 여러 레벨이 오릅니다.
+   */
+  while (newExpToNext > 0 && newExp >= newExpToNext) {
     newExp -= newExpToNext
     newLevel += 1
-    newExpToNext = Math.round(newExpToNext * 1.5)
+    newExpToNext = Math.max(1, Math.round(newExpToNext * 1.5))
   }
 
   const yesterday = addSeoulCalendarDays(completionDay, -1)
@@ -235,7 +241,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  await supabase
+  const { error: statsUpdateErr } = await supabase
     .from('child_stats')
     .update({
       credits: baseCredits + creditEarned,
@@ -259,9 +265,74 @@ export async function POST(req: NextRequest) {
       updated_at: completedAt,
     })
     .eq('child_id', childId)
+  if (statsUpdateErr) {
+    console.error('[daily-mission/complete] child_stats update failed', statsUpdateErr.message)
+    return NextResponse.json({ error: '보상 저장에 실패했어요' }, { status: 500 })
+  }
 
   // ── 게임 트리거: 첫 미션 완료 ──
   const triggerResult = await fireGameTrigger(supabase, childId, 'FIRST_MISSION')
+
+  /**
+   * 골드(스페셜) 카드 누적 5회 이상 완료 시, 칭찬 스티커를 자동 1회 지급합니다.
+   * - `child_trigger_fired` 게이트로 중복 지급을 원자적으로 방지합니다.
+   * - `praise_sticker_grants` 정책상 parent_id가 필요하므로, 연결된 부모 1명을 찾아 service_role로 삽입합니다.
+   */
+  let autoPraiseStickerGranted = false
+  if (isSpecialSectionMission(mission as Mission)) {
+    const AUTO_STICKER_KEY = PRAISE_ASSET_STICKER_KEYS[5] ?? 'asset:sticker_06'
+    const { data: specialMissionRows, error: specialMissionErr } = await supabase
+      .from('missions')
+      .select('id')
+      .or('repeat_type.eq.event,difficulty.eq.special')
+    if (specialMissionErr) {
+      console.error('[daily-mission/complete] special mission ids error', specialMissionErr.message)
+    }
+
+    const specialMissionIds = (specialMissionRows ?? []).map((r) => r.id)
+    if (specialMissionIds.length > 0) {
+      const { count: specialCompletedCount, error: specialCountErr } = await supabase
+        .from('mission_logs')
+        .select('id', { count: 'exact', head: true })
+        .eq('child_id', childId)
+        .eq('is_completed', true)
+        .in('mission_id', specialMissionIds)
+      if (specialCountErr) {
+        console.error('[daily-mission/complete] special mission count error', specialCountErr.message)
+      } else if ((specialCompletedCount ?? 0) >= 5) {
+        const specialGate = await fireGameTrigger(supabase, childId, 'SPECIAL_GOLD_CARD_5')
+        if (specialGate.fired) {
+          const { data: familyLink, error: linkErr } = await supabase
+            .from('family_links')
+            .select('parent_id')
+            .eq('child_id', childId)
+            .order('created_at', { ascending: true })
+            .limit(1)
+            .maybeSingle()
+          if (linkErr) {
+            console.error('[daily-mission/complete] family link for auto sticker error', linkErr.message)
+          }
+          if (familyLink?.parent_id) {
+            const svc = createServiceRoleClient()
+            if (!svc) {
+              console.error('[daily-mission/complete] service role unavailable for auto sticker')
+            } else {
+              const { error: grantErr } = await svc.from('praise_sticker_grants').insert({
+                child_id: childId,
+                parent_id: familyLink.parent_id,
+                sprite_key: AUTO_STICKER_KEY,
+              })
+              if (grantErr) {
+                console.error('[daily-mission/complete] auto sticker grant failed', grantErr.message)
+              } else {
+                autoPraiseStickerGranted = true
+              }
+            }
+          }
+        }
+      }
+    }
+  }
 
   const newCredits = baseCredits + creditEarned
   const newHearts = baseHearts + heartEarned
@@ -284,5 +355,6 @@ export async function POST(req: NextRequest) {
     itemUnlocked: triggerResult.fired && triggerResult.unlockedItemIndex !== null
       ? { index: triggerResult.unlockedItemIndex, triggerKey: 'FIRST_MISSION' }
       : null,
+    autoPraiseStickerGranted,
   })
 }

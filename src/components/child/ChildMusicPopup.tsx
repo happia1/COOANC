@@ -19,11 +19,46 @@ const TIMER_KEYWORD_VIDEOS = [
   { label: '놀이시간', url: 'https://youtu.be/yBanUW7ja8M?si=j5COdu4hKoAfHzgl' },
   { label: '모두 제자리', url: 'https://youtu.be/ZChTK8th_ps?si=7DKiV4XGLi6_kWku' },
   { label: '잠잘 준비', url: 'https://youtu.be/bdjyo0qsejI?si=XvMWVjb16aW91Hj4' },
+  /** 잠잘 준비 다음 — 요청 URL의 `t=3541s` 는 embed `start` 로 넘겨 해당 시점부터 재생합니다 */
+  {
+    label: '뽀로로 수면음악',
+    url: 'https://www.youtube.com/watch?v=875Gl5vFEek&t=3541s',
+  },
 ] as const
+
+/**
+ * watch URL 의 `start` 또는 `t`(예: 3541, 3541s, 59m1s)를 embed용 시작 초로 바꿉니다.
+ * 비개발자: 유튜브 주소 끝에 `t=59분1초`처럼 붙어 있으면, 팝업 안 영상도 그 시점부터 나오게 합니다.
+ */
+function youtubeStartSecondsFromSearchParams(searchParams: URLSearchParams): number | null {
+  const start = searchParams.get('start')
+  if (start != null && /^\d+$/.test(start)) {
+    const n = parseInt(start, 10)
+    return Number.isFinite(n) && n >= 0 ? n : null
+  }
+  const t = searchParams.get('t')
+  if (!t) return null
+  const trimmed = t.trim()
+  // "3541s" / "3541"
+  const secOnly = /^(\d+)s?$/i.exec(trimmed)
+  if (secOnly) {
+    const n = parseInt(secOnly[1], 10)
+    return Number.isFinite(n) && n >= 0 ? n : null
+  }
+  // "59m1s" / "59m01s"
+  const minSec = /^(\d+)m(\d+)s?$/i.exec(trimmed)
+  if (minSec) {
+    const m = parseInt(minSec[1], 10)
+    const s = parseInt(minSec[2], 10)
+    if (Number.isFinite(m) && Number.isFinite(s) && m >= 0 && s >= 0) return m * 60 + s
+  }
+  return null
+}
 
 /**
  * 유튜브 링크를 팝업 내부에서 재생 가능한 embed URL로 변환합니다.
  * - 지원: `youtu.be/<id>`, `youtube.com/watch?v=<id>`, `youtube.com/shorts/<id>`
+ * - `watch`/`youtu.be` 의 `t`·`start` 쿼리는 iframe `start` 초로 전달합니다.
  */
 function toYouTubeEmbedUrl(rawUrl: string, { autoplay = true }: { autoplay?: boolean } = {}): string | null {
   try {
@@ -46,6 +81,9 @@ function toYouTubeEmbedUrl(rawUrl: string, { autoplay = true }: { autoplay?: boo
       enablejsapi: '1',
       autoplay: autoplay ? '1' : '0',
     })
+    const startSec = youtubeStartSecondsFromSearchParams(u.searchParams)
+    if (startSec != null) params.set('start', String(startSec))
+
     return `https://www.youtube.com/embed/${videoId}?${params.toString()}`
   } catch {
     return null

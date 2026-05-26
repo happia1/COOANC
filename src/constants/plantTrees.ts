@@ -72,6 +72,45 @@ export const HEARTS_PER_STAGE: Record<PlantStage, number> = {
   7: 0, // 완성 (자동 리셋 대기)
 }
 
+/**
+ * DB 의 `pot_stage` / `pot_hearts_used` 가 어긋날 때(한쪽만 반영된 경우) 보정합니다.
+ * 비개발자: 막대는 꽉 찼는데 단계 숫자가 안 올라가는 것처럼 보이면, 쌓인 하트만큼 단계를 몇 칸 올려 맞춥니다.
+ */
+export function normalizePlantPotProgress(
+  stageRaw: number,
+  heartsUsedRaw: number,
+  completedRaw: boolean,
+): { stage: PlantStage; heartsUsed: number; completed: boolean } {
+  let stage = Math.min(7, Math.max(0, Math.trunc(Number(stageRaw)) || 0)) as PlantStage
+  let heartsUsed = Math.max(0, Math.trunc(Number(heartsUsedRaw)) || 0)
+  let completed = Boolean(completedRaw)
+
+  while (stage < 7) {
+    const needed = HEARTS_PER_STAGE[stage]
+    if (needed <= 0) break
+    if (heartsUsed < needed) break
+    heartsUsed -= needed
+    stage = Math.min(7, stage + 1) as PlantStage
+  }
+
+  /**
+   * 완성(열매) 플래그는 **7단계에서만** true 입니다.
+   * DB 에 잘못 저장된 `pot_completed`(예: 5단계인데 true)가 있으면
+   * 예전 서버가 `stage === 7 || completed` 로 분기할 때 **항상 씨앗 리셋**만 하려 해
+   * 물주기·막대가 멈춘 것처럼 보일 수 있어, 7단계가 아니면 여기서 false 로 맞춥니다.
+   */
+  if (stage < 7) {
+    completed = false
+  }
+
+  if (stage === 7) {
+    completed = true
+    heartsUsed = 0
+  }
+
+  return { stage, heartsUsed, completed }
+}
+
 export type PlantTreeDefinition = {
   id: PlantTreeId
   label: string

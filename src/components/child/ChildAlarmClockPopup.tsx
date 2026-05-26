@@ -13,7 +13,7 @@ import {
   type RoutineCustomAlarmStored,
 } from '@/lib/routineAlarmLocalPrefs'
 import { AUDIO } from '@/constants/audio'
-import { CHILD_AUDIO } from '@/lib/childAudio'
+import { CHILD_AUDIO, createPreloadedAudio } from '@/lib/childAudio'
 
 type Props = {
   open: boolean
@@ -344,6 +344,51 @@ export default function ChildAlarmClockPopup({ open, onClose }: Props) {
   const pomodoroEndMelodyRef = useRef<HTMLAudioElement | null>(null)
   /** 이번 실행에서 10초 알람을 이미 시작했는지(매 초 재시작 방지) */
   const tenSecondAlarmStartedRef = useRef(false)
+  /** 사용자 제스처로 오디오 잠금 해제가 끝났는지(모바일 autoplay 대응) */
+  const pomodoroAudioUnlockedRef = useRef(false)
+
+  /**
+   * 10초 알람 오디오를 1회 생성 후 재사용합니다.
+   * 비개발자: 매초 새 오디오를 만들지 않아 메모리 낭비를 줄입니다.
+   */
+  const ensurePomodoroTickAudio = useCallback((): HTMLAudioElement => {
+    if (!pomodoroTenSecAlarmRef.current) {
+      pomodoroTenSecAlarmRef.current = createPreloadedAudio(CHILD_AUDIO.tickTock)
+    }
+    return pomodoroTenSecAlarmRef.current
+  }, [])
+
+  /**
+   * 종료 멜로디 오디오를 1회 생성 후 재사용합니다.
+   * 비개발자: 타이머가 끝났을 때 소리가 더 안정적으로 시작됩니다.
+   */
+  const ensurePomodoroEndAudio = useCallback((): HTMLAudioElement => {
+    if (!pomodoroEndMelodyRef.current) {
+      pomodoroEndMelodyRef.current = createPreloadedAudio(AUDIO.COUNTDOWN.HAPPY_COUNTDOWN)
+    }
+    return pomodoroEndMelodyRef.current
+  }, [])
+
+  /**
+   * 재생 버튼을 누르는 사용자 제스처에서 오디오 재생 권한을 미리 확보합니다.
+   * 비개발자: iOS/Android 브라우저가 나중 알람 재생을 막는 확률을 낮춥니다.
+   */
+  const unlockPomodoroAudioByGesture = useCallback(async () => {
+    if (pomodoroAudioUnlockedRef.current) return
+    try {
+      const probe = ensurePomodoroEndAudio()
+      probe.muted = true
+      probe.volume = 0
+      await probe.play()
+      probe.pause()
+      probe.currentTime = 0
+      probe.muted = false
+      probe.volume = 0.85
+      pomodoroAudioUnlockedRef.current = true
+    } catch {
+      /* ignore */
+    }
+  }, [ensurePomodoroEndAudio])
 
   /**
    * 뽀모도로 10초 경고음 + 종료 멜로디를 모두 멈추고 플래그를 초기화합니다.
@@ -354,7 +399,6 @@ export default function ChildAlarmClockPopup({ open, onClose }: Props) {
     if (pomodoroTenSecAlarmRef.current) pomodoroTenSecAlarmRef.current.currentTime = 0
     pomodoroEndMelodyRef.current?.pause()
     if (pomodoroEndMelodyRef.current) pomodoroEndMelodyRef.current.currentTime = 0
-    pomodoroEndMelodyRef.current = null
     tenSecondAlarmStartedRef.current = false
     setPomodoroAwaitingConfirm(false)
   }, [])
@@ -375,6 +419,9 @@ export default function ChildAlarmClockPopup({ open, onClose }: Props) {
    */
   useEffect(() => {
     if (!open) return
+    /** 팝업이 열릴 때 오디오 엘리먼트를 미리 만들고 preload를 시작합니다. */
+    ensurePomodoroTickAudio()
+    ensurePomodoroEndAudio()
     const prefs = readRoutineAlarmPrefs()
     const hasSchool = readRoutineHasSchoolFromStorage()
     setAlarmRows(buildRoutineAlarmRows(prefs, hasSchool))
@@ -396,7 +443,7 @@ export default function ChildAlarmClockPopup({ open, onClose }: Props) {
     setExtraPopupRows(extras.filter((r) => /^\d{2}:\d{2}$/.test(r.time)))
     /** 첫 화면 = 뽀모도로(slide 0). 알람 목록은 slide 1. */
     setSlideIndex(0)
-  }, [open])
+  }, [open, ensurePomodoroTickAudio, ensurePomodoroEndAudio])
 
   /** 헤더 디지털 시계(초 단위) — 팝업이 열린 동안 1초마다 갱신합니다. */
   useEffect(() => {
@@ -422,10 +469,10 @@ export default function ChildAlarmClockPopup({ open, onClose }: Props) {
             if (pomodoroTenSecAlarmRef.current) pomodoroTenSecAlarmRef.current.currentTime = 0
             setSlideIndex(0)
             setPomodoroAwaitingConfirm(true)
-            pomodoroEndMelodyRef.current?.pause()
-            const endAudio = new Audio(AUDIO.COUNTDOWN.HAPPY_COUNTDOWN)
+            const endAudio = ensurePomodoroEndAudio()
+            endAudio.pause()
+            endAudio.currentTime = 0
             endAudio.volume = 0.85
-            pomodoroEndMelodyRef.current = endAudio
             void endAudio.play().catch(() => {})
           }
           return 0
@@ -433,11 +480,7 @@ export default function ChildAlarmClockPopup({ open, onClose }: Props) {
         const next = prev - 1
         if (next === 10 && !tenSecondAlarmStartedRef.current) {
           tenSecondAlarmStartedRef.current = true
-          let a = pomodoroTenSecAlarmRef.current
-          if (!a) {
-            a = new Audio(CHILD_AUDIO.tickTock)
-            pomodoroTenSecAlarmRef.current = a
-          }
+          const a = ensurePomodoroTickAudio()
           a.volume = 0.65
           a.currentTime = 0
           void a.play().catch(() => {})
@@ -446,7 +489,7 @@ export default function ChildAlarmClockPopup({ open, onClose }: Props) {
       })
     }, 1000)
     return () => clearInterval(timer)
-  }, [open, running])
+  }, [open, running, ensurePomodoroEndAudio, ensurePomodoroTickAudio])
 
   /** 일시정지 시 10초 알람도 멈춤(재개는 시작 버튼에서 처리). */
   useEffect(() => {
@@ -460,6 +503,15 @@ export default function ChildAlarmClockPopup({ open, onClose }: Props) {
     setRunning(false)
     stopPomodoroSounds()
   }, [open, stopPomodoroSounds])
+
+  /** 언마운트 시 오디오 객체를 해제해 메모리 누수를 막습니다. */
+  useEffect(() => {
+    return () => {
+      stopPomodoroSounds()
+      pomodoroTenSecAlarmRef.current = null
+      pomodoroEndMelodyRef.current = null
+    }
+  }, [stopPomodoroSounds])
 
   const nextAlarm = useMemo(() => findNextAlarm(alarmRows, nowMs), [alarmRows, nowMs])
   /** 알람 리스트는 요청사항에 맞춰 시간(HH:mm) 오름차순으로 정렬합니다. */
@@ -613,6 +665,9 @@ export default function ChildAlarmClockPopup({ open, onClose }: Props) {
                         if (next && tenSecondAlarmStartedRef.current && secondsLeft <= 10 && secondsLeft > 0) {
                           const a = pomodoroTenSecAlarmRef.current
                           if (a) void a.play().catch(() => {})
+                        }
+                        if (next) {
+                          void unlockPomodoroAudioByGesture()
                         }
                         return next
                       })

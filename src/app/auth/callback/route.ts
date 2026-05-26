@@ -6,7 +6,7 @@ import { createServerClient } from '@supabase/ssr'
  * - 이메일 확인 링크 클릭 시 Supabase가 이 URL로 리다이렉트
  * - code를 세션으로 교환한 뒤 역할에 따라 분기
  *   - 신규 부모(자녀 미등록) → /onboarding
- *   - 기존 부모(자녀 있음)   → /parent
+ *   - 기존 부모(자녀 있음)   → / (루트에서 자녀 수·localStorage 에 따라 자녀 화면 또는 부모 홈)
  *   - 자녀                  → /home
  *
  * 비개발자: 세션 쿠키는 **리다이렉트 응답 자체**에 붙여야 브라우저가 받습니다.
@@ -76,5 +76,5 @@ export async function GET(request: NextRequest) {
   if (!count || count === 0) {
     return redirectWithSessionCookies(`${origin}/onboarding`)
   }
-  return redirectWithSessionCookies(`${origin}/parent`)
+  return redirectWithSessionCookies(`${origin}/`)
 }

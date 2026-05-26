@@ -76,6 +76,8 @@ type Props = {
   onAssistantRepliesWhileClosed?: (count: number) => void
   /** 패널이 열릴 때마다 호출 — 미읽음 배지를 0으로 돌릴 때 사용합니다 */
   onPanelOpened?: () => void
+  /** 홈 탭에서는 루틴 관리 진입을 숨기고 일정 등록 흐름만 노출합니다. */
+  showRoutineManageEntry?: boolean
 }
 
 /** 예전 버전에서 넣었던 안내 말풍선 — 스텝 UI로 바뀐 뒤에는 목록에서 숨깁니다 */
@@ -654,6 +656,7 @@ export default function RoutineAgentSchedulePanel({
   onToast,
   onAssistantRepliesWhileClosed,
   onPanelOpened,
+  showRoutineManageEntry = true,
 }: Props) {
   const [mounted, setMounted] = useState(false)
   /** 채팅 말풍선 목록(위에서 아래로 시간 순) */
@@ -663,6 +666,8 @@ export default function RoutineAgentSchedulePanel({
   /** 이미지 미리보기(data URL)와 서버용 base64(접두사 제거) */
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [imageBase64, setImageBase64] = useState<string | null>(null)
+  /** OCR/파싱 실패 시 텍스트 입력으로 자연스럽게 이어주기 위한 안내 표시 상태 */
+  const [imageFallbackPending, setImageFallbackPending] = useState(false)
   const [loading, setLoading] = useState(false)
   /** 통합 제안 카드에서 POST /agent-b/approve 연속 호출 중 — `parseMsgId` 또는 `parseMsgId:slotIndex` */
   const [suggestionSubmitKey, setSuggestionSubmitKey] = useState<string | null>(null)
@@ -695,7 +700,8 @@ export default function RoutineAgentSchedulePanel({
     type: string
     description: string
   } | null>(null)
-  const fileRef = useRef<HTMLInputElement>(null)
+  const fileCameraRef = useRef<HTMLInputElement>(null)
+  const fileGalleryRef = useRef<HTMLInputElement>(null)
   const listEndRef = useRef<HTMLDivElement>(null)
   /** 비동기(parse)가 끝날 때 패널이 열려 있는지 — 닫힌 뒤 완료되면 미읽음만 올립니다 */
   const openRef = useRef(open)
@@ -762,8 +768,10 @@ export default function RoutineAgentSchedulePanel({
     setComposerText('')
     setImagePreview(null)
     setImageBase64(null)
+    setImageFallbackPending(false)
     setLoading(false)
-    if (fileRef.current) fileRef.current.value = ''
+    if (fileCameraRef.current) fileCameraRef.current.value = ''
+    if (fileGalleryRef.current) fileGalleryRef.current.value = ''
     setShell('welcome')
     setRoutineSubTab('routine')
     setWeeklyWizardStep('route')
@@ -809,6 +817,10 @@ export default function RoutineAgentSchedulePanel({
     chatLastActiveAtRef.current = Date.now()
     scheduleChatResetTimer()
   }, [messages, composerText, imagePreview, imageBase64, shell, scheduleChatResetTimer])
+
+  useEffect(() => {
+    if (shell !== 'schedule_image') setImageFallbackPending(false)
+  }, [shell])
 
   /**
    * 닫아 둔 상태에서 시간이 지났을 수 있으므로, 다시 열 때 만료 여부를 한 번 더 확인합니다.
@@ -935,6 +947,10 @@ export default function RoutineAgentSchedulePanel({
       return
     }
     setLoading(true)
+    if (body.input_type === 'image') {
+      /** 새 이미지를 다시 시도하는 순간 이전 실패 안내는 숨깁니다. */
+      setImageFallbackPending(false)
+    }
     try {
       const resRaw = await postAgentParse(body)
       const resNorm = normalizeParseResponse(resRaw)
@@ -978,6 +994,7 @@ export default function RoutineAgentSchedulePanel({
           },
         ])
         bumpUnreadIfClosed(1)
+        setImageFallbackPending(true)
         return
       }
       /** 단건 파싱: 서버 초안과 동일 일정을 부모 캘린더(localStorage)에도 반영 — 행 id 를 나중에 [등록하기] 패치에 씁니다 */
@@ -1002,6 +1019,7 @@ export default function RoutineAgentSchedulePanel({
       ])
       bumpUnreadIfClosed(1)
       onToast(isMulti ? `일정 ${multiSlots?.length ?? 0}건을 찾았어요. 한 건씩 확인해 주세요` : 'AI 분석이 완료됐어요')
+      if (body.input_type === 'image') setImageFallbackPending(false)
     } catch (err) {
       const raw = err instanceof Error ? err.message : '분석에 실패했어요'
       const httpStatus = err instanceof AgentParseRequestError ? err.status : null
@@ -1018,6 +1036,7 @@ export default function RoutineAgentSchedulePanel({
         ])
         bumpUnreadIfClosed(1)
         onToast('이미지 분석을 완료하지 못했어요. 위 안내를 확인해 주세요.', false, true)
+        setImageFallbackPending(true)
       } else {
         onToast(raw, false, true)
       }
@@ -1027,22 +1046,31 @@ export default function RoutineAgentSchedulePanel({
   }
 
   /**
-   * 이미지 선택 — STEP 1A-2 에서만 쓰이며, 선택 직후 Vision 파싱(`runParse`)을 호출합니다.
-   * `runParse` 정의 뒤에 두어 호출 순서 오류를 막습니다.
+   * 공통 이미지 처리기
+   * - 카메라/갤러리 입력을 같은 경로로 태워 파싱 요청을 보냅니다.
+   * - 압축 실패 시 FileReader(base64)로 폴백해 업로드 실패율을 줄입니다.
    */
-  const onPickImage = (e: React.ChangeEvent<HTMLInputElement>) => {
-    void (async () => {
-      const f = e.target.files?.[0]
-      if (!f) return
-      if (!f.type.startsWith('image/')) {
+  const handlePickedImage = useCallback(
+    async (file: File, source: 'camera' | 'gallery') => {
+      const fileType = (file.type || '').toLowerCase()
+      const fileLooksLikeImage =
+        fileType.startsWith('image/') || /\.(jpg|jpeg|png|webp|heic|heif)$/i.test(file.name || '')
+      if (!fileLooksLikeImage) {
         onToast('이미지 파일만 선택할 수 있어요', false)
         return
       }
+      /** 비개발자: 원본이 매우 크면 OCR 서버 요청이 실패할 수 있어 업로드 전에 한번 제한합니다. */
+      if (file.size > 15 * 1024 * 1024) {
+        onToast('이미지가 너무 커요. 15MB 이하 파일로 다시 시도해 주세요.', false)
+        return
+      }
+      setImageFallbackPending(false)
+      const sourceLabel = source === 'camera' ? '카메라 사진을 보냈어요' : '갤러리 이미지를 보냈어요'
       const fireScheduleImageParse = async (previewUrl: string, b64: string) => {
         setImagePreview(previewUrl)
         setImageBase64(b64)
         if (shell !== 'schedule_image' || !familyLinkId || !childId) return
-        setMessages((prev) => [...prev, { id: newId(), kind: 'text', role: 'user', text: '이미지를 보냈어요' }])
+        setMessages((prev) => [...prev, { id: newId(), kind: 'text', role: 'user', text: sourceLabel }])
         await runParse({
           family_link_id: familyLinkId,
           child_id: childId,
@@ -1051,10 +1079,10 @@ export default function RoutineAgentSchedulePanel({
         })
         setImagePreview(null)
         setImageBase64(null)
-        if (fileRef.current) fileRef.current.value = ''
+        if (fileCameraRef.current) fileCameraRef.current.value = ''
+        if (fileGalleryRef.current) fileGalleryRef.current.value = ''
       }
-
-      const compressed = await compressImageFileToJpegPayload(f)
+      const compressed = await compressImageFileToJpegPayload(file)
       if (compressed) {
         await fireScheduleImageParse(compressed.previewUrl, compressed.base64)
         return
@@ -1062,10 +1090,28 @@ export default function RoutineAgentSchedulePanel({
       const reader = new FileReader()
       reader.onload = () => {
         const r = String(reader.result ?? '')
+        if (!r) {
+          onToast('이미지 파일을 읽지 못했어요. 다시 선택해 주세요.', false)
+          return
+        }
         void fireScheduleImageParse(r, stripDataUrlBase64(r))
       }
-      reader.readAsDataURL(f)
-    })()
+      reader.onerror = () => {
+        onToast('이미지 파일을 읽지 못했어요. 다시 선택해 주세요.', false)
+      }
+      reader.readAsDataURL(file)
+    },
+    [childId, familyLinkId, onToast, shell],
+  )
+
+  /**
+   * 이미지 선택 이벤트 핸들러(카메라/갤러리 공용)
+   * - source 값으로 어떤 입력 흐름에서 왔는지 구분해 UX 문구를 다르게 보여줍니다.
+   */
+  const onPickImage = (source: 'camera' | 'gallery') => (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0]
+    if (!f) return
+    void handlePickedImage(f, source)
   }
 
   /** STEP 1A-1 텍스트 [보내기] — 로컬 파싱 후 필요 시에만 Gemini */
@@ -1642,7 +1688,7 @@ export default function RoutineAgentSchedulePanel({
                 <p className="text-center text-[15px] font-bold leading-snug text-gray-800">
                   안녕하세요! 무엇을 도와드릴까요?
                 </p>
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className={`grid grid-cols-1 gap-3 ${showRoutineManageEntry ? 'sm:grid-cols-2' : ''}`}>
                   <button
                     type="button"
                     onClick={() => setShell('schedule_menu')}
@@ -1650,18 +1696,20 @@ export default function RoutineAgentSchedulePanel({
                   >
                     일정 등록
                   </button>
-                  <button
-                    type="button"
-                    disabled={!childId}
-                    onClick={() => {
-                      if (!childId) return
-                      setShell('routine_manage')
-                      setRoutineSubTab('routine')
-                    }}
-                    className="rounded-2xl border border-violet-200 bg-violet-50/95 px-4 py-4 text-center text-sm font-black text-violet-950 shadow-sm transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    루틴 관리
-                  </button>
+                  {showRoutineManageEntry ? (
+                    <button
+                      type="button"
+                      disabled={!childId}
+                      onClick={() => {
+                        if (!childId) return
+                        setShell('routine_manage')
+                        setRoutineSubTab('routine')
+                      }}
+                      className="rounded-2xl border border-violet-200 bg-violet-50/95 px-4 py-4 text-center text-sm font-black text-violet-950 shadow-sm transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      루틴 관리
+                    </button>
+                  ) : null}
                 </div>
               </div>
             ) : null}
@@ -1719,13 +1767,13 @@ export default function RoutineAgentSchedulePanel({
               <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
                 {shell === 'schedule_text' ? (
                   <div className="shrink-0 space-y-3 border-b border-gray-100 bg-white px-3 py-3">
-                    <p className="text-center text-sm font-bold text-gray-800">아래 형식으로 입력해 주세요.</p>
+                    <p className="text-center text-sm font-bold text-gray-800">등록할 일정을 아래 형식으로 입력해 주세요.</p>
                     <div className="rounded-2xl border border-sky-100 bg-sky-50/80 px-3 py-3 text-left shadow-sm ring-1 ring-sky-100/60">
-                      <p className="text-[11px] font-black text-sky-950">날짜 + 일정 내용</p>
+                      <p className="text-[11px] font-black text-sky-950">날짜 + 일정 + 특이사항</p>
                       <p className="mt-2 whitespace-pre-wrap text-[10px] font-medium leading-relaxed text-gray-700">
-                        {`예) 4월 25일 체육대회
-다음주 토요일 여행
-7월 말부터 여름방학`}
+                        {`예) 4월 25일 체육대회 활동복, 도시락 준비
+다음주 토요일 가족여행 장소는 영월 한옥마을
+7월 말부터 여름방학기간 시작 `}
                       </p>
                     </div>
                   </div>
@@ -2021,24 +2069,59 @@ export default function RoutineAgentSchedulePanel({
                   </div>
                 ) : (
                   <div className="shrink-0 border-t border-gray-100 bg-white px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-3">
-                    <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={onPickImage} />
-                    <button
-                      type="button"
-                      disabled={loading}
-                      onClick={() => fileRef.current?.click()}
-                      className="flex w-full items-center justify-center gap-2 rounded-2xl border border-violet-200 bg-violet-50 py-3 text-sm font-black text-violet-950 shadow-sm disabled:opacity-50"
-                    >
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="shrink-0 text-violet-700" aria-hidden>
-                        <path
-                          d="M4 7a2 2 0 0 1 2-2h2l1-1h6l1 1h2a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7Z"
-                          stroke="currentColor"
-                          strokeWidth="1.5"
-                          strokeLinejoin="round"
-                        />
-                        <circle cx="12" cy="13" r="3.25" stroke="currentColor" strokeWidth="1.5" />
-                      </svg>
-                      사진 선택하기
-                    </button>
+                    <input
+                      ref={fileCameraRef}
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      className="hidden"
+                      onChange={onPickImage('camera')}
+                    />
+                    <input
+                      ref={fileGalleryRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={onPickImage('gallery')}
+                    />
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        disabled={loading}
+                        onClick={() => fileCameraRef.current?.click()}
+                        className="flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl border border-violet-200 bg-violet-50 py-3 text-xs font-black text-violet-950 shadow-sm disabled:opacity-50"
+                      >
+                        카메라 촬영
+                      </button>
+                      <button
+                        type="button"
+                        disabled={loading}
+                        onClick={() => fileGalleryRef.current?.click()}
+                        className="flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl border border-sky-200 bg-sky-50 py-3 text-xs font-black text-sky-950 shadow-sm disabled:opacity-50"
+                      >
+                        갤러리 선택
+                      </button>
+                    </div>
+                    <p className="mt-1 text-center text-[10px] font-medium text-gray-500">
+                      카메라 촬영과 앨범 선택을 모두 지원해요.
+                    </p>
+                    {imageFallbackPending ? (
+                      <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-2.5 py-2">
+                        <p className="text-[10px] font-semibold leading-snug text-amber-900">
+                          사진에서 날짜/장소를 읽지 못했어요. 아래 버튼으로 텍스트 입력으로 바로 전환할 수 있어요.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setImageFallbackPending(false)
+                            setShell('schedule_text')
+                          }}
+                          className="mt-1.5 w-full rounded-lg border border-amber-300 bg-white py-2 text-[11px] font-black text-amber-900"
+                        >
+                          텍스트로 직접 입력하기
+                        </button>
+                      </div>
+                    ) : null}
                     {imagePreview ? (
                       // eslint-disable-next-line @next/next/no-img-element -- 로컬 미리보기
                       <img src={imagePreview} alt="" className="mt-2 max-h-28 w-full rounded-lg object-contain ring-1 ring-violet-100" />

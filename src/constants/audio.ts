@@ -32,7 +32,11 @@ export const AUDIO = {
 
   /** 카운트다운 - 타이머/미션 제한시간 (`public/assets/audio/countdown/`) */
   COUNTDOWN: {
-    HAPPY_COUNTDOWN: `${BASE}/countdown/alarm-children-happy-countdown-923.wav`,
+    /**
+     * 실제 저장소에 있는 파일 경로로 유지합니다.
+     * 비개발자: 기존 countdown 폴더 파일이 없어 재생 실패가 나던 문제를 막습니다.
+     */
+    HAPPY_COUNTDOWN: `${BASE}/alerts/잘시간.mp3`,
   },
 
   /** 효과음 - 보상/레벨업/알림 */

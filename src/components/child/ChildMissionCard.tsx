@@ -31,7 +31,22 @@ import {
   childHomeMissionSpriteWidthPx,
 } from '@/lib/missionTodayLayoutSpec'
 import { isSpecialSectionMission } from '@/lib/specialMissionChips'
+import { createPreloadedAudio } from '@/lib/childAudio'
 import type { DailyMissionWithTemplate } from '@/types/database'
+
+/**
+ * 카드 탭 효과음 공유 오디오(모듈 전역).
+ * 비개발자: 카드를 누르면 카드가 바로 사라질 수 있는데, 소리는 끝까지 재생되도록
+ * 컴포넌트 생명주기(마운트/언마운트)와 분리해 한 번 만든 오디오를 재사용합니다.
+ */
+let sharedMissionCardTapAudio: HTMLAudioElement | null = null
+
+function getSharedMissionCardTapAudio(src: string): HTMLAudioElement {
+  if (!sharedMissionCardTapAudio) {
+    sharedMissionCardTapAudio = createPreloadedAudio(src)
+  }
+  return sharedMissionCardTapAudio
+}
 
 type Props = {
   mission: DailyMissionWithTemplate
@@ -63,6 +78,9 @@ type Props = {
  * - 카드를 한 번 탭하면 부모가 처리하는 동안 같은 그림이 잠깐 보이다가 사라집니다(별도 “완료 팝업” 없음).
  */
 export default function ChildMissionCard({ mission, onComplete, tapResetKey = 0 }: Props) {
+  /** 요청 반영: 오늘의 미션 카드 탭 효과음 경로를 이 파일로 고정합니다. */
+  const missionCardTapSoundSrc =
+    '/assets/audio/missions/success_reward-fairy-arcade-sparkle-866.wav' as const
   /**
    * 뷰포트 너비 — 스프라이트·아이콘 픽셀 보간용.
    * SSR 과 첫 클라이언트 페인트는 **같은 값**이어야 하므로 `window` 를 읽지 않고 `minPx` 로 시작한 뒤
@@ -84,6 +102,18 @@ export default function ChildMissionCard({ mission, onComplete, tapResetKey = 0 
 
   /** 한 카드에 대해 완료 요청을 한 번만 보내기 위한 잠금(연속 탭·중복 호출 방지) */
   const firedRef = useRef(false)
+
+  /**
+   * 카드 탭 효과음을 재생합니다.
+   * - 요청하신 success_reward 파일만 재생합니다(다른 효과음 폴백 없음).
+   */
+  function playMissionCardTapSound() {
+    const a = getSharedMissionCardTapAudio(missionCardTapSoundSrc)
+    a.pause()
+    a.currentTime = 0
+    a.volume = 0.42
+    void a.play().catch(() => {})
+  }
   /**
    * 연속 탭 취소 등으로 상위가 tapResetKey 를 올리면 잠금을 풀어 같은 카드를 다시 탭할 수 있게 합니다.
    * 비개발자: 숫자가 바뀌면 "이 카드, 다시 한 번 눌러도 돼" 신호로 받아들이면 됩니다.
@@ -165,6 +195,8 @@ export default function ChildMissionCard({ mission, onComplete, tapResetKey = 0 
       return
     }
     firedRef.current = true
+    /** 카드 선택 직후 즉시 효과음 재생 */
+    playMissionCardTapSound()
 
     /** 카드 위치를 부모로 전달해 파티클·컨페티 출발 좌표를 계산합니다 */
     const rect = cardRef.current?.getBoundingClientRect()

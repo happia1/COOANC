@@ -100,10 +100,10 @@ export default function OnboardingPage() {
           <Image src={AUTH_LOGO_SRC} alt="COOANC" width={72} height={72} className="rounded-2xl max-h-12 w-auto" style={{ height: 'auto' }} />
           <h1 className="text-base font-black text-brand-blue text-center">초기 루틴 설정</h1>
         </div>
-        <RoutineOnboarding linkedChildId={createdChildId} onComplete={() => { window.location.href = '/parent' }} />
+        <RoutineOnboarding linkedChildId={createdChildId} onComplete={() => { window.location.href = '/' }} />
         <button
           type="button"
-          onClick={() => { window.location.href = '/parent' }}
+          onClick={() => { window.location.href = '/' }}
           className="mt-4 text-xs text-gray-400 underline"
         >
           건너뛰고 나중에 설정할게요

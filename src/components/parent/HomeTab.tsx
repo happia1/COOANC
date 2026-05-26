@@ -37,6 +37,8 @@ import { CHILD_GROWTH_LEVELS } from '@/constants/childGrowthLevels'
 import type { AgentLatestReportRow } from '@/lib/agentApi'
 import SpriteImage from '@/components/common/SpriteImage'
 import { ICONS } from '@/constants/sprites'
+import RoutineAgentSchedulePanel from '@/components/parent/RoutineAgentSchedulePanel'
+import RoutineAgentFab from '@/components/parent/RoutineAgentFab'
 
 /**
  * 서버에서 내려온 브리핑용 일정이 현재 선택 자녀에 맞는지 판별합니다.
@@ -120,9 +122,16 @@ type Props = {
   }[]
   /** 이번 주(월~일) 중 데일리 미션 기록이 있는 날짜 수(자녀별 서버 계산값). */
   daysWithDataByChild: Record<string, number>
+  /** 자녀 id → family_links.id (AI 일정 등록 payload에 사용) */
+  familyLinkByChild?: Record<string, string>
 }
 
-export default function HomeTab({ childrenData, upcomingEvents, daysWithDataByChild }: Props) {
+export default function HomeTab({
+  childrenData,
+  upcomingEvents,
+  daysWithDataByChild,
+  familyLinkByChild = {},
+}: Props) {
   const { selectedChildId, setSelectedChildId } = useParentStore()
   /**
    * `useRef(createClient())`는 **매 렌더마다** `createClient()`가 실행됩니다(JS는 인자를 먼저 계산).
@@ -135,6 +144,7 @@ export default function HomeTab({ childrenData, upcomingEvents, daysWithDataByCh
   }
 
   const currentId = selectedChildId ?? childrenData[0]?.id
+  const familyLinkId = currentId ? familyLinkByChild[currentId] ?? null : null
   const child = childrenData.find((c) => c.id === currentId) ?? childrenData[0]
   const selectedDaysWithData = child ? (daysWithDataByChild[child.id] ?? 0) : 0
 
@@ -224,6 +234,13 @@ export default function HomeTab({ childrenData, upcomingEvents, daysWithDataByCh
       : agentReport
   /** 홈에서도 루틴 탭과 같은 일정 등록 시트를 그대로 재사용합니다. */
   const [calendarEventSheetOpen, setCalendarEventSheetOpen] = useState(false)
+  /** 홈에서도 루틴 탭과 동일한 도우미 패널 + 미읽음 배지를 제공합니다. */
+  const [schedulePanelOpen, setSchedulePanelOpen] = useState(false)
+  const [routineAgentUnread, setRoutineAgentUnread] = useState(0)
+
+  useEffect(() => {
+    setRoutineAgentUnread(0)
+  }, [currentId])
   /**
    * 원인 보정:
    * - 캘린더 탭 등록은 localStorage(`cooanc_calendar_events_v1`) 기반이며,
@@ -625,6 +642,31 @@ export default function HomeTab({ childrenData, upcomingEvents, daysWithDataByCh
           </div>
         </>
       )}
+      <RoutineAgentFab
+        disabled={!currentId || !familyLinkId}
+        unreadCount={routineAgentUnread}
+        onClick={() => setSchedulePanelOpen(true)}
+      />
+      <RoutineAgentSchedulePanel
+        open={schedulePanelOpen}
+        onClose={() => setSchedulePanelOpen(false)}
+        familyLinkId={familyLinkId}
+        childId={currentId ?? null}
+        onToast={(_msg, _ok, _multiline) => {
+          /**
+           * 홈 탭에는 기존 루틴 탭처럼 토스트 레이어가 없어서 여기서는 무음 처리합니다.
+           * 대신 실패/성공 안내는 패널 내 말풍선·카드에서 보입니다.
+           */
+        }}
+        onAssistantRepliesWhileClosed={(delta) =>
+          setRoutineAgentUnread((n) => {
+            const next = n + delta
+            return next > 999 ? 999 : next
+          })
+        }
+        onPanelOpened={() => setRoutineAgentUnread(0)}
+        showRoutineManageEntry={false}
+      />
       {child && calendarEventSheetOpen ? (
         <CalendarEventSheet
           initialStartDate={getSeoulDateString()}

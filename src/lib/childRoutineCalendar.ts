@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { getSeoulWeekdayShort } from '@/lib/koreaDate'
 
 /**
  * 자녀 루틴(평일/주말/휴식) 판단용 — `calendar_events` 에서 날짜·루틴만 읽습니다.
@@ -18,9 +19,8 @@ export type ChildRoutineCalendarType = 'weekday' | 'weekend' | 'holiday' | 'vaca
 export function resolveRoutineTypeFromCalEvents(today: string, calendarEvents: CalEventRow[]): ChildRoutineCalendarType {
   const overlapping = calendarEvents.filter((e) => today >= e.start_date && today <= e.end_date)
   if (overlapping.length === 0) {
-    const [yy, mm, dd] = today.split('-').map(Number)
-    const dow = new Date(yy, mm - 1, dd).getDay()
-    return dow === 0 || dow === 6 ? 'weekend' : 'weekday'
+    const weekday = getSeoulWeekdayShort(today)
+    return weekday === '토' || weekday === '일' ? 'weekend' : 'weekday'
   }
   if (overlapping.some((e) => e.routine_override === 'none')) return 'holiday'
   if (overlapping.some((e) => e.routine_override === 'weekday')) return 'weekday'

@@ -28,6 +28,11 @@ export type PlantPotWaterActions = {
   water: () => Promise<WaterResult>
   onNoHearts: () => void
   onGrowthCelebrate?: (newStage: PlantStage) => void
+  /**
+   * 7단계(완성)에서는 하트가 0이어도 서버가 화분만 씨앗으로 돌립니다 — 버튼 잠금을 풉니다.
+   * 비개발자: 열매가 다 익은 뒤에는 하트가 없어도 물조리개를 누를 수 있어요.
+   */
+  allowWaterWithoutHearts?: boolean
 }
 
 type Props = {
@@ -216,6 +221,7 @@ export default function PlantPot({ pot, onRequestSeedSelect, waterActions }: Pro
                 <WateringCanButton
                   hearts={waterActions.hearts}
                   disabled={false}
+                  allowWaterWithoutHearts={waterActions.allowWaterWithoutHearts}
                   onWater={handleWaterInPopup}
                   onNoHearts={waterActions.onNoHearts}
                   onGrowthCelebrate={waterActions.onGrowthCelebrate}

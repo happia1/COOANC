@@ -40,7 +40,7 @@ export type ChildStats = {
   credits_piggy?: number
   hearts: number
   total_credits_earned: number
-  current_level: number         // 0~5
+  current_level: number         // 0~99
   exp: number
   exp_to_next_level: number
   /** 만족 지연 지수 0~100 — 전체 credits 대비 저금통(credits_piggy) 비율 */
@@ -82,11 +82,11 @@ export type ChildStats = {
    * 그날 배정된 미션은 부모 롤백이 막힙니다.
    */
   sleep_session_locked_date?: string | null
-  /** 화분 성장 단계 0~6 (없으면 0 으로 간주) */
+  /** 화분 성장 단계 0~7 (없으면 0 으로 간주) */
   pot_stage?: number
   /** 현재 단계에서 물주기로 쓴 하트 누적 */
   pot_hearts_used?: number
-  /** 완성(6단계) 후 씨앗 선택 전 */
+  /** 완성(7단계) 후 씨앗 선택 전 */
   pot_completed?: boolean
   /** 심은 나무 종류 코드 (예: apple) */
   pot_tree_id?: string

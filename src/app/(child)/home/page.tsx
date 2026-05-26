@@ -257,22 +257,35 @@ export default async function ChildHomePage() {
   const missingFromToday = pool.filter((m) => !existingTemplateIds.has(m.id))
 
   if (pool.length > 0 && missingFromToday.length > 0) {
-    await Promise.all(
-      missingFromToday.map(async (m) => {
-        const row = {
-          child_id: childId,
-          mission_template_id: m.id,
-          date: today,
-          scheduled_time: m.scheduled_time ?? null,
-          routine_type: routineType,
-          is_completed: false,
-        }
-        const { error } = await missionDb.from('daily_missions').insert(row)
-        if (error && error.code !== '23505') {
-          console.error('[child/home] daily_missions insert', error)
-        }
-      }),
-    )
+    const rowsToInsert = missingFromToday.map((m) => ({
+      child_id: childId,
+      mission_template_id: m.id,
+      date: today,
+      scheduled_time: m.scheduled_time ?? null,
+      routine_type: routineType,
+      is_completed: false,
+    }))
+
+    /**
+     * 날짜 전환 직후(특히 주말/휴일 분기)에는 누락 행이 많아질 수 있어,
+     * 네트워크 왕복 N회를 1회로 줄이는 배치 업서트를 우선 사용합니다.
+     */
+    const bulkInsert = await missionDb.from('daily_missions').upsert(rowsToInsert, {
+      onConflict: 'child_id,date,mission_template_id',
+      ignoreDuplicates: true,
+    })
+    if (bulkInsert.error) {
+      console.warn('[child/home] daily_missions bulk upsert failed, fallback to row inserts', bulkInsert.error)
+      await Promise.all(
+        rowsToInsert.map(async (row) => {
+          const { error } = await missionDb.from('daily_missions').insert(row)
+          if (error && error.code !== '23505') {
+            console.error('[child/home] daily_missions insert', error)
+          }
+        }),
+      )
+    }
+
     const refetch = await missionDb
       .from('daily_missions')
       .select(`*, missions:mission_template_id(${missionJoinWithSort})`)

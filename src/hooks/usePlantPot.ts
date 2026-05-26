@@ -11,7 +11,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { HEARTS_PER_STAGE, type PlantStage, type PlantTreeId } from '@/constants/plantTrees'
+import { HEARTS_PER_STAGE, normalizePlantPotProgress, type PlantStage, type PlantTreeId } from '@/constants/plantTrees'
 import { createClient } from '@/lib/supabase/client'
 import { readChildStatInt } from '@/lib/childCreditsSplit'
 
@@ -31,7 +31,39 @@ export type WaterResult = 'ok' | 'no_hearts' | { type: 'grew'; newStage: PlantSt
 
 const DEFAULT_TREE: PlantTreeId = 'apple'
 
-export function usePlantPot(childId: string) {
+/**
+ * 물주기 API 성공 JSON으로 로컬 화분 상태를 만듭니다.
+ * `refresh()` 전에 호출해 막대·그림이 바로 바뀌게 합니다(지연·캐시 대비).
+ */
+function potStateFromWaterResponse(
+  treeId: PlantTreeId,
+  pot_stage: unknown,
+  pot_hearts_used: unknown,
+  pot_completed: unknown,
+): PotState {
+  const stageDb = Math.min(7, Math.max(0, readChildStatInt(pot_stage))) as PlantStage
+  const heartsUsedRaw = readChildStatInt(pot_hearts_used)
+  const completedRaw = Boolean(pot_completed)
+  const n = normalizePlantPotProgress(stageDb, heartsUsedRaw, completedRaw)
+  return {
+    treeId,
+    stage: n.stage,
+    heartsUsed: n.heartsUsed,
+    heartsNeeded: HEARTS_PER_STAGE[n.stage],
+    completed: n.completed,
+  }
+}
+
+export function usePlantPot(
+  childId: string,
+  options?: {
+    /**
+     * 물주기 API 가 성공한 뒤 `child_stats` 일부를 돌려줄 때 — 상단 레벨 카드 `stats` 와 동기화합니다.
+     * 비개발자: 화분 쪽 숫자만 바뀌고 위 카드 하트는 그대로인 현상을 막습니다.
+     */
+    onPlantStatsSynced?: (patch: Record<string, unknown>) => void
+  },
+) {
   /**
    * 렌더마다 `createClient()`를 호출하면 안 됩니다.
    * - 인자로 `createClient()`를 넘기는 `useRef(createClient())`와 같이, 매번 새 브라우저 클라이언트를 만들면
@@ -47,13 +79,34 @@ export function usePlantPot(childId: string) {
    * 이 디바이스 세션 안에서만 `씨앗 고르기`로 선택한 나무를 기억합니다(자녀 바뀔 때 초기화).
    */
   const chosenTreeRef = useRef<PlantTreeId>(DEFAULT_TREE)
+  /** 부모가 넘긴 콜백은 매 렌더마다 바뀔 수 있어 ref 로 최신만 읽습니다(물주기 `water` 의존성 안정화). */
+  const onPlantStatsSyncedRef = useRef(options?.onPlantStatsSynced)
+  onPlantStatsSyncedRef.current = options?.onPlantStatsSynced
 
   useEffect(() => {
     chosenTreeRef.current = DEFAULT_TREE
   }, [childId])
 
+  /**
+   * 브라우저에서 pot_* 정규화 UPDATE 가 실패했을 때, 같은 작업을 서버 세션으로 한 번 더 시도합니다.
+   * (하트·다른 컬럼은 건드리지 않습니다.)
+   */
+  const serverRepairPlantNormalize = useCallback(async (): Promise<boolean> => {
+    try {
+      const r = await fetch('/api/child/plant-repair', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ childId }),
+        credentials: 'same-origin',
+      })
+      return r.ok
+    } catch {
+      return false
+    }
+  }, [childId])
+
   const refresh = useCallback(async () => {
-    const { data, error } = await supabase
+    const { data: initialData, error } = await supabase
       .from('child_stats')
       .select('hearts, pot_stage, pot_hearts_used, pot_completed')
       .eq('child_id', childId)
@@ -64,24 +117,95 @@ export function usePlantPot(childId: string) {
       setLoading(false)
       return
     }
-    if (!data) {
+    if (!initialData) {
       setLoading(false)
       return
     }
 
+    let data = initialData
+
     const stageRaw = readChildStatInt(data.pot_stage)
-    const stage = Math.min(7, Math.max(0, stageRaw)) as PlantStage
+    const stageDb = Math.min(7, Math.max(0, stageRaw)) as PlantStage
+    const heartsUsedDb = readChildStatInt(data.pot_hearts_used)
+    const completedDb = data.pot_completed ?? false
+
+    const normalized = normalizePlantPotProgress(stageDb, heartsUsedDb, completedDb)
+    const needsDbRepair =
+      normalized.stage !== stageDb ||
+      normalized.heartsUsed !== heartsUsedDb ||
+      normalized.completed !== completedDb
+
+    if (needsDbRepair) {
+      const { error: fixErr } = await supabase
+        .from('child_stats')
+        .update({
+          pot_stage: normalized.stage,
+          pot_hearts_used: normalized.heartsUsed,
+          pot_completed: normalized.completed,
+        })
+        .eq('child_id', childId)
+      if (fixErr) {
+        console.warn('[usePlantPot] pot progress repair failed', fixErr.message)
+        /** 브라우저 직접 UPDATE 가 막히면 쿠키 세션 API로 정규화만 다시 시도합니다 */
+        const recovered = await serverRepairPlantNormalize()
+        if (recovered) {
+          const { data: dataAfter, error: refetchErr } = await supabase
+            .from('child_stats')
+            .select('hearts, pot_stage, pot_hearts_used, pot_completed')
+            .eq('child_id', childId)
+            .maybeSingle()
+          if (!refetchErr && dataAfter) {
+            data = dataAfter
+          }
+        }
+      } else {
+        const { data: dataAfter, error: refetchErr } = await supabase
+          .from('child_stats')
+          .select('hearts, pot_stage, pot_hearts_used, pot_completed')
+          .eq('child_id', childId)
+          .maybeSingle()
+        if (!refetchErr && dataAfter) {
+          data = dataAfter
+        }
+      }
+    }
+
+    const stageRawFinal = readChildStatInt(data.pot_stage)
+    const stageDbFinal = Math.min(7, Math.max(0, stageRawFinal)) as PlantStage
+    const heartsUsedFinal = readChildStatInt(data.pot_hearts_used)
+    const completedFinal = data.pot_completed ?? false
+    const normalizedFinal = normalizePlantPotProgress(stageDbFinal, heartsUsedFinal, completedFinal)
 
     setHearts(readChildStatInt(data.hearts))
     setPot({
       treeId: chosenTreeRef.current,
-      stage,
-      heartsUsed: readChildStatInt(data.pot_hearts_used),
-      heartsNeeded: HEARTS_PER_STAGE[stage],
-      completed: data.pot_completed ?? false,
+      stage: normalizedFinal.stage,
+      heartsUsed: normalizedFinal.heartsUsed,
+      heartsNeeded: HEARTS_PER_STAGE[normalizedFinal.stage],
+      completed: normalizedFinal.completed,
     })
     setLoading(false)
-  }, [childId, supabase])
+  }, [childId, supabase, serverRepairPlantNormalize])
+
+  /**
+   * 미션 완료 낙관적 UI — ChildScreen 이 `stats.hearts` 를 올린 직후 같은 만큼 훅의 `hearts` 도 올립니다.
+   * 화분이 로드된 뒤 화면이 `plantHearts` 위주로 그릴 때, DB/Realtime 을 기다리지 않고 숫자가 바로 맞습니다.
+   *
+   * 비개발자: 미션 끝나자마자 위쪽 하트 숫자가 바로 올라가게 합니다.
+   */
+  const bumpHeartsForMissionOptimistic = useCallback((delta: number) => {
+    if (delta <= 0) return
+    setHearts((h) => h + delta)
+  }, [])
+
+  /**
+   * 미션 완료 API 가 실패했을 때 — 아까 미리 올려 둔 하트만큼 훅에서 다시 뺍니다.
+   * 비개발자: 저장이 안 되면 미리 올려 둔 숫자만 되돌립니다.
+   */
+  const rollbackMissionHeartsOptimistic = useCallback((delta: number) => {
+    if (delta <= 0) return
+    setHearts((h) => Math.max(0, h - delta))
+  }, [])
 
   useEffect(() => {
     void refresh()
@@ -118,19 +242,20 @@ export function usePlantPot(childId: string) {
               const stageRaw = Object.prototype.hasOwnProperty.call(row, 'pot_stage')
                 ? readChildStatInt(row.pot_stage)
                 : prev.stage
-              const stage = Math.min(7, Math.max(0, stageRaw)) as PlantStage
-              const heartsUsed = Object.prototype.hasOwnProperty.call(row, 'pot_hearts_used')
+              const stageDb = Math.min(7, Math.max(0, stageRaw)) as PlantStage
+              const heartsUsedRaw = Object.prototype.hasOwnProperty.call(row, 'pot_hearts_used')
                 ? readChildStatInt(row.pot_hearts_used)
                 : prev.heartsUsed
-              const completed = Object.prototype.hasOwnProperty.call(row, 'pot_completed')
+              const completedRaw = Object.prototype.hasOwnProperty.call(row, 'pot_completed')
                 ? Boolean(row.pot_completed)
                 : prev.completed
+              const normalized = normalizePlantPotProgress(stageDb, heartsUsedRaw, completedRaw)
               return {
                 ...prev,
-                stage,
-                heartsUsed,
-                heartsNeeded: HEARTS_PER_STAGE[stage],
-                completed,
+                stage: normalized.stage,
+                heartsUsed: normalized.heartsUsed,
+                heartsNeeded: HEARTS_PER_STAGE[normalized.stage],
+                completed: normalized.completed,
               }
             })
           }
@@ -144,69 +269,89 @@ export function usePlantPot(childId: string) {
   }, [childId, supabase])
 
   const water = useCallback(async (): Promise<WaterResult> => {
-    if (!pot) return 'ok'
+    /**
+     * 물주기는 **서버 API**로 처리합니다.
+     * 비개발자: 폰 앱에서 DB를 직접 고치면 가끔 권한·통신 때문에 숫자가 안 바뀌는 것처럼 보일 수 있어,
+     * 웹사이트 서버(로그인 쿠키가 있는 쪽)가 대신 안전하게 저장합니다.
+     */
+    try {
+      const res = await fetch('/api/child/plant-water', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ childId }),
+        credentials: 'same-origin',
+      })
+      const json = (await res.json().catch(() => ({}))) as {
+        ok?: boolean
+        code?: string
+        grew?: boolean
+        newStage?: number
+      }
 
-    // 완성 상태면 자동 리셋(단계·하트 누적만 초기화, 나무 종류는 유지)
-    if (pot.stage === 7 || pot.completed) {
-      await supabase
-        .from('child_stats')
-        .update({ pot_stage: 0, pot_hearts_used: 0, pot_completed: false })
-        .eq('child_id', childId)
+      if (res.status === 400 && json?.code === 'NO_HEARTS') {
+        await refresh()
+        return 'no_hearts'
+      }
+
+      if (!res.ok || json?.ok !== true) {
+        console.warn('[usePlantPot] plant-water API', res.status, json)
+        await refresh()
+        return 'ok'
+      }
+
+      const full = json as {
+        ok: true
+        grew?: boolean
+        newStage?: number
+        hearts?: number
+        pot_stage?: number
+        pot_hearts_used?: number
+        pot_completed?: boolean
+        reset?: boolean
+      }
+      if (
+        typeof full.hearts === 'number' &&
+        typeof full.pot_stage === 'number' &&
+        typeof full.pot_hearts_used === 'number' &&
+        typeof full.pot_completed === 'boolean'
+      ) {
+        onPlantStatsSyncedRef.current?.({
+          hearts: full.hearts,
+          pot_stage: full.pot_stage,
+          pot_hearts_used: full.pot_hearts_used,
+          pot_completed: full.pot_completed,
+        })
+        /** 응답 직후 UI 반영 — Realtime/SELECT 가 늦어도 막대·단계 그림이 바로 바뀝니다 */
+        setHearts(readChildStatInt(full.hearts))
+        setPot((prev) =>
+          potStateFromWaterResponse(
+            prev?.treeId ?? chosenTreeRef.current,
+            full.pot_stage,
+            full.pot_hearts_used,
+            full.pot_completed,
+          ),
+        )
+      }
+
+      await refresh()
+
+      if (full.grew === true && typeof full.newStage === 'number') {
+        const ns = Math.min(7, Math.max(0, Math.trunc(full.newStage)))
+        return { type: 'grew', newStage: ns as PlantStage }
+      }
+      return 'ok'
+    } catch (e) {
+      console.warn('[usePlantPot] plant-water fetch', e)
       await refresh()
       return 'ok'
     }
-
-    /**
-     * Realtime 이 잠깐 늦거나 미션 완료 응답이 stats 만 갱신했을 때
-     * 훅 내부 `hearts` 가 잠시 0 으로 보일 수 있어, 항상 최신 DB 값을 한 번 더 확인합니다.
-     * 비개발자: 하트가 분명히 있는데 「물이 없어요」 라고 잘못 뜨던 현상을 막습니다.
-     */
-    const { data: freshRow, error: freshErr } = await supabase
-      .from('child_stats')
-      .select('hearts')
-      .eq('child_id', childId)
-      .maybeSingle()
-    const freshHearts = freshErr || !freshRow ? hearts : readChildStatInt(freshRow.hearts)
-
-    if (freshHearts <= 0) {
-      if (freshHearts !== hearts) setHearts(freshHearts)
-      return 'no_hearts'
-    }
-
-    const newHeartsUsed = pot.heartsUsed + 1
-    const needed = HEARTS_PER_STAGE[pot.stage]
-    const levelUp = needed > 0 && newHeartsUsed >= needed
-
-    const newStage = levelUp ? (Math.min(pot.stage + 1, 7) as PlantStage) : pot.stage
-    const newHeartsUsedAfter = levelUp ? 0 : newHeartsUsed
-    const isCompleted = newStage === 7
-
-    const { error } = await supabase
-      .from('child_stats')
-      .update({
-        hearts: freshHearts - 1,
-        pot_stage: newStage,
-        pot_hearts_used: newHeartsUsedAfter,
-        pot_completed: isCompleted,
-      })
-      .eq('child_id', childId)
-
-    if (error) {
-      console.warn('[usePlantPot] update error', error.message)
-      return 'ok'
-    }
-
-    await refresh()
-
-    if (levelUp) return { type: 'grew', newStage }
-    return 'ok'
-  }, [pot, hearts, childId, supabase, refresh])
+  }, [childId, refresh])
 
   /** 씨앗 고르기 확인 시 — 단계 초기화 + 선택한 나무 id 저장 */
   const resetPot = useCallback(
     async (treeId: PlantTreeId = DEFAULT_TREE) => {
       chosenTreeRef.current = treeId
-      await supabase
+      const { error } = await supabase
         .from('child_stats')
         .update({
           pot_stage: 0,
@@ -214,10 +359,35 @@ export function usePlantPot(childId: string) {
           pot_completed: false,
         })
         .eq('child_id', childId)
+      if (error) {
+        console.warn('[usePlantPot] resetPot client update failed', error.message)
+        try {
+          const r = await fetch('/api/child/plant-reset-progress', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ childId }),
+            credentials: 'same-origin',
+          })
+          if (!r.ok) {
+            console.warn('[usePlantPot] resetPot API fallback failed', r.status)
+          }
+        } catch (e) {
+          console.warn('[usePlantPot] resetPot API fallback', e)
+        }
+      }
       await refresh()
     },
     [childId, supabase, refresh],
   )
 
-  return { pot, hearts, loading, water, resetPot, refresh }
+  return {
+    pot,
+    hearts,
+    loading,
+    water,
+    resetPot,
+    refresh,
+    bumpHeartsForMissionOptimistic,
+    rollbackMissionHeartsOptimistic,
+  }
 }

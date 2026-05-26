@@ -17,10 +17,12 @@ export const CHILD_AUDIO = {
   morningGreet: '/assets/audio/alerts/아침인사.wav',
   timeToGo: '/assets/audio/alerts/이제 나갈시간이야.wav',
   dontLie: '/assets/audio/alerts/거짓말은 나 속상해.wav',
-  /** 뽀모도로 등 추후용 — 파일 추가 전까지 재생 실패 시 콘솔만 경고 */
-  tickTock: '/assets/audio/alerts/tick-tock-timer.wav',
-  /** 연속 탭 확인 팝업 등 — 짧은 보조 효과음(`public/assets/audio/alerts/no.wav`) */
-  popupAlert: '/assets/audio/alerts/no.wav',
+  /** 실제 레포에 존재하는 파일로 고정(기존 tick-tock 경로는 파일 부재로 404). */
+  tickTock: '/assets/audio/alerts/잘시간.mp3',
+  /** 미션 카드 탭 즉시 반응음 — 요청 경로의 성공 효과음으로 고정 */
+  cardTap: '/assets/audio/missions/success_reward-fairy-arcade-sparkle-866.wav',
+  /** 연속 탭 확인 팝업 등 보조 효과음 */
+  popupAlert: '/assets/audio/alerts/잘시간.mp3',
 } as const
 
 /** `installChildRoutineAudioUnlockOnFirstGesture` 가 전역 리스너를 중복해서 붙지 않게 합니다 */
@@ -89,7 +91,7 @@ export async function playRoutineAlarmLooped(
   src: string,
   volume = 1,
 ): Promise<HTMLAudioElement | null> {
-  const audio = new Audio(src)
+  const audio = createPreloadedAudio(src)
   audio.loop = true
   audio.volume = volume
   try {
@@ -102,7 +104,7 @@ export async function playRoutineAlarmLooped(
 }
 
 export function playAudio(src: string, volume = 1.0): HTMLAudioElement {
-  const audio = new Audio(src)
+  const audio = createPreloadedAudio(src)
   audio.volume = volume
   void audio.play().catch((e) => console.warn('[childAudio] play failed', e))
   return audio
@@ -113,7 +115,7 @@ export function playAudio(src: string, volume = 1.0): HTMLAudioElement {
  */
 export async function tryPlayAudioOnce(src: string, volume = 1.0): Promise<boolean> {
   try {
-    const audio = new Audio(src)
+    const audio = createPreloadedAudio(src)
     audio.volume = volume
     await audio.play()
     return true
@@ -121,4 +123,14 @@ export async function tryPlayAudioOnce(src: string, volume = 1.0): Promise<boole
     console.warn('[childAudio] tryPlayAudioOnce failed', e)
     return false
   }
+}
+
+/**
+ * 재생 전에 `preload='auto'`를 지정해 파일 준비 시간을 줄입니다.
+ * 비개발자: 소리를 누르자마자 더 빨리 나오게 돕는 공통 생성기입니다.
+ */
+export function createPreloadedAudio(src: string): HTMLAudioElement {
+  const audio = new Audio(src)
+  audio.preload = 'auto'
+  return audio
 }

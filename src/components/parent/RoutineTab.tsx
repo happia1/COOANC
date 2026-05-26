@@ -44,7 +44,6 @@ import {
 } from '@/lib/routineChips'
 import SpriteImage from '@/components/common/SpriteImage'
 import { ICONS } from '@/constants/sprites'
-import { TOPBAR_LOGO_SRC } from '@/constants/branding'
 import { MISSION_ROUTINES_ATLAS } from '@/constants/missionRoutineAtlas'
 import { missionRoutineIconFrame } from '@/lib/missionRoutineIconFrame'
 import { PARENT_NEUTRAL_CARD_CLASSNAME, PARENT_NEUTRAL_CARD_OVERFLOW_X_CLASSNAME } from '@/lib/parentNeutralBlockStyle'
@@ -56,6 +55,7 @@ import {
 import { scaledMissionRewards } from '@/lib/missionRewardMultiplier'
 import { MissionRewardIconTriple } from '@/components/mission/MissionRewardIconTriple'
 import SortableHorizontalMissionStrip from '@/components/parent/SortableHorizontalMissionStrip'
+import RoutineAgentFab from '@/components/parent/RoutineAgentFab'
 
 /** 롱프레스(길게 누르기)로 간주할 기준 시간(ms) — 드래그 시작 전 팝업 오픈 방지 */
 const LONG_PRESS_MS = 220
@@ -768,45 +768,11 @@ export default function RoutineTab({
         </div>
       )}
 
-      {/**
-       * 루틴 도우미(챗봇) FAB
-       * - 모바일: 독바 바로 위 (bottom = 독높이 + safe-area + 10px)
-       * - md+: 하단 우측 고정 (bottom-6)
-       */}
-      <div className="pointer-events-none fixed inset-x-0 bottom-[calc(60px+env(safe-area-inset-bottom,0px)+10px)] z-[55] flex justify-center md:bottom-6">
-        {/**
-         * pointer-events-none 을 래퍼 div에도 유지합니다.
-         * 이전에는 routine-fab-cloud div에 pointer-events-auto 를 두어
-         * 버튼 주변 빈 영역(w-full 전체 너비)이 클릭 이벤트를 가로챘습니다.
-         * 그로 인해 하단 콘텐츠(예: 「매일 일정」 토글 버튼)가 이 영역과 겹칠 때
-         * 탭해도 반응하지 않는 문제가 발생했습니다.
-         * pointer-events-auto 를 버튼 자체에만 적용해 빈 공간은 click-through 되도록 합니다.
-         */}
-        <div className="routine-fab-cloud pointer-events-none flex w-full max-w-md justify-end px-4 md:max-w-none md:px-8">
-          <button
-            type="button"
-            disabled={!currentId}
-            onClick={() => setSchedulePanelOpen(true)}
-            aria-label={
-              routineAgentUnread > 0
-                ? `루틴 도우미, 새 답장 ${routineAgentUnread}개. 열어서 확인하기`
-                : '루틴 도우미 챗봇 열기'
-            }
-            className="pointer-events-auto relative flex h-12 w-12 shrink-0 items-center justify-center overflow-visible rounded-full border border-sky-100/90 bg-white shadow-[0_10px_28px_-6px_rgba(59,130,246,0.35),0_4px_14px_-4px_rgba(15,23,42,0.12)] transition active:scale-[0.94] disabled:pointer-events-none disabled:opacity-40"
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element -- 작은 브랜드 마크 */}
-            <img src={TOPBAR_LOGO_SRC} alt="" className="h-8 w-8 object-contain" />
-            {routineAgentUnread > 0 ? (
-              <span
-                className="absolute -right-0.5 -top-0.5 flex h-[1.125rem] min-w-[1.125rem] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-black tabular-nums leading-none text-white shadow ring-2 ring-white"
-                aria-hidden
-              >
-                {routineAgentUnread > 99 ? '99+' : routineAgentUnread}
-              </span>
-            ) : null}
-          </button>
-        </div>
-      </div>
+      <RoutineAgentFab
+        disabled={!currentId}
+        unreadCount={routineAgentUnread}
+        onClick={() => setSchedulePanelOpen(true)}
+      />
 
       <RoutineAgentSchedulePanel
         open={schedulePanelOpen}

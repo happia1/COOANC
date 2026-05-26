@@ -99,9 +99,10 @@ export default async function ParentHomePage() {
   const supabase = await createClient()
   const childIds = auth.familyLinks.map((l) => l.child_id)
   const familyLinkIds = auth.familyLinks.map((l) => l.id)
+  const familyLinkByChild: Record<string, string> = Object.fromEntries(auth.familyLinks.map((l) => [l.child_id, l.id]))
 
   if (childIds.length === 0) {
-    return <HomeTab childrenData={[]} upcomingEvents={[]} daysWithDataByChild={{}} />
+    return <HomeTab childrenData={[]} upcomingEvents={[]} daysWithDataByChild={{}} familyLinkByChild={{}} />
   }
 
   const today = getSeoulDateString()
@@ -317,5 +318,12 @@ export default async function ParentHomePage() {
     }).catch((e) => console.warn('[agent-a] trigger failed', e))
   }
 
-  return <HomeTab childrenData={childrenData} upcomingEvents={upcomingEvents} daysWithDataByChild={daysWithDataByChild} />
+  return (
+    <HomeTab
+      childrenData={childrenData}
+      upcomingEvents={upcomingEvents}
+      daysWithDataByChild={daysWithDataByChild}
+      familyLinkByChild={familyLinkByChild}
+    />
+  )
 }

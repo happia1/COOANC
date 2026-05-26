@@ -2,7 +2,8 @@
 
 /**
  * 설정 시트·직접 방문 페이지 공통 본문입니다.
- * - 부모 프로필 이름 편집, 자녀 목록, 알림/소리 토글, 로그아웃, 계정 삭제 영역을 담습니다.
+ * - 부모 프로필 이름 편집, 자녀 목록, 다자녀일 때 「시작 화면 자녀」선택(localStorage),
+ *   알림/소리 토글, 로그아웃, 계정 삭제 영역을 담습니다.
  * - 비개발자: 내용은 예전 `/settings` 페이지와 동일하고, 이제는 오버레이 시트 안에서만 보일 때가 많습니다.
  */
 
@@ -21,6 +22,11 @@ import { CompactChildProfileCard } from '@/components/parent/CompactChildProfile
 import DeleteParentAccountSection from '@/components/parent/DeleteParentAccountSection'
 import ChildProfileEditModal from '@/components/settings/ChildProfileEditModal'
 import ChildProfileAddSheet from '@/components/settings/ChildProfileAddSheet'
+import {
+  clearStoredDefaultChildIdIfMatches,
+  getStoredDefaultChildId,
+  setStoredDefaultChildId,
+} from '@/lib/defaultChildIdPreference'
 
 /** 설정에서 불러온 자녀 한 줄(수정 모달에 그대로 넘김) */
 type LinkedChildRow = {
@@ -56,6 +62,8 @@ export default function ParentSettingsPanelContent() {
   const [deleteMsg, setDeleteMsg] = useState<string | null>(null)
   const [editingChild, setEditingChild] = useState<LinkedChildRow | null>(null)
   const [addChildSheetOpen, setAddChildSheetOpen] = useState(false)
+  /** 자녀가 둘 이상일 때만 쓰는 「로그인 직후 열 아이」 선택값 — localStorage 와 동기 */
+  const [startScreenPick, setStartScreenPick] = useState<string>('')
 
   /** 로컬 토글 + 내 프로필(role) 로드 */
   useEffect(() => {
@@ -163,6 +171,23 @@ export default function ParentSettingsPanelContent() {
     void loadLinkedChildren()
   }, [loadLinkedChildren])
 
+  /**
+   * 자녀 목록이 바뀔 때마다, 저장된 시작 화면 UUID 가 여전히 유효한지 확인합니다.
+   * 없거나 삭제된 아이를 가리키면 빈 값(부모 홈 우선)으로 맞춥니다.
+   */
+  useEffect(() => {
+    if (linkedChildren.length <= 1) return
+    const stored = getStoredDefaultChildId()
+    if (stored && linkedChildren.some((c) => c.id === stored)) {
+      setStartScreenPick(stored)
+      return
+    }
+    setStartScreenPick('')
+    if (stored && !linkedChildren.some((c) => c.id === stored)) {
+      setStoredDefaultChildId(null)
+    }
+  }, [linkedChildren])
+
   async function deleteChildProfile(childId: string) {
     setDeleteMsg(null)
     setDeletingId(childId)
@@ -181,6 +206,7 @@ export default function ParentSettingsPanelContent() {
       setPendingDeleteId(null)
       clearSelectionIfChildRemoved(childId)
       removeLocalStorageScopedToChild(childId)
+      clearStoredDefaultChildIdIfMatches(childId)
       router.refresh()
       return true
     } catch {
@@ -383,6 +409,35 @@ export default function ParentSettingsPanelContent() {
               </ul>
             )}
             {deleteMsg ? <p className="text-xs font-bold text-red-600">{deleteMsg}</p> : null}
+
+            {linkedChildren.length > 1 ? (
+              <div className="flex flex-col gap-2 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
+                <p className="text-xs font-bold uppercase tracking-wider text-gray-400">시작 화면 자녀 선택</p>
+                <p className="text-[11px] leading-snug text-gray-500">
+                  로그인할 때 먼저 열릴 아이를 고릅니다. 「부모 홈에서 시작」이면 매번 부모 홈으로 들어가요.
+                </p>
+                <label className="sr-only" htmlFor="cooanc-start-screen-child">
+                  시작 화면 자녀
+                </label>
+                <select
+                  id="cooanc-start-screen-child"
+                  className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm font-bold text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/40"
+                  value={startScreenPick}
+                  onChange={(e) => {
+                    const v = e.target.value
+                    setStartScreenPick(v)
+                    setStoredDefaultChildId(v || null)
+                  }}
+                >
+                  <option value="">부모 홈에서 시작</option>
+                  {linkedChildren.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name} 화면으로 시작
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : null}
           </div>
         ) : null}
 

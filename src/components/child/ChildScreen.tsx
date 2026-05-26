@@ -7,7 +7,7 @@
  *
  * 비개발자 설명:
  * - 배경 이미지 위에 캐릭터가 서 있고, 하단에 오늘의 미션 카드가 가로로 스크롤됩니다.
- * - 우측 상단 스택(나가기·스티커·장바구니·코인)은 화면이 넓어질수록 문·스티커·장바구니는 최대 1.8배까지 커집니다. 마켓 패널은 아래에서 올라옵니다.
+ * - 우측 상단 스택(나가기·스티커·장바구니·코인)은 문·스티커·장바구니가 조금 더 큰 타일(44px)과 그림(28~32px)에, 화면이 넓어질수록 묶음 스케일이 더 커집니다(코인은 별도 배율). 마켓 패널은 아래에서 올라옵니다.
  * - 상단 오른쪽 나가기(유리 버튼)를 누르면 부모 화면으로 나갑니다.
  * - 새로고침은 레벨·크레딧 유리 카드 **안 오른쪽 아래** 아주 연한 회색 아이콘으로만 둡니다(전체 페이지를 다시 불러 꼬임을 풀 때 씁니다).
  * - 뽀모도로(왼쪽)·음악(오른쪽)은 레벨 블록 바로 아래 한 줄에 배치합니다.
@@ -46,7 +46,7 @@ import ChildPanelOverlay, { type PanelType } from '@/components/child/ChildPanel
 import ChildLevelStatsCard from '@/components/child/ChildLevelStatsCard'
 import ChildHomePiggyBank from '@/components/child/ChildHomePiggyBank'
 import { normalizeChildStatsCreditsSplit, mergeChildStatsPatch, readChildStatInt } from '@/lib/childCreditsSplit'
-import { usesSingleBucket } from '@/constants/childAgeConfig'
+import { MULTI_BUCKET_MIN_LEVEL, usesSingleBucket } from '@/constants/childAgeConfig'
 import { completionRateToHearts } from '@/lib/missionHeartCount'
 import { scaledMissionRewards } from '@/lib/missionRewardMultiplier'
 import { isSpecialSectionMission, isRetiredSpecialMissionTitle } from '@/lib/specialMissionChips'
@@ -84,19 +84,63 @@ import SleepModeScreen from '@/components/child/SleepModeScreen'
 import MorningWakeScreen from '@/components/child/MorningWakeScreen'
 import SleepReadyPopup from '@/components/child/SleepReadyPopup'
 import SchoolTimePopup from '@/components/child/SchoolTimePopup'
+import PiggyBankUnlockFlowModal from '@/components/child/PiggyBankUnlockFlowModal'
 import { readRoutineAlarmPrefs } from '@/lib/routineAlarmLocalPrefs'
 import { resolveRoutineAlarmSoundUrl } from '@/lib/routineAlarmSounds'
 import { installChildRoutineAudioUnlockOnFirstGesture } from '@/lib/childAudio'
-import { toYyyyMmDdDbValue, dbValueMeansIncomplete, getSeoulTimeHHMM, getSeoulWeekdayShort } from '@/lib/koreaDate'
+import {
+  toYyyyMmDdDbValue,
+  dbValueMeansIncomplete,
+  getSeoulDateString,
+  getSeoulTimeHHMM,
+  getSeoulWeekdayShort,
+  getMsUntilNextSeoulMidnight,
+} from '@/lib/koreaDate'
 import { isAfternoonMission } from '@/lib/missionAmPm'
 import {
   isBedtimeMissionBlockedBeforeSleepReadyWindow,
   isSeoulTimeBeforeNoon,
 } from '@/lib/missionHonestyTiming'
 
+/**
+ * 미션 완료 직후 API 응답을 기다리지 않고 상단 숫자(하트·크레딧)를 먼저 올립니다.
+ * 실패 시 같은 양만큼 빼서 되돌립니다(경험치·레벨은 서버 응답으로만 맞춤).
+ *
+ * 비개발자: "인터넷이 느려도 보상 숫자는 바로 올라가요. 저장이 실패하면 숫자도 다시 내려가요."
+ */
+function applyOptimisticMissionMoneyRewards(prev: ChildStats, creditReward: number, heartReward: number): ChildStats {
+  return normalizeChildStatsCreditsSplit({
+    ...prev,
+    hearts: readChildStatInt(prev.hearts) + heartReward,
+    credits: readChildStatInt(prev.credits) + creditReward,
+    total_credits_earned: readChildStatInt(prev.total_credits_earned) + creditReward,
+  } as ChildStats)
+}
+
+function rollbackOptimisticMissionMoneyRewards(
+  prev: ChildStats,
+  creditReward: number,
+  heartReward: number,
+): ChildStats {
+  return normalizeChildStatsCreditsSplit({
+    ...prev,
+    hearts: Math.max(0, readChildStatInt(prev.hearts) - heartReward),
+    credits: Math.max(0, readChildStatInt(prev.credits) - creditReward),
+    total_credits_earned: Math.max(0, readChildStatInt(prev.total_credits_earned) - creditReward),
+  } as ChildStats)
+}
+
 /** 화분 단계 상승(물주기로 stage+1) 시 재생할 효과음 */
 const PLANT_STAGE_UP_SOUND_SRC =
   '/assets/audio/missions/get_badge-christmas-reveal-tones-2988.wav' as const
+
+/** 저금통 해금 팝업/튜토리얼 재노출 방지용 로컬 키 */
+function piggyUnlockSeenStorageKey(childId: string): string {
+  return `cooanc:piggy-unlock-seen:${childId}`
+}
+function piggyTutorialSkipStorageKey(childId: string): string {
+  return `cooanc:piggy-tutorial-skip:${childId}`
+}
 
 /**
  * 상단 레벨 카드 반응형 배율 (최대 1.7배) — 실측 너비 기준.
@@ -116,10 +160,10 @@ const LEVEL_BLOCK_SCALE_BASE_W = 400
 const LEVEL_BLOCK_SCALE_FULL_W = 820
 const LEVEL_BLOCK_SCALE_MAX = 1.7
 
-/** 문·뽀모도로·스티커·장바구니 네 버튼 — 레벨 카드와 같은 가로 구간에서 선형 확대, 최대 1.8배 */
+/** 문·스티커·장바구니 묶음 — 레벨 카드와 같은 가로 구간에서 선형 확대, 넓은 화면에서 최대 ~2배까지 */
 const RIGHT_ICON_PRIMARY_SCALE_BASE_W = LEVEL_BLOCK_SCALE_BASE_W
 const RIGHT_ICON_PRIMARY_SCALE_FULL_W = LEVEL_BLOCK_SCALE_FULL_W
-const RIGHT_ICON_PRIMARY_SCALE_MAX = 1.8
+const RIGHT_ICON_PRIMARY_SCALE_MAX = 1.95
 
 /** 코인(💰)만 별도 — 같은 구간식이지만 최대 1.3배까지만(기존 상한 유지) */
 const RIGHT_ICON_COIN_SCALE_BASE_W = LEVEL_BLOCK_SCALE_BASE_W
@@ -274,14 +318,13 @@ function scaleForLevelBlock(containerWidthPx: number): number {
   )
 }
 
-/** 나가기·타이머·스티커·마켓 바구니 — 넓은 화면에서 최대 1.8배 */
+/** 나가기·스티커·장바구니 묶음 — 좁은 화면도 살짝 키우고, 넓은 화면에서 `RIGHT_ICON_PRIMARY_SCALE_MAX` 까지 */
 function scaleForRightIconPrimary(containerWidthPx: number): number {
   /**
-   * 요청사항:
-   * - 최소 아이콘 크기를 기존 1배에서 1.2배로 올립니다.
-   * - 최대값(1.8배)은 유지합니다.
+   * 비개발자: 폰처럼 가로가 좁을 때도 아이콘이 너무 작지 않게(약 1.28배) 시작하고,
+   * 태블릿·가로가 넓어질수록 더 커지다가 상한(약 2배)에서 멈춥니다.
    */
-  const base = 1.2
+  const base = 1.28
   if (!(containerWidthPx > 0)) return base
   const span = RIGHT_ICON_PRIMARY_SCALE_FULL_W - RIGHT_ICON_PRIMARY_SCALE_BASE_W
   if (span <= 0) return base
@@ -302,13 +345,21 @@ function scaleForRightIconCoin(containerWidthPx: number): number {
 }
 
 /**
- * 우측 상단 나가기·타이머·스티커·장바구니(·코인) 버튼 셸 — 왼쪽 레벨 카드와 같은 유리 톤.
- * 비개발자: 레벨 블록과 똑같이 살짝 비치는 흰 배경, 흐림, 둥근 모서리로 맞춥니다.
- * 안 그림(문·타이머·스티커·바구니)은 같은 기본 크기(h-6/h-7)·화면이 넓으면 묶음 단위로 최대 1.8배까지 커집니다.
+ * 유리 톤 버튼 셸(기본 40×40) — 뽀모도로·음악·코인(💰) 등에 사용합니다.
+ * 비개발자: 레벨 카드와 같은 반투명·둥근 유리 느낌의 버튼 테두리 박스입니다.
  */
 const CHILD_HOME_RIGHT_ICON_GLASS_CLASS = [
   CHILD_HOME_TOP_BAR_GLASS_CLASS,
   'flex h-10 w-10 shrink-0 items-center justify-center',
+].join(' ')
+
+/**
+ * 우측 나가기·스티커·장바구니 전용 — 안 그림을 조금 더 크게 두기 위해 박스를 44×44로 키웁니다.
+ * 비개발자: 왼쪽 타이머/음악 버튼 크기는 그대로 두고, 오른쪽 세 아이콘만 살짝 더 크게 보이게 합니다.
+ */
+const CHILD_HOME_EXIT_STICKER_CART_GLASS_CLASS = [
+  CHILD_HOME_TOP_BAR_GLASS_CLASS,
+  'flex h-11 w-11 shrink-0 items-center justify-center',
 ].join(' ')
 
 // ─── 파티클 타입 정의 ────────────────────────────────────────────────────────
@@ -539,6 +590,11 @@ export default function ChildScreen({
   const [badgeShine, setBadgeShine] = useState(false)
 
   const router = useRouter()
+  /**
+   * 클라이언트 기준 "서울 오늘 날짜" 키.
+   * 서버 props(`today`)가 자정 이후 늦게 갱신되는 틈을 메우기 위해 별도로 유지합니다.
+   */
+  const [seoulDayKey, setSeoulDayKey] = useState(() => today)
 
   /**
    * 레벨 카드 오른쪽 아래 새로고침에서 호출합니다.
@@ -555,8 +611,24 @@ export default function ChildScreen({
     initialStats ? normalizeChildStatsCreditsSplit(initialStats) : null,
   )
 
+  /**
+   * 물주기 API 가 저장한 하트·화분 진행을 레벨 카드 `stats` 에도 바로 반영합니다.
+   * 비개발자: 위쪽 숫자와 화분이 서로 다른 값으로 남는 것을 막습니다.
+   */
+  const onPlantStatsSynced = useCallback((patch: Record<string, unknown>) => {
+    setStats((prev) => normalizeChildStatsCreditsSplit(mergeChildStatsPatch(prev, patch)))
+  }, [])
+
   /** 화분(식물) — `child_stats`의 pot_* 컬럼과 동기화 */
-  const { pot, hearts: plantHearts, loading: plantLoading, water, resetPot } = usePlantPot(childId)
+  const {
+    pot,
+    hearts: plantHearts,
+    loading: plantLoading,
+    water,
+    resetPot,
+    bumpHeartsForMissionOptimistic,
+    rollbackMissionHeartsOptimistic,
+  } = usePlantPot(childId, { onPlantStatsSynced })
   /** 완성 후 씨앗 고르기 모달 */
   const [seedModalOpen, setSeedModalOpen] = useState(false)
   /** 성장 단계 축하 팝업 — 도달한 단계 번호(null 이메 닫힘) */
@@ -582,8 +654,15 @@ export default function ChildScreen({
     if (needSeed) openSeedModal()
   }, [openSeedModal])
 
-  /** 물줄 때 숫자는 상단 스탯과 맞추되, 스탯보다 훅이 먼저 갱신될 때를 대비해 둘 중 있는 값 사용 */
-  const waterButtonHearts = stats?.hearts ?? plantHearts
+  /**
+   * 레벨 카드·물조리개에 쓸 보유 하트.
+   * - 미션 보상은 `stats` 와 화분 훅 둘 다 낙관적으로 올리므로, 둘 중 큰 값을 써서 한쪽만 늦게 와도 바로 보입니다.
+   * - 물주기 후 API가 `onPlantStatsSynced` 로 stats 를 맞추고, 훅은 `refresh` 로 DB와 동기화합니다.
+   * - Realtime 이 `hearts` 없이 `pot_*` 만 줄 때는 여전히 한쪽이 잠깐 늦을 수 있어, 가능한 한 max 로 맞춥니다.
+   */
+  const statsHeartsUi = readChildStatInt(stats?.hearts)
+  const heartsForHomeUi =
+    !plantLoading && pot != null ? Math.max(statsHeartsUi, plantHearts) : statsHeartsUi
 
   useEffect(() => {
     if (!plantHint) return
@@ -649,7 +728,7 @@ export default function ChildScreen({
           sleepReadyEnabled: sleepReadyTimeEnabled,
           sleepReadyWeekday: sleepReadyTimeWeekday,
           sleepReadyWeekend: sleepReadyTimeWeekend,
-          seoulDateYmd: today,
+          seoulDateYmd: seoulDayKey,
           seoulNowHHMM: nowStr,
         })
       ) {
@@ -665,7 +744,7 @@ export default function ChildScreen({
       return null
     },
     [
-      today,
+      seoulDayKey,
       sleepReadyTimeHHMM,
       sleepReadyTimeEnabled,
       sleepReadyTimeWeekday,
@@ -772,6 +851,60 @@ export default function ChildScreen({
   /** 축하·수면·기상·다른 루틴 팝업이 떠 있으면 새 알림을 띄우지 않음 */
   const blockRoutineAlarmPopupsRef = useRef(false)
 
+  /** 서버 props가 갱신되면 클라이언트 day key도 같은 값으로 맞춥니다. */
+  useEffect(() => {
+    setSeoulDayKey((prev) => (prev === today ? prev : today))
+  }, [today])
+
+  /**
+   * 서울 자정 타이머 + 포그라운드 복귀 시 날짜 점검.
+   * 비개발자: 앱을 켜 둔 채로 자정이 지나도 "오늘 날짜"를 자동으로 넘깁니다.
+   */
+  useEffect(() => {
+    let cancelled = false
+    let timeoutId: ReturnType<typeof setTimeout> | null = null
+
+    const bumpIfDateChanged = () => {
+      const latest = getSeoulDateString()
+      setSeoulDayKey((prev) => (prev === latest ? prev : latest))
+    }
+
+    const armNextMidnight = () => {
+      const ms = getMsUntilNextSeoulMidnight()
+      timeoutId = window.setTimeout(() => {
+        if (cancelled) return
+        bumpIfDateChanged()
+        armNextMidnight()
+      }, ms)
+    }
+
+    armNextMidnight()
+
+    const onVisibility = () => {
+      if (document.visibilityState !== 'visible') return
+      bumpIfDateChanged()
+    }
+
+    document.addEventListener('visibilitychange', onVisibility)
+    window.addEventListener('focus', bumpIfDateChanged)
+
+    return () => {
+      cancelled = true
+      if (timeoutId != null) clearTimeout(timeoutId)
+      document.removeEventListener('visibilitychange', onVisibility)
+      window.removeEventListener('focus', bumpIfDateChanged)
+    }
+  }, [])
+
+  /**
+   * 서울 날짜 키가 서버 props와 달라지면 다음날 데이터를 즉시 재요청합니다.
+   * 비개발자: "앱 재접속" 없이도 자정 이후 카드가 자동으로 바뀝니다.
+   */
+  useEffect(() => {
+    if (seoulDayKey === today) return
+    router.refresh()
+  }, [router, seoulDayKey, today])
+
   /** 클라이언트에서만 루틴 기상 시각 로드 */
   useEffect(() => {
     const p = readRoutineAlarmPrefs()
@@ -810,7 +943,7 @@ export default function ChildScreen({
       }
       return merged
     })
-  }, [dailyMissions, today])
+  }, [dailyMissions, seoulDayKey])
 
   /** 날짜(오늘)이 바뀌면 축하 관련 상태를 초기화합니다. */
   useEffect(() => {
@@ -828,7 +961,7 @@ export default function ChildScreen({
     setShowSchoolTime(false)
     setParentRedoModalMission(null)
     optimisticDailyMissionCompleteIdsRef.current.clear()
-  }, [today])
+  }, [seoulDayKey])
 
   /**
    * 부모 롤백·기타 갱신을 자녀 화면에 즉시 반영합니다.
@@ -894,7 +1027,7 @@ export default function ChildScreen({
     function onDailyMissionRemoteUpdate(payload: { new: Record<string, unknown> }) {
       const row = payload.new
       const rowDate = toYyyyMmDdDbValue(row.date)
-      if (rowDate !== today) return
+      if (rowDate !== seoulDayKey) return
       if (!dbValueMeansIncomplete(row.is_completed)) return
       const dmId = String(row.id ?? '')
       if (!dmId) return
@@ -904,14 +1037,14 @@ export default function ChildScreen({
     function onMissionLogRemoteUpdate(payload: { new: Record<string, unknown> }) {
       const row = payload.new
       const ad = toYyyyMmDdDbValue(row.assigned_date)
-      if (ad !== today) return
+      if (ad !== seoulDayKey) return
       if (!dbValueMeansIncomplete(row.is_completed)) return
       const templateId = String(row.mission_id ?? '')
       if (!templateId) return
 
       setMissionList((prevList) => {
         const snapshot = prevList.find(
-          (m) => m.mission_template_id === templateId && toYyyyMmDdDbValue(m.date) === today,
+          (m) => m.mission_template_id === templateId && toYyyyMmDdDbValue(m.date) === seoulDayKey,
         )
         if (!snapshot) return prevList
         const dmId = snapshot.id
@@ -998,7 +1131,7 @@ export default function ChildScreen({
       void supabase.removeChannel(mlChannel)
       void supabase.removeChannel(statsChannel)
     }
-  }, [childId, today])
+  }, [childId, seoulDayKey])
 
   /** 루틴 시각 알림은 ref 로 ‘하루 1회’만 — 축하·수면·아침 화면만 막음 */
   useEffect(() => {
@@ -1015,7 +1148,7 @@ export default function ChildScreen({
     const check = () => {
       if (blockRoutineAlarmPopupsRef.current) return
       const current = getSeoulTimeHHMM()
-      const isWeekend = ['토', '일'].includes(getSeoulWeekdayShort(today))
+      const isWeekend = ['토', '일'].includes(getSeoulWeekdayShort(seoulDayKey))
 
       const allowSleepReady =
         sleepReadyTimeHHMM &&
@@ -1047,17 +1180,8 @@ export default function ChildScreen({
     schoolTimeEnabled,
     schoolTimeWeekday,
     schoolTimeWeekend,
-    today,
+    seoulDayKey,
   ])
-
-  /** 자정 자동 새로고침 */
-  useEffect(() => {
-    const now = new Date()
-    const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0)
-    const ms = midnight.getTime() - now.getTime()
-    const timer = setTimeout(() => router.refresh(), ms)
-    return () => clearTimeout(timer)
-  }, [router])
 
   /**
    * 포그라운드 복귀 시 미션 데이터 자동 동기화
@@ -1165,6 +1289,14 @@ export default function ChildScreen({
        */
       optimisticDailyMissionCompleteIdsRef.current.add(dm.id)
       /**
+       * Supabase/서버 완료 응답을 기다리지 않고 보유 하트·크레딧을 먼저 올립니다(낙관적 UI).
+       * 아래 fetch 가 실패하면 같은 보상만큼 빼서 되돌립니다.
+       * 비개발자: "보상 숫자는 탭하자마자 올라가고, 저장이 안 되면 다시 내려가요."
+       */
+      setStats((prev) => (prev ? applyOptimisticMissionMoneyRewards(prev, creditReward, heartReward) : prev))
+      /** 화분 훅 숫자도 같이 올려 `heartsForHomeUi` 가 plantHearts 만 볼 때 생기던 지연을 없앱니다 */
+      bumpHeartsForMissionOptimistic(heartReward)
+      /**
        * 카드가 사라지는 순간 그 위치에서 컨페티(새로 추가).
        * 비개발자: “완료” 글자 화면 대신 색종이가 터지는 느낌으로 축하합니다.
        */
@@ -1251,30 +1383,32 @@ export default function ChildScreen({
         }, lastFlightEndMs)
       }
 
-      setTimeout(() => {
-        setDone((prev) => {
-          const next = new Set([...prev, dm.id])
-          const allNowDone = visibleMissions.every((m) => next.has(m.id))
-          if (allNowDone && visibleMissions.length > 0 && !celebrationShownRef.current) {
-            celebrationShownRef.current = true
-            if (celebrationShowTimerRef.current != null) {
-              clearTimeout(celebrationShowTimerRef.current)
-            }
-            celebrationShowTimerRef.current = window.setTimeout(() => {
-              celebrationShowTimerRef.current = null
-              setShowCelebration(true)
-            }, 700)
+      /**
+       * 완료한 미션을 슬라이더에서 빼고, 상단 「오늘 미션 하트 5칸」 채움 비율을 바로 반영합니다.
+       * (예전에는 220ms 늦춰 두어 숫자·칸이 늦게 바뀌는 느낌이 났습니다.)
+       */
+      setDone((prev) => {
+        const next = new Set([...prev, dm.id])
+        const allNowDone = visibleMissions.every((m) => next.has(m.id))
+        if (allNowDone && visibleMissions.length > 0 && !celebrationShownRef.current) {
+          celebrationShownRef.current = true
+          if (celebrationShowTimerRef.current != null) {
+            clearTimeout(celebrationShowTimerRef.current)
           }
-          return next
-        })
-      }, 220)
+          celebrationShowTimerRef.current = window.setTimeout(() => {
+            celebrationShowTimerRef.current = null
+            setShowCelebration(true)
+          }, 700)
+        }
+        return next
+      })
 
       void (async () => {
         try {
           const res = await fetch('/api/daily-mission/complete', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ dailyMissionId: dm.id, today, childId }),
+            body: JSON.stringify({ dailyMissionId: dm.id, today: seoulDayKey, childId }),
           })
           const text = await res.text()
           let json: unknown = {}
@@ -1285,8 +1419,20 @@ export default function ChildScreen({
           }
           if (res.ok) {
             setStats((prev) => tryApplyCompletePayload(prev, json) ?? prev)
+            if (
+              json &&
+              typeof json === 'object' &&
+              (json as { autoPraiseStickerGranted?: unknown }).autoPraiseStickerGranted === true
+            ) {
+              router.refresh()
+            }
           } else {
             optimisticDailyMissionCompleteIdsRef.current.delete(dm.id)
+            /** 낙관적으로 올려 둔 하트·크레딧을 요청 실패에 맞춰 되돌립니다 */
+            setStats((prev) =>
+              prev ? rollbackOptimisticMissionMoneyRewards(prev, creditReward, heartReward) : prev,
+            )
+            rollbackMissionHeartsOptimistic(heartReward)
             if (celebrationShowTimerRef.current != null) {
               clearTimeout(celebrationShowTimerRef.current)
               celebrationShowTimerRef.current = null
@@ -1301,6 +1447,10 @@ export default function ChildScreen({
           }
         } catch {
           optimisticDailyMissionCompleteIdsRef.current.delete(dm.id)
+          setStats((prev) =>
+            prev ? rollbackOptimisticMissionMoneyRewards(prev, creditReward, heartReward) : prev,
+          )
+          rollbackMissionHeartsOptimistic(heartReward)
           if (celebrationShowTimerRef.current != null) {
             clearTimeout(celebrationShowTimerRef.current)
             celebrationShowTimerRef.current = null
@@ -1315,7 +1465,15 @@ export default function ChildScreen({
         }
       })()
     },
-    [today, childId, triggerBadgeShine, visibleMissions],
+    [
+      seoulDayKey,
+      childId,
+      triggerBadgeShine,
+      visibleMissions,
+      bumpHeartsForMissionOptimistic,
+      rollbackMissionHeartsOptimistic,
+      router,
+    ],
   )
 
   const handleMissionComplete = useCallback(
@@ -1325,10 +1483,17 @@ export default function ChildScreen({
       creditReward: number,
       heartReward: number,
     ) => {
+      /**
+       * 서울 날짜가 이미 넘어갔는데 서버 props가 아직 어제면,
+       * 잘못된 날짜(today)로 완료 API를 보내지 않도록 새로고침을 먼저 유도합니다.
+       */
+      if (seoulDayKey !== today) {
+        router.refresh()
+        return
+      }
       if (done.has(dm.id)) {
         return
       }
-
       const honesty = getHonestyBlockForMission(dm)
       if (honesty) {
         setHonestyBlockReason(honesty)
@@ -1377,7 +1542,7 @@ export default function ChildScreen({
       /** 연속 탭 감지 통과 — 정상 완료 처리를 진행합니다 */
       commitMissionComplete(dm, cardRect, creditReward, heartReward)
     },
-    [done, commitMissionComplete, getHonestyBlockForMission],
+    [done, commitMissionComplete, getHonestyBlockForMission, router, seoulDayKey, today],
   )
 
   /**
@@ -1595,7 +1760,7 @@ export default function ChildScreen({
   /** 상단 왼쪽(레벨·크레딧 통합 카드) — 컨테이너 가로가 넓어질수록 최대 1.7배(글자·아이콘 동일 비율) */
   const levelBlockScale = useMemo(() => scaleForLevelBlock(containerW), [containerW])
 
-  /** 상단 우측: 문·타이머·스티커·장바구니 묶음 — 최대 1.8배 / 코인은 별도 1.3배 상한 */
+  /** 상단 우측: 나가기·스티커·장바구니 묶음 — 반응형 스케일 상한은 `RIGHT_ICON_PRIMARY_SCALE_MAX` / 코인은 별도 1.3배 상한 */
   const rightIconPrimaryScale = useMemo(() => scaleForRightIconPrimary(containerW), [containerW])
   const rightIconCoinScale = useMemo(() => scaleForRightIconCoin(containerW), [containerW])
 
@@ -1645,6 +1810,65 @@ export default function ChildScreen({
     () => !usesSingleBucket(stats?.current_level ?? 0, ageYears),
     [stats?.current_level, ageYears],
   )
+  /** 저금통 해금 기준 레벨(Progressive Unlock) */
+  const piggyUnlockLevel = MULTI_BUCKET_MIN_LEVEL
+  /** 현재 저금통이 실제로 열린 상태인지 */
+  const piggyUnlocked = multiBucketMode
+  /** 해금 축하 + 튜토리얼 플로우 모달 */
+  const [piggyUnlockFlowOpen, setPiggyUnlockFlowOpen] = useState(false)
+  const piggyUnlockSeenRef = useRef(false)
+  const piggyTutorialSkipRef = useRef(false)
+  const piggyBootstrapDoneRef = useRef(false)
+  const prevLevelRef = useRef(stats?.current_level ?? 0)
+
+  /**
+   * 자녀별 로컬 persistence 로드.
+   * - 기존에 이미 레벨 5 이상인 사용자에게는 팝업을 다시 띄우지 않도록 기본값을 즉시 "본 상태"로 저장합니다.
+   */
+  useEffect(() => {
+    piggyBootstrapDoneRef.current = false
+  }, [childId])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    if (piggyBootstrapDoneRef.current) return
+    const currentLevel = stats?.current_level
+    if (typeof currentLevel !== 'number') return
+    const seenKey = piggyUnlockSeenStorageKey(childId)
+    const skipKey = piggyTutorialSkipStorageKey(childId)
+    const seen = window.localStorage.getItem(seenKey) === '1'
+    const skipped = window.localStorage.getItem(skipKey) === '1'
+    piggyUnlockSeenRef.current = seen
+    piggyTutorialSkipRef.current = skipped
+    prevLevelRef.current = currentLevel
+    piggyBootstrapDoneRef.current = true
+
+    if (currentLevel >= piggyUnlockLevel && !seen) {
+      window.localStorage.setItem(seenKey, '1')
+      piggyUnlockSeenRef.current = true
+    }
+  }, [childId, piggyUnlockLevel, stats?.current_level])
+
+  /**
+   * 레벨업 직후 해금 조건 체크:
+   * - 이전 레벨 < 5 && 현재 레벨 >= 5 인 "교차 순간"에만 해금 연출을 띄웁니다.
+   */
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    if (!piggyBootstrapDoneRef.current) return
+    const currentLevel = stats?.current_level ?? 0
+    const previousLevel = prevLevelRef.current
+    if (
+      previousLevel < piggyUnlockLevel &&
+      currentLevel >= piggyUnlockLevel &&
+      !piggyUnlockSeenRef.current
+    ) {
+      piggyUnlockSeenRef.current = true
+      window.localStorage.setItem(piggyUnlockSeenStorageKey(childId), '1')
+      setPiggyUnlockFlowOpen(true)
+    }
+    prevLevelRef.current = currentLevel
+  }, [childId, piggyUnlockLevel, stats?.current_level])
 
   /** 저금통 팝업에서 지갑·저금 잔액만 반영합니다. */
   const patchWalletPiggyFromHome = useCallback((p: { credits_wallet: number; credits_piggy: number }) => {
@@ -1728,7 +1952,7 @@ export default function ChildScreen({
                       creditRef={creditBadgeRef}
                       heartRef={levelHeartsRef}
                       shine={badgeShine}
-                      heartsCount={waterButtonHearts}
+                      heartsCount={heartsForHomeUi}
                       onRefresh={handleChildHomeRefresh}
                     />
                     {/*
@@ -1772,7 +1996,7 @@ export default function ChildScreen({
                     {/*
                       화분 로딩 전·실패 시: 카드 아래에 저금통만 잠깐 둡니다(발 옆 자리로 옮기기 전).
                     */}
-                    {stats && (plantLoading || !pot) ? (
+                    {piggyUnlocked && stats && (plantLoading || !pot) ? (
                       <div className="pointer-events-auto mt-6 flex w-max max-w-full justify-start">
                         <ChildHomePiggyBank
                           walletCredits={readChildStatInt(stats.credits_wallet)}
@@ -1793,7 +2017,7 @@ export default function ChildScreen({
 
             <div className="flex shrink-0 flex-col items-end gap-3 pointer-events-auto">
               {/*
-                문·스티커·장바구니를 한 묶음으로 스케일 — 레벨 카드와 같은 가로폭 규칙으로 최대 1.8배.
+                나가기·스티커·장바구니를 한 묶음으로 스케일 — 컨테이너 가로에 따라 `scaleForRightIconPrimary`.
               */}
               <div
                 className="flex flex-col items-end gap-3"
@@ -1804,7 +2028,7 @@ export default function ChildScreen({
               >
                 <a
                   href={exitHref}
-                  className={`${CHILD_HOME_RIGHT_ICON_GLASS_CLASS} no-underline transition active:scale-95`}
+                  className={`${CHILD_HOME_EXIT_STICKER_CART_GLASS_CLASS} no-underline transition active:scale-95`}
                   style={CHILD_HOME_TOP_BAR_GLASS_STYLE}
                   aria-label="나가기"
                 >
@@ -1812,17 +2036,17 @@ export default function ChildScreen({
                   <img
                     src="/assets/img/common/ui/exit.png"
                     alt=""
-                    width={24}
-                    height={24}
+                    width={28}
+                    height={28}
                     // 버튼 블록은 고정하고, 나가기 문 아이콘 그림만 오른쪽으로 아주 미세하게 이동합니다.
-                    className="h-6 w-6 translate-x-[1px] object-contain drop-shadow-md"
+                    className="h-7 w-7 translate-x-[1px] object-contain drop-shadow-md"
                   />
                 </a>
                 {features.sticker && (
                   <button
                     type="button"
                     onClick={() => setActivePanel('sticker')}
-                    className={`${CHILD_HOME_RIGHT_ICON_GLASS_CLASS} border-0 bg-transparent p-0 transition active:scale-95`}
+                    className={`${CHILD_HOME_EXIT_STICKER_CART_GLASS_CLASS} border-0 bg-transparent p-0 transition active:scale-95`}
                     style={CHILD_HOME_TOP_BAR_GLASS_STYLE}
                     aria-label="칭찬 스티커 판 열기"
                   >
@@ -1830,9 +2054,9 @@ export default function ChildScreen({
                     <img
                       src="/assets/img/common/ui/luckybox.png"
                       alt=""
-                      width={28}
-                      height={28}
-                      className="h-7 w-7 object-contain drop-shadow-md"
+                      width={32}
+                      height={32}
+                      className="h-8 w-8 object-contain drop-shadow-md"
                     />
                   </button>
                 )}
@@ -1840,7 +2064,7 @@ export default function ChildScreen({
                   <button
                     type="button"
                     onClick={() => setActivePanel('market')}
-                    className={`${CHILD_HOME_RIGHT_ICON_GLASS_CLASS} border-0 bg-transparent p-0 transition active:scale-95`}
+                    className={`${CHILD_HOME_EXIT_STICKER_CART_GLASS_CLASS} border-0 bg-transparent p-0 transition active:scale-95`}
                     style={CHILD_HOME_TOP_BAR_GLASS_STYLE}
                     aria-label="마켓 열기"
                   >
@@ -1848,9 +2072,9 @@ export default function ChildScreen({
                     <img
                       src="/assets/img/common/ui/basket_filled.png"
                       alt=""
-                      width={28}
-                      height={28}
-                      className="h-7 w-7 object-contain drop-shadow-md"
+                      width={32}
+                      height={32}
+                      className="h-8 w-8 object-contain drop-shadow-md"
                     />
                   </button>
                 )}
@@ -1884,30 +2108,32 @@ export default function ChildScreen({
           */}
           {!plantLoading && pot && stats ? (
             <>
-              <div
-                className="pointer-events-auto absolute z-[21]"
-                style={{
-                  left: `${plantFeetAnchorsPct.plantPct - piggyPotExtraSpreadPct}%`,
-                  top: `${anchor.characterFootY * 100}%`,
-                  transform: 'translate(-50%, calc(-90% - 28px))',
-                }}
-              >
+              {piggyUnlocked ? (
                 <div
-                  className="flex flex-col items-center"
+                  className="pointer-events-auto absolute z-[21]"
                   style={{
-                    transform: `scale(${plantFeetUiScale})`,
-                    transformOrigin: 'center bottom',
+                    left: `${plantFeetAnchorsPct.plantPct - piggyPotExtraSpreadPct}%`,
+                    top: `${anchor.characterFootY * 100}%`,
+                    transform: 'translate(-50%, calc(-90% - 28px))',
                   }}
                 >
-                  <ChildHomePiggyBank
-                    walletCredits={readChildStatInt(stats.credits_wallet)}
-                    piggyCredits={readChildStatInt(stats.credits_piggy)}
-                    childId={childId}
-                    multiBucket={multiBucketMode}
-                    onWalletPiggyUpdate={patchWalletPiggyFromHome}
-                  />
+                  <div
+                    className="flex flex-col items-center"
+                    style={{
+                      transform: `scale(${plantFeetUiScale})`,
+                      transformOrigin: 'center bottom',
+                    }}
+                  >
+                    <ChildHomePiggyBank
+                      walletCredits={readChildStatInt(stats.credits_wallet)}
+                      piggyCredits={readChildStatInt(stats.credits_piggy)}
+                      childId={childId}
+                      multiBucket={multiBucketMode}
+                      onWalletPiggyUpdate={patchWalletPiggyFromHome}
+                    />
+                  </div>
                 </div>
-              </div>
+              ) : null}
               <div
                 className="pointer-events-auto absolute z-[21]"
                 style={{
@@ -1927,7 +2153,9 @@ export default function ChildScreen({
                     pot={pot}
                     onRequestSeedSelect={openSeedModal}
                     waterActions={{
-                      hearts: waterButtonHearts,
+                      /** 물주기 가능 여부는 DB와 맞는 `plantHearts` 기준(레벨 카드는 `heartsForHomeUi` 별도) */
+                      hearts: plantHearts,
+                      allowWaterWithoutHearts: pot.stage === 7,
                       water,
                       onNoHearts: () =>
                         setPlantHint('하트가 부족해요! 미션을 하면 하트를 받을 수 있어요.'),
@@ -2174,6 +2402,17 @@ export default function ChildScreen({
         onClose={() => setSeedModalOpen(false)}
         onConfirm={async (treeId) => {
           await resetPot(treeId)
+        }}
+      />
+
+      <PiggyBankUnlockFlowModal
+        open={piggyUnlockFlowOpen}
+        onClose={() => setPiggyUnlockFlowOpen(false)}
+        onSkipTutorial={() => {
+          piggyTutorialSkipRef.current = true
+          if (typeof window !== 'undefined') {
+            window.localStorage.setItem(piggyTutorialSkipStorageKey(childId), '1')
+          }
         }}
       />
 

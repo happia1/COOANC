@@ -2,18 +2,21 @@
  * 연령·레벨에 따른 크레딧 「단일 버킷」 vs 「지갑/저금통/돈바구니 3분할」 전환
  *
  * 비개발자 설명:
- * - 꽤 어리거나(만 7세 미만) 레벨이 낮을 때(레벨 2 미만)는 코인을 한 덩어리(`credits`)로만 씁니다.
+ * - 레벨이 낮을 때(레벨 5 미만)는 코인을 한 덩어리(`credits`)로만 씁니다.
  * - 나이·레벨이 일정 이상이면 돈바구니·지갑·저금통을 나누는 모드(멀티 버킷)를 씁니다.
  */
 
 // 단일 크레딧 모드 (3버킷 비활성)
-// current_level < MULTI_BUCKET_MIN_LEVEL 이거나
-// age < MULTI_BUCKET_MIN_AGE 이면 credits 단일 버킷 사용
-export const MULTI_BUCKET_MIN_LEVEL = 2
-export const MULTI_BUCKET_MIN_AGE = 7
+// current_level < MULTI_BUCKET_MIN_LEVEL 이면 credits 단일 버킷 사용
+// 비개발자: 저금통/지갑은 레벨 5부터 열립니다.
+export const MULTI_BUCKET_MIN_LEVEL = 5
 
 export function usesSingleBucket(level: number, ageYears?: number | null): boolean {
-  if (ageYears != null && ageYears < MULTI_BUCKET_MIN_AGE) return true
+  /**
+   * ageYears 파라미터는 기존 호출부 호환을 위해 유지합니다.
+   * 현재 정책에서는 저금통 해금을 레벨 기준으로만 판단합니다.
+   */
+  void ageYears
   return level < MULTI_BUCKET_MIN_LEVEL
 }
 

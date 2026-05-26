@@ -24,6 +24,11 @@ type Props = {
   onWater: () => Promise<WaterResult>
   onNoHearts: () => void
   /**
+   * true면 보유 하트가 0이어도 `onWater` 를 호출합니다(7단계 완성 후 화분만 씨앗으로 돌리는 등).
+   * 비개발자: 열매가 다 익은 뒤에는 하트가 없어도 한 번 탭하면 나무가 다시 씨앗부터 시작해요.
+   */
+  allowWaterWithoutHearts?: boolean
+  /**
    * 한 단계(또는 최종 7단계) 성장 직후 — 팝업·콘페티는 부모에서 처리.
    * 비개발자: 물을 준 뒤 화분 그림이 바뀌는 단계에 도달하면 여기로 알려 줍니다.
    */
@@ -33,7 +38,7 @@ type Props = {
 }
 
 const WateringCanButton = forwardRef<HTMLButtonElement, Props>(function WateringCanButton(
-  { hearts, disabled, onWater, onNoHearts, onGrowthCelebrate, onPourVisual },
+  { hearts, disabled, onWater, onNoHearts, onGrowthCelebrate, onPourVisual, allowWaterWithoutHearts = false },
   ref,
 ) {
   const [busy, setBusy] = useState(false)
@@ -44,7 +49,7 @@ const WateringCanButton = forwardRef<HTMLButtonElement, Props>(function Watering
 
   async function handleClick() {
     if (busy || disabled) return
-    if (hearts <= 0) {
+    if (hearts <= 0 && !allowWaterWithoutHearts) {
       setEmptyShake(true)
       onNoHearts()
       window.setTimeout(() => setEmptyShake(false), 420)

@@ -27,8 +27,8 @@ type Props = {
  * 왜 클라이언트 컴포넌트인가요?
  * - 지금 주소가 `/parent` 인지 `/parent/home` 인지 구분하려면 `usePathname()` 이 필요합니다.
  *
- * 왜 `/parent` 에서는 껍데기를 빼나요?
- * - `/parent` 는 곧바로 `/parent/home` 으로 보내는 **짧은 진입 주소**일 뿐이라,
+ * 왜 `/parent`·`/parent/child-entry` 에서는 껍데기를 빼나요?
+ * - `/parent` 와 `/parent/child-entry` 는 곧바로 다른 주소로 넘기는 **짧은 진입용**이라,
  *   상단·하단 바가 잠깐 보였다 사라지는 깜빡임을 막기 위함입니다.
  * - (예전 구조에서는 `page.tsx` 가 `(tabs)` 폴더 밖에 있어서 레이아웃이 자동으로 안 붙었습니다.)
  */
@@ -41,8 +41,8 @@ export default function ParentAppChrome({ pendingApprovalCount, children }: Prop
   const openSettings = useCallback(() => setSettingsOpen(true), [])
   const closeSettings = useCallback(() => setSettingsOpen(false), [])
 
-  if (normalized === '/parent') {
-    /** 진입 전용: 리다이렉트 페이지만 그대로 보여 줍니다 */
+  if (normalized === '/parent' || normalized === '/parent/child-entry') {
+    /** 진입 전용: 리다이렉트·분기 페이지만 그대로 보여 상·하단 바 깜빡임을 줄입니다 */
     return <>{children}</>
   }
 
