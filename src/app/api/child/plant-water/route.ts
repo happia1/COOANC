@@ -14,7 +14,7 @@ type PotRow = {
 function derivePot(row: PotRow) {
   const stageDb = Math.min(7, Math.max(0, readChildStatInt(row.pot_stage))) as PlantStage
   const heartsUsedDb = readChildStatInt(row.pot_hearts_used)
-  const completedDb = row.pot_completed ?? false
+  const completedDb = Boolean(row.pot_completed ?? false)
   const synced = normalizePlantPotProgress(stageDb, heartsUsedDb, completedDb)
   return {
     freshHearts: readChildStatInt(row.hearts),

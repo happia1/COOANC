@@ -192,17 +192,18 @@ export default function PlantPot({ pot, onRequestSeedSelect, waterActions }: Pro
         aria-label="화분 상태 닫기"
         onClick={() => setStatusPopupOpen(false)}
       />
-      <div className="relative z-[1] w-full max-w-xs rounded-2xl border border-green-100 bg-white p-4 shadow-xl">
-        <h2 className="text-center text-lg font-black leading-tight text-green-800">
+      <div className="relative z-[1] flex min-h-[21.5rem] w-full max-w-[17.5rem] flex-col rounded-2xl border border-green-100 bg-white p-4 shadow-xl">
+        {/** 제목(예: 새싹)과 단계(예: 2단계) — 팝업 상단에서 조금 아래로 둡니다 */}
+        <h2 className="mt-5 text-center text-lg font-black leading-tight text-green-800">
           {label}
           <span className="block text-sm font-bold text-green-700/90">{pot.stage + 1}단계</span>
         </h2>
 
         {waterActions ? (
-          <div className="mt-4 flex flex-col items-center gap-2.5">
-            <div ref={arcWrapRef} className="relative mx-auto flex w-[220px] items-end justify-between px-1">
+          <div className="mt-6 flex flex-1 translate-y-3 flex-col items-center justify-center gap-2">
+            <div ref={arcWrapRef} className="relative mx-auto flex w-[200px] items-end justify-center gap-7 px-1">
               {/* 위치 교체: 화분을 왼쪽으로 보냅니다. */}
-              <div ref={potVisualRef} className="relative h-24 w-24">
+              <div ref={potVisualRef} className="relative h-24 w-24 -translate-x-4">
                 <Image
                   src={imgSrc}
                   alt={label}
@@ -215,7 +216,7 @@ export default function PlantPot({ pot, onRequestSeedSelect, waterActions }: Pro
               {/* 위치 교체: 물조리개를 오른쪽에 두고, 살짝 중앙(왼쪽)으로 당깁니다. */}
               <div
                 ref={canVisualRef}
-                className="origin-bottom-right scale-[2] -translate-x-3"
+                className="origin-bottom-right scale-[2] translate-x-3"
                 style={{ animation: canShakeBurst ? 'popupCanShake 0.34s ease-in-out' : undefined }}
               >
                 <WateringCanButton
@@ -253,10 +254,10 @@ export default function PlantPot({ pot, onRequestSeedSelect, waterActions }: Pro
               ) : null}
             </div>
 
-            <div className="mx-auto w-[92%] px-1">
-              <div className="relative h-2.5 w-full overflow-visible rounded-full bg-pink-100">
+            <div className="mx-auto mt-1 w-[78%] px-1">
+              <div className="relative h-2.5 w-full overflow-visible rounded-full bg-gray-300">
                 <div
-                  className="h-full rounded-full bg-pink-200 transition-all duration-500 ease-out"
+                  className="h-full rounded-full bg-pink-300 transition-all duration-500 ease-out"
                   style={{ width: `${progressPct}%` }}
                 />
                 {/* 게이지 끝 하트 — 진행률에 따라 막대 끝을 따라 이동합니다. */}
@@ -292,7 +293,7 @@ export default function PlantPot({ pot, onRequestSeedSelect, waterActions }: Pro
         <button
           type="button"
           onClick={() => setStatusPopupOpen(false)}
-          className="mt-5 w-full rounded-xl bg-gray-100 py-2.5 text-sm font-bold text-gray-700"
+          className="mt-auto mb-2 w-full rounded-xl bg-gray-100 py-2.5 text-sm font-bold text-gray-700"
         >
           닫기
         </button>

@@ -42,21 +42,27 @@ async function resolveFamilyLinkIdForChild(
   return link.id
 }
 
+/**
+ * 이미지 업로드 결과를 단일 형태로 반환합니다.
+ * - `response` 가 있으면 실패(그대로 API 응답으로 돌려보냄), 없으면 성공.
+ * - 비개발자 메모: tsconfig의 strict가 꺼져 있어 `{ok:true} | {ok:false}` 같은
+ *   판별 유니온 타입 좁히기가 동작하지 않으므로, 단순 truthy 체크가 가능한 형태로 둡니다.
+ */
 async function uploadStoreItemImage(
   supabase: Awaited<ReturnType<typeof createClient>>,
   parentId: string,
   imageFile: File,
-): Promise<{ ok: true; publicUrl: string } | { ok: false; response: NextResponse }> {
+): Promise<{ response: NextResponse | null; publicUrl: string | null }> {
   if (!ALLOWED_TYPES.has(imageFile.type.toLowerCase())) {
     return {
-      ok: false,
       response: NextResponse.json({ error: 'JPG, PNG, WebP, GIF 이미지만 올릴 수 있어요' }, { status: 400 }),
+      publicUrl: null,
     }
   }
   if (imageFile.size > MAX_BYTES) {
     return {
-      ok: false,
       response: NextResponse.json({ error: '이미지는 5MB 이하로 올려 주세요' }, { status: 400 }),
+      publicUrl: null,
     }
   }
   const buf = Buffer.from(await imageFile.arrayBuffer())
@@ -69,15 +75,15 @@ async function uploadStoreItemImage(
   if (upErr) {
     console.error('[parent-store-item] storage', upErr.message)
     return {
-      ok: false,
       response: NextResponse.json(
         { error: '이미지 업로드에 실패했어요. 잠시 후 다시 시도해 주세요' },
         { status: 500 },
       ),
+      publicUrl: null,
     }
   }
   const { data: pub } = supabase.storage.from(BUCKET).getPublicUrl(path)
-  return { ok: true, publicUrl: pub.publicUrl }
+  return { response: null, publicUrl: pub.publicUrl }
 }
 
 /**
@@ -146,7 +152,7 @@ export async function POST(req: NextRequest) {
   let imageUrl: string | null = null
   if (imageFile) {
     const upload = await uploadStoreItemImage(supabase, auth.userId, imageFile)
-    if (!upload.ok) return upload.response
+    if (upload.response) return upload.response
     imageUrl = upload.publicUrl
   }
 
@@ -229,7 +235,7 @@ export async function PATCH(req: NextRequest) {
   }
   if (imageFile) {
     const upload = await uploadStoreItemImage(supabase, auth.userId, imageFile)
-    if (!upload.ok) return upload.response
+    if (upload.response) return upload.response
     nextImageUrl = upload.publicUrl
   }
 

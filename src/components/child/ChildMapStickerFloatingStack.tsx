@@ -5,7 +5,7 @@
  * 미션 탭 등 다른 화면에서 재사용 — `relative` 부모 안 첫 자식으로 두면 `absolute top-0` 이 홈 무대와 맞춰집니다.
  */
 
-import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from 'react'
+import { useCallback, useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { ChildStats, PraiseStickerGrant, PraiseStickerPlacement } from '@/types/database'
 import NavigationMapSheet from '@/components/child/NavigationMapSheet'
@@ -82,8 +82,16 @@ export default function ChildMapStickerFloatingStack({
   )
 
   useEffect(() => {
-    const pending = grants.some((x) => x.popup_dismissed_at == null)
-    setArrivalOpen(pending)
+    setArrivalOpen(grants.some((x) => x.popup_dismissed_at == null))
+  }, [grants])
+
+  /** 아직 팝업을 보지 않은 가장 최근 스티커 — 랜덤 발급 이미지 표시용 */
+  const pendingArrivalGrant = useMemo(() => {
+    const pending = grants.filter((g) => g.popup_dismissed_at == null)
+    if (pending.length === 0) return null
+    return pending.reduce((latest, g) =>
+      new Date(g.created_at) >= new Date(latest.created_at) ? g : latest,
+    )
   }, [grants])
 
   /** Realtime 제거 — 스티커 시트·저장 시점의 일반 조회로만 동기화합니다. */
@@ -160,7 +168,12 @@ export default function ChildMapStickerFloatingStack({
         onBoardCleared={clearPraiseStickerBoard}
         praiseGrantsRevision={praiseGrantsRevision}
       />
-      <PraiseGiftArrivalModal open={arrivalOpen} onGoStickers={openBearFromGift} />
+      <PraiseGiftArrivalModal
+        open={arrivalOpen}
+        spriteKey={pendingArrivalGrant?.sprite_key ?? null}
+        onGoStickers={openBearFromGift}
+        onClose={dismissArrival}
+      />
     </>
   )
 }

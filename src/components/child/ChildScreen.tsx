@@ -75,6 +75,7 @@ import { createClient } from '@/lib/supabase/client'
 import { fireMissionCardConfetti } from '@/lib/missionCardConfetti'
 import { tryApplyCompletePayload } from '@/lib/applyDailyMissionCompleteStats'
 import AllMissionCompleteOverlay from '@/components/child/AllMissionCompleteOverlay'
+import PraiseGiftArrivalModal from '@/components/child/PraiseGiftArrivalModal'
 import ChildAlarmClockPopup from '@/components/child/ChildAlarmClockPopup'
 import ChildMusicPopup from '@/components/child/ChildMusicPopup'
 import PlantPot from '@/components/child/PlantPot'
@@ -850,7 +851,7 @@ export default function ChildScreen({
 
     const armNextMidnight = () => {
       const ms = getMsUntilNextSeoulMidnight()
-      timeoutId = window.setTimeout(() => {
+      timeoutId = setTimeout(() => {
         if (cancelled) return
         bumpIfDateChanged()
         armNextMidnight()
@@ -1403,6 +1404,20 @@ export default function ChildScreen({
               typeof json === 'object' &&
               (json as { autoPraiseStickerGranted?: unknown }).autoPraiseStickerGranted === true
             ) {
+              void (async () => {
+                const supabase = createClient()
+                const { data } = await supabase
+                  .from('praise_sticker_grants')
+                  .select('*')
+                  .eq('child_id', childId)
+                  .order('created_at', { ascending: false })
+                if (data) {
+                  setGrants((prev) =>
+                    mergePraiseStickerGrantsFromServer(data as PraiseStickerGrant[], prev),
+                  )
+                  setPraiseGrantsRevision((r) => r + 1)
+                }
+              })()
               router.refresh()
             }
           } else {
@@ -1640,6 +1655,7 @@ export default function ChildScreen({
   const [grants, setGrants] = useState(initialPraiseGrants)
   const [placements, setPlacements] = useState(initialPraisePlacements)
   const [praiseGrantsRevision, setPraiseGrantsRevision] = useState(0)
+  const [arrivalOpen, setArrivalOpen] = useState(false)
 
   useEffect(() => {
     setGrants((prev) => mergePraiseStickerGrantsFromServer(initialPraiseGrants, prev))
@@ -1669,9 +1685,41 @@ export default function ChildScreen({
     [],
   )
 
+  /** 아직 팝업을 보지 않은 가장 최근 스티커 — 랜덤 발급 이미지 표시용 */
+  const pendingArrivalGrant = useMemo(() => {
+    const pending = grants.filter((g) => g.popup_dismissed_at == null)
+    if (pending.length === 0) return null
+    return pending.reduce((latest, g) =>
+      new Date(g.created_at) >= new Date(latest.created_at) ? g : latest,
+    )
+  }, [grants])
+
+  useEffect(() => {
+    setArrivalOpen(pendingArrivalGrant != null)
+  }, [pendingArrivalGrant])
+
+  const dismissArrival = useCallback(async () => {
+    const now = new Date().toISOString()
+    setGrants((prev) =>
+      prev.map((g) => (g.popup_dismissed_at ? g : { ...g, popup_dismissed_at: now })),
+    )
+    setArrivalOpen(false)
+    const supabase = createClient()
+    await supabase
+      .from('praise_sticker_grants')
+      .update({ popup_dismissed_at: now })
+      .eq('child_id', childId)
+      .is('popup_dismissed_at', null)
+  }, [childId])
+
   // ── 패널 상태 ──────────────────────────────────────────────────────────────
 
   const [activePanel, setActivePanel] = useState<PanelType>(null)
+
+  const openBearFromGift = useCallback(() => {
+    setActivePanel('sticker')
+    void dismissArrival()
+  }, [dismissArrival])
 
   // ── 기능 해금 ─────────────────────────────────────────────────────────────
 
@@ -2326,6 +2374,13 @@ export default function ChildScreen({
         onPraiseBoardCleared={clearPraiseStickerBoard}
         praiseGrantsRevision={praiseGrantsRevision}
         onInventoryChange={refreshStickerPlacements}
+      />
+
+      <PraiseGiftArrivalModal
+        open={arrivalOpen}
+        spriteKey={pendingArrivalGrant?.sprite_key ?? null}
+        onGoStickers={openBearFromGift}
+        onClose={dismissArrival}
       />
 
       {/* ── L6: 연속 탭 확인 팝업 ─────────────────────────────────────────── */}

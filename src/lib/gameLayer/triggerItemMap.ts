@@ -10,11 +10,6 @@ export type TriggerKey =
   | 'FIRST_WALLET_USE'
   | 'ADD_TO_CART'
   | 'FIRST_PURCHASE'
-  /**
-   * 스페셜(골드) 미션 카드를 누적 5회 이상 완료했을 때 1회 발동.
-   * 비개발자: 골드 카드 5장을 달성하면 자동 칭찬 스티커 지급 게이트로 씁니다.
-   */
-  | 'SPECIAL_GOLD_CARD_5'
 
 /**
  * 새 꾸미기 PNG 목록(인덱스 의미 변경)과 「지금은 전부 잠금」 단계에 맞춰,
@@ -26,5 +21,4 @@ export const TRIGGER_TO_ITEM: Record<TriggerKey, number | null> = {
   FIRST_WALLET_USE: null,
   ADD_TO_CART:      null,
   FIRST_PURCHASE:   null,
-  SPECIAL_GOLD_CARD_5: null,
 }

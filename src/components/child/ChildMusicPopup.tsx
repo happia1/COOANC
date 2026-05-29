@@ -17,7 +17,7 @@ const TIMER_KEYWORD_VIDEOS = [
   { label: '빠른 기상', url: 'https://youtu.be/sOX5x-C335o?si=pOjStvOwnhQFU-G8' },
   { label: '식사시간', url: 'https://youtu.be/OxVeowNwyFw?si=uMOJi03Hw7r4qkV1' },
   { label: '놀이시간', url: 'https://youtu.be/yBanUW7ja8M?si=j5COdu4hKoAfHzgl' },
-  { label: '모두 제자리', url: 'https://youtu.be/ZChTK8th_ps?si=7DKiV4XGLi6_kWku' },
+  { label: '모두 제자리', url: 'https://www.youtube.com/watch?v=bs3ztX4TWHc' },
   { label: '잠잘 준비', url: 'https://youtu.be/bdjyo0qsejI?si=XvMWVjb16aW91Hj4' },
   /** 잠잘 준비 다음 — 요청 URL의 `t=3541s` 는 embed `start` 로 넘겨 해당 시점부터 재생합니다 */
   {
