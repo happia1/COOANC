@@ -21,6 +21,8 @@ type RapidTapAlert = {
 type Props = {
   open: boolean
   onClose: () => void
+  /** 팝업 "더 보기" 등으로 열렸을 때, 자동으로 펼쳐서 보여 줄 공지 id */
+  focusNoticeId?: string | null
   /** 아직 확인하지 않은 구매 승인 대기 건수 — 0이면 알림 구역은 숨깁니다 */
   unreadPendingCount: number
   /** 승인 탭으로 이동하기 직전에 호출해, 해당 알림을 확인한 것으로 기록합니다 */
@@ -34,6 +36,7 @@ type Props = {
 export default function ParentBellBoardSheet({
   open,
   onClose,
+  focusNoticeId = null,
   unreadPendingCount,
   onAcknowledgePurchaseNotifications,
   rapidTapAlerts = [],
@@ -152,7 +155,7 @@ export default function ParentBellBoardSheet({
               </div>
             ) : null}
 
-            <ParentNoticeSlides active={open} onClose={onClose} />
+            <ParentNoticeSlides active={open} onClose={onClose} focusNoticeId={focusNoticeId} />
           </div>
         </section>
       </div>

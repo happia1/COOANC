@@ -18,6 +18,7 @@ import {
 } from '@/lib/parentBellPurchaseAck'
 import ParentBellBoardSheet from '@/components/parent/ParentBellBoardSheet'
 import RoutineAlarmSettingsSheet from '@/components/parent/RoutineAlarmSettingsSheet'
+import { OPEN_NOTICE_CENTER_EVENT, type OpenNoticeCenterDetail } from '@/lib/noticeCenterBus'
 
 /** 알림·공지(벨) 버튼용 PNG — `public/assets/img/common/ui/notice.png` */
 const PARENT_NOTICE_BELL_ICON_SRC = '/assets/img/common/ui/notice.png' as const
@@ -30,6 +31,8 @@ type Props = {
 export default function ParentRoutineAlarmButton({ initialPendingApprovalCount }: Props) {
   const [boardOpen, setBoardOpen] = useState(false)
   const [routineOpen, setRoutineOpen] = useState(false)
+  /** 팝업의 "더 보기" 등으로 공지센터를 열 때, 펼쳐서 보여 줄 공지 id */
+  const [focusNoticeId, setFocusNoticeId] = useState<string | null>(null)
   /** 현재 DB 기준 대기 중인 purchase_requests.id 목록 */
   const [pendingRequestIds, setPendingRequestIds] = useState<string[]>([])
   /** 시트에서 확인 처리한 id(브라우저 저장소와 동기) */
@@ -51,6 +54,20 @@ export default function ParentRoutineAlarmButton({ initialPendingApprovalCount }
   /** 클라이언트에서만: 예전에 확인해 둔 id 를 불러옵니다 */
   useEffect(() => {
     setAcknowledgedIds(readAcknowledgedPurchaseRequestIds())
+  }, [])
+
+  /**
+   * 다른 부품(앱 실행 팝업의 "더 보기")이 "공지센터 열어줘" 신호를 보내면,
+   * 보드를 열고 펼쳐서 보여 줄 공지 id 를 시트로 전달합니다.
+   */
+  useEffect(() => {
+    const onOpenNoticeCenter = (e: Event) => {
+      const detail = (e as CustomEvent<OpenNoticeCenterDetail>).detail
+      setFocusNoticeId(detail?.noticeId ?? null)
+      setBoardOpen(true)
+    }
+    window.addEventListener(OPEN_NOTICE_CENTER_EVENT, onOpenNoticeCenter)
+    return () => window.removeEventListener(OPEN_NOTICE_CENTER_EVENT, onOpenNoticeCenter)
   }, [])
 
   /**
@@ -208,7 +225,11 @@ export default function ParentRoutineAlarmButton({ initialPendingApprovalCount }
 
       <ParentBellBoardSheet
         open={boardOpen}
-        onClose={() => setBoardOpen(false)}
+        onClose={() => {
+          setBoardOpen(false)
+          setFocusNoticeId(null)
+        }}
+        focusNoticeId={focusNoticeId}
         unreadPendingCount={unreadPendingCount}
         onAcknowledgePurchaseNotifications={acknowledgePurchaseNotifications}
         rapidTapAlerts={rapidTapAlerts}

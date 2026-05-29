@@ -143,7 +143,22 @@ export function CompactChildProfileCard({
              * 양쪽 열(`pr-4`/`pl-4`): ‹ › 와 원형 프로필 사이를 넓게 — 스와이프는 줄 전체에 동일하게 걸림
              */}
             <div className="grid w-full max-w-[20rem] grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center">
-              <div className="flex min-h-[3rem] items-center justify-end pr-3 md:pr-6">
+              <div
+                className="flex min-h-[3rem] cursor-pointer items-center justify-end pr-3 md:pr-6"
+                /**
+                 * 다자녀 UX 개선:
+                 * 화살표 아이콘만이 아니라, 원형 캐릭터 바깥의 좌측 여백 전체를 눌러도 이전 자녀로 넘깁니다.
+                 */
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  siblingNav.onPrev()
+                }}
+                onPointerDown={(e) => {
+                  e.stopPropagation()
+                }}
+                aria-hidden
+              >
                 <SiblingNavArrow ariaLabel="이전 자녀로" orientation="prev" onPress={siblingNav.onPrev} />
               </div>
               <div className="flex justify-center px-2">
@@ -155,7 +170,22 @@ export function CompactChildProfileCard({
                   showShortcut={avatarEnterShortcut}
                 />
               </div>
-              <div className="flex min-h-[3rem] items-center justify-start pl-3 md:pl-6">
+              <div
+                className="flex min-h-[3rem] cursor-pointer items-center justify-start pl-3 md:pl-6"
+                /**
+                 * 다자녀 UX 개선:
+                 * 화살표 아이콘만이 아니라, 원형 캐릭터 바깥의 우측 여백 전체를 눌러도 다음 자녀로 넘깁니다.
+                 */
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  siblingNav.onNext()
+                }}
+                onPointerDown={(e) => {
+                  e.stopPropagation()
+                }}
+                aria-hidden
+              >
                 <SiblingNavArrow ariaLabel="다음 자녀로" orientation="next" onPress={siblingNav.onNext} />
               </div>
             </div>
@@ -214,12 +244,12 @@ function AvatarWithShortcut({
       <AvatarCircle avatarUrl={avatarUrl} stageName={stageName} boxClass={boxClass} />
       {showShortcut ? (
         <span
-          className="pointer-events-none absolute bottom-[-1px] right-[-2px] z-[1] flex h-[1.125rem] w-[1.125rem] items-center justify-center rounded-full bg-white shadow-[0_1px_3px_rgba(15,23,42,0.12)] ring-1 ring-gray-200/90"
+          className="pointer-events-none absolute bottom-[-1px] right-[14px] z-[1] flex h-[1.125rem] w-[1.125rem] items-center justify-center rounded-full bg-white shadow-[0_1px_3px_rgba(15,23,42,0.12)] ring-1 ring-gray-200/90"
           title="자녀 앱 화면으로 바로가기"
           aria-hidden
         >
           {/** 대각선 ↗ 로 「다른 화면으로 이동」을 직관적으로 표시 — 터치는 원형 안으로 통과시킵니다 */}
-          <span className="block pb-px text-[13px] font-black leading-none text-slate-500">↗</span>
+          <span className="block translate-y-px text-[13px] font-black leading-none text-slate-500">↗</span>
         </span>
       ) : null}
     </div>

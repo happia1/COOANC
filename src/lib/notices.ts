@@ -232,32 +232,36 @@ const POPUP_PRIORITY: Record<Exclude<PopupType, 'none'>, number> = {
 }
 
 /**
- * STEP 5 + STEP 6: 활성 공지들 중에서 "지금 앱 실행 시 띄울 팝업 1개"를 고릅니다.
+ * STEP 5 + STEP 6: 활성 공지들 중에서 "지금 앱 실행 시 띄울 팝업들"을 우선순위로 정렬해 모두 돌려줍니다.
  *
  * 노출 조건:
  * - popup_type != 'none'
  * - popup_until 이 null 이거나 현재 시각 이후(아직 안 지남)
  *   (is_active / start_at / end_at 기간 조건은 fetchActiveNotices 단계에서 이미 걸러졌다고 가정)
  *
- * 우선순위:
- * 1) force > 2) important > 3) once
- * 동일 우선순위면 order_index 오름차순 → created_at 최신순(보조)
- *   (입력 notices 가 이미 그 순서이므로, 안정 정렬로 "타입 우선순위"만 다시 적용)
+ * 정렬:
+ * 1) force > 2) important > 3) once (팝업 종류 우선순위, 클수록 먼저)
+ * 2) 동일 우선순위면 입력 순서(order_index 오름차순 → created_at 최신순)를 유지(안정 정렬)
+ *
+ * 비개발자 설명: 팝업으로 띄울 공지가 여러 개면, 이 순서대로 책장을 넘기듯 보여 줍니다.
  */
-export function pickLaunchPopupNotice(notices: Notice[], now: Date = new Date()): Notice | null {
+export function pickLaunchPopupNotices(notices: Notice[], now: Date = new Date()): Notice[] {
   const candidates = notices.filter((n) => {
     if (n.popupType === 'none') return false
     if (n.popupUntil && n.popupUntil.getTime() <= now.getTime()) return false
     return true
   })
 
-  if (candidates.length === 0) return null
-
-  const sorted = [...candidates].sort((a, b) => {
+  return [...candidates].sort((a, b) => {
     const pa = a.popupType === 'none' ? 0 : POPUP_PRIORITY[a.popupType]
     const pb = b.popupType === 'none' ? 0 : POPUP_PRIORITY[b.popupType]
     return pb - pa
   })
+}
 
-  return sorted[0] ?? null
+/**
+ * STEP 6: 위 목록에서 "가장 먼저 띄울 팝업 1개"만 고릅니다. (단일 팝업이 필요한 곳용)
+ */
+export function pickLaunchPopupNotice(notices: Notice[], now: Date = new Date()): Notice | null {
+  return pickLaunchPopupNotices(notices, now)[0] ?? null
 }

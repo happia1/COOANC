@@ -13,7 +13,10 @@ import { readChildStatInt } from '@/lib/childCreditsSplit'
 import type { Mission } from '@/types/database'
 import { fireGameTrigger } from '@/lib/gameLayer/fireGameTrigger'
 import { createServiceRoleClient } from '@/lib/supabase/admin'
-import { PRAISE_ASSET_STICKER_KEYS } from '@/lib/praiseAssetStickers'
+import {
+  PRAISE_ASSET_STICKER_KEYS_ROW_HEART,
+  PRAISE_ASSET_STICKER_KEYS_ROW_STAR,
+} from '@/lib/praiseAssetStickers'
 
 /**
  * POST /api/daily-mission/complete
@@ -274,13 +277,17 @@ export async function POST(req: NextRequest) {
   const triggerResult = await fireGameTrigger(supabase, childId, 'FIRST_MISSION')
 
   /**
-   * 골드(스페셜) 카드 누적 5회 이상 완료 시, 칭찬 스티커를 자동 1회 지급합니다.
-   * - `child_trigger_fired` 게이트로 중복 지급을 원자적으로 방지합니다.
-   * - `praise_sticker_grants` 정책상 parent_id가 필요하므로, 연결된 부모 1명을 찾아 service_role로 삽입합니다.
+   * 하루 기준 칭찬 스티커 자동 발급 (랜덤 1개)
+   * 비개발자 설명:
+   *  - 오늘 끝낸 '일반 미션'이 10개가 되면 → 하트 스티커 5종 중 1개를 무작위로 지급
+   *  - 오늘 끝낸 '스페셜 미션'이 5개가 되면 → 별 스티커 5종 중 1개를 무작위로 지급
+   *  - 같은 날에는 각각 한 번만 지급되도록 `child_trigger_fired` 에 '날짜별 키'로 게이트를 겁니다.
+   *    (다음 날이 되면 키가 달라지므로 자연히 초기화됩니다.)
+   *  - `praise_sticker_grants` 정책상 parent_id 가 필요하므로 연결된 부모 1명을 찾아 service_role 로 삽입합니다.
    */
   let autoPraiseStickerGranted = false
-  if (isSpecialSectionMission(mission as Mission)) {
-    const AUTO_STICKER_KEY = PRAISE_ASSET_STICKER_KEYS[5] ?? 'asset:sticker_06'
+  {
+    // 스페셜(골드) 미션 템플릿 id 집합 — '일반/스페셜' 구분 기준으로 씁니다.
     const { data: specialMissionRows, error: specialMissionErr } = await supabase
       .from('missions')
       .select('id')
@@ -288,46 +295,88 @@ export async function POST(req: NextRequest) {
     if (specialMissionErr) {
       console.error('[daily-mission/complete] special mission ids error', specialMissionErr.message)
     }
+    const specialIdSet = new Set((specialMissionRows ?? []).map((r) => r.id))
 
-    const specialMissionIds = (specialMissionRows ?? []).map((r) => r.id)
-    if (specialMissionIds.length > 0) {
-      const { count: specialCompletedCount, error: specialCountErr } = await supabase
-        .from('mission_logs')
-        .select('id', { count: 'exact', head: true })
+    // 오늘(배정일) 완료한 미션 로그 — 방금 완료한 미션도 위에서 이미 기록되어 포함됩니다.
+    const { data: todayLogs, error: todayLogErr } = await supabase
+      .from('mission_logs')
+      .select('mission_id')
+      .eq('child_id', childId)
+      .eq('assigned_date', assignedDate)
+      .eq('is_completed', true)
+    if (todayLogErr) {
+      console.error('[daily-mission/complete] today logs error', todayLogErr.message)
+    }
+
+    const logs = todayLogs ?? []
+    const specialDoneToday = logs.filter((l) => specialIdSet.has(l.mission_id as string)).length
+    const normalDoneToday = logs.length - specialDoneToday
+
+    const wantNormalSticker = normalDoneToday >= 10
+    const wantSpecialSticker = specialDoneToday >= 5
+
+    if (wantNormalSticker || wantSpecialSticker) {
+      const { data: familyLink, error: linkErr } = await supabase
+        .from('family_links')
+        .select('parent_id')
         .eq('child_id', childId)
-        .eq('is_completed', true)
-        .in('mission_id', specialMissionIds)
-      if (specialCountErr) {
-        console.error('[daily-mission/complete] special mission count error', specialCountErr.message)
-      } else if ((specialCompletedCount ?? 0) >= 5) {
-        const specialGate = await fireGameTrigger(supabase, childId, 'SPECIAL_GOLD_CARD_5')
-        if (specialGate.fired) {
-          const { data: familyLink, error: linkErr } = await supabase
-            .from('family_links')
-            .select('parent_id')
-            .eq('child_id', childId)
-            .order('created_at', { ascending: true })
-            .limit(1)
-            .maybeSingle()
-          if (linkErr) {
-            console.error('[daily-mission/complete] family link for auto sticker error', linkErr.message)
-          }
-          if (familyLink?.parent_id) {
-            const svc = createServiceRoleClient()
-            if (!svc) {
-              console.error('[daily-mission/complete] service role unavailable for auto sticker')
-            } else {
-              const { error: grantErr } = await svc.from('praise_sticker_grants').insert({
-                child_id: childId,
-                parent_id: familyLink.parent_id,
-                sprite_key: AUTO_STICKER_KEY,
-              })
-              if (grantErr) {
-                console.error('[daily-mission/complete] auto sticker grant failed', grantErr.message)
-              } else {
-                autoPraiseStickerGranted = true
-              }
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .maybeSingle()
+      if (linkErr) {
+        console.error('[daily-mission/complete] family link for auto sticker error', linkErr.message)
+      }
+
+      const parentId = familyLink?.parent_id ?? null
+      const svc = parentId ? createServiceRoleClient() : null
+      if (parentId && !svc) {
+        console.error('[daily-mission/complete] service role unavailable for auto sticker')
+      }
+
+      if (parentId && svc) {
+        /** 후보 목록에서 무작위로 하나 고릅니다(스티커 종류 랜덤). */
+        const pickRandom = <T>(arr: readonly T[]): T => arr[Math.floor(Math.random() * arr.length)]!
+
+        const dailyGrants: { gateKey: string; spriteKey: string }[] = []
+        if (wantNormalSticker) {
+          dailyGrants.push({
+            gateKey: `DAILY_NORMAL_STICKER:${completionDay}`,
+            spriteKey: pickRandom(PRAISE_ASSET_STICKER_KEYS_ROW_HEART),
+          })
+        }
+        if (wantSpecialSticker) {
+          dailyGrants.push({
+            gateKey: `DAILY_SPECIAL_STICKER:${completionDay}`,
+            spriteKey: pickRandom(PRAISE_ASSET_STICKER_KEYS_ROW_STAR),
+          })
+        }
+
+        for (const grant of dailyGrants) {
+          /**
+           * 하루 1회 게이트를 '선점'합니다. 같은 날 두 번째 호출은 PK 충돌(23505)로 막혀
+           * 스티커가 중복 지급되지 않습니다. RLS 영향을 받지 않도록 service_role 로 삽입합니다.
+           */
+          const { data: gateRows, error: gateErr } = await svc
+            .from('child_trigger_fired')
+            .insert({ child_id: childId, trigger_key: grant.gateKey })
+            .select('child_id')
+          if (gateErr) {
+            if (gateErr.code !== '23505') {
+              console.error('[daily-mission/complete] daily sticker gate error', gateErr.message)
             }
+            continue // 이미 오늘 지급됐거나(23505) 오류 → 지급 건너뜀
+          }
+          if (!gateRows?.length) continue
+
+          const { error: grantErr } = await svc.from('praise_sticker_grants').insert({
+            child_id: childId,
+            parent_id: parentId,
+            sprite_key: grant.spriteKey,
+          })
+          if (grantErr) {
+            console.error('[daily-mission/complete] auto sticker grant failed', grantErr.message)
+          } else {
+            autoPraiseStickerGranted = true
           }
         }
       }

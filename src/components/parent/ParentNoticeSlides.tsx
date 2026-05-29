@@ -55,6 +55,8 @@ type Props = {
   active: boolean
   /** 링크로 이동하기 직전에 시트를 닫을 때 호출합니다 */
   onClose: () => void
+  /** 팝업 "더 보기"로 열렸을 때, 자동으로 펼쳐서 보여 줄 공지 id */
+  focusNoticeId?: string | null
 }
 
 /** link_url 이 있을 때만 보이는 버튼 (STEP 8) */
@@ -213,7 +215,7 @@ function NoticeCategoryBox({
   )
 }
 
-export default function ParentNoticeSlides({ active, onClose }: Props) {
+export default function ParentNoticeSlides({ active, onClose, focusNoticeId = null }: Props) {
   const [rows, setRows] = useState<Notice[]>([])
   const [loading, setLoading] = useState(false)
   const [fetchError, setFetchError] = useState<string | null>(null)
@@ -311,6 +313,44 @@ export default function ParentNoticeSlides({ active, onClose }: Props) {
       return next
     })
   }, [])
+
+  /**
+   * 팝업 "더 보기"로 들어온 경우: 대상 공지가 목록에 있으면
+   * 그 카테고리와 공지를 자동으로 펼치고, 확인 처리한 뒤 화면을 그 위치로 스크롤합니다.
+   */
+  useEffect(() => {
+    if (!active || !focusNoticeId) return
+    const target = rows.find((r) => r.id === focusNoticeId)
+    if (!target) return
+
+    setExpandedTypes((prev) => {
+      if (prev.has(target.noticeType)) return prev
+      const next = new Set(prev)
+      next.add(target.noticeType)
+      return next
+    })
+    setExpandedIds((prev) => {
+      if (prev.has(focusNoticeId)) return prev
+      const next = new Set(prev)
+      next.add(focusNoticeId)
+      return next
+    })
+    setSeenIds((prev) => {
+      if (prev.has(focusNoticeId)) return prev
+      const next = new Set(prev)
+      next.add(focusNoticeId)
+      persistSeenNoticeIds(next)
+      return next
+    })
+
+    // 펼침이 화면에 반영된 뒤, 해당 공지로 부드럽게 스크롤합니다.
+    const timer = window.setTimeout(() => {
+      document
+        .getElementById(`notice-header-${focusNoticeId}`)
+        ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }, 280)
+    return () => window.clearTimeout(timer)
+  }, [active, focusNoticeId, rows])
 
   // STEP 3: 종류별 섹션으로 묶습니다. 비어 있는 종류는 자동으로 빠집니다.
   const sections = groupNoticesByType(rows)
