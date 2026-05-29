@@ -69,7 +69,7 @@ export default function ParentBellBoardSheet({
       */}
       <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center md:landscape:inset-x-0 md:landscape:inset-y-0 md:landscape:bottom-0 md:landscape:left-auto md:landscape:right-0 md:landscape:top-0 md:landscape:justify-end">
         <section
-          className={`pointer-events-auto flex max-h-[min(85dvh,100vh-1rem)] w-full max-w-none flex-col rounded-t-2xl bg-white shadow-2xl transition-transform duration-300 ease-out md:landscape:h-full md:landscape:max-h-none md:landscape:max-w-md md:landscape:rounded-none md:landscape:rounded-l-2xl ${
+          className={`pointer-events-auto flex max-h-[min(85dvh,100vh-1rem)] w-full max-w-none flex-col rounded-t-2xl bg-white shadow-2xl transition-transform duration-300 ease-out md:landscape:h-full md:landscape:max-h-none md:landscape:w-[21rem] md:landscape:max-w-[21rem] md:landscape:rounded-none md:landscape:rounded-l-2xl ${
             sheetEntered
               ? 'translate-y-0 md:landscape:translate-y-0 md:landscape:translate-x-0'
               : 'translate-y-full md:landscape:translate-y-0 md:landscape:translate-x-full'
@@ -86,7 +86,7 @@ export default function ParentBellBoardSheet({
             </p>
           </div>
 
-          <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-3">
+          <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-3 [scrollbar-gutter:stable]">
             {(unreadPendingCount > 0 || rapidTapAlerts.length > 0) ? (
               <div>
                 <p className="mb-2 px-0.5 text-[10px] font-black uppercase tracking-wide text-gray-500">알림</p>

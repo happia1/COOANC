@@ -10,6 +10,7 @@ import ParentNewPurchaseRequestModal from '@/components/parent/ParentNewPurchase
 import ParentStickerBoardCompleteModal from '@/components/parent/ParentStickerBoardCompleteModal'
 import ParentSettingsSheet from '@/components/parent/ParentSettingsSheet'
 import ParentSettingsDeepLink from '@/components/parent/ParentSettingsDeepLink'
+import ParentNoticePopup from '@/components/parent/ParentNoticePopup'
 
 type Props = {
   /**
@@ -65,6 +66,8 @@ export default function ParentAppChrome({ pendingApprovalCount, children }: Prop
       <ParentNewPurchaseRequestModal />
       <ParentStickerBoardCompleteModal />
       <ParentSettingsSheet open={settingsOpen} onClose={closeSettings} />
+      {/* 앱 실행 시 조건에 맞는 공지 팝업 1개를 띄웁니다 (STEP 5~8) */}
+      <ParentNoticePopup />
     </div>
   )
 }
