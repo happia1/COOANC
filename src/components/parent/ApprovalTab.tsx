@@ -119,6 +119,8 @@ type Props = {
   hiddenItemIdsByChild: Record<string, string[]>
   /** 자녀별 마켓 상품 크레딧 덮어쓰기(메뉴 제어에서 수정 가능) */
   initialCreditOverridesByChild: Record<string, Record<string, number>>
+  /** 자녀별 마켓 상품 표시 순서(없으면 기본 정렬 사용) */
+  initialItemOrdersByChild: Record<string, Record<string, number>>
 }
 
 export default function ApprovalTab({
@@ -130,6 +132,7 @@ export default function ApprovalTab({
   linkByChild,
   hiddenItemIdsByChild: initialHidden,
   initialCreditOverridesByChild,
+  initialItemOrdersByChild,
 }: Props) {
   /**
    * `useRef(createClient())`는 매 렌더마다 `createClient()`가 호출됩니다.
@@ -220,6 +223,27 @@ export default function ApprovalTab({
     setCreditOverridesByChild(m)
     // eslint-disable-next-line react-hooks/exhaustive-deps -- 초기 맵은 JSON 키에 전부 직렬화됨
   }, [creditOverridesInitialKey])
+
+  /** 메뉴 제어 — 자녀별 상품 표시 순서 맵(item_id -> order_rank) */
+  const itemOrdersInitialKey = useMemo(
+    () => JSON.stringify(initialItemOrdersByChild),
+    [initialItemOrdersByChild],
+  )
+  const [itemOrdersByChild, setItemOrdersByChild] = useState<Record<string, Record<string, number>>>(() => {
+    const m: Record<string, Record<string, number>> = {}
+    for (const c of childrenProfiles) {
+      m[c.id] = { ...(initialItemOrdersByChild[c.id] ?? {}) }
+    }
+    return m
+  })
+  useEffect(() => {
+    const m: Record<string, Record<string, number>> = {}
+    for (const c of childrenProfiles) {
+      m[c.id] = { ...(initialItemOrdersByChild[c.id] ?? {}) }
+    }
+    setItemOrdersByChild(m)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 초기 맵은 JSON 키에 모두 반영됨
+  }, [itemOrdersInitialKey])
 
   /** 「받았어요」클릭 시 — 바로 도착 완료 vs 외부 쇼핑몰 안내(자녀 화면 별도 팝업) */
   const [approveChoiceModal, setApproveChoiceModal] = useState<{ requestId: string; itemName: string } | null>(
@@ -481,6 +505,12 @@ export default function ApprovalTab({
     return creditOverridesByChild[currentId] ?? {}
   }, [creditOverridesByChild, currentId])
 
+  /** 선택 자녀의 수동 정렬 맵 */
+  const itemOrdersForCurrent = useMemo(() => {
+    if (!currentId) return {}
+    return itemOrdersByChild[currentId] ?? {}
+  }, [itemOrdersByChild, currentId])
+
   /** 메뉴 제어에서 크레딧 저장 API 성공 후 로컬 맵 갱신 */
   const onCreditOverrideSaved = useCallback(
     (itemId: string, nextOverride: number | null) => {
@@ -494,6 +524,55 @@ export default function ApprovalTab({
     },
     [currentId],
   )
+
+  /** 메뉴 제어에서 드래그 정렬 저장 성공 후 로컬 순서 맵 갱신 */
+  const onItemOrderSaved = useCallback(
+    (nextOrderMap: Record<string, number>) => {
+      if (!currentId) return
+      setItemOrdersByChild((prev) => ({
+        ...prev,
+        [currentId]: { ...nextOrderMap },
+      }))
+    },
+    [currentId],
+  )
+
+  /** 메뉴 제어에서 가족 전용 상품 수정 후 목록 갱신 */
+  const onItemUpdated = useCallback((updated: StoreItem) => {
+    setStoreItems((prev) => prev.map((it) => (it.id === updated.id ? updated : it)))
+  }, [])
+
+  /** 메뉴 제어에서 가족 전용 상품 삭제 후 관련 상태 정리 */
+  const onItemDeleted = useCallback((deletedItemId: string) => {
+    setStoreItems((prev) => prev.filter((it) => it.id !== deletedItemId))
+    setHiddenByChild((prev) => {
+      const next: Record<string, Set<string>> = {}
+      for (const [cid, ids] of Object.entries(prev)) {
+        const copied = new Set(ids)
+        copied.delete(deletedItemId)
+        next[cid] = copied
+      }
+      return next
+    })
+    setCreditOverridesByChild((prev) => {
+      const next: Record<string, Record<string, number>> = {}
+      for (const [cid, row] of Object.entries(prev)) {
+        const copied = { ...row }
+        delete copied[deletedItemId]
+        next[cid] = copied
+      }
+      return next
+    })
+    setItemOrdersByChild((prev) => {
+      const next: Record<string, Record<string, number>> = {}
+      for (const [cid, row] of Object.entries(prev)) {
+        const copied = { ...row }
+        delete copied[deletedItemId]
+        next[cid] = copied
+      }
+      return next
+    })
+  }, [])
 
   /** 외부 쇼핑(플레이스홀더 URL) — DB 는 `parent_buying`, 자녀는 실시간으로 안내 팝업 */
   async function handleParentShopPath(requestId: string) {
@@ -1069,6 +1148,10 @@ export default function ApprovalTab({
             onItemCreated={(item) => setStoreItems((prev) => [...prev, item])}
             creditOverrides={creditOverridesForCurrent}
             onCreditOverrideSaved={onCreditOverrideSaved}
+            itemOrders={itemOrdersForCurrent}
+            onItemOrderSaved={onItemOrderSaved}
+            onItemUpdated={onItemUpdated}
+            onItemDeleted={onItemDeleted}
           />
         </section>
 

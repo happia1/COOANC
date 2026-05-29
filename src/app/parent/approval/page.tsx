@@ -35,7 +35,7 @@ export default async function ApprovalPage() {
   }
   const profiles = profileBundle.rows ?? []
 
-  const [statsRes, requestsRes, historyRes, logsRes, storeRes, hiddenRes, creditOvRes] = await Promise.all([
+  const [statsRes, requestsRes, historyRes, logsRes, storeRes, hiddenRes, creditOvRes, orderRes] = await Promise.all([
     childIds.length > 0
       ? supabase
           .from('child_stats')
@@ -96,6 +96,13 @@ export default async function ApprovalPage() {
       ? supabase
           .from('child_store_item_credit_overrides')
           .select('child_id, store_item_id, credit_price')
+          .in('child_id', childIds)
+      : Promise.resolve({ data: [], error: null }),
+
+    childIds.length > 0
+      ? supabase
+          .from('child_market_item_orders')
+          .select('child_id, store_item_id, order_rank')
           .in('child_id', childIds)
       : Promise.resolve({ data: [], error: null }),
   ])
@@ -168,6 +175,24 @@ export default async function ApprovalPage() {
     console.warn('[parent approval] child_store_item_credit_overrides:', creditOvRes.error.message)
   }
 
+  /** 메뉴 제어에서 쓰는 자녀별 상품 순서 스냅샷 */
+  const initialItemOrdersByChild: Record<string, Record<string, number>> = {}
+  for (const cid of childIds) {
+    initialItemOrdersByChild[cid] = {}
+  }
+  if (!orderRes.error && orderRes.data) {
+    for (const row of orderRes.data as {
+      child_id: string
+      store_item_id: string
+      order_rank: number
+    }[]) {
+      if (!initialItemOrdersByChild[row.child_id]) initialItemOrdersByChild[row.child_id] = {}
+      initialItemOrdersByChild[row.child_id][row.store_item_id] = row.order_rank
+    }
+  } else if (orderRes.error) {
+    console.warn('[parent approval] child_market_item_orders:', orderRes.error.message)
+  }
+
   if (historyRes.error) {
     console.warn('[parent approval] purchase_requests history:', historyRes.error.message)
   }
@@ -182,6 +207,7 @@ export default async function ApprovalPage() {
       linkByChild={linkByChild}
       hiddenItemIdsByChild={hiddenItemIdsByChild}
       initialCreditOverridesByChild={initialCreditOverridesByChild}
+      initialItemOrdersByChild={initialItemOrdersByChild}
     />
   )
 }

@@ -15,6 +15,71 @@ function extForMime(mime: string): string {
   return 'jpg'
 }
 
+async function resolveParentAuth(supabase: Awaited<ReturnType<typeof createClient>>) {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { ok: false as const, response: NextResponse.json({ error: '인증이 필요해요' }, { status: 401 }) }
+  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle()
+  if (profile?.role !== 'parent') {
+    return { ok: false as const, response: NextResponse.json({ error: '부모 계정만 사용할 수 있어요' }, { status: 403 }) }
+  }
+  return { ok: true as const, userId: user.id }
+}
+
+async function resolveFamilyLinkIdForChild(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  parentId: string,
+  childId: string,
+) {
+  const { data: link, error } = await supabase
+    .from('family_links')
+    .select('id')
+    .eq('parent_id', parentId)
+    .eq('child_id', childId)
+    .maybeSingle()
+  if (error || !link) return null
+  return link.id
+}
+
+async function uploadStoreItemImage(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  parentId: string,
+  imageFile: File,
+): Promise<{ ok: true; publicUrl: string } | { ok: false; response: NextResponse }> {
+  if (!ALLOWED_TYPES.has(imageFile.type.toLowerCase())) {
+    return {
+      ok: false,
+      response: NextResponse.json({ error: 'JPG, PNG, WebP, GIF 이미지만 올릴 수 있어요' }, { status: 400 }),
+    }
+  }
+  if (imageFile.size > MAX_BYTES) {
+    return {
+      ok: false,
+      response: NextResponse.json({ error: '이미지는 5MB 이하로 올려 주세요' }, { status: 400 }),
+    }
+  }
+  const buf = Buffer.from(await imageFile.arrayBuffer())
+  const ext = extForMime(imageFile.type)
+  const path = `${parentId}/${randomUUID()}.${ext}`
+  const { error: upErr } = await supabase.storage.from(BUCKET).upload(path, buf, {
+    contentType: imageFile.type,
+    upsert: false,
+  })
+  if (upErr) {
+    console.error('[parent-store-item] storage', upErr.message)
+    return {
+      ok: false,
+      response: NextResponse.json(
+        { error: '이미지 업로드에 실패했어요. 잠시 후 다시 시도해 주세요' },
+        { status: 500 },
+      ),
+    }
+  }
+  const { data: pub } = supabase.storage.from(BUCKET).getPublicUrl(path)
+  return { ok: true, publicUrl: pub.publicUrl }
+}
+
 /**
  * POST /api/market/parent-store-item
  * - JSON: { childId, name, creditPrice, itemType? } (이미지 없을 때)
@@ -23,17 +88,9 @@ function extForMime(mime: string): string {
  */
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    return NextResponse.json({ error: '인증이 필요해요' }, { status: 401 })
-  }
-
-  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle()
-  if (profile?.role !== 'parent') {
-    return NextResponse.json({ error: '부모 계정만 추가할 수 있어요' }, { status: 403 })
+  const auth = await resolveParentAuth(supabase)
+  if (!auth.ok) {
+    return auth.response
   }
 
   const ct = req.headers.get('content-type') ?? ''
@@ -78,14 +135,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: '크레딧 가격은 0 이상으로 입력해 주세요' }, { status: 400 })
   }
 
-  const { data: link, error: linkErr } = await supabase
-    .from('family_links')
-    .select('id')
-    .eq('parent_id', user.id)
-    .eq('child_id', childId)
-    .maybeSingle()
-
-  if (linkErr || !link) {
+  const linkId = await resolveFamilyLinkIdForChild(supabase, auth.userId, childId)
+  if (!linkId) {
     return NextResponse.json({ error: '연결된 자녀에게만 상품을 추가할 수 있어요' }, { status: 403 })
   }
 
@@ -94,31 +145,15 @@ export async function POST(req: NextRequest) {
 
   let imageUrl: string | null = null
   if (imageFile) {
-    if (!ALLOWED_TYPES.has(imageFile.type.toLowerCase())) {
-      return NextResponse.json({ error: 'JPG, PNG, WebP, GIF 이미지만 올릴 수 있어요' }, { status: 400 })
-    }
-    if (imageFile.size > MAX_BYTES) {
-      return NextResponse.json({ error: '이미지는 5MB 이하로 올려 주세요' }, { status: 400 })
-    }
-    const buf = Buffer.from(await imageFile.arrayBuffer())
-    const ext = extForMime(imageFile.type)
-    const path = `${user.id}/${randomUUID()}.${ext}`
-    const { error: upErr } = await supabase.storage.from(BUCKET).upload(path, buf, {
-      contentType: imageFile.type,
-      upsert: false,
-    })
-    if (upErr) {
-      console.error('[parent-store-item] storage', upErr.message)
-      return NextResponse.json({ error: '이미지 업로드에 실패했어요. 잠시 후 다시 시도해 주세요' }, { status: 500 })
-    }
-    const { data: pub } = supabase.storage.from(BUCKET).getPublicUrl(path)
-    imageUrl = pub.publicUrl
+    const upload = await uploadStoreItemImage(supabase, auth.userId, imageFile)
+    if (!upload.ok) return upload.response
+    imageUrl = upload.publicUrl
   }
 
   const { data: inserted, error: insErr } = await supabase
     .from('store_items')
     .insert({
-      family_link_id: link.id,
+      family_link_id: linkId,
       name,
       description: null,
       image_url: imageUrl,
@@ -138,4 +173,130 @@ export async function POST(req: NextRequest) {
   }
 
   return NextResponse.json({ item: inserted })
+}
+
+/**
+ * PATCH /api/market/parent-store-item
+ * - 가족 전용 상품만 수정합니다.
+ * - multipart/form-data: { childId, storeItemId, name?, image?, removeImage? }
+ */
+export async function PATCH(req: NextRequest) {
+  const supabase = await createClient()
+  const auth = await resolveParentAuth(supabase)
+  if (!auth.ok) return auth.response
+
+  const ct = req.headers.get('content-type') ?? ''
+  if (!ct.includes('multipart/form-data')) {
+    return NextResponse.json({ error: '폼 데이터 요청만 지원해요' }, { status: 400 })
+  }
+
+  const form = await req.formData()
+  const childId = String(form.get('childId') ?? '').trim()
+  const storeItemId = String(form.get('storeItemId') ?? '').trim()
+  const nameRaw = String(form.get('name') ?? '').trim()
+  const removeImage = String(form.get('removeImage') ?? '').toLowerCase() === 'true'
+  const image = form.get('image')
+  const imageFile = image instanceof File && image.size > 0 ? image : null
+
+  if (!childId || !storeItemId) {
+    return NextResponse.json({ error: '자녀·상품 정보가 필요해요' }, { status: 400 })
+  }
+  if (!nameRaw || nameRaw.length > 80) {
+    return NextResponse.json({ error: '상품 이름을 확인해 주세요' }, { status: 400 })
+  }
+
+  const linkId = await resolveFamilyLinkIdForChild(supabase, auth.userId, childId)
+  if (!linkId) {
+    return NextResponse.json({ error: '연결된 자녀만 수정할 수 있어요' }, { status: 403 })
+  }
+
+  const { data: item, error: itemErr } = await supabase
+    .from('store_items')
+    .select('*')
+    .eq('id', storeItemId)
+    .maybeSingle()
+
+  if (itemErr || !item) {
+    return NextResponse.json({ error: '상품을 찾을 수 없어요' }, { status: 404 })
+  }
+  if (item.family_link_id !== linkId) {
+    return NextResponse.json({ error: '가족 전용 상품만 수정할 수 있어요' }, { status: 403 })
+  }
+
+  let nextImageUrl = item.image_url
+  if (removeImage) {
+    nextImageUrl = null
+  }
+  if (imageFile) {
+    const upload = await uploadStoreItemImage(supabase, auth.userId, imageFile)
+    if (!upload.ok) return upload.response
+    nextImageUrl = upload.publicUrl
+  }
+
+  const { data: updated, error: upErr } = await supabase
+    .from('store_items')
+    .update({
+      name: nameRaw,
+      image_url: nextImageUrl,
+    })
+    .eq('id', storeItemId)
+    .select('*')
+    .single()
+
+  if (upErr || !updated) {
+    console.error('[parent-store-item:patch]', upErr?.message)
+    return NextResponse.json({ error: '상품 정보를 저장하지 못했어요' }, { status: 500 })
+  }
+
+  return NextResponse.json({ item: updated })
+}
+
+/**
+ * DELETE /api/market/parent-store-item
+ * body: { childId, storeItemId }
+ * - 가족 전용 상품만 삭제합니다.
+ */
+export async function DELETE(req: NextRequest) {
+  const supabase = await createClient()
+  const auth = await resolveParentAuth(supabase)
+  if (!auth.ok) return auth.response
+
+  let childId = ''
+  let storeItemId = ''
+  try {
+    const body = await req.json()
+    childId = typeof body.childId === 'string' ? body.childId.trim() : ''
+    storeItemId = typeof body.storeItemId === 'string' ? body.storeItemId.trim() : ''
+  } catch {
+    return NextResponse.json({ error: '요청 형식이 올바르지 않아요' }, { status: 400 })
+  }
+
+  if (!childId || !storeItemId) {
+    return NextResponse.json({ error: '자녀·상품 정보가 필요해요' }, { status: 400 })
+  }
+
+  const linkId = await resolveFamilyLinkIdForChild(supabase, auth.userId, childId)
+  if (!linkId) {
+    return NextResponse.json({ error: '연결된 자녀만 삭제할 수 있어요' }, { status: 403 })
+  }
+
+  const { data: item, error: itemErr } = await supabase
+    .from('store_items')
+    .select('id, family_link_id')
+    .eq('id', storeItemId)
+    .maybeSingle()
+  if (itemErr || !item) {
+    return NextResponse.json({ error: '상품을 찾을 수 없어요' }, { status: 404 })
+  }
+  if (item.family_link_id !== linkId) {
+    return NextResponse.json({ error: '가족 전용 상품만 삭제할 수 있어요' }, { status: 403 })
+  }
+
+  const { error: delErr } = await supabase.from('store_items').delete().eq('id', storeItemId)
+  if (delErr) {
+    console.error('[parent-store-item:delete]', delErr.message)
+    return NextResponse.json({ error: '상품을 삭제하지 못했어요' }, { status: 500 })
+  }
+
+  return NextResponse.json({ ok: true, storeItemId })
 }

@@ -9,7 +9,7 @@
  * - 사진이 없는 기본 상품은 `items/shop/items/*.png` 를 씁니다(자녀 마켓과 같은 규칙).
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
 import MarketItemImage from '@/components/common/MarketItemImage'
 import { marketFrameKeyForItemId } from '@/lib/marketItemFrame'
 import type { StoreItem } from '@/types/database'
@@ -38,6 +38,14 @@ export type ParentMarketMenuControlProps = {
   creditOverrides: Record<string, number>
   /** 크레딧 저장 성공 시 — null 이면 덮어쓰기 제거(기본가로 복귀) */
   onCreditOverrideSaved: (itemId: string, nextOverride: number | null) => void
+  /** 자녀별 상품 표시 순서(item_id -> order_rank) */
+  itemOrders: Record<string, number>
+  /** 드래그 정렬 저장 성공 시 상위 컴포넌트 상태 동기화 */
+  onItemOrderSaved: (nextOrderMap: Record<string, number>) => void
+  /** 가족 전용 상품 수정 후 상위 목록 반영 */
+  onItemUpdated: (item: StoreItem) => void
+  /** 가족 전용 상품 삭제 후 상위 목록 반영 */
+  onItemDeleted: (deletedItemId: string) => void
 }
 
 /** 토글 스위치 — 켜짐=자녀에게 보임, 꺼짐=숨김 */
@@ -83,6 +91,10 @@ export default function ParentMarketMenuControl({
   onItemCreated,
   creditOverrides,
   onCreditOverrideSaved,
+  itemOrders,
+  onItemOrderSaved,
+  onItemUpdated,
+  onItemDeleted,
 }: ParentMarketMenuControlProps) {
   const [addOpen, setAddOpen] = useState(false)
   const [addName, setAddName] = useState('')
@@ -97,11 +109,16 @@ export default function ParentMarketMenuControl({
   const [addCategory, setAddCategory] = useState<string>('food')
   /** 마켓 보이기/숨기기 토글 API 실패 시 잠깐 보여 줄 메시지 */
   const [toggleSaveErr, setToggleSaveErr] = useState<string | null>(null)
-  /** 크레딧 변경 시트 — 어떤 상품을 고치는지 */
-  const [creditEditItem, setCreditEditItem] = useState<StoreItem | null>(null)
-  const [creditEditValue, setCreditEditValue] = useState('')
-  const [creditEditLoading, setCreditEditLoading] = useState(false)
-  const [creditEditErr, setCreditEditErr] = useState<string | null>(null)
+  /** 상품 수정 시트(연필 버튼) */
+  const [editItem, setEditItem] = useState<StoreItem | null>(null)
+  const [editName, setEditName] = useState('')
+  const [editPrice, setEditPrice] = useState('')
+  const [editLoading, setEditLoading] = useState(false)
+  const [editDeleteLoading, setEditDeleteLoading] = useState(false)
+  const [editErr, setEditErr] = useState<string | null>(null)
+  const [editImageFile, setEditImageFile] = useState<File | null>(null)
+  const [editImagePreviewUrl, setEditImagePreviewUrl] = useState<string | null>(null)
+  const [editRemoveImage, setEditRemoveImage] = useState(false)
   /**
    * 구역마다 상품 타일 영역을 **접기/펼치기** 합니다.
    * 디폴트는 **전부 접힘** — 간식·장난감·이벤트(및 기타) **헤더 줄 전체**를 누르면 펼쳐지고, 오른쪽 ▼ 만 보입니다(펼치면 ▲ 방향으로 회전).
@@ -114,14 +131,32 @@ export default function ParentMarketMenuControl({
     setMenuSectionExpanded({})
   }, [childId])
 
-  /** 자녀 전환 시 열려 있던 크레딧 편집 시트를 닫습니다 */
+  /** 자녀 전환 시 열려 있던 수정 시트를 닫습니다 */
   useEffect(() => {
-    setCreditEditItem(null)
-    setCreditEditErr(null)
+    setEditItem(null)
+    setEditErr(null)
   }, [childId])
 
-  const cameraInputRef = useRef<HTMLInputElement>(null)
-  const galleryInputRef = useRef<HTMLInputElement>(null)
+  const addCameraInputRef = useRef<HTMLInputElement>(null)
+  const addGalleryInputRef = useRef<HTMLInputElement>(null)
+  const editCameraInputRef = useRef<HTMLInputElement>(null)
+  const editGalleryInputRef = useRef<HTMLInputElement>(null)
+  const longPressTimerRef = useRef<number | null>(null)
+
+  /** 카드 정렬 모드(롱프레스 진입) */
+  const [reorderMode, setReorderMode] = useState(false)
+  /** 드래그 중인 카드 id + 섹션 */
+  const [dragging, setDragging] = useState<{ itemId: string; sectionKey: string } | null>(null)
+  /** 순서 저장 중 */
+  const [orderSaving, setOrderSaving] = useState(false)
+  const [orderSaveErr, setOrderSaveErr] = useState<string | null>(null)
+  /** 현재 화면에서 쓰는 순서 맵(자녀별) */
+  const [itemOrderMap, setItemOrderMap] = useState<Record<string, number>>(itemOrders)
+
+  const itemOrdersSyncKey = useMemo(() => JSON.stringify(itemOrders), [itemOrders])
+  useEffect(() => {
+    setItemOrderMap(itemOrders)
+  }, [itemOrdersSyncKey])
 
   useEffect(() => {
     if (!addImageFile) {
@@ -133,12 +168,32 @@ export default function ParentMarketMenuControl({
     return () => URL.revokeObjectURL(url)
   }, [addImageFile])
 
+  useEffect(() => {
+    if (!editImageFile) {
+      setEditImagePreviewUrl(null)
+      return
+    }
+    const url = URL.createObjectURL(editImageFile)
+    setEditImagePreviewUrl(url)
+    return () => URL.revokeObjectURL(url)
+  }, [editImageFile])
+
   /** 시트를 닫을 때 선택 이미지도 비웁니다 */
   useEffect(() => {
     if (!addOpen) {
       setAddImageFile(null)
     }
   }, [addOpen])
+
+  /** 롱프레스 타이머 정리 */
+  useEffect(
+    () => () => {
+      if (longPressTimerRef.current != null) {
+        window.clearTimeout(longPressTimerRef.current)
+      }
+    },
+    [],
+  )
 
   /**
    * 현재 자녀 마켓에 둘 상품만(전체 공개 + 이 부모-자녀 전용).
@@ -160,8 +215,22 @@ export default function ParentMarketMenuControl({
    * - 배치: 펼침일 때만 타일을 그립니다. 2줄 이상이면 열 방향 채움. 접힘이면 상품 줄 전체 숨김.
    */
   const menuSectionsToRender = useMemo(() => {
+    const rankOf = (id: string) => {
+      const v = itemOrderMap[id]
+      return Number.isFinite(v) ? v : null
+    }
+
+    const compareBySavedRank = (a: StoreItem, b: StoreItem): number => {
+      const ra = rankOf(a.id)
+      const rb = rankOf(b.id)
+      if (ra != null && rb != null && ra !== rb) return ra - rb
+      if (ra != null && rb == null) return -1
+      if (ra == null && rb != null) return 1
+      return 0
+    }
+
     /** 간식 외 구역: 마켓 표시(켜짐) 먼저, 그다음 이름순 */
-    const sortItemsForSection = (items: StoreItem[]) =>
+    const fallbackSortForSection = (items: StoreItem[]) =>
       [...items].sort((a, b) => {
         const aOn = !hiddenItemIds.has(a.id)
         const bOn = !hiddenItemIds.has(b.id)
@@ -174,7 +243,7 @@ export default function ParentMarketMenuControl({
      * 준비중(비활성) 항목은 뒤에 이름순으로 둡니다.
      * 같은 그룹 안에서는 표시 켜진 항목을 먼저 둡니다.
      */
-    const sortSnackItems = (items: StoreItem[]) =>
+    const fallbackSortSnackItems = (items: StoreItem[]) =>
       [...items].sort((a, b) => {
         const aBeta = isBetaActive(a.name, a.category ?? '')
         const bBeta = isBetaActive(b.name, b.category ?? '')
@@ -190,21 +259,36 @@ export default function ParentMarketMenuControl({
         return a.name.localeCompare(b.name, 'ko')
       })
 
+    const sortByManualOrder = (items: StoreItem[], fallbackSorter: (rows: StoreItem[]) => StoreItem[]) => {
+      const fallback = fallbackSorter(items)
+      return [...fallback].sort((a, b) => {
+        const rankCmp = compareBySavedRank(a, b)
+        if (rankCmp !== 0) return rankCmp
+        return fallback.findIndex((x) => x.id === a.id) - fallback.findIndex((x) => x.id === b.id)
+      })
+    }
+
     const rows: { sectionKey: string; title: string; items: StoreItem[] }[] = []
     for (const sec of PARENT_MARKET_MENU_SECTIONS) {
       const items = itemsForChild.filter((it) => parentMarketSectionIdForItem(it.category) === sec.id)
       if (items.length > 0) {
         const sorted =
-          sec.id === 'snack' ? sortSnackItems(items) : sortItemsForSection(items)
+          sec.id === 'snack'
+            ? sortByManualOrder(items, fallbackSortSnackItems)
+            : sortByManualOrder(items, fallbackSortForSection)
         rows.push({ sectionKey: sec.id, title: sec.title, items: sorted })
       }
     }
     const other = itemsForChild.filter((it) => parentMarketSectionIdForItem(it.category) === 'other')
     if (other.length > 0) {
-      rows.push({ sectionKey: 'other', title: '기타', items: sortItemsForSection(other) })
+      rows.push({
+        sectionKey: 'other',
+        title: '기타',
+        items: sortByManualOrder(other, fallbackSortForSection),
+      })
     }
     return rows
-  }, [itemsForChild, hiddenItemIds])
+  }, [itemsForChild, hiddenItemIds, itemOrderMap])
 
   const toggleHidden = useCallback(
     async (itemId: string, currentlyVisible: boolean) => {
@@ -250,42 +334,111 @@ export default function ParentMarketMenuControl({
     return o !== undefined ? o : it.credit_price
   }
 
-  /** 크레딧 편집 시트 열기 — 입력칸에 현재 적용가를 넣습니다 */
-  function openCreditEdit(it: StoreItem) {
-    setCreditEditErr(null)
-    setCreditEditItem(it)
-    setCreditEditValue(String(effectiveCreditPrice(it)))
+  /** 연필 버튼으로 상품 편집 시트를 엽니다 */
+  function openItemEdit(it: StoreItem) {
+    setEditErr(null)
+    setEditItem(it)
+    setEditName(it.name)
+    setEditPrice(String(effectiveCreditPrice(it)))
+    setEditImageFile(null)
+    setEditRemoveImage(false)
   }
 
-  /** 시트에서 저장 — API 가 기본가와 같으면 덮어쓰기 행을 지웁니다 */
-  async function submitCreditEdit() {
-    if (!childId || !creditEditItem) return
-    const v = Math.floor(Number(creditEditValue))
+  function canEditItemMeta(it: StoreItem): boolean {
+    return !!familyLinkIdForChild && it.family_link_id === familyLinkIdForChild
+  }
+
+  /** 수정 시트 저장 */
+  async function submitItemEdit() {
+    if (!childId || !editItem) return
+    const v = Math.floor(Number(editPrice))
     if (!Number.isFinite(v) || v < 0 || v > 999_999) {
-      setCreditEditErr('0~999999 사이 숫자로 입력해 주세요')
+      setEditErr('0~999999 사이 숫자로 입력해 주세요')
       return
     }
-    setCreditEditErr(null)
-    setCreditEditLoading(true)
+    const nameTrimmed = editName.trim()
+    if (!nameTrimmed || nameTrimmed.length > 80) {
+      setEditErr('상품 이름을 확인해 주세요')
+      return
+    }
+    setEditErr(null)
+    setEditLoading(true)
     try {
-      const res = await fetch('/api/market/child-item-credit', {
-        method: 'POST',
+      const oldPrice = effectiveCreditPrice(editItem)
+      if (oldPrice !== v) {
+        const res = await fetch('/api/market/child-item-credit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ childId, storeItemId: editItem.id, creditPrice: v }),
+        })
+        const json = await res.json().catch(() => ({}))
+        if (!res.ok) {
+          setEditErr(typeof json.error === 'string' ? json.error : '가격을 저장하지 못했어요')
+          return
+        }
+        const usedOverride = json.usedOverride === true
+        const nextPrice = typeof json.creditPrice === 'number' ? json.creditPrice : v
+        onCreditOverrideSaved(editItem.id, usedOverride ? nextPrice : null)
+      }
+
+      const canMeta = canEditItemMeta(editItem)
+      const needMetaSave =
+        canMeta &&
+        (nameTrimmed !== editItem.name || editImageFile != null || editRemoveImage)
+
+      if (needMetaSave) {
+        const fd = new FormData()
+        fd.append('childId', childId)
+        fd.append('storeItemId', editItem.id)
+        fd.append('name', nameTrimmed)
+        fd.append('removeImage', editRemoveImage ? 'true' : 'false')
+        if (editImageFile) fd.append('image', editImageFile)
+        const saveRes = await fetch('/api/market/parent-store-item', {
+          method: 'PATCH',
+          body: fd,
+        })
+        const saveJson = await saveRes.json().catch(() => ({}))
+        if (!saveRes.ok) {
+          setEditErr(typeof saveJson.error === 'string' ? saveJson.error : '상품 정보를 저장하지 못했어요')
+          return
+        }
+        if (saveJson.item) onItemUpdated(saveJson.item as StoreItem)
+      }
+
+      setEditItem(null)
+    } catch {
+      setEditErr('네트워크 오류가 났어요')
+    } finally {
+      setEditLoading(false)
+    }
+  }
+
+  /** 가족 전용 상품 삭제 */
+  async function submitItemDelete() {
+    if (!childId || !editItem) return
+    if (!canEditItemMeta(editItem)) {
+      setEditErr('기본 상품은 삭제할 수 없어요')
+      return
+    }
+    setEditErr(null)
+    setEditDeleteLoading(true)
+    try {
+      const res = await fetch('/api/market/parent-store-item', {
+        method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ childId, storeItemId: creditEditItem.id, creditPrice: v }),
+        body: JSON.stringify({ childId, storeItemId: editItem.id }),
       })
       const json = await res.json().catch(() => ({}))
       if (!res.ok) {
-        setCreditEditErr(typeof json.error === 'string' ? json.error : '저장하지 못했어요')
+        setEditErr(typeof json.error === 'string' ? json.error : '삭제하지 못했어요')
         return
       }
-      const usedOverride = json.usedOverride === true
-      const nextPrice = typeof json.creditPrice === 'number' ? json.creditPrice : v
-      onCreditOverrideSaved(creditEditItem.id, usedOverride ? nextPrice : null)
-      setCreditEditItem(null)
+      onItemDeleted(editItem.id)
+      setEditItem(null)
     } catch {
-      setCreditEditErr('네트워크 오류가 났어요')
+      setEditErr('네트워크 오류가 났어요')
     } finally {
-      setCreditEditLoading(false)
+      setEditDeleteLoading(false)
     }
   }
 
@@ -293,6 +446,68 @@ export default function ParentMarketMenuControl({
    * 한 칸(썸네일·이름·크레딧·토글) — 기본은 가로 스크롤 타일.
    * - 이벤트 섹션은 요청사항으로 1열 리스트로 따로 렌더링합니다.
    */
+  const saveItemOrder = useCallback(
+    async (orderedItemIds: string[], nextOrderMap: Record<string, number>) => {
+      if (!childId) return
+      setOrderSaveErr(null)
+      setOrderSaving(true)
+      try {
+        const res = await fetch('/api/market/child-item-order', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ childId, orderedItemIds }),
+        })
+        const json = await res.json().catch(() => ({}))
+        if (!res.ok) {
+          setOrderSaveErr(typeof json.error === 'string' ? json.error : '순서를 저장하지 못했어요')
+          return
+        }
+        onItemOrderSaved(nextOrderMap)
+      } catch {
+        setOrderSaveErr('네트워크 오류로 순서를 저장하지 못했어요')
+      } finally {
+        setOrderSaving(false)
+      }
+    },
+    [childId, onItemOrderSaved],
+  )
+
+  function clearLongPressTimer() {
+    if (longPressTimerRef.current != null) {
+      window.clearTimeout(longPressTimerRef.current)
+      longPressTimerRef.current = null
+    }
+  }
+
+  function beginLongPressForReorder() {
+    if (reorderMode) return
+    clearLongPressTimer()
+    longPressTimerRef.current = window.setTimeout(() => {
+      setReorderMode(true)
+    }, 420)
+  }
+
+  function onDragReorder(sectionKey: string, draggedId: string, targetId: string) {
+    if (draggedId === targetId) return
+    const sectionOrderByKey: Record<string, string[]> = {}
+    for (const sec of menuSectionsToRender) {
+      sectionOrderByKey[sec.sectionKey] = sec.items.map((x) => x.id)
+    }
+    const ids = sectionOrderByKey[sectionKey] ?? []
+    const from = ids.indexOf(draggedId)
+    const to = ids.indexOf(targetId)
+    if (from < 0 || to < 0) return
+    const nextIds = [...ids]
+    const [moved] = nextIds.splice(from, 1)
+    nextIds.splice(to, 0, moved)
+    sectionOrderByKey[sectionKey] = nextIds
+
+    const orderedAll = menuSectionsToRender.flatMap((sec) => sectionOrderByKey[sec.sectionKey] ?? [])
+    const nextOrderMap = Object.fromEntries(orderedAll.map((id, idx) => [id, idx]))
+    setItemOrderMap((prev) => ({ ...prev, ...nextOrderMap }))
+    void saveItemOrder(orderedAll, nextOrderMap)
+  }
+
   function renderMenuItemTile(it: StoreItem, sectionKey: string) {
     const hidden = hiddenItemIds.has(it.id)
     const visible = !hidden
@@ -311,10 +526,34 @@ export default function ParentMarketMenuControl({
      */
     const isBlocked = sectionKey === 'event' ? false : !isBeta
 
+    const tileWiggleClass = reorderMode ? 'animate-[marketCardWiggle_0.26s_ease-in-out_infinite]' : ''
+
     return (
-      <div key={it.id} className="relative flex min-w-0 snap-start flex-col items-center gap-0.5">
+      <div
+        key={it.id}
+        className={`relative flex min-w-0 snap-start flex-col items-center gap-0.5 rounded-xl px-0.5 py-0.5 ${tileWiggleClass} ${dragging?.itemId === it.id ? 'opacity-55' : ''}`}
+        draggable={reorderMode}
+        onPointerDown={() => beginLongPressForReorder()}
+        onPointerUp={clearLongPressTimer}
+        onPointerCancel={clearLongPressTimer}
+        onPointerLeave={clearLongPressTimer}
+        onDragStart={() => {
+          if (!reorderMode) return
+          setDragging({ itemId: it.id, sectionKey })
+        }}
+        onDragOver={(e) => {
+          if (!reorderMode || !dragging || dragging.sectionKey !== sectionKey) return
+          e.preventDefault()
+        }}
+        onDrop={(e) => {
+          if (!reorderMode || !dragging || dragging.sectionKey !== sectionKey) return
+          e.preventDefault()
+          onDragReorder(sectionKey, dragging.itemId, it.id)
+        }}
+        onDragEnd={() => setDragging(null)}
+      >
         {/* 베타 미포함 상품: 흐리게 처리 */}
-        <div className={isBlocked ? 'opacity-40 grayscale pointer-events-none' : ''}>
+        <div className={isBlocked ? 'opacity-40 grayscale' : ''}>
           {/** 이미지 블록 가로를 줄여 한 화면에 더 많은 칸이 들어가게 합니다. */}
           <div className="flex h-12 w-full max-w-[3.25rem] items-center justify-center overflow-hidden rounded-lg bg-gray-50 ring-1 ring-gray-100 sm:max-w-[3.5rem]">
             {it.image_url ? (
@@ -338,7 +577,10 @@ export default function ParentMarketMenuControl({
           {/** 이 자녀 기준 실제 가격 + 탭하면 숫자를 바꿀 수 있음 */}
           <button
             type="button"
-            onClick={() => openCreditEdit(it)}
+            onClick={() => {
+              if (reorderMode) return
+              openItemEdit(it)
+            }}
             title={hasOverride ? `기본 ${it.credit_price}크레딧 → 이 자녀만 ${price}` : '크레딧 바꾸기'}
             className="max-w-full truncate rounded-md px-0.5 text-[8px] font-black leading-tight text-brand-blue underline-offset-2 hover:underline"
           >
@@ -347,10 +589,25 @@ export default function ParentMarketMenuControl({
           </button>
           <VisibilityToggle
             on={visible}
+            disabled={reorderMode}
             ariaLabel={visible ? `${it.name} 마켓에서 숨기기` : `${it.name} 마켓에 표시하기`}
             onToggle={() => toggleHidden(it.id, visible)}
           />
         </div>
+
+        {/* 카드 우상단 연필 버튼 */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation()
+            if (reorderMode) return
+            openItemEdit(it)
+          }}
+          className="absolute right-0 top-0 z-[1] flex h-4 w-4 items-center justify-center rounded-full bg-white/90 text-gray-300 shadow-sm ring-1 ring-gray-100 transition active:scale-95 hover:text-gray-400"
+          aria-label={`${it.name} 수정`}
+        >
+          <PencilIcon className="h-2.5 w-2.5" />
+        </button>
 
         {/* 베타 미포함 상품 준비중 오버레이 */}
         {isBlocked && (
@@ -364,11 +621,20 @@ export default function ParentMarketMenuControl({
     )
   }
 
-  function onPickFile(e: React.ChangeEvent<HTMLInputElement>) {
+  function onPickAddFile(e: ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]
     e.target.value = ''
     if (f && f.size > 0) {
       setAddImageFile(f)
+    }
+  }
+
+  function onPickEditFile(e: ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0]
+    e.target.value = ''
+    if (f && f.size > 0) {
+      setEditImageFile(f)
+      setEditRemoveImage(false)
     }
   }
 
@@ -415,6 +681,18 @@ export default function ParentMarketMenuControl({
       <div className="mb-1 flex items-start justify-between gap-2">
         <h2 className="text-sm font-bold text-brand-text">메뉴 제어</h2>
         <div className="flex items-center gap-2">
+          {reorderMode ? (
+            <button
+              type="button"
+              onClick={() => {
+                setReorderMode(false)
+                setDragging(null)
+              }}
+              className="shrink-0 text-[11px] font-bold text-brand-blue underline-offset-2 hover:underline"
+            >
+              정렬 완료
+            </button>
+          ) : null}
           <button
             type="button"
             disabled={!childId}
@@ -431,10 +709,34 @@ export default function ParentMarketMenuControl({
       <p className="mb-3 text-[11px] leading-snug text-gray-400">
         자녀의 마켓에 올라가는 상품을 직접 관리할 수 있어요.
       </p>
+      <style>{`
+        @keyframes marketCardWiggle {
+          0% { transform: rotate(-1.4deg); }
+          50% { transform: rotate(1.4deg); }
+          100% { transform: rotate(-1.4deg); }
+        }
+      `}</style>
+      {reorderMode ? (
+        <p className="mb-2 rounded-xl bg-blue-50 px-3 py-2 text-[11px] font-bold text-blue-700 ring-1 ring-blue-100">
+          카드를 끌어서 순서를 바꿀 수 있어요. 다시 눌러 놓으면 저장됩니다.
+        </p>
+      ) : (
+        <p className="mb-2 text-[11px] font-bold text-gray-400">카드를 길게 누르면 드래그 정렬 모드가 켜져요.</p>
+      )}
 
       {toggleSaveErr && (
         <p className="mb-2 rounded-xl bg-red-50 px-3 py-2 text-[11px] font-bold text-red-600 ring-1 ring-red-100" role="alert">
           {toggleSaveErr}
+        </p>
+      )}
+      {orderSaveErr && (
+        <p className="mb-2 rounded-xl bg-red-50 px-3 py-2 text-[11px] font-bold text-red-600 ring-1 ring-red-100" role="alert">
+          {orderSaveErr}
+        </p>
+      )}
+      {orderSaving && (
+        <p className="mb-2 rounded-xl bg-gray-50 px-3 py-2 text-[11px] font-bold text-gray-500 ring-1 ring-gray-100">
+          순서 저장 중...
         </p>
       )}
 
@@ -569,35 +871,35 @@ export default function ParentMarketMenuControl({
 
             {/* 숨긴 file input — 모바일에서 capture 로 카메라, 없으면 갤러리·파일 */}
             <input
-              ref={cameraInputRef}
+              ref={addCameraInputRef}
               type="file"
               accept="image/jpeg,image/jpg,image/png,image/webp,image/gif"
               capture="environment"
               className="sr-only"
               tabIndex={-1}
-              onChange={onPickFile}
+              onChange={onPickAddFile}
             />
             <input
-              ref={galleryInputRef}
+              ref={addGalleryInputRef}
               type="file"
               accept="image/jpeg,image/jpg,image/png,image/webp,image/gif"
               className="sr-only"
               tabIndex={-1}
-              onChange={onPickFile}
+              onChange={onPickAddFile}
             />
 
             <p className="mb-1.5 text-xs font-bold text-gray-600">상품 이미지 (선택)</p>
             <div className="mb-4 flex flex-wrap gap-2">
               <button
                 type="button"
-                onClick={() => cameraInputRef.current?.click()}
+                onClick={() => addCameraInputRef.current?.click()}
                 className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-bold text-gray-700 active:scale-[0.98]"
               >
                 카메라로 촬영
               </button>
               <button
                 type="button"
-                onClick={() => galleryInputRef.current?.click()}
+                onClick={() => addGalleryInputRef.current?.click()}
                 className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-bold text-gray-700 active:scale-[0.98]"
               >
                 사진·파일 선택
@@ -645,60 +947,160 @@ export default function ParentMarketMenuControl({
         </div>
       )}
 
-      {creditEditItem && (
+      {editItem && (
         <div
           className="fixed inset-0 z-[60] flex items-end justify-center bg-black/40"
           role="presentation"
-          onClick={() => setCreditEditItem(null)}
+          onClick={() => setEditItem(null)}
         >
           <div
             role="dialog"
             aria-modal="true"
-            aria-labelledby="credit-edit-title"
-            className="w-full max-w-none max-h-[min(70dvh,calc(100vh-0.5rem))] overflow-y-auto rounded-t-3xl bg-white p-6 shadow-2xl"
+            aria-labelledby="item-edit-title"
+            className="w-full max-w-none max-h-[min(84dvh,calc(100vh-0.5rem))] overflow-y-auto rounded-t-3xl bg-white p-6 shadow-2xl"
             style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom, 0px))' }}
             onClick={(e) => e.stopPropagation()}
           >
-            <p id="credit-edit-title" className="mb-1 font-black text-brand-text text-base">
-              크레딧 설정
+            <p id="item-edit-title" className="mb-1 font-black text-brand-text text-base">
+              상품 수정
             </p>
-            <p className="mb-4 text-xs font-bold text-gray-700">{creditEditItem.name}</p>
+            <p className="mb-4 text-[11px] text-gray-400">
+              가격은 자녀별로 저장되고, 이미지/이름/삭제는 가족 전용 상품에서만 가능합니다.
+            </p>
+            <label className="mb-3 block text-xs font-bold text-gray-600">
+              상품 이름
+              <input
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                maxLength={80}
+                disabled={!canEditItemMeta(editItem)}
+                className="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm disabled:bg-gray-50 disabled:text-gray-400"
+              />
+            </label>
             <label className="mb-2 block text-xs font-bold text-gray-600">
               크레딧 수정
               <input
                 type="number"
                 min={0}
                 max={999999}
-                value={creditEditValue}
-                onChange={(e) => setCreditEditValue(e.target.value)}
+                value={editPrice}
+                onChange={(e) => setEditPrice(e.target.value)}
                 className="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm"
               />
             </label>
-            {creditEditErr && (
+
+            <input
+              ref={editCameraInputRef}
+              type="file"
+              accept="image/jpeg,image/jpg,image/png,image/webp,image/gif"
+              capture="environment"
+              className="sr-only"
+              tabIndex={-1}
+              onChange={onPickEditFile}
+            />
+            <input
+              ref={editGalleryInputRef}
+              type="file"
+              accept="image/jpeg,image/jpg,image/png,image/webp,image/gif"
+              className="sr-only"
+              tabIndex={-1}
+              onChange={onPickEditFile}
+            />
+
+            <p className="mb-1.5 mt-3 text-xs font-bold text-gray-600">상품 이미지</p>
+            <div className="mb-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                disabled={!canEditItemMeta(editItem)}
+                onClick={() => editCameraInputRef.current?.click()}
+                className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-bold text-gray-700 disabled:opacity-40"
+              >
+                카메라
+              </button>
+              <button
+                type="button"
+                disabled={!canEditItemMeta(editItem)}
+                onClick={() => editGalleryInputRef.current?.click()}
+                className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-bold text-gray-700 disabled:opacity-40"
+              >
+                사진 선택
+              </button>
+              <button
+                type="button"
+                disabled={!canEditItemMeta(editItem)}
+                onClick={() => {
+                  setEditImageFile(null)
+                  setEditRemoveImage(true)
+                }}
+                className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-600 disabled:opacity-40"
+              >
+                이미지 제거
+              </button>
+            </div>
+
+            {(editImagePreviewUrl || (!editRemoveImage && editItem.image_url)) ? (
+              <div className="mb-3 overflow-hidden rounded-xl border border-gray-100 bg-gray-50">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={editImagePreviewUrl ?? (editItem.image_url as string)}
+                  alt="상품 이미지 미리보기"
+                  className="mx-auto max-h-40 w-full object-contain"
+                />
+              </div>
+            ) : null}
+
+            {!canEditItemMeta(editItem) && (
+              <p className="mb-3 text-[11px] font-bold text-gray-400">
+                기본 상품은 가격만 자녀별로 바꿀 수 있어요.
+              </p>
+            )}
+
+            {editErr && (
               <p className="mb-3 text-xs font-bold text-red-500" role="alert">
-                {creditEditErr}
+                {editErr}
               </p>
             )}
             <div className="flex gap-2">
               <button
                 type="button"
-                onClick={() => setCreditEditItem(null)}
+                onClick={() => setEditItem(null)}
                 className="flex-1 rounded-2xl border border-gray-200 py-3 text-sm font-bold text-gray-500"
               >
                 취소
               </button>
               <button
                 type="button"
-                disabled={creditEditLoading}
-                onClick={() => void submitCreditEdit()}
+                disabled={editLoading || editDeleteLoading}
+                onClick={() => void submitItemEdit()}
                 className="flex-1 rounded-2xl bg-brand-blue py-3 text-sm font-bold text-white shadow-md disabled:opacity-50"
               >
-                {creditEditLoading ? '저장 중...' : '저장'}
+                {editLoading ? '저장 중...' : '저장'}
               </button>
             </div>
+            <button
+              type="button"
+              disabled={!canEditItemMeta(editItem) || editLoading || editDeleteLoading}
+              onClick={() => void submitItemDelete()}
+              className="mt-3 w-full rounded-2xl border border-red-200 bg-red-50 py-3 text-sm font-bold text-red-600 disabled:opacity-40"
+            >
+              {editDeleteLoading ? '삭제 중...' : '상품 삭제'}
+            </button>
           </div>
         </div>
       )}
     </section>
+  )
+}
+
+function PencilIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <path d="M12 20h9" strokeLinecap="round" />
+      <path
+        d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   )
 }
