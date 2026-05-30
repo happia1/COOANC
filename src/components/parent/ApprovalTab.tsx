@@ -28,6 +28,7 @@ import {
   getSeoulDateFromIsoTimestamp,
   getSeoulDateString,
 } from '@/lib/koreaDate'
+import { PARENT_POPUP_BTN_SOLO, PARENT_POPUP_CARD } from '@/lib/parentPopupCardStyles'
 import { PARENT_EXTERNAL_SHOP_URL } from '@/constants/parentShop'
 import { purchaseRequestStatusPill } from '@/lib/purchaseRequestStatusUi'
 /** mission_logs 조회 시 부모 탭 목록과 동일한 필드(실시간 갱신용) */
@@ -704,7 +705,7 @@ export default function ApprovalTab({
           aria-modal="true"
           aria-labelledby="rollback-sleep-lock-title"
         >
-          <div className="w-full max-w-sm rounded-3xl bg-white px-6 py-8 shadow-2xl">
+          <div className={`${PARENT_POPUP_CARD} justify-between px-6 py-8`}>
             <h3 id="rollback-sleep-lock-title" className="mb-3 text-lg font-black text-gray-900">
               되돌리기를 할 수 없어요
             </h3>
@@ -714,7 +715,7 @@ export default function ApprovalTab({
             </p>
             <button
               type="button"
-              className="w-full rounded-2xl bg-brand-blue py-3.5 text-base font-black text-white shadow-md active:opacity-90"
+              className={`${PARENT_POPUP_BTN_SOLO} bg-brand-blue text-white shadow-md active:opacity-90`}
               onClick={() => setRollbackSleepLockModalOpen(false)}
             >
               확인
@@ -733,7 +734,7 @@ export default function ApprovalTab({
           onClick={() => setApproveChoiceModal(null)}
         >
           <div
-            className="w-full max-w-sm rounded-3xl bg-white px-6 py-6 shadow-2xl"
+            className={`${PARENT_POPUP_CARD} justify-between px-6 py-6`}
             onClick={(e) => e.stopPropagation()}
           >
             <p id="approve-choice-title" className="text-center text-base font-black leading-snug text-brand-text">
@@ -756,7 +757,7 @@ export default function ApprovalTab({
                   setApproveChoiceModal(null)
                   void handleApprove(id)
                 }}
-                className="w-full rounded-xl border-0 bg-brand-blue py-3.5 text-sm font-black text-white shadow-md active:scale-[0.98] disabled:opacity-50"
+                className={`${PARENT_POPUP_BTN_SOLO} bg-brand-blue text-white shadow-md disabled:opacity-50`}
               >
                 자녀에게 직접 보상
               </button>
@@ -765,7 +766,7 @@ export default function ApprovalTab({
                 type="button"
                 disabled
                 aria-disabled="true"
-                className="w-full cursor-not-allowed rounded-xl border-0 bg-amber-500 py-3.5 text-sm font-black text-white shadow-md opacity-55"
+                className={`${PARENT_POPUP_BTN_SOLO} cursor-not-allowed bg-amber-500 text-white shadow-md opacity-55`}
               >
                 <span className="flex items-center justify-center gap-2">
                   <span>상품 구매하기</span>
@@ -777,7 +778,7 @@ export default function ApprovalTab({
               <button
                 type="button"
                 onClick={() => setApproveChoiceModal(null)}
-                className="w-full rounded-2xl py-3 text-sm font-bold text-gray-500"
+                className={`${PARENT_POPUP_BTN_SOLO} text-gray-500`}
               >
                 취소
               </button>

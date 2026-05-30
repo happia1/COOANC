@@ -11,7 +11,7 @@ import TabTransitionSkeleton from '@/components/ui/TabTransitionSkeleton'
 export default function ParentSegmentLoading() {
   return (
     <div className="flex min-h-0 w-full flex-1 flex-col">
-      <TabTransitionSkeleton />
+      <TabTransitionSkeleton statusMessage="화면을 불러오는 중…" />
     </div>
   )
 }

@@ -10,9 +10,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { getCachedParentChildIds } from '@/lib/browserParentAuthCache'
 import MarketItemImage from '@/components/common/MarketItemImage'
 import { marketFrameKeyForItemId } from '@/lib/marketItemFrame'
 import { useParentStore } from '@/store/parentStore'
+import { PARENT_POPUP_BTN_SOLO, PARENT_POPUP_CARD, PARENT_POPUP_OVERLAY } from '@/lib/parentPopupCardStyles'
 
 /** 모달이 닫혀 있을 때 / 열려 있을 때(자녀·상품 정보) */
 type ModalState =
@@ -28,31 +30,20 @@ export default function ParentNewPurchaseRequestModal() {
   /** 마지막으로 확인한 pending 요청 id — polling 시 중복 팝업 방지 */
   const lastSeenRequestIdRef = useRef<string | null>(null)
 
+  /** Realtime 으로 새 구매 요청을 감지 — 30초 polling + getUser() 로 Auth 를 두드리지 않습니다 */
   useEffect(() => {
     const supabase = createClient()
-    const pollLatestPending = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      if (!user) return
-      const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle()
-      if (profile?.role !== 'parent') return
-      const { data: links } = await supabase.from('family_links').select('child_id').eq('parent_id', user.id)
-      const childIds = (links ?? []).map((r: { child_id: string }) => r.child_id).filter(Boolean)
-      if (childIds.length === 0) return
-      const { data } = await supabase
-        .from('purchase_requests')
-        .select('id, child_id, item_id, item_name, status, requested_at')
-        .in('child_id', childIds)
-        .eq('status', 'pending')
-        .order('requested_at', { ascending: false })
-        .limit(1)
-      const row = data?.[0] as
-        | { id: string; child_id: string; item_id?: string | null; item_name?: string | null }
-        | undefined
-      if (!row?.id) return
+    let cancelled = false
+    let channel: ReturnType<typeof supabase.channel> | null = null
+    const childIdSet = new Set<string>()
+
+    function openModalForRow(row: {
+      id: string
+      child_id: string
+      item_id?: string | null
+      item_name?: string | null
+    }) {
       if (lastSeenRequestIdRef.current === null) {
-        /** 최초 1회는 기준점만 잡고 팝업은 띄우지 않습니다. */
         lastSeenRequestIdRef.current = row.id
         return
       }
@@ -66,20 +57,55 @@ export default function ParentNewPurchaseRequestModal() {
       })
     }
 
-    void pollLatestPending()
-    const interval = window.setInterval(() => {
-      void pollLatestPending()
-    }, 30000)
-    const onVisible = () => {
-      if (document.visibilityState === 'visible') void pollLatestPending()
-    }
-    window.addEventListener('focus', onVisible)
-    document.addEventListener('visibilitychange', onVisible)
+    async function bootstrap() {
+      const childIds = await getCachedParentChildIds(supabase)
+      if (cancelled || childIds.length === 0) return
+      childIds.forEach((id) => childIdSet.add(id))
 
+      const { data } = await supabase
+        .from('purchase_requests')
+        .select('id, child_id, item_id, item_name, status, requested_at')
+        .in('child_id', childIds)
+        .eq('status', 'pending')
+        .order('requested_at', { ascending: false })
+        .limit(1)
+      const baseline = data?.[0] as
+        | { id: string; child_id: string; item_id?: string | null; item_name?: string | null }
+        | undefined
+      if (baseline?.id) {
+        lastSeenRequestIdRef.current = baseline.id
+      }
+
+      channel = supabase
+        .channel(`parent-new-purchase-${childIds.join('-')}`)
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'purchase_requests' },
+          (payload) => {
+            const row = payload.new as {
+              id?: string
+              child_id?: string
+              item_id?: string | null
+              item_name?: string | null
+              status?: string
+            }
+            if (!row.id || !row.child_id || !childIdSet.has(row.child_id)) return
+            if (row.status !== 'pending') return
+            openModalForRow({
+              id: row.id,
+              child_id: row.child_id,
+              item_id: row.item_id,
+              item_name: row.item_name,
+            })
+          },
+        )
+        .subscribe()
+    }
+
+    void bootstrap()
     return () => {
-      window.clearInterval(interval)
-      window.removeEventListener('focus', onVisible)
-      document.removeEventListener('visibilitychange', onVisible)
+      cancelled = true
+      if (channel) void supabase.removeChannel(channel)
     }
   }, [])
 
@@ -136,14 +162,14 @@ export default function ParentNewPurchaseRequestModal() {
 
   return (
     <div
-      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/45 px-5"
+      className={`${PARENT_POPUP_OVERLAY} z-[200] bg-black/45`}
       role="dialog"
       aria-modal="true"
       aria-labelledby="parent-new-purchase-title"
       onClick={() => setModal({ open: false })}
     >
       <div
-        className="w-full max-w-sm rounded-3xl bg-white px-6 py-6 shadow-2xl"
+        className={`${PARENT_POPUP_CARD} justify-between px-6 py-6`}
         onClick={(e) => e.stopPropagation()}
       >
         <p id="parent-new-purchase-title" className="text-center text-lg font-black leading-snug text-brand-text">
@@ -180,14 +206,14 @@ export default function ParentNewPurchaseRequestModal() {
           <button
             type="button"
             onClick={handleGoToApproval}
-            className="w-full rounded-2xl bg-brand-blue py-3.5 text-sm font-black text-white shadow-md active:scale-[0.98]"
+            className={`${PARENT_POPUP_BTN_SOLO} bg-brand-blue text-white shadow-md`}
           >
             구매 요청 확인하기
           </button>
           <button
             type="button"
             onClick={() => setModal({ open: false })}
-            className="w-full rounded-2xl border border-gray-200 py-3 text-sm font-bold text-gray-500"
+            className={`${PARENT_POPUP_BTN_SOLO} border border-gray-200 bg-white text-gray-500`}
           >
             나중에
           </button>

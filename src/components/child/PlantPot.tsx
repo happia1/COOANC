@@ -149,15 +149,16 @@ export default function PlantPot({ pot, onRequestSeedSelect, waterActions }: Pro
     window.setTimeout(() => setInspectWiggle(false), 420)
   }
 
-  /** 팝업 안 물주기 — 성공 시 하트 포물선 연출을 재생합니다. */
+  /** 팝업 안 물주기 — 탭 직후 하트 포물선을 먼저 띄우고 API는 뒤에서 처리합니다. */
   async function handleWaterInPopup(): Promise<WaterResult> {
-    // 요청사항: 물조리개를 누르는 즉시 클릭 사운드 재생
     playCanClickSound()
     setCanShakeBurst(true)
     window.setTimeout(() => setCanShakeBurst(false), 340)
     if (!waterActions) return 'ok'
-    const r = await waterActions.water()
-    if (r !== 'no_hearts') {
+
+    const shouldFlyHeart = waterActions.hearts > 0 && !waterActions.allowWaterWithoutHearts
+
+    if (shouldFlyHeart) {
       const wrap = arcWrapRef.current
       const canEl = canVisualRef.current
       const potEl = potVisualRef.current
@@ -165,10 +166,8 @@ export default function PlantPot({ pot, onRequestSeedSelect, waterActions }: Pro
         const ww = wrap.getBoundingClientRect()
         const cw = canEl.getBoundingClientRect()
         const pw = potEl.getBoundingClientRect()
-        /** 물조리개 입구 쪽(좌측)에서 출발 */
         const startX = cw.left + cw.width * 0.28 - ww.left
         const startY = cw.top + cw.height * 0.54 - ww.top
-        /** 화분 중앙으로 정확히 도착 */
         const targetX = pw.left + pw.width * 0.5 - ww.left
         const targetY = pw.top + pw.height * 0.5 - ww.top
         const dx = targetX - startX
@@ -180,6 +179,11 @@ export default function PlantPot({ pot, onRequestSeedSelect, waterActions }: Pro
           setHeartBurst((prev) => (prev && prev.id === id ? null : prev))
         }, 700)
       }
+    }
+
+    const r = await waterActions.water()
+    if (r === 'no_hearts') {
+      setHeartBurst(null)
     }
     return r
   }

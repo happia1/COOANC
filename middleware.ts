@@ -6,6 +6,13 @@ import {
   type SupabaseCookieHeaders,
 } from '@/lib/supabase/supabaseSetAllCacheHeaders'
 import { requireSupabaseUrlAndAnonKey } from '@/lib/supabase/requireEnv'
+import {
+  SUPABASE_SERVER_FETCH_TIMEOUT_MS,
+  wrapFetchWithTimeout,
+} from '@/lib/supabase/fetchWithTimeout'
+
+/** 로그인·가입 등 — 세션 갱신(getUser) 없이 바로 통과시킬 공개 경로 */
+const MIDDLEWARE_AUTH_SKIP_PREFIXES = ['/login', '/signup', '/auth/']
 
 /**
  * Supabase 세션 쿠키 갱신 미들웨어
@@ -24,12 +31,19 @@ import { requireSupabaseUrlAndAnonKey } from '@/lib/supabase/requireEnv'
  * `getActorChildContext` 등 서버 레이어를 따릅니다.
  */
 export async function middleware(request: NextRequest) {
-  // 로그인 API 는 방금 줄 새 세션과, 브라우저에 남은 깨진 리프레시 쿠키가 동시에 있을 수 있습니다.
-  // 이 구간에서 getUser→signOut 까지 타면 라우터 응답과 섞여 쿠키가 꼬이거나, 불필요한 정리만 반복할 수 있어 건너뜁니다.
-  if (
-    (request.nextUrl.pathname === '/api/auth/sign-in' && request.method === 'POST') ||
-    (request.nextUrl.pathname === '/api/auth/session' && request.method === 'GET')
-  ) {
+  const pathname = request.nextUrl.pathname
+
+  /**
+   * API Route Handler 는 `createClient()` + `getUser()` 로 세션을 직접 읽습니다.
+   * 여기서까지 Auth 를 호출하면 Supabase `/auth/v1/user` 가 느릈 때(504) 요청마다
+   * getUser 가 2번(미들웨어 + API) 돌고, Edge 미들웨어가 Vercel 제한 시간을 넘깁니다
+   * (MIDDLEWARE_INVOCATION_TIMEOUT).
+   */
+  if (pathname.startsWith('/api/')) {
+    return NextResponse.next({ request })
+  }
+
+  if (MIDDLEWARE_AUTH_SKIP_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))) {
     return NextResponse.next({ request })
   }
 
@@ -40,6 +54,9 @@ export async function middleware(request: NextRequest) {
     url,
     anonKey,
     {
+      global: {
+        fetch: wrapFetchWithTimeout(fetch, SUPABASE_SERVER_FETCH_TIMEOUT_MS),
+      },
       cookies: {
         getAll() {
           return request.cookies.getAll()
@@ -68,7 +85,6 @@ export async function middleware(request: NextRequest) {
     await supabase.auth.signOut({ scope: 'local' })
   }
 
-  const pathname = request.nextUrl.pathname
   /** `/` 에서 SSR 이 쿠키를 못 따라가거나 지연될 때를 대비해, 미들웨어 단계에서 곧바로 분기합니다. */
   if (pathname === '/') {
     const effectiveUser = authError && shouldClearAuthCookiesAfterError(authError) ? null : user
@@ -139,6 +155,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|api/|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }

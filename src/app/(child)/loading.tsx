@@ -1,22 +1,32 @@
 /**
- * 자녀 앱(`(child)` 세그먼트, 주로 `/home`)으로 들어오거나 같은 그룹 안에서 페이지가 바뀔 때 잠깐 보이는 로딩 UI 입니다.
+ * 자녀 앱(`(child)` 세그먼트, 주로 `/home`) 전환 시 잠깐 보이는 로딩 UI 입니다.
  *
  * 비개발자 설명:
- * - 부모가 자녀 프로필을 눌러 「자녀 화면 보기」로 넘어올 때도 이 화면이 잠시 뜰 수 있습니다.
- * - 루트(/) 첫 진입과 같은 토끼 달리기 애니메이션을 쓰고, 그 아래에 「지금 자녀 앱으로 바뀌는 중」이라는 문구를 보여 줍니다.
- * - 배경은 앱 공통 배경 이미지를 깔아 전환이 자연스럽게 보이게 합니다.
+ * - 부모가 「자녀 화면 보기」로 넘어올 때도 같은 스켈레톤이 잠시 보입니다.
+ * - 배경은 자녀 홈과 같은 키즈룸 그림을 깔고, 본문은 회색 placeholder + 안내 문구로 표시합니다.
  */
 
-import BunnyRunLoader from '@/components/ui/BunnyRunLoader'
-import { ASSETS } from '@/constants/assets'
+import TabTransitionSkeleton from '@/components/ui/TabTransitionSkeleton'
+import { ASSETS, CHILD_HOME_BACKGROUND_CACHE_BUST } from '@/constants/assets'
 
 export default function ChildSegmentLoading() {
+  const childBgSrc = `${ASSETS.layouts.childHomeBackgroundSecondScreen}?v=${CHILD_HOME_BACKGROUND_CACHE_BUST}`
+
   return (
-    <div
-      className="flex min-h-dvh w-full flex-col items-center justify-center bg-cover bg-center bg-no-repeat px-4"
-      style={{ backgroundImage: `url(${ASSETS.layouts.sharedAppBackground})` }}
-    >
-      <BunnyRunLoader statusMessage="자녀 앱 화면으로 전환 중" />
+    <div className="relative flex min-h-dvh w-full flex-col items-stretch justify-center overflow-hidden px-4 py-8">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={childBgSrc}
+        alt=""
+        className="pointer-events-none absolute inset-0 h-full w-full select-none object-cover brightness-[1.1]"
+        draggable={false}
+        fetchPriority="high"
+        loading="eager"
+        decoding="async"
+      />
+      <div className="relative z-10 flex w-full flex-1 flex-col justify-center">
+        <TabTransitionSkeleton statusMessage="자녀 화면을 불러오는 중…" />
+      </div>
     </div>
   )
 }

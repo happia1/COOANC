@@ -10,7 +10,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
-import { getAuthUserWithRetry } from '@/lib/supabaseGetUserRetry'
+import { getCachedParentChildIds } from '@/lib/browserParentAuthCache'
 import {
   pruneAcknowledgedToCurrentPending,
   readAcknowledgedPurchaseRequestIds,
@@ -71,20 +71,12 @@ export default function ParentRoutineAlarmButton({ initialPendingApprovalCount }
   }, [])
 
   /**
-   * `getUser` + `family_links` 를 **한 번만** 쓰고, 구매 대기 + 연속 탭 알림을 같이 갱신합니다.
-   * (동시에 `getUser` 두 번 호출 시 Auth storage 락 충돌로 런타임 오류가 나던 이슈 완화)
+   * 연결 자녀 기준 구매 대기 + 연속 탭 알림을 갱신합니다.
+   * Auth `/user` 는 치지 않고 로컬 세션(`getSession`)만 사용합니다.
    */
   const refreshBellHubData = useCallback(async () => {
     const supabase = createClient()
-    const user = await getAuthUserWithRetry(supabase)
-    if (!user) {
-      setPendingRequestIds([])
-      setRapidTapAlerts([])
-      setFetchDone(true)
-      return
-    }
-    const { data: links } = await supabase.from('family_links').select('child_id').eq('parent_id', user.id)
-    const childIds = (links ?? []).map((r: { child_id: string }) => r.child_id)
+    const childIds = await getCachedParentChildIds(supabase)
     if (childIds.length === 0) {
       setPendingRequestIds([])
       setRapidTapAlerts([])

@@ -100,6 +100,7 @@ export default async function ParentHomePage() {
   const childIds = auth.familyLinks.map((l) => l.child_id)
   const familyLinkIds = auth.familyLinks.map((l) => l.id)
   const familyLinkByChild: Record<string, string> = Object.fromEntries(auth.familyLinks.map((l) => [l.child_id, l.id]))
+  const childIdByFamilyLink: Record<string, string> = Object.fromEntries(auth.familyLinks.map((l) => [l.id, l.child_id]))
 
   if (childIds.length === 0) {
     return <HomeTab childrenData={[]} upcomingEvents={[]} daysWithDataByChild={{}} familyLinkByChild={{}} />
@@ -143,8 +144,7 @@ export default async function ParentHomePage() {
     // 홈 상단 일정 브리핑 — 오늘~오늘+6일 구간과 겹치는 캘린더 일정(자녀 필터링은 클라이언트)
     supabase
       .from('calendar_events')
-      // child_id 는 홈 브리핑을 「선택 자녀」 기준으로 걸 때 사용합니다(CalendarSection 과 동일).
-      .select('id, start_date, end_date, routine_override, title, event_type, child_id')
+      .select('id, start_date, end_date, routine_override, title, event_type, family_link_id')
       .in('family_link_id', familyLinkIds)
       .or(`end_date.gte.${today},end_date.is.null`)
       .lte('start_date', briefingEndInclusive)
@@ -259,7 +259,26 @@ export default async function ParentHomePage() {
     }
   })
 
-  const calendarBriefingRows = (calendarEventsRes.data ?? []) as BriefingEv[]
+  const calendarBriefingRows: BriefingEv[] = (calendarEventsRes.data ?? []).map((raw) => {
+    const row = raw as {
+      id: string
+      start_date: string
+      end_date: string | null
+      routine_override?: string | null
+      event_type?: string | null
+      title?: string | null
+      family_link_id?: string
+    }
+    return {
+      id: row.id,
+      start_date: row.start_date,
+      end_date: row.end_date,
+      routine_override: row.routine_override,
+      event_type: row.event_type,
+      title: row.title,
+      child_id: row.family_link_id ? childIdByFamilyLink[row.family_link_id] ?? null : null,
+    }
+  })
 
   /** 공휴일부터 합치고 시작일 순으로 정렬 — 클라에서 다시 한 번 브리핑 구간 필터링합니다 */
   const upcomingEvents: BriefingEv[] = [...phBriefingRows, ...calendarBriefingRows].sort((a, b) =>

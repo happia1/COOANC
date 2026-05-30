@@ -419,34 +419,6 @@ export default function HomeTab({
       .slice(0, 24)
   }, [localUpcomingEvents, upcomingEvents, currentId])
 
-  // #region agent log
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '68797e' },
-      body: JSON.stringify({
-        sessionId: '68797e',
-        location: 'HomeTab.tsx:briefingDebug',
-        message: 'calendar_briefing_counts',
-        hypothesisId: 'H1',
-        data: {
-          host: window.location.hostname,
-          serverUpcoming: upcomingEvents?.length ?? 0,
-          localUpcoming: localUpcomingEvents.length,
-          merged: effectiveUpcomingEvents.length,
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {})
-  }, [
-    upcomingEvents?.length,
-    localUpcomingEvents.length,
-    effectiveUpcomingEvents.length,
-    child?.id,
-  ])
-  // #endregion
-
   function formatEventDate(dateStr: string): string {
     const parts = dateStr.split('-')
     if (parts.length < 3) return dateStr

@@ -38,21 +38,29 @@ function coerceRoutineOverride(raw: string | null | undefined): LocalCalendarEve
   return 'none'
 }
 
-/** Supabase 행 → 캘린더 카드 모델 */
-export function calendarEventRowToLocal(row: {
-  id: string
-  title: string
-  start_date: string
-  end_date: string | null
-  event_type: string | null
-  routine_override: string | null
-  child_id: string | null
-}): LocalCalendarEvent {
+/** Supabase 행 → 캘린더 카드 모델 (`family_link_id` 로 자녀 id 를 역추적) */
+export function calendarEventRowToLocal(
+  row: {
+    id: string
+    title: string
+    start_date: string
+    end_date: string | null
+    event_type: string | null
+    routine_override: string | null
+    family_link_id?: string
+    child_id?: string | null
+  },
+  childIdByFamilyLink?: Map<string, string>,
+): LocalCalendarEvent {
   const sd = String(row.start_date).slice(0, 10)
   const ed = row.end_date ? String(row.end_date).slice(0, 10) : sd
+  const childId =
+    row.child_id ??
+    (row.family_link_id && childIdByFamilyLink?.get(row.family_link_id)) ??
+    null
   return {
     id: row.id,
-    childId: row.child_id,
+    childId,
     title: row.title,
     startDate: sd,
     endDate: ed,
@@ -138,7 +146,7 @@ type CalRow = {
   end_date: string | null
   event_type: string | null
   routine_override: string | null
-  child_id: string | null
+  family_link_id: string
 }
 
 /**
@@ -148,7 +156,7 @@ type CalRow = {
  * `parent_id` 컬럼은 없으므로 `.eq('parent_id', …)` 같은 조회는 쓰지 않습니다.
  *
  * 흐름: 현재 부모 uid 로 `family_links.id` 목록을 구한 뒤 `calendar_events` 를 `family_link_id IN (…)` 로만 조회합니다.
- * 자녀 필터가 필요하면(`childId` 지정) `child_id IS NULL` 이거나 해당 자녀인 행만 남깁니다.
+ * 자녀 필터가 필요하면(`childId` 지정) 해당 자녀의 `family_link_id` 행만 조회합니다.
  */
 export async function fetchParentCalendarEventsFromServer(childId: string | null): Promise<LocalCalendarEvent[]> {
   const supabase = createClient()
@@ -157,21 +165,22 @@ export async function fetchParentCalendarEventsFromServer(childId: string | null
   } = await supabase.auth.getUser()
   if (!user) return []
 
-  const { data: allLinks } = await supabase.from('family_links').select('id').eq('parent_id', user.id)
+  let linksQuery = supabase.from('family_links').select('id, child_id').eq('parent_id', user.id)
+  if (childId) {
+    linksQuery = linksQuery.eq('child_id', childId)
+  }
+  const { data: allLinks } = await linksQuery
   const familyLinkIds = (allLinks ?? []).map((r) => r.id).filter(Boolean)
   if (familyLinkIds.length === 0) return []
 
-  let q = supabase
+  const res = await supabase
     .from('calendar_events')
-    .select('id, title, start_date, end_date, event_type, routine_override, child_id')
+    .select('id, title, start_date, end_date, event_type, routine_override, family_link_id')
     .in('family_link_id', familyLinkIds)
-
-  if (childId) {
-    q = q.or(`child_id.is.null,child_id.eq.${childId}`)
-  }
-
-  const res = await q
   if (res.error || !res.data) return []
 
-  return (res.data as CalRow[]).map(calendarEventRowToLocal)
+  const childIdByFamilyLink = new Map<string, string>(
+    (allLinks ?? []).map((row: { id: string; child_id: string }) => [row.id, row.child_id] as const),
+  )
+  return (res.data as CalRow[]).map((row) => calendarEventRowToLocal(row, childIdByFamilyLink))
 }

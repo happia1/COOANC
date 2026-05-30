@@ -21,6 +21,7 @@
  */
 
 import { Fragment, useRef, useState, useCallback, useMemo, useEffect, memo } from 'react'
+import { flushSync } from 'react-dom'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import RapidTapConfirmModal from '@/components/child/RapidTapConfirmModal'
@@ -42,6 +43,7 @@ import { getUnlockedFeatures } from '@/constants/childScreenFeatures'
 import { usePlantPot } from '@/hooks/usePlantPot'
 import { useContainerSize } from '@/hooks/useContainerSize'
 import ChildMissionCard from '@/components/child/ChildMissionCard'
+import ChildAppTransitionOverlay from '@/components/child/ChildAppTransitionOverlay'
 import ChildPanelOverlay, { type PanelType } from '@/components/child/ChildPanelOverlay'
 import ChildLevelStatsCard from '@/components/child/ChildLevelStatsCard'
 import ChildHomePiggyBank from '@/components/child/ChildHomePiggyBank'
@@ -592,6 +594,20 @@ export default function ChildScreen({
     window.location.reload()
   }, [])
 
+  /** 자녀 홈 최초 진입 시 미션·UI가 순차로 나타나게 합니다 */
+  const [enterReveal, setEnterReveal] = useState(false)
+
+  /** 나가기 문 — 누르자마자 전환 오버레이를 보여 준 뒤 실제 이동합니다 */
+  const [isExiting, setIsExiting] = useState(false)
+  const exitStatusMessage = exitHref.includes('exit-child-ui')
+    ? '부모 화면으로 이동 중…'
+    : '화면을 전환하는 중…'
+  const handleExitClick = useCallback(() => {
+    if (isExiting) return
+    flushSync(() => setIsExiting(true))
+    window.location.assign(exitHref)
+  }, [exitHref, isExiting])
+
   // ── 통계(크레딧/하트) ──────────────────────────────────────────────────────
 
   const [stats, setStats] = useState<ChildStats | null>(() =>
@@ -901,6 +917,47 @@ export default function ChildScreen({
   useEffect(() => {
     installChildRoutineAudioUnlockOnFirstGesture()
   }, [])
+
+  /** 이전 디버그 빌드에서 남은 좌상단 오버레이가 있으면 제거합니다 */
+  useEffect(() => {
+    document.getElementById('cooanc-debug-box')?.remove()
+  }, [])
+
+  /** 로딩 오버레이 뒤 본문(미션 카드 등)이 순차로 페이드인 됩니다 */
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => setEnterReveal(true))
+    return () => cancelAnimationFrame(frame)
+  }, [])
+
+  /** 자녀 홈 진입 시 서버 `today`와 미션 행 수를 기록 — 자정 리셋 동작 확인용 */
+  useEffect(() => {
+    const missionDates = dailyMissions.map((dm) => {
+      const raw = dm.date
+      if (typeof raw === 'string') return raw.slice(0, 10)
+      return String(raw ?? '')
+    })
+    // #region agent log
+    fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '65823a' },
+      body: JSON.stringify({
+        sessionId: '65823a',
+        location: 'ChildScreen.tsx:mount-mission-day',
+        message: 'child home mission day snapshot',
+        data: {
+          serverToday: today,
+          clientSeoulDayKey: seoulDayKey,
+          datesMatch: today === seoulDayKey,
+          missionCount: dailyMissions.length,
+          uniqueMissionDates: [...new Set(missionDates)],
+          incompleteCount: dailyMissions.filter((dm) => !dm.is_completed).length,
+        },
+        hypothesisId: 'midnight-reset',
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {})
+    // #endregion
+  }, [dailyMissions, seoulDayKey, today])
 
   useEffect(() => {
     /** 서버 배열로 목록을 맞추되, 방금 완료 요청을 보낸 행(`optimisticDailyMissionCompleteIdsRef`)은 서버가 아직 `is_completed=false` 인 한 `done` 에 남깁니다. */
@@ -1903,6 +1960,7 @@ export default function ChildScreen({
 
   return (
     <>
+      {isExiting ? <ChildAppTransitionOverlay statusMessage={exitStatusMessage} /> : null}
       {/**
        * 전체 화면 컨테이너 — fixed inset-0 로 ChildNavBar(z-50), 레이아웃 나가기 버튼(z-50) 위에 올립니다.
        * 비개발자 설명: 이 화면이 기존 탭 바를 완전히 가리고 단일 화면으로 동작합니다.
@@ -2052,11 +2110,14 @@ export default function ChildScreen({
                   transform: `scale(${rightIconPrimaryScale})`,
                 }}
               >
-                <a
-                  href={exitHref}
-                  className={`${CHILD_HOME_EXIT_STICKER_CART_GLASS_CLASS} no-underline transition active:scale-95`}
+                <button
+                  type="button"
+                  onClick={handleExitClick}
+                  disabled={isExiting}
+                  className={`${CHILD_HOME_EXIT_STICKER_CART_GLASS_CLASS} border-0 bg-transparent p-0 no-underline transition active:scale-95 disabled:pointer-events-none`}
                   style={CHILD_HOME_TOP_BAR_GLASS_STYLE}
                   aria-label="나가기"
+                  aria-busy={isExiting}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
@@ -2067,7 +2128,7 @@ export default function ChildScreen({
                     // 버튼 블록은 고정하고, 나가기 문 아이콘 그림만 오른쪽으로 아주 미세하게 이동합니다.
                     className="h-7 w-7 translate-x-[1px] object-contain drop-shadow-md"
                   />
-                </a>
+                </button>
                 {features.sticker && (
                   <button
                     type="button"
@@ -2159,8 +2220,8 @@ export default function ChildScreen({
                     pot={pot}
                     onRequestSeedSelect={openSeedModal}
                     waterActions={{
-                      /** 물주기 가능 여부는 DB와 맞는 `plantHearts` 기준(레벨 카드는 `heartsForHomeUi` 별도) */
-                      hearts: plantHearts,
+                      /** 물조리개 그림·탭 판정은 레벨 카드와 같은 `heartsForHomeUi` 기준 */
+                      hearts: heartsForHomeUi,
                       allowWaterWithoutHearts: pot.stage === 7,
                       water,
                       onNoHearts: () =>
@@ -2236,7 +2297,12 @@ export default function ChildScreen({
               </div>
             ) : null}
             {/* 미션 헤더 — 오른쪽: 완주 하트 5칸 → 완료 수/전체(예: 10/19) */}
-            <div className="mb-2 flex shrink-0 items-center justify-between gap-2 px-5 min-[400px]:px-6">
+            <div
+              className={`mb-2 flex shrink-0 items-center justify-between gap-2 px-5 transition-all duration-500 ease-out min-[400px]:px-6 ${
+                enterReveal ? 'translate-y-0 opacity-100' : 'translate-y-2 opacity-0'
+              }`}
+              style={{ transitionDelay: '80ms' }}
+            >
               <p className="min-w-0 text-[clamp(0.875rem,calc(0.8rem+0.2vw),1.125rem)] font-black text-white drop-shadow">
                 오늘의 미션
               </p>
@@ -2324,6 +2390,8 @@ export default function ChildScreen({
                   const showMorningAfternoonDivider =
                     prev != null && !isAfternoonMission(prev) && isAfternoonMission(mission)
 
+                  const revealDelayMs = Math.min(idx, 8) * 70 + 140
+
                   return (
                     <Fragment key={mission.id}>
                       {showMorningAfternoonDivider ? (
@@ -2333,11 +2401,18 @@ export default function ChildScreen({
                           className="pointer-events-none shrink-0 self-stretch w-px min-h-[5rem] bg-white/45 shadow-[1px_0_0_rgba(0,0,0,0.08)] mx-[clamp(2px,calc(0.25rem+0.2vw),6px)]"
                         />
                       ) : null}
-                      <ChildMissionCard
-                        mission={mission}
-                        tapResetKey={missionTapUnblock[mission.id] ?? 0}
-                        onComplete={handleMissionComplete}
-                      />
+                      <div
+                        className={`shrink-0 snap-center transition-all duration-500 ease-out ${
+                          enterReveal ? 'translate-y-0 opacity-100' : 'translate-y-3 opacity-0'
+                        }`}
+                        style={{ transitionDelay: `${revealDelayMs}ms` }}
+                      >
+                        <ChildMissionCard
+                          mission={mission}
+                          tapResetKey={missionTapUnblock[mission.id] ?? 0}
+                          onComplete={handleMissionComplete}
+                        />
+                      </div>
                     </Fragment>
                   )
                 })}

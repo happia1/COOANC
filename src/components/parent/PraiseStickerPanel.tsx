@@ -6,6 +6,7 @@ import {
   praiseAssetStickerTitle,
   praiseAssetStickerUrl,
 } from '@/lib/praiseAssetStickers'
+import { PARENT_POPUP_BTN, PARENT_POPUP_CARD } from '@/lib/parentPopupCardStyles'
 
 type Props = {
   childId: string | null
@@ -129,7 +130,7 @@ export default function PraiseStickerPanel({ childId, childName }: Props) {
 
       {confirmKey && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/40 p-6">
-          <div className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl">
+          <div className={`${PARENT_POPUP_CARD} justify-between p-6`}>
             <p className="text-center text-base font-black text-brand-text">스티커를 선물하시겠어요?</p>
             <p className="mt-1 text-center text-xs text-gray-500">{childName}에게 전달돼요</p>
             <div className="mt-5 flex gap-2">
@@ -137,7 +138,7 @@ export default function PraiseStickerPanel({ childId, childName }: Props) {
                 type="button"
                 disabled={loading}
                 onClick={() => setConfirmKey(null)}
-                className="flex-1 rounded-2xl border border-gray-200 py-3 text-sm font-bold text-gray-500"
+                className={`${PARENT_POPUP_BTN} border border-gray-200 bg-white text-gray-500`}
               >
                 아니오
               </button>
@@ -145,7 +146,7 @@ export default function PraiseStickerPanel({ childId, childName }: Props) {
                 type="button"
                 disabled={loading}
                 onClick={() => void send(confirmKey)}
-                className="flex-1 rounded-2xl bg-brand-blue py-3 text-sm font-bold text-white shadow-md disabled:opacity-50"
+                className={`${PARENT_POPUP_BTN} bg-brand-blue text-white shadow-md disabled:opacity-50`}
               >
                 {loading ? '보내는 중...' : '예'}
               </button>

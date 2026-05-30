@@ -216,37 +216,6 @@ export default function CalendarSection({ childId, focusDate = null }: Props) {
       })
       setCalendarDataRevision((n) => n + 1)
     }
-    // #region agent log
-    if (typeof window !== 'undefined') {
-      const typeCounts = merged.reduce<Record<string, number>>((acc, e) => {
-        acc[e.eventType] = (acc[e.eventType] ?? 0) + 1
-        return acc
-      }, {})
-      fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '68797e' },
-        body: JSON.stringify({
-          sessionId: '68797e',
-          location: 'CalendarSection.tsx:refreshMergedEvents',
-          message: 'calendar_merge',
-          data: {
-            serverCount: server.length,
-            localCount: local.length,
-            mergedCount: merged.length,
-            hasChildId: Boolean(childId),
-            /** 홈과 동일: 부모의 모든 family_link 기준 서버 조회(형제 링크 일정 포함 여부 확인용) */
-            fetchScope: 'all_parent_family_links',
-            typeCounts,
-            serverTravelCount: server.filter((e) => e.eventType === 'travel').length,
-            localTravelCount: local.filter((e) => e.eventType === 'travel').length,
-            mergedTravelCount: typeCounts.travel ?? 0,
-          },
-          timestamp: Date.now(),
-          hypothesisId: 'H-data-provenance',
-        }),
-      }).catch(() => {})
-    }
-    // #endregion
   }, [childId])
 
   /**
@@ -435,32 +404,6 @@ export default function CalendarSection({ childId, focusDate = null }: Props) {
     const userAll = userEventsOverlappingDay(dk)
     const byId = new Map(userAll.map((e) => [e.id, e]))
     const uniqUser = [...byId.values()]
-    // #region agent log
-    if (typeof window !== 'undefined') {
-      fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '68797e' },
-        body: JSON.stringify({
-          sessionId: '68797e',
-          location: 'CalendarSection.tsx:handleDayClick',
-          message: 'day_detail_unscoped_user_events',
-          data: {
-            dk,
-            legendFilter,
-            mapFilteredTotal: raw.length,
-            unscopedUserCount: userAll.length,
-            travelCountInDetail: userAll.filter((e) => e.eventType === 'travel').length,
-            eventsTotal: events.length,
-            hasPh: Boolean(publicHolidayEv),
-            hasChildId: Boolean(childId),
-            monthAllCount: monthEventsAll.length,
-          },
-          timestamp: Date.now(),
-          hypothesisId: 'H-legend-or-child',
-        }),
-      }).catch(() => {})
-    }
-    // #endregion
     const detailList: LocalCalendarEvent[] = publicHolidayEv ? [publicHolidayEv, ...uniqUser] : uniqUser
 
     if (detailList.length > 0) {
@@ -485,26 +428,6 @@ export default function CalendarSection({ childId, focusDate = null }: Props) {
     if (calendarDataRevision === 0) return
     handleDayClick(toOpen)
     setPendingFocusDate(null)
-    // #region agent log
-    if (typeof window !== 'undefined') {
-      fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '68797e' },
-        body: JSON.stringify({
-          sessionId: '68797e',
-          location: 'CalendarSection.tsx:autoOpenAfterMerge',
-          message: 'focus_link_after_merge',
-          data: {
-            dk: toOpen,
-            calendarDataRevision,
-            eventsLenAfterRender: events.length,
-          },
-          timestamp: Date.now(),
-          hypothesisId: 'H-focus-race',
-        }),
-      }).catch(() => {})
-    }
-    // #endregion
     // `calendarDataRevision`이 올라간 뒤(병합 flush 후) handleDayClick을 호출해, 빈 `events`로 ‘일정 없음’이 뜨는 레이스를 막습니다.
     // eslint-disable-next-line react-hooks/exhaustive-deps -- toOpen/열기 1회만; handleDayClick·events는 이 시점의 렌더 기준
   }, [pendingFocusDate, year, month, calendarDataRevision])

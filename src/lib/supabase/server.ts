@@ -1,6 +1,10 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { requireSupabaseUrlAndAnonKey } from '@/lib/supabase/requireEnv'
+import {
+  SUPABASE_SERVER_FETCH_TIMEOUT_MS,
+  wrapFetchWithTimeout,
+} from '@/lib/supabase/fetchWithTimeout'
 
 /**
  * 서버 환경(Server Components, Actions, Route Handlers)에서
@@ -14,6 +18,9 @@ export const createClient = async () => {
     url,
     anonKey,
     {
+      global: {
+        fetch: wrapFetchWithTimeout(fetch, SUPABASE_SERVER_FETCH_TIMEOUT_MS),
+      },
       cookies: {
         getAll() {
           return cookieStore.getAll()

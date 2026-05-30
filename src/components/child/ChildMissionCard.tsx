@@ -31,22 +31,8 @@ import {
   childHomeMissionSpriteWidthPx,
 } from '@/lib/missionTodayLayoutSpec'
 import { isSpecialSectionMission } from '@/lib/specialMissionChips'
-import { createPreloadedAudio } from '@/lib/childAudio'
+import { CHILD_AUDIO } from '@/lib/childAudio'
 import type { DailyMissionWithTemplate } from '@/types/database'
-
-/**
- * 카드 탭 효과음 공유 오디오(모듈 전역).
- * 비개발자: 카드를 누르면 카드가 바로 사라질 수 있는데, 소리는 끝까지 재생되도록
- * 컴포넌트 생명주기(마운트/언마운트)와 분리해 한 번 만든 오디오를 재사용합니다.
- */
-let sharedMissionCardTapAudio: HTMLAudioElement | null = null
-
-function getSharedMissionCardTapAudio(src: string): HTMLAudioElement {
-  if (!sharedMissionCardTapAudio) {
-    sharedMissionCardTapAudio = createPreloadedAudio(src)
-  }
-  return sharedMissionCardTapAudio
-}
 
 type Props = {
   mission: DailyMissionWithTemplate
@@ -78,9 +64,6 @@ type Props = {
  * - 카드를 한 번 탭하면 부모가 처리하는 동안 같은 그림이 잠깐 보이다가 사라집니다(별도 “완료 팝업” 없음).
  */
 export default function ChildMissionCard({ mission, onComplete, tapResetKey = 0 }: Props) {
-  /** 요청 반영: 오늘의 미션 카드 탭 효과음 경로를 이 파일로 고정합니다. */
-  const missionCardTapSoundSrc =
-    '/assets/audio/missions/success_reward-fairy-arcade-sparkle-866.wav' as const
   /**
    * 뷰포트 너비 — 스프라이트·아이콘 픽셀 보간용.
    * SSR 과 첫 클라이언트 페인트는 **같은 값**이어야 하므로 `window` 를 읽지 않고 `minPx` 로 시작한 뒤
@@ -105,14 +88,18 @@ export default function ChildMissionCard({ mission, onComplete, tapResetKey = 0 
 
   /**
    * 카드 탭 효과음을 재생합니다.
-   * - 요청하신 success_reward 파일만 재생합니다(다른 효과음 폴백 없음).
+   * - 탭 직후 `new Audio()`로 만들어 재생합니다(물조리개·저금통과 동일).
+   * - 비개발자: iOS·태블릿은 화면을 누를 때 만든 소리만 허용하는 경우가 많아,
+   *   미리 만들어 둔 공유 오디오보다 탭 순간에 새로 만드는 방식이 더 잘 들립니다.
    */
   function playMissionCardTapSound() {
-    const a = getSharedMissionCardTapAudio(missionCardTapSoundSrc)
-    a.pause()
-    a.currentTime = 0
-    a.volume = 0.42
-    void a.play().catch(() => {})
+    try {
+      const audio = new Audio(CHILD_AUDIO.cardTap)
+      audio.volume = 0.42
+      void audio.play().catch(() => {})
+    } catch {
+      /* noop */
+    }
   }
   /**
    * 연속 탭 취소 등으로 상위가 tapResetKey 를 올리면 잠금을 풀어 같은 카드를 다시 탭할 수 있게 합니다.

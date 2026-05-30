@@ -5,8 +5,7 @@
  *
  * 비개발자 설명:
  * - 부모 앱이 처음 켜질 때, 관리자가 "팝업으로 띄우라"고 설정한 공지가 있으면 보여 줍니다.
- * - 팝업이 여러 개면, 책장을 넘기듯 카드가 살짝 겹쳐진 모습으로 쌓이고
- *   좌우로 밀거나(스와이프) 화살표를 눌러 한 장씩 넘겨 볼 수 있어요.
+ * - 팝업이 여러 개면, 좌우 스와이프로 슬라이드하며 넘기고 위쪽 도트로 위치를 알 수 있습니다.
  * - 표시 순서는 우선순위(force > important > once)로 정렬합니다.
  * - 팝업을 닫아도 공지는 사라지지 않고, 종(알림·공지) 안의 공지센터에서 계속 볼 수 있습니다.
  * - 따로 저장(기억)하지 않으므로, 앱을 새로 켜면 조건에 맞는 팝업은 다시 보일 수 있습니다.
@@ -18,17 +17,11 @@
  * - force     : '확인'을 누르기 전까지 닫기 불가(바깥 클릭/X 비활성화)
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { createClient } from '@/lib/supabase/client'
-import {
-  fetchActiveNotices,
-  pickLaunchPopupNotices,
-  NOTICE_LINK_DEFAULT_LABEL,
-  NOTICE_TYPE_LABELS,
-  type Notice,
-} from '@/lib/notices'
-import NoticeMarkdown from '@/components/common/NoticeMarkdown'
+import { fetchActiveNotices, pickLaunchPopupNotices, type Notice } from '@/lib/notices'
+import ParentNoticePopupCard from '@/components/parent/ParentNoticePopupCard'
 import { openNoticeCenter } from '@/lib/noticeCenterBus'
 
 /**
@@ -44,8 +37,21 @@ const DISMISSED_POPUP_STORAGE_KEY = 'cooanc.dismissedPopupIds'
 /** 좌우 스와이프로 "넘김"으로 인정하는 최소 이동 거리(px) */
 const SWIPE_THRESHOLD = 50
 
-/** 팝업 본문에 보여 줄 최대 높이(px) — 이보다 길면 잘라 보여 주고 "더 보기"를 띄웁니다 */
-const POPUP_BODY_MAX_HEIGHT = 200
+/** 슬라이드 넘김 애니메이션 길이(ms) */
+const SLIDE_MS = 280
+
+/** DOM 측정 보조 — 본문이 대략 이 높이를 넘기면 잘린 것으로 봅니다 */
+const POPUP_BODY_CLAMP_HINT_PX = 120
+
+/** 본문 문자열 기준 — DOM 측정 전에도 긴 글은 더 보기 후보로 봅니다 */
+function noticeBodyLikelyClamped(body: string | null | undefined): boolean {
+  const text = (body ?? '').trim()
+  if (!text) return false
+  if (text.length > 180) return true
+  if (text.split('\n').length > 4) return true
+  return false
+}
+
 
 /** 저장소에서 "다시 보지 않기" 한 공지 id 목록을 읽어옵니다 */
 function loadDismissedPopupIds(): Set<string> {
@@ -79,7 +85,11 @@ export default function ParentNoticePopup() {
   const [entered, setEntered] = useState(false)
   /** 손가락으로 끌고 있는 가로 거리(px) — 카드가 손끝을 따라 움직이게 합니다 */
   const [dragX, setDragX] = useState(0)
+  const dragXRef = useRef(0)
   const [dragging, setDragging] = useState(false)
+  /** 스와이프 후 슬라이드 애니메이션 중 */
+  const [sliding, setSliding] = useState(false)
+  const [cardWidth, setCardWidth] = useState(300)
   /** "다시 보지 않기" 체크박스(현재 카드 기준) 상태 */
   const [dontShowAgain, setDontShowAgain] = useState(false)
   /** 현재 카드 본문이 최대 높이를 넘겨 잘렸는지 — 넘쳤으면 "더 보기"를 보여 줍니다 */
@@ -97,6 +107,14 @@ export default function ParentNoticePopup() {
   const touchRef = useRef<{ x: number; y: number; axis: 'h' | 'v' | null } | null>(null)
   /** 본문 영역 DOM — 실제 높이를 재서 "잘림" 여부를 판단합니다 */
   const bodyRef = useRef<HTMLDivElement | null>(null)
+  /** 덱(카드 묶음) 너비 — 넘김 transform 계산에 사용 */
+  const deckRef = useRef<HTMLDivElement | null>(null)
+  const cardWidthRef = useRef(300)
+
+  const setDragXTracked = useCallback((x: number) => {
+    dragXRef.current = x
+    setDragX(x)
+  }, [])
 
   /** Realtime 구독용 supabase 클라이언트(한 번만 생성) */
   const supabase = useMemo(() => createClient(), [])
@@ -201,23 +219,68 @@ export default function ParentNoticePopup() {
   }, [open])
 
   // 현재 카드 본문이 최대 높이를 넘겨 잘렸는지 측정합니다.(넘치면 "더 보기" 노출)
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!open || !current) {
       setBodyClamped(false)
       return
     }
+
+    const bodyText = current.body ?? ''
+
     const measure = () => {
-      const el = bodyRef.current
-      if (!el) return
-      setBodyClamped(el.scrollHeight > el.clientHeight + 4)
+      const byText = noticeBodyLikelyClamped(bodyText)
+      const node = bodyRef.current
+      if (!node) {
+        setBodyClamped(byText)
+        return
+      }
+      const byDom =
+        node.scrollHeight > node.clientHeight + 2 ||
+        (node.clientHeight > 0 && node.scrollHeight > POPUP_BODY_CLAMP_HINT_PX)
+      setBodyClamped(byDom || byText)
     }
-    const id = requestAnimationFrame(() => requestAnimationFrame(measure))
+
+    measure()
+    const rafId = requestAnimationFrame(() => requestAnimationFrame(measure))
     window.addEventListener('resize', measure)
-    return () => {
-      cancelAnimationFrame(id)
-      window.removeEventListener('resize', measure)
+
+    let ro: ResizeObserver | null = null
+    const attachObserver = () => {
+      const node = bodyRef.current
+      if (!node || ro) return
+      ro = new ResizeObserver(measure)
+      ro.observe(node)
     }
-  }, [open, current?.id, entered])
+    attachObserver()
+    const retry0 = window.setTimeout(attachObserver, 0)
+    const retry1 = window.setTimeout(measure, 80)
+    const retry2 = window.setTimeout(measure, 320)
+
+    return () => {
+      cancelAnimationFrame(rafId)
+      window.clearTimeout(retry0)
+      window.clearTimeout(retry1)
+      window.clearTimeout(retry2)
+      window.removeEventListener('resize', measure)
+      ro?.disconnect()
+    }
+  }, [open, current?.id, current?.body, entered, index, cardWidth, sliding])
+
+  useEffect(() => {
+    const el = deckRef.current
+    if (!el) return
+    const measure = () => {
+      const w = el.offsetWidth
+      if (w > 0) {
+        cardWidthRef.current = w
+        setCardWidth(w)
+      }
+    }
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [open, entered])
 
   /** 한 장 넘기기(dir: +1 다음, -1 이전) — 범위를 벗어나면 무시 */
   const go = useCallback(
@@ -231,13 +294,26 @@ export default function ParentNoticePopup() {
     [notices.length],
   )
 
+  /** 스와이프 확정 — index 를 즉시 바꾸고 트랙만 슬라이드합니다(버튼 영역 딜레이 방지) */
+  const completeSlide = useCallback(
+    (dir: 1 | -1) => {
+      setDragging(false)
+      setSliding(true)
+      go(dir)
+      setDragXTracked(0)
+      window.setTimeout(() => setSliding(false), SLIDE_MS)
+    },
+    [go, setDragXTracked],
+  )
+
   if (!portalReady || !open || !current) return null
 
-  const popupType = current.popupType
-  const isImportant = popupType === 'important'
-  const isForce = popupType === 'force'
+  const isForce = current.popupType === 'force'
   const total = notices.length
   const hasMultiple = total > 1
+  const trackX = -index * cardWidth + dragX
+  const slideTransition =
+    sliding || (!dragging && dragX === 0) ? 'transition-transform duration-300 ease-out' : ''
 
   /** 팝업을 닫습니다. 닫는 순간 "다시 보지 않기"로 체크해 둔 공지들을 영구 제외로 저장합니다. */
   const close = () => {
@@ -262,23 +338,23 @@ export default function ParentNoticePopup() {
     close()
   }
 
-  /** "더 보기": 팝업을 닫고, 공지센터를 열어 이 공지의 전체 글을 펼쳐 보여 줍니다 */
-  const handleMore = () => {
-    openNoticeCenter(current.id)
-    close()
+  /** 공지별 "다시 보지 않기" 체크 — 슬라이드 중인 카드에도 바로 반영 */
+  const toggleDontShowFor = (noticeId: string, checked: boolean) => {
+    const next = new Set(markedDontShowRef.current)
+    if (checked) next.add(noticeId)
+    else next.delete(noticeId)
+    markedDontShowRef.current = next
+    if (current?.id === noticeId) setDontShowAgain(checked)
   }
 
-  /** 현재 카드의 "다시 보지 않기" 체크를 토글합니다 */
-  const toggleDontShow = (checked: boolean) => {
-    const next = new Set(markedDontShowRef.current)
-    if (checked) next.add(current.id)
-    else next.delete(current.id)
-    markedDontShowRef.current = next
-    setDontShowAgain(checked)
+  const handleMoreFor = (noticeId: string) => {
+    openNoticeCenter(noticeId)
+    close()
   }
 
   // ── 터치(스와이프) 처리 — 세로 스크롤과 충돌하지 않게 방향을 먼저 잠급니다 ──
   const onTouchStart = (e: React.TouchEvent) => {
+    if (sliding) return
     const t = e.touches[0]
     touchRef.current = { x: t.clientX, y: t.clientY, axis: null }
     setDragging(true)
@@ -296,27 +372,28 @@ export default function ParentNoticePopup() {
       // 끝 카드에서 더 끌면 저항감을 주어 살짝만 움직이게 합니다.
       const atStart = index === 0 && dx > 0
       const atEnd = index === total - 1 && dx < 0
-      setDragX(atStart || atEnd ? dx * 0.3 : dx)
+      setDragXTracked(atStart || atEnd ? dx * 0.3 : dx)
     }
   }
   const onTouchEnd = () => {
     const ref = touchRef.current
-    if (ref?.axis === 'h') {
-      if (dragX <= -SWIPE_THRESHOLD && index < total - 1) go(1)
-      else if (dragX >= SWIPE_THRESHOLD && index > 0) go(-1)
+    const dx = dragXRef.current
+    if (ref?.axis === 'h' && !sliding) {
+      if (dx <= -SWIPE_THRESHOLD && index < total - 1) {
+        completeSlide(1)
+        touchRef.current = null
+        return
+      }
+      if (dx >= SWIPE_THRESHOLD && index > 0) {
+        completeSlide(-1)
+        touchRef.current = null
+        return
+      }
     }
-    setDragX(0)
+    setDragXTracked(0)
     setDragging(false)
     touchRef.current = null
   }
-
-  /** 상단 알약 배지에 표시할 공지 종류 라벨 (예: 이벤트 / 사용 가이드 / 공지사항) */
-  const typeLabel = NOTICE_TYPE_LABELS[current.noticeType]
-  const link = current.linkUrl?.trim()
-  const linkLabel = (current.linkLabel && current.linkLabel.trim()) || NOTICE_LINK_DEFAULT_LABEL
-
-  /** 현재 카드 뒤에 "남은 카드 수"만큼(최대 2장) 살짝 겹쳐 보이게 하는 장식 레이어 */
-  const remaining = Math.min(total - index - 1, 2)
 
   const overlay = (
     <div
@@ -334,174 +411,55 @@ export default function ParentNoticePopup() {
         className={`absolute inset-0 bg-black/50 transition-opacity duration-200 ${entered ? 'opacity-100' : 'opacity-0'} ${isForce ? 'cursor-default' : ''}`}
       />
 
-      {/* 책처럼 겹친 카드 더미: 등장 애니메이션은 이 래퍼가 담당합니다 */}
+      {/* 가로 슬라이드 — 스와이프 시 이전·다음 공지가 옆에서 들어옵니다 */}
       <div
-        className={`relative w-full max-w-xs transition-all duration-200 ${
+        className={`w-full max-w-xs transition-all duration-200 ${
           entered ? 'translate-y-0 scale-100 opacity-100' : 'translate-y-2 scale-95 opacity-0'
         }`}
       >
-        {/* 뒤에 쌓인 카드(장식) — 오른쪽 아래로 조금씩 밀려 책장처럼 보이게 합니다 */}
-        {Array.from({ length: remaining }).map((_, k) => {
-          const depth = k + 1
-          return (
-            <div
-              key={`stack-${k}`}
-              aria-hidden
-              className="absolute inset-0 rounded-2xl border border-gray-100 bg-white shadow-lg"
-              style={{
-                transform: `translate(${depth * 8}px, ${depth * 8}px) scale(${1 - depth * 0.04})`,
-                zIndex: 0,
-                opacity: 1 - depth * 0.15,
-              }}
-            />
-          )
-        })}
-
-        {/* 맨 앞(현재) 카드 — 손가락으로 끌면 가로로 움직입니다 */}
         <div
+          ref={deckRef}
+          className="relative h-[min(22rem,85dvh)] min-h-[22rem] w-full overflow-hidden rounded-2xl"
+          style={{ touchAction: 'pan-y' }}
           onTouchStart={onTouchStart}
           onTouchMove={onTouchMove}
           onTouchEnd={onTouchEnd}
-          className={`relative z-10 flex max-h-[85dvh] w-full flex-col overflow-hidden rounded-2xl bg-white shadow-2xl ${
-            dragging ? '' : 'transition-transform duration-200'
-          } ${isImportant ? 'ring-2 ring-[#4A90E2]' : ''}`}
-          style={{ transform: `translateX(${dragX}px)`, touchAction: 'pan-y' }}
         >
-          {/* 상단: 강조(important)면 파란 띠, 그 외는 단정한 헤더 — 내용은 가운데 정렬 */}
-          <div className={`relative px-5 pb-3 pt-5 text-center ${isImportant ? 'bg-[#4A90E2]/5' : ''}`}>
-            {/* force 가 아닐 때만 X 버튼 노출 — 우상단에 고정해 제목 중앙정렬을 방해하지 않습니다 */}
-            {!isForce ? (
-              <button
-                type="button"
-                onClick={close}
-                aria-label="닫기"
-                className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden>
-                  <path d="M6 6l12 12M18 6L6 18" strokeLinecap="round" />
-                </svg>
-              </button>
-            ) : null}
-            {/* 상단 알약 배지: 공지 종류(notice_type)에 맞춘 라벨을 보여 줍니다 */}
-            <span className="mb-2 inline-block rounded-full bg-[#4A90E2] px-2.5 py-0.5 text-[10px] font-black text-white">
-              {typeLabel}
-            </span>
-            <h2 id="parent-notice-popup-title" className="px-6 text-base font-black leading-snug text-gray-900">
-              {current.title}
-            </h2>
-          </div>
-
-          {/* 본문(마크다운) — 일정 분량만 보여 주고, 길면 아래에 "더 보기"로 공지센터로 연결합니다. */}
-          <div className="relative px-5 pt-4">
-            <div ref={bodyRef} className="overflow-hidden" style={{ maxHeight: POPUP_BODY_MAX_HEIGHT }}>
-              <NoticeMarkdown className="text-xs leading-relaxed text-center">{current.body ?? ''}</NoticeMarkdown>
-            </div>
-            {/* 잘렸을 때만: 아래쪽을 흐리게(페이드) 처리해 글이 "이어진다"는 느낌을 줍니다 */}
-            {bodyClamped ? (
-              <div className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-white to-transparent" />
-            ) : null}
-          </div>
-
-          {/* 본문이 잘렸으면: 공지센터에서 전체 글을 바로 볼 수 있는 "더 보기" */}
-          {bodyClamped ? (
-            <div className="px-5 pt-2 text-center">
-              <button
-                type="button"
-                onClick={handleMore}
-                className="inline-flex items-center gap-0.5 text-xs font-black text-[#4A90E2] transition active:scale-[0.98]"
-              >
-                더 보기
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden>
-                  <path d="M9 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </button>
-            </div>
-          ) : null}
-
-          {/* 여러 장이면: 좌우 화살표 + 점(현재 위치) 표시로 넘겨 볼 수 있게 합니다 */}
-          {hasMultiple ? (
-            <div className="flex items-center justify-center gap-3 px-5 pt-3">
-              <button
-                type="button"
-                onClick={() => go(-1)}
-                disabled={index === 0}
-                aria-label="이전 공지"
-                className="flex h-8 w-8 items-center justify-center rounded-full text-gray-400 transition-colors enabled:hover:bg-gray-100 enabled:hover:text-gray-700 disabled:opacity-30"
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden>
-                  <path d="M15 6l-6 6 6 6" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </button>
-
-              <div className="flex items-center gap-1.5">
-                {notices.map((n, i) => (
-                  <span
-                    key={n.id}
-                    className={`h-1.5 rounded-full transition-all ${
-                      i === index ? 'w-4 bg-[#4A90E2]' : 'w-1.5 bg-gray-300'
-                    }`}
+          <div
+            className={`flex h-full will-change-transform ${slideTransition}`}
+            style={{ transform: `translateX(${trackX}px)` }}
+          >
+            {notices.map((notice, i) => {
+              const isActive = i === index
+              const dontShow = markedDontShowRef.current.has(notice.id)
+              return (
+                <div
+                  key={notice.id}
+                  className={`h-full flex-shrink-0 ${isActive ? '' : 'pointer-events-none'}`}
+                  style={{ width: cardWidth > 0 ? cardWidth : '100%' }}
+                  aria-hidden={!isActive}
+                >
+                  <ParentNoticePopupCard
+                    notice={notice}
+                    interactive={isActive}
+                    showDots={isActive}
+                    hasMultiple={hasMultiple}
+                    index={index}
+                    total={total}
+                    isForce={notice.popupType === 'force' && isActive}
+                    bodyRef={isActive ? bodyRef : undefined}
+                    bodyClamped={
+                      isActive ? bodyClamped : noticeBodyLikelyClamped(notice.body)
+                    }
+                    dontShowAgain={dontShow}
+                    onClose={close}
+                    onMore={() => handleMoreFor(notice.id)}
+                    onToggleDontShow={(checked) => toggleDontShowFor(notice.id, checked)}
+                    titleId={isActive ? 'parent-notice-popup-title' : undefined}
                   />
-                ))}
-              </div>
-
-              <button
-                type="button"
-                onClick={() => go(1)}
-                disabled={index === total - 1}
-                aria-label="다음 공지"
-                className="flex h-8 w-8 items-center justify-center rounded-full text-gray-400 transition-colors enabled:hover:bg-gray-100 enabled:hover:text-gray-700 disabled:opacity-30"
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden>
-                  <path d="M9 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </button>
-            </div>
-          ) : null}
-
-          {/* 하단 버튼 영역 */}
-          <div className="space-y-2 px-5 pb-5 pt-3">
-            {link ? (
-              /^https?:\/\//i.test(link) ? (
-                <a
-                  href={link}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block w-full rounded-xl bg-[#4A90E2] py-3 text-center text-sm font-black text-white shadow-sm transition active:scale-[0.98]"
-                >
-                  {linkLabel}
-                </a>
-              ) : (
-                <a
-                  href={link.startsWith('/') ? link : `/${link}`}
-                  className="block w-full rounded-xl bg-[#4A90E2] py-3 text-center text-sm font-black text-white shadow-sm transition active:scale-[0.98]"
-                >
-                  {linkLabel}
-                </a>
+                </div>
               )
-            ) : null}
-
-            {/* '확인' 버튼: 팝업 전체를 닫습니다 (force 는 이 버튼으로만 닫을 수 있어요) */}
-            <button
-              type="button"
-              onClick={close}
-              className={`w-full rounded-xl py-3 text-sm font-black transition active:scale-[0.98] ${
-                link ? 'bg-gray-100 text-gray-700 hover:bg-gray-200' : 'bg-[#4A90E2] text-white shadow-sm'
-              }`}
-            >
-              확인
-            </button>
-
-            {/* "다시 보지 않기" — 체크 후 닫으면 이 공지는 팝업으로 다시 안 뜨고
-                공지센터(종 아이콘)에서만 볼 수 있습니다 (현재 보고 있는 카드 기준) */}
-            <label className="flex cursor-pointer items-center justify-center gap-2 pt-1 text-[11px] text-gray-500">
-              <input
-                type="checkbox"
-                checked={dontShowAgain}
-                onChange={(e) => toggleDontShow(e.target.checked)}
-                className="h-3.5 w-3.5 rounded border-gray-300 text-[#4A90E2] accent-[#4A90E2]"
-              />
-              다시 보지 않기
-            </label>
+            })}
           </div>
         </div>
       </div>

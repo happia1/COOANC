@@ -269,11 +269,52 @@ export function usePlantPot(
   }, [childId, supabase])
 
   const water = useCallback(async (): Promise<WaterResult> => {
+    const prevHearts = hearts
+    const prevPot = pot
+    const stage7Reset = prevPot?.stage === 7
+
     /**
-     * 물주기는 **서버 API**로 처리합니다.
-     * 비개발자: 폰 앱에서 DB를 직접 고치면 가끔 권한·통신 때문에 숫자가 안 바뀌는 것처럼 보일 수 있어,
-     * 웹사이트 서버(로그인 쿠키가 있는 쪽)가 대신 안전하게 저장합니다.
+     * API 응답을 기다리기 전에 하트·화분 막대를 먼저 줄여, 탭 직후 숫자·그림이 바로 바뀌게 합니다.
+     * 7단계(열매 완성) 리셋은 하트를 쓰지 않으므로 낙관적 차감을 하지 않습니다.
      */
+    if (!stage7Reset && prevHearts > 0 && prevPot) {
+      const needed = prevPot.heartsNeeded
+      const newHeartsUsed = prevPot.heartsUsed + 1
+      const levelUp = needed > 0 && newHeartsUsed >= needed
+      const newStage = levelUp ? (Math.min(prevPot.stage + 1, 7) as PlantStage) : prevPot.stage
+      const newHeartsUsedAfter = levelUp ? 0 : newHeartsUsed
+      const isCompleted = newStage === 7
+      const optimisticHearts = prevHearts - 1
+
+      setHearts(optimisticHearts)
+      setPot({
+        ...prevPot,
+        stage: newStage,
+        heartsUsed: newHeartsUsedAfter,
+        heartsNeeded: HEARTS_PER_STAGE[newStage],
+        completed: isCompleted,
+      })
+      onPlantStatsSyncedRef.current?.({
+        hearts: optimisticHearts,
+        pot_stage: newStage,
+        pot_hearts_used: newHeartsUsedAfter,
+        pot_completed: isCompleted,
+      })
+    }
+
+    const rollbackOptimistic = () => {
+      setHearts(prevHearts)
+      if (prevPot) {
+        setPot(prevPot)
+        onPlantStatsSyncedRef.current?.({
+          hearts: prevHearts,
+          pot_stage: prevPot.stage,
+          pot_hearts_used: prevPot.heartsUsed,
+          pot_completed: prevPot.completed,
+        })
+      }
+    }
+
     try {
       const res = await fetch('/api/child/plant-water', {
         method: 'POST',
@@ -289,12 +330,13 @@ export function usePlantPot(
       }
 
       if (res.status === 400 && json?.code === 'NO_HEARTS') {
-        await refresh()
+        rollbackOptimistic()
         return 'no_hearts'
       }
 
       if (!res.ok || json?.ok !== true) {
         console.warn('[usePlantPot] plant-water API', res.status, json)
+        rollbackOptimistic()
         await refresh()
         return 'ok'
       }
@@ -321,7 +363,6 @@ export function usePlantPot(
           pot_hearts_used: full.pot_hearts_used,
           pot_completed: full.pot_completed,
         })
-        /** 응답 직후 UI 반영 — Realtime/SELECT 가 늦어도 막대·단계 그림이 바로 바뀝니다 */
         setHearts(readChildStatInt(full.hearts))
         setPot((prev) =>
           potStateFromWaterResponse(
@@ -333,8 +374,6 @@ export function usePlantPot(
         )
       }
 
-      await refresh()
-
       if (full.grew === true && typeof full.newStage === 'number') {
         const ns = Math.min(7, Math.max(0, Math.trunc(full.newStage)))
         return { type: 'grew', newStage: ns as PlantStage }
@@ -342,10 +381,11 @@ export function usePlantPot(
       return 'ok'
     } catch (e) {
       console.warn('[usePlantPot] plant-water fetch', e)
+      rollbackOptimistic()
       await refresh()
       return 'ok'
     }
-  }, [childId, refresh])
+  }, [childId, hearts, pot, refresh])
 
   /** 씨앗 고르기 확인 시 — 단계 초기화 + 선택한 나무 id 저장 */
   const resetPot = useCallback(
