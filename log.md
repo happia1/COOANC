@@ -1,16 +1,21 @@
-# 2026-04-25 작업 로그
+# 2026-05-31 작업 로그
 
 ## 오늘 한 일
-- 부모 홈 `AI 리포트`/`경제 EQ` 영역의 표시 흐름을 정리했습니다.
-- 에이전트 응답이 `insufficient_data`일 때도 화면이 비지 않도록 폴백 리포트 흐름을 보강했습니다.
-- 에러 상태 문구를 원인별(인증/타임아웃/서버/네트워크 등)로 분리했습니다.
-- 태블릿 가로 레이아웃에서 요청한 카드 위치를 조정했습니다.
-- `아이에게 한마디`, `부모 가이드`, `루틴·미션 습관` 등 요청된 블록을 순차적으로 삭제/이동했습니다.
-- `크레딧·저축 이야기`의 팝업 정보를 본문 하단 고정 정보로 이동했습니다.
-- 텍스트 스타일(제목/본문)을 블록 간 일관되게 통일했습니다.
+- **부모 ↔ 자녀 화면 전환 UX**: 클릭 직후 루트 전역 오버레이(자녀 키즈룸 / 부모 그라데이션) → `enter-child-ui`·`exit-child-ui` JSON API → `router.push` 로 **이중 새로고침·깜빡임** 제거.
+- **자동 로그인**: `/api/auth/post-login-redirect` 로 목적지 1회 결정, `child-entry`·`/` 연쇄 리다이렉트 축소.
+- **로딩 UI**: `TabTransitionSkeleton` 통일, 루트 `loading.tsx` null, 나가기/진입 중 중복 스켈레톤 생략.
+- **안정성**: `ChildHomeScreenClient` 로 `ChildScreen` chunk 분리; dev `ChunkLoadError` 시 `.next` 재생성 가이드 정리.
+- **정리**: 디버그 instrumentation 제거.
 
 ## 커밋/배포
-- 로컬 변경 커밋 및 원격 `main` 브랜치 푸시 완료.
+- `35b90f9` — `feat(app): 부모-자녀 화면 전환·자동 로그인 경로 UX 개선` (`main` push 완료)
 
 ## 메모
-- 다음 작업 시 부모 홈의 카드 순서/텍스트 스타일은 `ParentAgentHomeCards`, `EconomicEqPanel` 두 파일을 우선 확인하면 빠릅니다.
+- 전환 상태·오버레이: `src/components/child/ChildEnterTransitionProvider.tsx`
+- 진입 링크: `ParentEnterChildUiLink.tsx` / 나가기: `ChildScreen.tsx` + `ParentExitTransitionEnd.tsx`
+- 로그인 후 분기: `resolvePostLoginRedirect.ts`, `pickPostLoginNavigationTarget.ts`
+- dev 서버 **실행 중**에는 `.next` 폴더 삭제하지 말 것 (webpack 캐시 손상 → ChunkLoadError)
+
+## 다음에 이어서
+- Vercel·실기기에서 전환·자동 로그인 최종 확인
+- 필요 시 Supabase 플랜/쿼리 부하 점검

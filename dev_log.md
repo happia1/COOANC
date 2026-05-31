@@ -354,6 +354,48 @@
 
 ---
 
+## [2026-05-31] - 부모↔자녀 화면 전환·자동 로그인·로딩 UX 개선 (세션 종료)
+- **Status:** ✅ 완료
+- **Git:** `35b90f9` — `feat(app): 부모-자녀 화면 전환·자동 로그인 경로 UX 개선` (`main` push)
+- **Files Created:**
+  - `src/lib/resolvePostLoginRedirect.ts` — 로그인 후 이동 계획(자녀/온보딩/단일·다자녀) 공통 규칙
+  - `src/lib/pickPostLoginNavigationTarget.ts` — `defaultChildId`(localStorage) 반영
+  - `src/app/api/auth/post-login-redirect/route.ts` — 자동 로그인·수동 로그인 후 1회 API로 목적지 결정
+  - `src/lib/parentExitChildUi.ts` — 나가기 JSON API URL
+  - `src/components/child/ChildAppTransitionOverlay.tsx` — 진입·나가기 공용 전환 오버레이
+  - `src/components/child/ChildEnterTransitionProvider.tsx` — 루트 전역 오버레이(자녀 진입 / 부모 나가기)
+  - `src/components/child/ChildHomeScreenClient.tsx` — `ChildScreen` dynamic chunk 분리(HMR·ChunkLoadError 완화)
+  - `src/components/parent/ParentExitTransitionEnd.tsx` — 부모 홈 렌더 후 나가기 오버레이 종료
+  - `src/components/parent/ParentSegmentLoadingClient.tsx` — 나가기 중 중복 스켈레톤 생략
+- **Files Modified (핵심):**
+  - `src/components/parent/ParentEnterChildUiLink.tsx` — `fetch(?json=1)` + `router.push('/home')`, 전역 오버레이
+  - `src/components/child/ChildScreen.tsx` — 나가기도 JSON API + `router.push`; 진입 오버레이 연동
+  - `src/app/api/parent/enter-child-ui/route.ts` — `?json=1` 시 쿠키 설정 후 JSON(302 없음)
+  - `src/app/api/parent/exit-child-ui/route.ts` — `?json=1` 시 미리보기 쿠키 삭제 후 JSON
+  - `src/app/login/page.tsx` — 자동 로그인·수동 로그인 후 `/` 경유·`child-entry` 제거, `post-login-redirect` 직행
+  - `src/app/page.tsx`, `middleware.ts` — `resolvePostLoginRedirectForUser` 와 동일 분기
+  - `src/app/parent/child-entry/page.tsx` — 클라 Supabase 3회 조회 제거, API 1회 + 즉시 이동
+  - `src/app/(child)/loading.tsx`, `src/app/parent/loading.tsx`, `src/app/loading.tsx` — 스켈레톤·배경 정리
+  - `src/app/layout.tsx` — `ChildEnterTransitionProvider` 루트 장착
+  - `src/lib/getActorChildContext.ts` — `family_links` 중복 조회 제거(캐시 공유)
+- **Files Deleted:**
+  - `src/components/child/ChildExitTransitionOverlay.tsx` — `ChildAppTransitionOverlay` 로 통합
+  - `src/components/ui/BunnyRunLoader.tsx` — 탭 전환 스켈레톤으로 대체
+- **Summary:**
+  - 부모↔자녀 전환 시 **전체 새로고침 2회·로딩 UI 2~4겹**이던 문제를 JSON API + `router.push` + **루트 전역 오버레이**로 1회 전환·1장 로딩으로 줄였습니다.
+  - 자동 로그인은 `session` → `/` → `child-entry` → `enter-child-ui` 연쇄 대신 **`post-login-redirect` 한 번**으로 목적지(자녀 홈·부모 홈·온보딩)를 정합니다.
+  - dev `ChunkLoadError`(missing `page.js`)는 손상된 `.next` webpack 캐시 + `ChildScreen` chunk 분리로 완화; **dev 서버 중 `.next` 삭제 금지**, 재시작 시에만 캐시 삭제.
+- **확인·기타 (이전 커밋/세션 포함):**
+  - 자정 미션: 서버 `getSeoulDateString()` + 클라 `seoulDayKey` 타이머·`router.refresh()` — 코드상 당일 카드 노출 설계 확인
+  - Supabase 과부하: middleware `/api/*` Auth 스kip, `fetchWithTimeout`, Realtime 구매 알림 등(별도 커밋 `2c14f70` 등)
+  - 디버그 ingest 로그(`127.0.0.1:7447`) 전부 제거 완료
+- **Next Steps:**
+  - Vercel 배포 후 실기기에서 부모→자녀·자녀→부모·자동 로그인 전환 체감 재확인
+  - dev에서 `ChunkLoadError` 재발 시: dev 중지 → `.next` 삭제 → `npm run dev` → 브라우저 강력 새로고침
+  - (선택) Supabase Compute Micro 업그레이드로 Auth/DB 지연 여유 확보
+
+---
+
 ## 📑 Commit Message Protocol
 1. 모든 커밋 메시지는 이 로그의 최신 기록을 바탕으로 작성한다.
 2. **형식**: `type: [작업명] #이슈번호(선택)`
