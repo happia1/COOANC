@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import { useFeatureUnlockCelebrationSound } from '@/hooks/useFeatureUnlockCelebrationSound'
 
 type Props = {
   open: boolean
@@ -45,6 +46,8 @@ const TUTORIAL_STEPS: TutorialStep[] = [
 export default function PiggyBankUnlockFlowModal({ open, onClose, onSkipTutorial }: Props) {
   const [phase, setPhase] = useState<'unlock' | 'tutorial'>('unlock')
   const [step, setStep] = useState(0)
+
+  useFeatureUnlockCelebrationSound(open)
 
   const current = useMemo(() => TUTORIAL_STEPS[step] ?? TUTORIAL_STEPS[0], [step])
   const isLast = step >= TUTORIAL_STEPS.length - 1

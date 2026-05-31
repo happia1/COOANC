@@ -285,18 +285,6 @@ export default async function ParentHomePage() {
     a.start_date.localeCompare(b.start_date),
   )
 
-  console.log('[home] calendar+brief query', {
-    today,
-    briefingEndInclusive,
-    parentId: auth.user.id,
-    familyLinkIds,
-    publicHolidayCount: phBriefingRows.length,
-    calendarRows: calendarBriefingRows.length,
-    merged: upcomingEvents.length,
-    calendarError: calendarEventsRes.error?.message,
-    holidaysError: publicHolidaysBriefingRes.error?.message,
-  })
-
   const daysWithDataByChild: Record<string, number> = {}
   for (const cid of childIds) daysWithDataByChild[cid] = 0
   const daysSetByChild: Record<string, Set<string>> = {}

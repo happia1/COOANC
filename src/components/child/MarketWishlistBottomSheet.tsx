@@ -99,6 +99,7 @@ export default function MarketWishlistBottomSheet({
                     <div className="flex h-[3.25rem] w-[3.25rem] shrink-0 items-center justify-center overflow-hidden rounded-lg bg-amber-100/80">
                       <StoreItemThumbnail
                         imageUrl={item.image_url}
+                        itemName={item.name}
                         frame={marketFrameKeyForItemId(item.id, item.name)}
                         height={48}
                         className="max-h-full max-w-full object-contain"

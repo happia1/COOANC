@@ -460,7 +460,33 @@ export default function BearStickerSheet({
       placingInFlightRef.current = true
       setPlacing(true)
       setPlaceSnapError(null)
+
+      /**
+       * 낙관적 업데이트: 서버 응답을 기다리지 않고 「즉시」 칸에 스티커를 표시합니다.
+       * - 예전에는 POST 왕복(200~430ms, 첫 요청은 더 오래)이 끝나야 스티커가 보여 느리게 느껴졌습니다.
+       * - 임시 행(temp)을 먼저 넣고, 성공하면 서버가 준 실제 행으로 바꾸고, 실패하면 임시 행을 지워 되돌립니다.
+       */
+      const tempId = `temp_${Date.now()}`
+      const wasOneAwayFromFull = occupiedSlots.size === SLOT_TOTAL - 1
+      const optimistic: PraiseStickerPlacement = {
+        id: tempId,
+        child_id: childId,
+        grant_id: grantId,
+        board_slot: slot,
+        x_ratio: c.x / 100,
+        y_ratio: c.y / 100,
+        scale_ratio: 1,
+        created_at: new Date().toISOString(),
+      }
+      setPlacements((prev) => [...prev, optimistic])
+      setFloatPos((prev) => {
+        const n = { ...prev }
+        delete n[grantId]
+        return n
+      })
+
       let data: PraiseStickerPlacement | null = null
+      let failed = false
       try {
         const res = await fetch('/api/praise-sticker/place', {
           method: 'POST',
@@ -479,62 +505,67 @@ export default function BearStickerSheet({
           error?: string
         }
         if (!res.ok) {
+          failed = true
           const msg = typeof json.error === 'string' && json.error.trim() ? json.error.trim() : res.statusText
           setPlaceSnapError(msg)
           if (res.status === 403) console.warn('[bear sticker slot]', msg)
           else console.error('[bear sticker slot]', msg)
-          return
+        } else if (json.placement) {
+          data = json.placement
         }
-        if (json.placement) data = json.placement
       } catch (e) {
+        failed = true
         setPlaceSnapError('네트워크 오류로 저장하지 못했어요.')
         console.error('[bear sticker slot]', e instanceof Error ? e.message : String(e))
       } finally {
         placingInFlightRef.current = false
         setPlacing(false)
       }
+
+      if (failed) {
+        /** 저장 실패 → 임시 행 제거. unplacedGrants 가 다시 늘어 floatPos effect 가 종이로 되돌립니다 */
+        setPlacements((prev) => prev.filter((p) => p.id !== tempId))
+        return
+      }
+
+      /** 성공: 임시 행을 서버가 준 실제 행(진짜 id 등)으로 교체 */
       if (data) {
         setPlaceSnapError(null)
-        const wasOneAwayFromFull = occupiedSlots.size === SLOT_TOTAL - 1
-        setPlacements((prev) => [...prev, data as PraiseStickerPlacement])
-        setFloatPos((prev) => {
-          const n = { ...prev }
-          delete n[grantId]
-          return n
-        })
-        if (wasOneAwayFromFull) {
-          setBoardCompleteConfetti(true)
-          setBoardCompleteModalOpen(true)
-          try {
-            const resetRes = await fetch('/api/praise-sticker/reset-board', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ childId }),
-            })
-            const resetJson = (await resetRes.json().catch(() => ({}))) as {
-              error?: string
-              clearedAt?: string
-              grantsDeleted?: boolean
-            }
-            if (!resetRes.ok) {
-              console.error('[bear sticker reset]', resetJson.error ?? resetRes.statusText)
-            } else {
-              setPlacements([])
-              if (resetJson.grantsDeleted) setGrants([])
-              /** 부모 state 를 먼저 비워야 `initialPlacements` effect 가 옛 행을 다시 넣지 않음 */
-              onBoardCleared?.(resetJson.clearedAt, {
-                grantsDeleted: Boolean(resetJson.grantsDeleted),
-              })
-              /** 종이 위 예전 지급 스티커 숨김 + sessionStorage — clearedAt 은 DB와 동일 */
-              bumpBoardCycle(resetJson.clearedAt)
-              /** 리셋 직후 Supabase 재조회는 가끔 삭제 전 스냅샷을 주어 덮어쓸 수 있어 호출하지 않음 */
-            }
-          } catch (e) {
-            console.error('[bear sticker reset]', e instanceof Error ? e.message : String(e))
+        setPlacements((prev) => prev.map((p) => (p.id === tempId ? (data as PraiseStickerPlacement) : p)))
+      }
+
+      if (wasOneAwayFromFull) {
+        setBoardCompleteConfetti(true)
+        setBoardCompleteModalOpen(true)
+        try {
+          const resetRes = await fetch('/api/praise-sticker/reset-board', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ childId }),
+          })
+          const resetJson = (await resetRes.json().catch(() => ({}))) as {
+            error?: string
+            clearedAt?: string
+            grantsDeleted?: boolean
           }
-        } else {
-          onInventoryChange?.()
+          if (!resetRes.ok) {
+            console.error('[bear sticker reset]', resetJson.error ?? resetRes.statusText)
+          } else {
+            setPlacements([])
+            if (resetJson.grantsDeleted) setGrants([])
+            /** 부모 state 를 먼저 비워야 `initialPlacements` effect 가 옛 행을 다시 넣지 않음 */
+            onBoardCleared?.(resetJson.clearedAt, {
+              grantsDeleted: Boolean(resetJson.grantsDeleted),
+            })
+            /** 종이 위 예전 지급 스티커 숨김 + sessionStorage — clearedAt 은 DB와 동일 */
+            bumpBoardCycle(resetJson.clearedAt)
+            /** 리셋 직후 Supabase 재조회는 가끔 삭제 전 스냅샷을 주어 덮어쓸 수 있어 호출하지 않음 */
+          }
+        } catch (e) {
+          console.error('[bear sticker reset]', e instanceof Error ? e.message : String(e))
         }
+      } else {
+        onInventoryChange?.()
       }
     },
     [childId, occupiedSlots, onBoardCleared, onInventoryChange, bumpBoardCycle],

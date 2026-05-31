@@ -12,6 +12,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
 import MarketItemImage from '@/components/common/MarketItemImage'
 import { marketFrameKeyForItemId } from '@/lib/marketItemFrame'
+import { resolveStoreItemImageUrl } from '@/constants/marketItemImages'
 import type { StoreItem } from '@/types/database'
 import { formatMarketCreditLabel } from '@/lib/applyStoreItemCreditOverrides'
 import {
@@ -20,7 +21,14 @@ import {
   isCategoryExcludedFromMarket,
   parentMarketSectionIdForItem,
 } from '@/lib/parentMarketMenuSections'
-import { activeFoodSortIndex, isBetaActive } from '@/constants/betaMarketConfig'
+import {
+  activeContentSortIndex,
+  activeFoodSortIndex,
+  isBetaActive,
+  isParentPreparingMarketItem,
+  storeItemDisplayName,
+} from '@/constants/betaMarketConfig'
+import { isContentZoneUnlocked } from '@/constants/childScreenFeatures'
 
 export type ParentMarketMenuControlProps = {
   childId: string | null
@@ -46,6 +54,8 @@ export type ParentMarketMenuControlProps = {
   onItemUpdated: (item: StoreItem) => void
   /** 가족 전용 상품 삭제 후 상위 목록 반영 */
   onItemDeleted: (deletedItemId: string) => void
+  /** 선택 자녀 레벨 — 콘텐츠 구역은 레벨 8부터 활성 */
+  childLevel?: number
 }
 
 /** 토글 스위치 — 켜짐=자녀에게 보임, 꺼짐=숨김 */
@@ -95,6 +105,7 @@ export default function ParentMarketMenuControl({
   onItemOrderSaved,
   onItemUpdated,
   onItemDeleted,
+  childLevel = 0,
 }: ParentMarketMenuControlProps) {
   const [addOpen, setAddOpen] = useState(false)
   const [addName, setAddName] = useState('')
@@ -212,7 +223,7 @@ export default function ParentMarketMenuControl({
    * 구역별 상품 목록 — 간식 / 장난감 / 이벤트(활동+체험) / 기타 순, 비어 있으면 구역 제목 숨김
    * - 간식: 베타 활성(`activeFood` 순) → 준비중 항목(이름순); 같은 그룹 안에서는 표시 켜진 항목 먼저.
    * - 그 외 구역: 마켓에 켜 둔 항목 먼저, 그다음 꺼진 항목 — 같은 그룹 안에서는 이름 순.
-   * - 배치: 펼침일 때만 타일을 그립니다. 2줄 이상이면 열 방향 채움. 접힘이면 상품 줄 전체 숨김.
+   * - 배치: 펼침일 때만 타일을 그립니다. 2줄일 때는 1줄을 왼→오른 순으로 채운 뒤 2줄로 넘깁니다. 접힘이면 상품 줄 전체 숨김.
    */
   const menuSectionsToRender = useMemo(() => {
     const rankOf = (id: string) => {
@@ -259,6 +270,22 @@ export default function ParentMarketMenuControl({
         return a.name.localeCompare(b.name, 'ko')
       })
 
+    const fallbackSortContentItems = (items: StoreItem[]) =>
+      [...items].sort((a, b) => {
+        const aBeta = isBetaActive(a.name, a.category ?? '')
+        const bBeta = isBetaActive(b.name, b.category ?? '')
+        if (aBeta !== bBeta) return aBeta ? -1 : 1
+        if (aBeta && bBeta) {
+          const ia = activeContentSortIndex(a.name)
+          const ib = activeContentSortIndex(b.name)
+          if (ia !== ib) return ia - ib
+        }
+        const aOn = !hiddenItemIds.has(a.id)
+        const bOn = !hiddenItemIds.has(b.id)
+        if (aOn !== bOn) return aOn ? -1 : 1
+        return a.name.localeCompare(b.name, 'ko')
+      })
+
     const sortByManualOrder = (items: StoreItem[], fallbackSorter: (rows: StoreItem[]) => StoreItem[]) => {
       const fallback = fallbackSorter(items)
       return [...fallback].sort((a, b) => {
@@ -275,7 +302,9 @@ export default function ParentMarketMenuControl({
         const sorted =
           sec.id === 'snack'
             ? sortByManualOrder(items, fallbackSortSnackItems)
-            : sortByManualOrder(items, fallbackSortForSection)
+            : sec.id === 'content'
+              ? sortByManualOrder(items, fallbackSortContentItems)
+              : sortByManualOrder(items, fallbackSortForSection)
         rows.push({ sectionKey: sec.id, title: sec.title, items: sorted })
       }
     }
@@ -512,6 +541,7 @@ export default function ParentMarketMenuControl({
     const hidden = hiddenItemIds.has(it.id)
     const visible = !hidden
     const spriteFrame = marketFrameKeyForItemId(it.id, it.name)
+    const thumbSrc = resolveStoreItemImageUrl(it.name, it.image_url)
     const price = effectiveCreditPrice(it)
     const hasOverride = creditOverrides[it.id] !== undefined
     /**
@@ -519,12 +549,22 @@ export default function ParentMarketMenuControl({
      * 기능 자체(토글·크레딧 수정)는 살아있어 미리 설정해 둘 수 있습니다.
      */
     const isBeta = isBetaActive(it.name, it.category ?? '')
+    const isContentLevelLocked =
+      sectionKey === 'content' && !isContentZoneUnlocked(childLevel)
     /**
      * 요청사항:
      * - 이벤트 옆 준비중 표시는 제거 (이벤트 항목은 베타 준비중 처리도 하지 않음)
      * - 장난감은 목록을 노출하고 준비중이라고 표기(타일 오버레이 유지)
+     * - 콘텐츠는 자녀 레벨 8 미만이면 준비중
      */
-    const isBlocked = sectionKey === 'event' ? false : !isBeta
+    const isBlocked =
+      sectionKey === 'event'
+        ? false
+        : isContentLevelLocked
+          ? true
+          : isParentPreparingMarketItem(it.name)
+            ? true
+            : !isBeta
 
     const tileWiggleClass = reorderMode ? 'animate-[marketCardWiggle_0.26s_ease-in-out_infinite]' : ''
 
@@ -556,10 +596,10 @@ export default function ParentMarketMenuControl({
         <div className={isBlocked ? 'opacity-40 grayscale' : ''}>
           {/** 이미지 블록 가로를 줄여 한 화면에 더 많은 칸이 들어가게 합니다. */}
           <div className="flex h-12 w-full max-w-[3.25rem] items-center justify-center overflow-hidden rounded-lg bg-gray-50 ring-1 ring-gray-100 sm:max-w-[3.5rem]">
-            {it.image_url ? (
+            {thumbSrc ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
-                src={it.image_url}
+                src={thumbSrc}
                 alt=""
                 className="max-h-[34px] max-w-[34px] object-contain object-center"
                 draggable={false}
@@ -570,9 +610,9 @@ export default function ParentMarketMenuControl({
           </div>
           <p
             className="w-full truncate text-center text-[9px] font-bold leading-tight text-gray-700"
-            title={it.name}
+            title={storeItemDisplayName(it.name)}
           >
-            {it.name}
+            {storeItemDisplayName(it.name)}
           </p>
           {/** 이 자녀 기준 실제 가격 + 탭하면 숫자를 바꿀 수 있음 */}
           <button
@@ -753,6 +793,8 @@ export default function ParentMarketMenuControl({
             const expanded = menuSectionExpanded[block.sectionKey] === true
             /** 펼쳤을 때만 2줄 그리드 — 상품이 1개면 1줄 */
             const useTwoRows = block.items.length > 1
+            /** 나열 순서대로 1줄을 먼저 채우고 2줄로 넘길 때 필요한 열 수 */
+            const twoRowColumnCount = Math.max(1, Math.ceil(block.items.length / 2))
 
             return (
               <div key={block.sectionKey}>
@@ -798,13 +840,20 @@ export default function ParentMarketMenuControl({
                  */}
                 {expanded ? (
                   <div className="-mx-1 snap-x snap-mandatory overflow-x-auto overflow-y-hidden pb-1 pt-1 [scrollbar-width:thin] [-ms-overflow-style:none] [&::-webkit-scrollbar]:h-1">
-                    <div
-                      className={`grid w-max grid-flow-col gap-x-1.5 gap-y-2.5 px-1 auto-cols-[minmax(3.25rem,3.5rem)] sm:auto-cols-[minmax(3.5rem,3.75rem)] ${
-                        block.sectionKey === 'event' ? 'grid-rows-1' : useTwoRows ? 'grid-rows-2' : 'grid-rows-1'
-                      }`}
-                    >
-                      {block.items.map((it) => renderMenuItemTile(it, block.sectionKey))}
-                    </div>
+                    {block.sectionKey === 'event' || block.sectionKey === 'content' || !useTwoRows ? (
+                      <div className="grid w-max grid-flow-col grid-rows-1 gap-x-1.5 gap-y-2.5 px-1 auto-cols-[minmax(3.25rem,3.5rem)] sm:auto-cols-[minmax(3.5rem,3.75rem)]">
+                        {block.items.map((it) => renderMenuItemTile(it, block.sectionKey))}
+                      </div>
+                    ) : (
+                      <div
+                        className="grid w-max grid-rows-2 gap-x-1.5 gap-y-2.5 px-1"
+                        style={{
+                          gridTemplateColumns: `repeat(${twoRowColumnCount}, minmax(3.25rem, 3.75rem))`,
+                        }}
+                      >
+                        {block.items.map((it) => renderMenuItemTile(it, block.sectionKey))}
+                      </div>
+                    )}
                   </div>
                 ) : null}
               </div>

@@ -22,6 +22,7 @@ import { praiseAssetStickerUrl } from '@/lib/praiseAssetStickers'
 import { praiseUiKindFromSpriteKey } from '@/lib/praiseStickerUi'
 import PraiseUiIcon from '@/components/common/PraiseUiIcon'
 import { slotCenterPercent } from '@/lib/bearBoardLayout'
+import type { ParentMarketSectionId } from '@/lib/parentMarketMenuSections'
 
 /** MarketTab은 용량이 크므로 사용 시 동적으로 불러옵니다 */
 const MarketTab = dynamic(() => import('@/components/child/MarketTab'), { ssr: false })
@@ -50,6 +51,9 @@ type Props = {
   /** 총 보유 코인 `child_stats.credits` — 단일 버킷 모드 마켓 잔액에 사용 */
   creditsTotal: number
   level: number
+  /** 마켓 열릴 때 스크롤할 구역(콘텐츠 해금 안내 등) */
+  marketInitialScrollSection?: ParentMarketSectionId | null
+  onMarketInitialScrollDone?: () => void
 
   /* ── 꾸미기 패널 props ── */
   unlockedItemIndexes: number[]
@@ -81,6 +85,8 @@ export default function ChildPanelOverlay({
   initialWishlistEntries,
   creditsTotal,
   level,
+  marketInitialScrollSection = null,
+  onMarketInitialScrollDone,
   unlockedItemIndexes,
   praiseGrants,
   praisePlacements,
@@ -184,6 +190,8 @@ export default function ChildPanelOverlay({
               creditsTotal={creditsTotal}
               initialWishlistEntries={initialWishlistEntries}
               level={level}
+              initialScrollSection={marketInitialScrollSection}
+              onInitialScrollDone={onMarketInitialScrollDone}
             />
           )}
           {active === 'dressup' && (

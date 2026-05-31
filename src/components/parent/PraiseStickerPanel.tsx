@@ -6,7 +6,7 @@ import {
   praiseAssetStickerTitle,
   praiseAssetStickerUrl,
 } from '@/lib/praiseAssetStickers'
-import { PARENT_POPUP_BTN, PARENT_POPUP_CARD } from '@/lib/parentPopupCardStyles'
+import { PARENT_POPUP_BTN } from '@/lib/parentPopupCardStyles'
 
 type Props = {
   childId: string | null
@@ -18,7 +18,7 @@ type Props = {
  * 스티커 목록은 기본으로 펼쳐 두며, 필요하면 「접기」로 접을 수 있습니다.
  * (스티커판 비우기·보낸 기록 일괄 삭제는 이 패널에서 제공하지 않습니다.)
  */
-export default function PraiseStickerPanel({ childId, childName }: Props) {
+export default function PraiseStickerPanel({ childId }: Props) {
   /** 어떤 스티커를 보낼지 고른 뒤 확인 모달을 띄울 때 사용하는 키 */
   const [confirmKey, setConfirmKey] = useState<string | null>(null)
   /** 스티커 전송 중이면 버튼을 비활성화합니다 */
@@ -130,9 +130,23 @@ export default function PraiseStickerPanel({ childId, childName }: Props) {
 
       {confirmKey && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/40 p-6">
-          <div className={`${PARENT_POPUP_CARD} justify-between p-6`}>
+          {/* 내용 높이에 맞춘 컴팩트 카드 — 공통 고정 높이(min-h-[22rem])를 쓰지 않아 불필요한 여백을 없앱니다 */}
+          <div className="relative z-10 flex w-full max-w-xs flex-col overflow-hidden rounded-2xl bg-white p-6 shadow-2xl">
             <p className="text-center text-base font-black text-brand-text">스티커를 선물하시겠어요?</p>
-            <p className="mt-1 text-center text-xs text-gray-500">{childName}에게 전달돼요</p>
+            {/* 선택한 스티커 미리보기 — confirmKey 로 같은 PNG URL 을 그려 부모가 무엇을 보내는지 확인합니다 */}
+            {praiseAssetStickerUrl(confirmKey) ? (
+              <div className="mt-4 flex justify-center">
+                {/* eslint-disable-next-line @next/next/no-img-element -- public 정적 PNG, next/image보다 단순 */}
+                <img
+                  src={praiseAssetStickerUrl(confirmKey)!}
+                  alt={praiseAssetStickerTitle(confirmKey)}
+                  width={72}
+                  height={72}
+                  className="object-contain"
+                  style={{ width: 72, height: 72 }}
+                />
+              </div>
+            ) : null}
             <div className="mt-5 flex gap-2">
               <button
                 type="button"

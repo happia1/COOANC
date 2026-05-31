@@ -10,6 +10,7 @@ import {
   SUPABASE_SERVER_FETCH_TIMEOUT_MS,
   wrapFetchWithTimeout,
 } from '@/lib/supabase/fetchWithTimeout'
+import { resolvePostLoginRedirectForUser } from '@/lib/resolvePostLoginRedirect'
 
 /** 로그인·가입 등 — 세션 갱신(getUser) 없이 바로 통과시킬 공개 경로 */
 const MIDDLEWARE_AUTH_SKIP_PREFIXES = ['/login', '/signup', '/auth/']
@@ -137,17 +138,12 @@ export async function middleware(request: NextRequest) {
       return appendRefreshedSession(NextResponse.redirect(new URL('/home', request.url)))
     }
 
-    const { count, error: linkErr } = await supabase
-      .from('family_links')
-      .select('*', { count: 'exact', head: true })
-      .eq('parent_id', effectiveUser.id)
-
-    if (linkErr) {
-      console.error('[middleware /] family_links count:', linkErr.message)
+    const plan = await resolvePostLoginRedirectForUser(supabase, effectiveUser)
+    if (!plan.authenticated) {
+      return appendRefreshedSession(NextResponse.redirect(new URL('/login', request.url)))
     }
 
-    const dest = count != null && count > 0 ? '/parent' : '/onboarding'
-    return appendRefreshedSession(NextResponse.redirect(new URL(dest, request.url)))
+    return appendRefreshedSession(NextResponse.redirect(new URL(plan.redirectTo, request.url)))
   }
 
   return supabaseResponse

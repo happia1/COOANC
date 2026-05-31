@@ -23,6 +23,7 @@ import type { PurchaseRequest, StoreItem } from '@/types/database'
 import { createClient } from '@/lib/supabase/client'
 import MarketItemImage from '@/components/common/MarketItemImage'
 import { marketFrameKeyForItemId } from '@/lib/marketItemFrame'
+import { resolveStoreItemImageUrl } from '@/constants/marketItemImages'
 import {
   getMsUntilNextSeoulMidnight,
   getSeoulDateFromIsoTimestamp,
@@ -865,8 +866,7 @@ export default function ApprovalTab({
             ) : (
               requestsForChild.map((req) => {
                 const linked = req.item_id ? storeItemById.get(req.item_id) : undefined
-                const rawUrl = linked?.image_url
-                const thumbUrl = typeof rawUrl === 'string' && rawUrl.trim() !== '' ? rawUrl.trim() : null
+                const thumbUrl = resolveStoreItemImageUrl(req.item_name, linked?.image_url)
                 const frame = marketFrameKeyForItemId(req.item_id, req.item_name)
                 const isParentBuying = req.status === 'parent_buying'
                 return (
@@ -1153,6 +1153,7 @@ export default function ApprovalTab({
             onItemOrderSaved={onItemOrderSaved}
             onItemUpdated={onItemUpdated}
             onItemDeleted={onItemDeleted}
+            childLevel={childLevel}
           />
         </section>
 

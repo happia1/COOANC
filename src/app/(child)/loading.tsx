@@ -1,15 +1,21 @@
+'use client'
+
 /**
- * 자녀 앱(`(child)` 세그먼트, 주로 `/home`) 전환 시 잠깐 보이는 로딩 UI 입니다.
- *
- * 비개발자 설명:
- * - 부모가 「자녀 화면 보기」로 넘어올 때도 같은 스켈레톤이 잠시 보입니다.
- * - 배경은 자녀 홈과 같은 키즈룸 그림을 깔고, 본문은 회색 placeholder + 안내 문구로 표시합니다.
+ * 자녀 앱 전환 로딩 UI — 부모→자녀 진입 중에는 루트 전역 오버레이가 이미 덮고 있으므로
+ * 중복 스켈레톤을 그리지 않습니다.
  */
 
 import TabTransitionSkeleton from '@/components/ui/TabTransitionSkeleton'
 import { ASSETS, CHILD_HOME_BACKGROUND_CACHE_BUST } from '@/constants/assets'
+import { useChildEnterTransition } from '@/components/child/ChildEnterTransitionProvider'
 
 export default function ChildSegmentLoading() {
+  const { active } = useChildEnterTransition()
+
+  if (active) {
+    return null
+  }
+
   const childBgSrc = `${ASSETS.layouts.childHomeBackgroundSecondScreen}?v=${CHILD_HOME_BACKGROUND_CACHE_BUST}`
 
   return (

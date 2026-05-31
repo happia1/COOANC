@@ -1,17 +1,14 @@
 /**
- * 루트 `app` 레벨에서 라우트가 준비되기 전 잠깐 보이는 로딩 UI 입니다.
+ * 루트 `app` 레벨 로딩 경계입니다. **일부러 아무것도 그리지 않습니다(null).**
  *
  * 비개발자 설명:
- * - 로그인·온보딩 등 상위 전환에서 쓰이며, 탭 전환용은 `(child)/loading`, `parent/loading` 이 담당합니다.
- * - 스켈레톤 + 「불러오는 중…」 문구로 전환 중임을 알립니다.
+ * - 부모 앱에서 자녀 앱(`/home`)으로 들어갈 때, 자녀 세그먼트 레이아웃이 준비되는 짧은 순간
+ *   예전에는 이 루트 로딩의 "회색 스켈레톤"이 잠깐 보였습니다.
+ * - 그 결과 「자녀 배경 로딩」(`(child)/loading`) 과 겹쳐 로딩 화면이 두 번 뜨는 것처럼 보였습니다.
+ * - 이제 루트 로딩은 비워 두어, 자녀 진입 시 **자녀 배경 로딩 화면 하나만** 보이도록 정리했습니다.
+ * - 탭 전환용 스켈레톤은 `(child)/loading`, `parent/loading` 이 각자 담당합니다.
  */
 
-import TabTransitionSkeleton from '@/components/ui/TabTransitionSkeleton'
-
 export default function RootLoading() {
-  return (
-    <div className="flex min-h-[50vh] w-full flex-col items-stretch justify-start px-4 pt-6">
-      <TabTransitionSkeleton statusMessage="불러오는 중…" />
-    </div>
-  )
+  return null
 }

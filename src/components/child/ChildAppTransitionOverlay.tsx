@@ -11,21 +11,23 @@ import { ASSETS, CHILD_HOME_BACKGROUND_CACHE_BUST } from '@/constants/assets'
 type Props = {
   statusMessage: string
   /**
-   * `child` — 자녀 홈과 같은 키즈룸 배경(부모→자녀 진입)
-   * `shared` — 부모·공용 배경(자녀→부모 나가기)
+   * `child` — 자녀 홈 키즈룸 배경(부모→자녀 진입)
+   * `parent` — 부모 앱 그라데이션 배경(자녀→부모 나가기, 이미지 없음)
    */
-  background?: 'child' | 'shared'
+  background?: 'child' | 'parent'
 }
 
 export default function ChildAppTransitionOverlay({
   statusMessage,
-  background = 'shared',
+  background = 'parent',
 }: Props) {
   const childBgSrc = `${ASSETS.layouts.childHomeBackgroundSecondScreen}?v=${CHILD_HOME_BACKGROUND_CACHE_BUST}`
 
   return (
     <div
-      className="fixed inset-0 z-[200] flex flex-col items-stretch justify-center overflow-hidden px-4 py-8"
+      className={`fixed inset-0 z-[200] flex flex-col items-stretch justify-center overflow-hidden px-4 py-8 ${
+        background === 'parent' ? 'bg-gradient-to-b from-sky-50 via-white to-blue-50' : ''
+      }`}
       role="status"
       aria-live="polite"
       aria-busy="true"
@@ -48,10 +50,7 @@ export default function ChildAppTransitionOverlay({
           </div>
         </>
       ) : (
-        <div
-          className="flex h-full w-full flex-col items-stretch justify-center bg-cover bg-center bg-no-repeat"
-          style={{ backgroundImage: `url(${ASSETS.layouts.sharedAppBackground})` }}
-        >
+        <div className="flex h-full w-full flex-1 flex-col justify-center">
           <TabTransitionSkeleton statusMessage={statusMessage} />
         </div>
       )}

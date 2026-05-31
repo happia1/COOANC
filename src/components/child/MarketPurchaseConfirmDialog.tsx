@@ -17,6 +17,27 @@ import type { StoreItem } from '@/types/database'
 import SpriteImage from '@/components/common/SpriteImage'
 import { SHOP_ANIMATIONS, ICONS } from '@/constants/sprites'
 import type { MarketItemFrameKey } from '@/lib/marketItemFrame'
+import { isQuantityPurchasableMarketItem } from '@/lib/contentTickets'
+import {
+  formatVideoPassPurchaseDuration,
+  isVideoViewingPassStoreItem,
+} from '@/lib/contentWatchTime'
+
+/** 「네, 살게요」 이후 계산대 연출(슬롯 차감·동전)에 재생하는 효과음 */
+const MARKET_CHECKOUT_SOUND_SRC =
+  '/assets/audio/effects/floraphonic-coin-donation-6-183893.mp3' as const
+
+function playMarketCheckoutSound() {
+  try {
+    const audio = new Audio(MARKET_CHECKOUT_SOUND_SRC)
+    audio.volume = 0.85
+    void audio.play().catch(() => {
+      /* 브라우저 자동재생 정책 등으로 실패해도 조용히 무시 */
+    })
+  } catch {
+    /* noop */
+  }
+}
 
 export type MarketPurchaseSelected = {
   item: StoreItem
@@ -27,7 +48,7 @@ type Props = {
   selected: MarketPurchaseSelected
   balanceBefore: number
   onClose: () => void
-  onSubmit: () => Promise<boolean>
+  onSubmit: (quantity: number) => Promise<boolean>
   /** API 성공 직후 호출 — 팝업 전체 닫기 */
   onSuccessDismiss: () => void
 }
@@ -150,7 +171,12 @@ export default function MarketPurchaseConfirmDialog({
   onSuccessDismiss,
 }: Props) {
   const { item } = selected
-  const price = item.credit_price
+  const supportsQuantity = isQuantityPurchasableMarketItem(item.name, item.category)
+  const unitPrice = item.credit_price
+  const [purchaseQty, setPurchaseQty] = useState(1)
+  const maxPurchaseQty = Math.max(1, Math.min(99, Math.floor(balanceBefore / unitPrice) || 1))
+  const clampedQty = Math.min(Math.max(1, purchaseQty), maxPurchaseQty)
+  const price = unitPrice * clampedQty
   const after = Math.max(0, balanceBefore - price)
   const digitLen = Math.max(balanceBefore.toString().length, after.toString().length, 2)
 
@@ -164,6 +190,7 @@ export default function MarketPurchaseConfirmDialog({
     setCheckoutStep('finalSure')
     setPayRunId(0)
     setDecoAnimate(false)
+    setPurchaseQty(1)
   }, [item.id, balanceBefore])
 
   const { current: slotBalance, done: slotDone } = useSlotBalanceSteps(
@@ -199,6 +226,7 @@ export default function MarketPurchaseConfirmDialog({
 
   /** 「정말 구매」확인 — 여기서부터 슬롯·동전 애니메이션 */
   function startCheckoutAnimation() {
+    playMarketCheckoutSound()
     setCheckoutStep('animating')
     setPayRunId(Date.now())
   }
@@ -207,7 +235,7 @@ export default function MarketPurchaseConfirmDialog({
     if (requestBusy) return
     setRequestBusy(true)
     try {
-      const ok = await onSubmit()
+      const ok = await onSubmit(clampedQty)
       if (ok) onSuccessDismiss()
     } finally {
       setRequestBusy(false)
@@ -283,6 +311,37 @@ export default function MarketPurchaseConfirmDialog({
                     정말 구매하시겠어요?
                   </p>
                   <p className="mt-2 text-xs font-bold text-gray-500 sm:text-sm">결제 시 크레딧이 바로 차감돼요</p>
+                  {supportsQuantity && (
+                    <div className="mt-4 flex items-center justify-center gap-3">
+                      <span className="text-xs font-bold text-gray-600">수량</span>
+                      <button
+                        type="button"
+                        aria-label="수량 줄이기"
+                        disabled={clampedQty <= 1}
+                        onClick={() => setPurchaseQty((q) => Math.max(1, q - 1))}
+                        className="flex h-9 w-9 items-center justify-center rounded-xl bg-gray-100 text-lg font-black text-gray-700 disabled:opacity-40"
+                      >
+                        −
+                      </button>
+                      <span className="min-w-[2rem] text-center text-xl font-black tabular-nums text-brand-text">
+                        {clampedQty}
+                      </span>
+                      <button
+                        type="button"
+                        aria-label="수량 늘리기"
+                        disabled={clampedQty >= maxPurchaseQty}
+                        onClick={() => setPurchaseQty((q) => Math.min(maxPurchaseQty, q + 1))}
+                        className="flex h-9 w-9 items-center justify-center rounded-xl bg-gray-100 text-lg font-black text-gray-700 disabled:opacity-40"
+                      >
+                        +
+                      </button>
+                    </div>
+                  )}
+                  {isVideoViewingPassStoreItem(item.name, item.category) ? (
+                    <p className="mt-3 text-center text-xs font-bold text-indigo-600 sm:text-sm">
+                      총 {formatVideoPassPurchaseDuration(clampedQty)} 시청 가능
+                    </p>
+                  ) : null}
                   <div className="mt-6 flex flex-col items-center justify-center rounded-2xl bg-red-50/90 py-5 ring-1 ring-red-100">
                     <div className="flex flex-wrap items-center justify-center gap-2">
                       <SpriteImage sheet={ICONS} frame="credit" width={28} clipRotated={false} />

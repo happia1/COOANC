@@ -22,7 +22,7 @@ type Props = {
 export default function MarketPurchaseSuccessOverlay({
   open,
   onDismiss,
-  autoCloseMs = 2800,
+  autoCloseMs = 3600,
 }: Props) {
   const confettiFired = useRef(false)
 
@@ -70,20 +70,35 @@ export default function MarketPurchaseSuccessOverlay({
       aria-labelledby="market-success-title"
     >
       <style>{`
+        /* 낙하산: 위→아래 자연스럽게 낙하, 좌우는 두 번만 살짝 흔들림 */
         @keyframes successBalloonDrop {
-          0% { transform: translateX(-50%) translateY(-170px) rotate(-3deg) scale(0.95); opacity: 0; }
-          10% { opacity: 1; }
-          25% { transform: translateX(-50%) translateY(-120px) rotate(-2.7deg) scale(0.96); }
-          50% { transform: translateX(-50%) translateY(-58px) rotate(-2.1deg) scale(0.975); }
-          75% { transform: translateX(-50%) translateY(-8px) rotate(-1.1deg) scale(0.99); }
-          100% { transform: translateX(-50%) translateY(18px) rotate(0deg) scale(1); opacity: 1; }
+          0% {
+            transform: translateX(calc(-50% + 0px)) translateY(-185px) rotate(-1deg) scale(0.94);
+            opacity: 0;
+          }
+          10% {
+            transform: translateX(calc(-50% + 0px)) translateY(-155px) rotate(-1deg) scale(0.955);
+            opacity: 1;
+          }
+          48% {
+            transform: translateX(calc(-50% - 11px)) translateY(-72px) rotate(-2.5deg) scale(0.975);
+          }
+          78% {
+            transform: translateX(calc(-50% + 9px)) translateY(-18px) rotate(2deg) scale(0.99);
+          }
+          100% {
+            transform: translateX(calc(-50% + 0px)) translateY(18px) rotate(0deg) scale(1);
+            opacity: 1;
+          }
         }
       `}</style>
       <div className="absolute inset-0 bg-black/45" aria-hidden />
-      {/** 오토바이 대신 열기구가 하늘하늘 내려오는 연출 */}
+      {/** 낙하산이 하늘하늘 좌우로 흔들리며 내려오는 연출 */}
       <div
         className="pointer-events-none absolute left-1/2 top-[calc(50%-220px)] z-[325] drop-shadow-xl"
-        style={{ animation: 'successBalloonDrop 2.35s cubic-bezier(0.22, 0.8, 0.28, 1) forwards' }}
+        style={{
+          animation: 'successBalloonDrop 3.2s cubic-bezier(0.32, 0.68, 0.22, 1) forwards',
+        }}
       >
         <SpriteImage sheet={SHOP_ANIMATIONS} frame="reward" width={92} clipRotated={false} />
       </div>

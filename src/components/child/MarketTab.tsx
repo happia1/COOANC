@@ -20,7 +20,9 @@ import {
   parentMarketSectionIdForItem,
   type ParentMarketSectionId,
 } from '@/lib/parentMarketMenuSections'
-import { BETA_MARKET_CONFIG } from '@/constants/betaMarketConfig'
+import { activeContentSortIndex, activeEventSortIndex, activeFoodSortIndex, BETA_MARKET_CONFIG, canonicalSnackCatalogName, isBetaActive, storeItemDisplayName } from '@/constants/betaMarketConfig'
+import { isContentZoneUnlocked } from '@/constants/childScreenFeatures'
+import { isQuantityPurchasableMarketItem } from '@/lib/contentTickets'
 import { parseJsonFromResponse } from '@/lib/parseJsonResponse'
 
 type Props = {
@@ -38,6 +40,9 @@ type Props = {
   /** 장바구니(서버 `market_wishlist_items`) 초기 목록(상품별 수량 포함) */
   initialWishlistEntries: { storeItemId: string; quantity: number }[]
   level: number
+  /** 열릴 때 해당 구역(콘텐츠 등)으로 가로 스크롤 */
+  initialScrollSection?: ParentMarketSectionId | null
+  onInitialScrollDone?: () => void
 }
 
 type SelectedInfo = {
@@ -95,6 +100,8 @@ export default function MarketTab({
   creditsTotal,
   initialWishlistEntries,
   level,
+  initialScrollSection = null,
+  onInitialScrollDone,
 }: Props) {
   /**
    * 마켓 결제 기준은 레벨 블록(총 코인)과 동일하게 맞춥니다.
@@ -179,12 +186,14 @@ export default function MarketTab({
     return marketEligibleItems.filter((item) => !hidden.has(item.id))
   }, [marketEligibleItems, hiddenStoreItemIds])
 
+  const contentZoneUnlocked = isContentZoneUnlocked(level)
+
   /**
    * 베타 활성 상품만 추출합니다.
    * - 이벤트(experience/activity) → activeEvents 목록에 있는 것만
+   * - 콘텐츠(content) → activeContent 목록에 있는 것만
    * - 간식(food) → activeFood 목록에 있는 것만
-   * - toy 등 나머지 카테고리는 완전 제외
-   * - 순서: 이벤트 먼저, 그다음 간식
+   * - 순서: 이벤트 → 간식 → 콘텐츠
    *
    * 비개발자 설명: 베타 기간에 자녀 마켓에 보일 상품만 걸러냅니다.
    */
@@ -192,16 +201,48 @@ export default function MarketTab({
     const activeFood = BETA_MARKET_CONFIG.activeFood as readonly string[]
     const activeEvents = BETA_MARKET_CONFIG.activeEvents as readonly string[]
 
-    const events = visibleItems.filter(
-      (i) =>
-        (i.category === 'experience' || i.category === 'activity') &&
-        activeEvents.includes(i.name),
+    const events = visibleItems
+      .filter(
+        (i) =>
+          (i.category === 'experience' || i.category === 'activity') &&
+          activeEvents.includes(i.name),
+      )
+      .sort((a, b) => activeEventSortIndex(a.name) - activeEventSortIndex(b.name))
+    const content = visibleItems
+      .filter(
+        (i) =>
+          i.category === 'content' &&
+          contentZoneUnlocked &&
+          isBetaActive(i.name, i.category),
+      )
+      .sort((a, b) => activeContentSortIndex(a.name) - activeContentSortIndex(b.name))
+    const food = visibleItems
+      .filter(
+        (i) =>
+          i.category === 'food' &&
+          activeFood.includes(canonicalSnackCatalogName(i.name)),
+      )
+      .sort((a, b) => activeFoodSortIndex(a.name) - activeFoodSortIndex(b.name))
+    return [...events, ...food, ...content]
+  }, [visibleItems, contentZoneUnlocked])
+
+  /** 해금 안내 등에서 마켓 콘텐츠 구역으로 스크롤 */
+  useEffect(() => {
+    if (!initialScrollSection || betaItems.length === 0) return
+    const idx = betaItems.findIndex(
+      (item) => parentMarketSectionIdForItem(item.category) === initialScrollSection,
     )
-    const food = visibleItems.filter(
-      (i) => i.category === 'food' && activeFood.includes(i.name),
-    )
-    return [...events, ...food]
-  }, [visibleItems])
+    if (idx < 0) {
+      onInitialScrollDone?.()
+      return
+    }
+    const frame = requestAnimationFrame(() => {
+      const el = shelfScrollRef.current?.children.item(idx) as HTMLElement | null
+      el?.scrollIntoView({ behavior: 'smooth', inline: 'start', block: 'nearest' })
+      onInitialScrollDone?.()
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [initialScrollSection, betaItems, onInitialScrollDone])
 
   /**
    * 부모 「메뉴 제어」와 같은 순서(간식 → 장난감 → 이벤트 → 기타)로 구역을 나눕니다.
@@ -212,6 +253,7 @@ export default function MarketTab({
       snack: [],
       toy: [],
       event: [],
+      content: [],
       other: [],
     }
     for (const item of visibleItems) {
@@ -232,15 +274,16 @@ export default function MarketTab({
     const sections: Block[] = []
     /**
      * 요청사항: 자녀 마켓 선반 순서를 고정
-     * 1) 이벤트 2) 간식 3) 장난감
+     * 1) 이벤트 2) 간식 3) 콘텐츠 4) 장난감
      */
     const sectionMetaById: Record<ParentMarketSectionId, { title: string }> = {
       snack: { title: '간식' },
       toy: { title: '장난감' },
       event: { title: '이벤트' },
+      content: { title: '콘텐츠' },
       other: { title: '기타' },
     }
-    const ordered: ParentMarketSectionId[] = ['event', 'snack', 'toy']
+    const ordered: ParentMarketSectionId[] = ['event', 'snack', 'content', 'toy']
     for (const id of ordered) {
       const items = buckets[id]
       if (items.length === 0) continue
@@ -329,6 +372,7 @@ export default function MarketTab({
   const [showReceiveBtn, setShowReceiveBtn] = useState(false)
   /** 승인된 요청이 연속으로 올 때, 한 건씩만 연출하고 나머지는 줄을 섭니다 */
   const deliveryWaitRef = useRef<PurchaseRequest[]>([])
+  const shelfScrollRef = useRef<HTMLDivElement>(null)
 
   const showToast = (msg: string, ok = true) => {
     setToast({ msg, ok })
@@ -641,9 +685,12 @@ export default function MarketTab({
   }, [shelfActionFor, level, currentWallet])
 
   /** 구매 요청 API — 성공 시 다이얼로그가 바로 닫힘 */
-  async function submitPurchaseRequest(): Promise<boolean> {
+  async function submitPurchaseRequest(quantity = 1): Promise<boolean> {
     if (!selected) return false
     const { item } = selected
+    const purchaseQty = isQuantityPurchasableMarketItem(item.name, item.category)
+      ? Math.min(99, Math.max(1, Math.floor(quantity)))
+      : 1
     setLoading(item.id)
     try {
       const res = await fetch('/api/market/request', {
@@ -653,6 +700,7 @@ export default function MarketTab({
           itemId: item.id,
           childId,
           childMessage: MARKET_REQUEST_PARENT_NOTICE,
+          quantity: purchaseQty,
         }),
       })
       const text = await res.text()
@@ -662,7 +710,7 @@ export default function MarketTab({
         return false
       }
       if (typeof json.credits === 'number') setCurrentWallet(readChildStatInt(json.credits))
-      else setCurrentWallet((w) => w - item.credit_price)
+      else setCurrentWallet((w) => w - item.credit_price * purchaseQty)
       if (json.request) setMyRequests((prev) => [json.request as PurchaseRequest, ...prev])
       /** 축하 오버레이에서 안내하므로 별도 토스트는 띄우지 않음(문구 겹침 방지) */
       return true
@@ -756,12 +804,12 @@ export default function MarketTab({
         </div>
       ) : (
         /*
-         * 베타 마켓: 카테고리 선반 구조 없이 단일 가로 스크롤 한 줄로 표시합니다.
-         * 순서: 간식 → 이벤트 (betaItems 배열 순서 그대로)
-         *
-         * 비개발자 설명: 상품들이 카드 형태로 가로로 쭉 늘어서 있고, 좌우로 밀어서 볼 수 있습니다.
+         * 베타 마켓: 가로 한 줄 스크롤 — betaItems 순서(이벤트 → 콘텐츠 → 간식)대로 나열
          */
-        <div className="flex min-h-0 flex-1 flex-row gap-4 overflow-x-auto px-5 py-5 snap-x snap-mandatory [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [-webkit-overflow-scrolling:touch]">
+        <div
+          ref={shelfScrollRef}
+          className="flex min-h-0 flex-1 flex-row gap-4 overflow-x-auto px-5 py-5 snap-x snap-mandatory [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [-webkit-overflow-scrolling:touch]"
+        >
           {betaItems.map((item, itemIdx) => {
             const frameKey = marketFrameKeyForItemId(item.id, item.name)
             const isPending = shelfBlockedItemIds.has(item.id)
@@ -787,6 +835,7 @@ export default function MarketTab({
                 <div className="flex h-[100px] w-[100px] items-center justify-center">
                   <StoreItemThumbnail
                     imageUrl={item.image_url}
+                    itemName={item.name}
                     frame={frameKey}
                     height={88}
                     width={100}
@@ -799,7 +848,7 @@ export default function MarketTab({
 
                 {/* 상품명 */}
                 <p className="w-full text-center text-sm font-bold leading-snug text-gray-800 line-clamp-1">
-                  {item.name}
+                  {storeItemDisplayName(item.name)}
                 </p>
 
                 {/* 구매 버튼 — 탭 시 기존 액션 시트 오픈 */}
@@ -919,6 +968,7 @@ export default function MarketTab({
               <div className="mt-3 flex justify-center" aria-hidden>
                 <StoreItemThumbnail
                   imageUrl={shelfActionFor.item.image_url}
+                  itemName={shelfActionFor.item.name}
                   frame={shelfActionFor.frame}
                   height={96}
                   className="max-h-[6.75rem] max-w-[min(100%,8.25rem)] object-contain"
@@ -1070,6 +1120,7 @@ export default function MarketTab({
             <div className="-mt-1 flex items-end justify-center" style={{ filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.15))' }}>
               <StoreItemThumbnail
                 imageUrl={delivery.itemImageUrl}
+                itemName={delivery.request.item_name}
                 frame={delivery.frame}
                 height={96}
                 className="max-h-[96px] max-w-[min(100vw-2rem,200px)] object-contain object-bottom"

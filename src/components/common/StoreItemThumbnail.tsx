@@ -10,10 +10,13 @@ import Image from 'next/image'
 import type { CSSProperties } from 'react'
 import MarketItemImage from '@/components/common/MarketItemImage'
 import type { MarketItemFrameKey } from '@/lib/marketItemFrame'
+import { resolveStoreItemImageUrl } from '@/constants/marketItemImages'
 
 export type StoreItemThumbnailProps = {
   imageUrl: string | null | undefined
   frame: MarketItemFrameKey
+  /** 카탈로그 기본 일러스트 — 이름으로 올바른 PNG 를 고릅니다 */
+  itemName?: string
   /** 세로 기준(px) — 가로는 비율로 맞추거나 width 를 함께 주면 고정합니다 */
   height: number
   width?: number
@@ -28,6 +31,7 @@ export type StoreItemThumbnailProps = {
 export default function StoreItemThumbnail({
   imageUrl,
   frame,
+  itemName,
   height,
   width,
   className,
@@ -38,10 +42,15 @@ export default function StoreItemThumbnail({
 }: StoreItemThumbnailProps) {
   const w = width ?? Math.max(28, Math.round(height * 1.22))
 
-  if (imageUrl) {
+  const resolvedUrl =
+    itemName != null && itemName.trim()
+      ? resolveStoreItemImageUrl(itemName, imageUrl)
+      : imageUrl?.trim() || null
+
+  if (resolvedUrl) {
     return (
       <Image
-        src={imageUrl}
+        src={resolvedUrl}
         alt=""
         width={w}
         height={height}

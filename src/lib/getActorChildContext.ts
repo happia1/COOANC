@@ -2,7 +2,7 @@ import { cache } from 'react'
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { getCachedProfileRowById } from '@/lib/childAppDataCache'
+import { getCachedProfileRowById, getCachedFamilyLinksForChild } from '@/lib/childAppDataCache'
 import { normalizeUuidParam } from '@/lib/normalizeUuid'
 import { PARENT_AS_CHILD_COOKIE } from '@/lib/parentAsChildCookie'
 
@@ -50,14 +50,9 @@ export const getActorChildContext = cache(async (): Promise<ActorChildContext> =
       redirect('/parent/home')
     }
 
-    const { data: link } = await supabase
-      .from('family_links')
-      .select('id')
-      .eq('parent_id', user.id)
-      .eq('child_id', childId)
-      .maybeSingle()
-
-    if (!link) {
+    const familyRows = await getCachedFamilyLinksForChild(childId)
+    const linked = familyRows.some((row) => row.parent_id === user.id)
+    if (!linked) {
       redirect('/parent/home')
     }
 

@@ -10,16 +10,27 @@ import type { Mission } from '@/types/database'
  *   **이미 지워진 카드 id**로 오늘 일정을 채우려다 실패하는 문제가 있었습니다.
  * - 그래서 **캐시 없이** 요청마다 DB에서 바로 읽습니다(자녀 홈·미션 탭이 항상 최신 템플릿을 봅니다).
  */
+/** 네트워크 일시 오류 시 한 번 더 시도합니다 */
+async function queryMissionTemplatesOnce(missionDb: NonNullable<ReturnType<typeof createServiceRoleClient>>) {
+  return missionDb
+    .from('missions')
+    .select('*')
+    .order('sort_order', { ascending: true })
+    .order('scheduled_time', { ascending: true, nullsFirst: false })
+}
+
 export async function getMissionTemplatesForChildMissionPage() {
   const missionDb = createServiceRoleClient()
   if (!missionDb) {
     return { data: null as Mission[] | null, error: { message: 'no_service_role' as const } }
   }
-  const res = await missionDb
-    .from('missions')
-    .select('*')
-    .order('sort_order', { ascending: true })
-    .order('scheduled_time', { ascending: true, nullsFirst: false })
+
+  let res = await queryMissionTemplatesOnce(missionDb)
+  if (res.error?.message?.includes('fetch failed')) {
+    await new Promise((r) => setTimeout(r, 500))
+    res = await queryMissionTemplatesOnce(missionDb)
+  }
+
   return {
     data: (res.data ?? null) as Mission[] | null,
     error: res.error ? { message: res.error.message } : null,

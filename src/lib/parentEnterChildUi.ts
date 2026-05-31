@@ -15,3 +15,9 @@ export function parentEnterChildUiHref(childId: string | null | undefined): stri
   }
   return '/api/parent/enter-child-ui'
 }
+
+/** 쿠키만 심고 JSON 으로 응답 — 클라이언트 `router.push('/home')` 용 */
+export function parentEnterChildUiJsonHref(childId: string | null | undefined): string {
+  const base = parentEnterChildUiHref(childId)
+  return base.includes('?') ? `${base}&json=1` : `${base}?json=1`
+}

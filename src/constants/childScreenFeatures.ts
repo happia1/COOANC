@@ -7,11 +7,24 @@
  * - 이 함수의 반환값으로 상단 바 아이콘을 표시하거나 숨깁니다.
  */
 
+/** 칭찬 스티커 판(우측 상단 아이콘) 해금 — 레벨 1 이상 */
+export const STICKER_UNLOCK_MIN_LEVEL = 1
+
+/** 보물상자·콘텐츠 이용권 해금 — 레벨 8 이상 */
+export const CONTENT_ZONE_UNLOCK_MIN_LEVEL = 8
+
+/** 레벨 기준 보물상자(콘텐츠존) 사용 가능 여부 */
+export function isContentZoneUnlocked(level: number): boolean {
+  return level >= CONTENT_ZONE_UNLOCK_MIN_LEVEL
+}
+
 export type UnlockedFeatures = {
   /** 미션 카드 — 항상 노출 */
   missions: boolean
   /** 마켓 — 항상 노출 (상품 구경은 연령 무관) */
   market: boolean
+  /** 보물상자(콘텐츠존) — 레벨 8 이상 */
+  contentZone: boolean
   /**
    * 코인 팝업 (돈바구니/저금통/지갑):
    * 레벨 5 이상일 때만 노출
@@ -37,8 +50,9 @@ export function getUnlockedFeatures(level: number, ageYears: number | null): Unl
   return {
     missions: true,
     market: true,
+    contentZone: isContentZoneUnlocked(level),
     coinPocket: coinPocketUnlocked,
     dressUp: level >= 2,
-    sticker: level >= 1,
+    sticker: level >= STICKER_UNLOCK_MIN_LEVEL,
   }
 }

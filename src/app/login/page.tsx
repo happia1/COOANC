@@ -9,12 +9,12 @@ import { createClient } from '@/lib/supabase/client'
 import { runSerializedBrowserAuthOp } from '@/lib/supabase/browserAuthQueue'
 import { mapSupabaseClientErrorMessage } from '@/lib/mapSupabaseClientErrorMessage'
 import { parseJsonFromResponse } from '@/lib/parseJsonResponse'
-import { useRouter } from 'next/navigation'
+import { pickPostLoginNavigationTarget } from '@/lib/pickPostLoginNavigationTarget'
+import type { PostLoginRedirectPlan } from '@/lib/resolvePostLoginRedirect'
 
 const AUTO_LOGIN_STORAGE_KEY = 'cooanc:auto-login-enabled'
 
 export default function LoginPage() {
-  const router = useRouter()
   const [email, setEmail]     = useState('')
   const [password, setPassword] = useState('')
   const [error, setError]     = useState<string | null>(null)
@@ -31,15 +31,14 @@ export default function LoginPage() {
   useEffect(() => {
     let cancelled = false
     async function redirectWhenAlreadySignedIn() {
-      // 자동 로그인이 켜져 있고 HttpOnly 세션 쿠키가 있으면 로그인 화면을 건너뜁니다.
-      // 브라우저 SDK `getSession()` 은 GoTrue Web Lock 과 겹치기 쉬워 같은 출처 API 만 씁니다.
       if (!autoLoginEnabled) return
       try {
-        const res = await fetch('/api/auth/session', { credentials: 'same-origin' })
-        const { data, parseError } = await parseJsonFromResponse<{ authenticated?: boolean }>(res)
-        if (cancelled) return
-        if (parseError || !data?.authenticated) return
-        router.replace('/')
+        const res = await fetch('/api/auth/post-login-redirect', { credentials: 'same-origin' })
+        const { data, parseError } = await parseJsonFromResponse<PostLoginRedirectPlan>(res)
+        if (cancelled || parseError || !data?.authenticated) return
+        const target = pickPostLoginNavigationTarget(data)
+        if (!target || cancelled) return
+        window.location.replace(target)
       } catch {
         /* 세션 확인 실패 시 로그인 폼 유지 */
       }
@@ -48,7 +47,7 @@ export default function LoginPage() {
     return () => {
       cancelled = true
     }
-  }, [autoLoginEnabled, router])
+  }, [autoLoginEnabled])
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
@@ -79,10 +78,13 @@ export default function LoginPage() {
           '→ 브라우저 SDK 로 재시도합니다.',
         )
       } else if (apiRes.ok && payload.ok !== false) {
-        // 세션 쿠키는 서버(API)가 Set-Cookie 로 이미 줬습니다. 여기서 다시 클라 SDK 로 로그인하면
-        // 같은 탭에서 락 충돌·이중 요청 또는 잘못된 Supabase URL 시 HTML 파싱 오류만 늘 수 있어 생략합니다.
         window.localStorage.setItem(AUTO_LOGIN_STORAGE_KEY, String(autoLoginEnabled))
-        window.location.href = '/'
+        const navRes = await fetch('/api/auth/post-login-redirect', { credentials: 'same-origin' })
+        const { data: plan, parseError: navParseError } =
+          await parseJsonFromResponse<PostLoginRedirectPlan>(navRes)
+        const target =
+          !navParseError && plan?.authenticated ? pickPostLoginNavigationTarget(plan) : null
+        window.location.replace(target ?? '/parent/home')
         return
       } else if (payload.error) {
         setError(payload.error)
@@ -140,8 +142,12 @@ export default function LoginPage() {
     // 다음 접속 시 같은 선택을 유지하도록 자동 로그인 설정을 저장합니다.
     window.localStorage.setItem(AUTO_LOGIN_STORAGE_KEY, String(autoLoginEnabled))
 
-    // 로그인 후 루트로 → 역할별 화면으로 분기합니다.
-    window.location.href = '/'
+    const navRes = await fetch('/api/auth/post-login-redirect', { credentials: 'same-origin' })
+    const { data: plan, parseError: navParseError } =
+      await parseJsonFromResponse<PostLoginRedirectPlan>(navRes)
+    const target =
+      !navParseError && plan?.authenticated ? pickPostLoginNavigationTarget(plan) : null
+    window.location.replace(target ?? '/parent/home')
   }
 
   return (

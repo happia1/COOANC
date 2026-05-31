@@ -20,6 +20,8 @@ import { applyStoreItemCreditOverrides } from '@/lib/applyStoreItemCreditOverrid
 import { readChildStatInt } from '@/lib/childCreditsSplit'
 import { isCategoryExcludedFromMarket } from '@/lib/parentMarketMenuSections'
 import { fetchCalendarEventsForChildRoutine, resolveRoutineTypeFromCalEvents } from '@/lib/childRoutineCalendar'
+import { fetchChildHomeContentZoneData, EMPTY_CHILD_HOME_CONTENT_ZONE } from '@/lib/fetchChildHomeContentZone'
+import { CONTENT_ZONE_UNLOCK_MIN_LEVEL } from '@/constants/childScreenFeatures'
 import {
   filterDailyMissionsByTemplatePool,
   templatePoolForMissionDay,
@@ -97,23 +99,38 @@ export default async function ChildHomePage() {
     'title, icon_emoji, description, credit_reward, heart_reward, exp_reward, reward_multiplier, difficulty, block, repeat_type'
   const missionJoinWithSort = `${missionJoinBase}, sort_order`
 
-  const templatesQuery =
-    serviceRoleClient != null
-      ? getMissionTemplatesForChildMissionPage()
-      : (async () => {
-          const withSort = await missionDb
-            .from('missions')
-            .select('*')
-            .order('sort_order', { ascending: true })
-            .order('scheduled_time', { ascending: true, nullsFirst: false })
-          if (!isMissingSortOrderColumn(withSort.error?.message)) return withSort
+  const templatesQuery = (async () => {
+    const run = async () => {
+      if (serviceRoleClient != null) {
+        return getMissionTemplatesForChildMissionPage()
+      }
+      const withSort = await missionDb
+        .from('missions')
+        .select('*')
+        .order('sort_order', { ascending: true })
+        .order('scheduled_time', { ascending: true, nullsFirst: false })
+      if (!isMissingSortOrderColumn(withSort.error?.message)) return withSort
 
-          console.warn('[child/home] sort_order missing, fallback templates query')
-          return missionDb
-            .from('missions')
-            .select('*')
-            .order('scheduled_time', { ascending: true, nullsFirst: false })
-        })()
+      console.warn('[child/home] sort_order missing, fallback templates query')
+      return missionDb
+        .from('missions')
+        .select('*')
+        .order('scheduled_time', { ascending: true, nullsFirst: false })
+    }
+
+    let res = await run()
+    const errMsg =
+      'error' in res && res.error && typeof res.error === 'object' && 'message' in res.error
+        ? String((res.error as { message?: string }).message ?? '')
+        : res.error?.message ?? ''
+    if (errMsg.includes('fetch failed')) {
+      await new Promise((r) => setTimeout(r, 500))
+      res = await run()
+    }
+    return res
+  })()
+
+  const EMPTY_CONTENT_ZONE = EMPTY_CHILD_HOME_CONTENT_ZONE
 
   /**
    * 1단계: childId 만 알면 되는 병렬 조회
@@ -200,9 +217,15 @@ export default async function ChildHomePage() {
   const familyLinkId = familyRows[0]?.id ?? null
 
   /**
-   * 2단계: 오늘 맞는 calendar_events 와 오늘 daily_missions 를 병렬 조회
+   * 2단계: 캘린더·오늘 미션·콘텐츠존(레벨 8+) 병렬 조회
+   * — 콘텐츠존 SSR 에서 유튜브 썸네일을 일괄 조회하지 않아 홈 TTFB 가 짧아집니다.
    */
-  const [calEvents, dailyMissionsResWithSort] = await Promise.all([
+  const contentZonePromise =
+    level >= CONTENT_ZONE_UNLOCK_MIN_LEVEL
+      ? fetchChildHomeContentZoneData(supabase, childId)
+      : Promise.resolve(EMPTY_CONTENT_ZONE)
+
+  const [calEvents, dailyMissionsResWithSort, contentZone] = await Promise.all([
     fetchCalendarEventsForChildRoutine(missionDb, {
       today,
       childId,
@@ -215,6 +238,7 @@ export default async function ChildHomePage() {
       .eq('child_id', childId)
       .eq('date', today)
       .order('scheduled_time', { ascending: true, nullsFirst: false }),
+    contentZonePromise,
   ])
   const dailyMissionsRes = isMissingSortOrderColumn(dailyMissionsResWithSort.error?.message)
     ? await missionDb
@@ -228,7 +252,11 @@ export default async function ChildHomePage() {
   const routineType: MissionDayRoutineType = resolveRoutineTypeFromCalEvents(today, calEvents)
 
   if (templatesRes.error) {
-    console.error('[child/home] missions select', templatesRes.error.message)
+    const msg = templatesRes.error.message ?? 'unknown'
+    const networkHint = msg.includes('fetch failed')
+      ? ' — Supabase 연결 실패(DNS/네트워크). 인터넷·VPN 확인 후 새로고침해 주세요.'
+      : ''
+    console.error('[child/home] missions select', msg + networkHint)
   }
 
   const pool = templatePoolForMissionDay(
@@ -249,7 +277,6 @@ export default async function ChildHomePage() {
   if (existingErr) console.error('[child/home] daily_missions select', existingErr.message)
 
   let existing = (existingRows ?? []) as DailyMissionWithTemplate[]
-  console.log('[home] today=', today, 'routineType=', routineType, 'existing=', existing.length, 'pool=', pool.length)
 
   const existingTemplateIds = new Set(
     existing.filter((dm) => dm.missions != null).map((dm) => dm.mission_template_id),
@@ -370,6 +397,10 @@ export default async function ChildHomePage() {
       initialWishlistEntries={initialWishlistEntries}
       initialUnlockedItemIndexes={unlockedItemIndexes}
       exitHref={exitHref}
+      contentChannels={contentZone.channels}
+      initialContentVideoTicketQuantity={contentZone.videoTicketQuantity}
+      initialMinigameTicketQuantity={contentZone.minigameTicketQuantity}
+      initialActiveContentSession={contentZone.activeSession}
     />
   )
 }

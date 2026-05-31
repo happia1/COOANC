@@ -6,7 +6,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { normalizeUuidParam } from '@/lib/normalizeUuid'
 import { PARENT_AS_CHILD_COOKIE, PARENT_AS_CHILD_COOKIE_MAX_AGE } from '@/lib/parentAsChildCookie'
-import { getCachedFamilyLinksForChild, getCachedFamilyLinksForParent } from '@/lib/childAppDataCache'
+import { getCachedProfileRowById, getCachedFamilyLinksForChild, getCachedFamilyLinksForParent } from '@/lib/childAppDataCache'
 
 /**
  * GET /api/parent/enter-child-ui?childId=UUID (childId 생략 가능)
@@ -25,22 +25,9 @@ export async function GET(req: NextRequest) {
       data: { user },
     } = await supabase.auth.getUser()
 
-    const { data: profile } = user
-      ? await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle()
-      : { data: null }
+    const profile = user ? await getCachedProfileRowById(user.id) : null
 
     const childIdParam = req.nextUrl.searchParams.get('childId')
-    const rsc = req.nextUrl.searchParams.get('_rsc')
-
-    /** 개발 환경 또는 RSC 보조 요청일 때만 — user/role/쿼리 불일치 원인 추적 */
-    if (process.env.NODE_ENV === 'development' || rsc !== null) {
-      console.log('enter-child-ui debug:', {
-        userId: user?.id,
-        role: profile?.role,
-        childId: childIdParam,
-        rsc,
-      })
-    }
 
     if (req.nextUrl.searchParams.has('_rsc')) {
       return NextResponse.json({ ok: true, noop: true, reason: 'next-rsc-prefetch-skip' }, { status: 200 })
@@ -77,6 +64,19 @@ export async function GET(req: NextRequest) {
     }
 
     const url = new URL('/home', req.nextUrl.origin)
+    const wantsJson = req.nextUrl.searchParams.has('json')
+
+    if (wantsJson) {
+      const res = NextResponse.json({ ok: true, redirectTo: url.pathname })
+      res.cookies.set(PARENT_AS_CHILD_COOKIE, childId, {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        maxAge: PARENT_AS_CHILD_COOKIE_MAX_AGE,
+      })
+      return res
+    }
+
     const res = NextResponse.redirect(url)
     res.cookies.set(PARENT_AS_CHILD_COOKIE, childId, {
       httpOnly: true,

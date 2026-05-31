@@ -5,7 +5,7 @@
  *
  * 비개발자 설명:
  * - 부모 앱이 처음 켜질 때, 관리자가 "팝업으로 띄우라"고 설정한 공지가 있으면 보여 줍니다.
- * - 팝업이 여러 개면, 좌우 스와이프로 슬라이드하며 넘기고 위쪽 도트로 위치를 알 수 있습니다.
+ * - 팝업이 여러 개면, 카드 바깥 좌·우 화살표와 스와이프로 슬라이드하며 넘기고 위쪽 도트로 위치를 알 수 있습니다.
  * - 표시 순서는 우선순위(force > important > once)로 정렬합니다.
  * - 팝업을 닫아도 공지는 사라지지 않고, 종(알림·공지) 안의 공지센터에서 계속 볼 수 있습니다.
  * - 따로 저장(기억)하지 않으므로, 앱을 새로 켜면 조건에 맞는 팝업은 다시 보일 수 있습니다.
@@ -42,6 +42,44 @@ const SLIDE_MS = 280
 
 /** DOM 측정 보조 — 본문이 대략 이 높이를 넘기면 잘린 것으로 봅니다 */
 const POPUP_BODY_CLAMP_HINT_PX = 120
+
+/** 팝업 바깥 슬라이드 안내 화살표 */
+function PopupSlideSideHint({
+  direction,
+  disabled,
+  onPress,
+}: {
+  direction: 'prev' | 'next'
+  disabled: boolean
+  onPress: () => void
+}) {
+  const label = direction === 'prev' ? '이전 공지' : '다음 공지'
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      disabled={disabled}
+      onClick={onPress}
+      className="flex h-9 w-9 shrink-0 items-center justify-center text-white/90 transition active:scale-95 disabled:pointer-events-none disabled:opacity-35"
+    >
+      <svg
+        width="20"
+        height="20"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.4"
+        aria-hidden
+      >
+        {direction === 'prev' ? (
+          <path d="M15 6l-6 6 6 6" strokeLinecap="round" strokeLinejoin="round" />
+        ) : (
+          <path d="M9 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
+        )}
+      </svg>
+    </button>
+  )
+}
 
 /** 본문 문자열 기준 — DOM 측정 전에도 긴 글은 더 보기 후보로 봅니다 */
 function noticeBodyLikelyClamped(body: string | null | undefined): boolean {
@@ -411,57 +449,79 @@ export default function ParentNoticePopup() {
         className={`absolute inset-0 bg-black/50 transition-opacity duration-200 ${entered ? 'opacity-100' : 'opacity-0'} ${isForce ? 'cursor-default' : ''}`}
       />
 
-      {/* 가로 슬라이드 — 스와이프 시 이전·다음 공지가 옆에서 들어옵니다 */}
+      {/* 가로 슬라이드 — 바깥 화살표·스와이프로 이전·다음 공지 */}
       <div
-        className={`w-full max-w-xs transition-all duration-200 ${
+        className={`relative z-10 flex max-w-[calc(100vw-1.5rem)] items-center justify-center gap-2 transition-all duration-200 ${
           entered ? 'translate-y-0 scale-100 opacity-100' : 'translate-y-2 scale-95 opacity-0'
         }`}
       >
-        <div
-          ref={deckRef}
-          className="relative h-[min(22rem,85dvh)] min-h-[22rem] w-full overflow-hidden rounded-2xl"
-          style={{ touchAction: 'pan-y' }}
-          onTouchStart={onTouchStart}
-          onTouchMove={onTouchMove}
-          onTouchEnd={onTouchEnd}
-        >
+        {hasMultiple ? (
+          <PopupSlideSideHint
+            direction="prev"
+            disabled={index === 0 || sliding}
+            onPress={() => {
+              if (index > 0 && !sliding) completeSlide(-1)
+            }}
+          />
+        ) : null}
+
+        <div className="w-full max-w-xs shrink-0">
           <div
-            className={`flex h-full will-change-transform ${slideTransition}`}
-            style={{ transform: `translateX(${trackX}px)` }}
+            ref={deckRef}
+            className="relative h-[min(22rem,85dvh)] min-h-[22rem] w-full overflow-hidden rounded-2xl"
+            style={{ touchAction: 'pan-y' }}
+            onTouchStart={onTouchStart}
+            onTouchMove={onTouchMove}
+            onTouchEnd={onTouchEnd}
           >
-            {notices.map((notice, i) => {
-              const isActive = i === index
-              const dontShow = markedDontShowRef.current.has(notice.id)
-              return (
-                <div
-                  key={notice.id}
-                  className={`h-full flex-shrink-0 ${isActive ? '' : 'pointer-events-none'}`}
-                  style={{ width: cardWidth > 0 ? cardWidth : '100%' }}
-                  aria-hidden={!isActive}
-                >
-                  <ParentNoticePopupCard
-                    notice={notice}
-                    interactive={isActive}
-                    showDots={isActive}
-                    hasMultiple={hasMultiple}
-                    index={index}
-                    total={total}
-                    isForce={notice.popupType === 'force' && isActive}
-                    bodyRef={isActive ? bodyRef : undefined}
-                    bodyClamped={
-                      isActive ? bodyClamped : noticeBodyLikelyClamped(notice.body)
-                    }
-                    dontShowAgain={dontShow}
-                    onClose={close}
-                    onMore={() => handleMoreFor(notice.id)}
-                    onToggleDontShow={(checked) => toggleDontShowFor(notice.id, checked)}
-                    titleId={isActive ? 'parent-notice-popup-title' : undefined}
-                  />
-                </div>
-              )
-            })}
+            <div
+              className={`flex h-full will-change-transform ${slideTransition}`}
+              style={{ transform: `translateX(${trackX}px)` }}
+            >
+              {notices.map((notice, i) => {
+                const isActive = i === index
+                const dontShow = markedDontShowRef.current.has(notice.id)
+                return (
+                  <div
+                    key={notice.id}
+                    className={`h-full flex-shrink-0 ${isActive ? '' : 'pointer-events-none'}`}
+                    style={{ width: cardWidth > 0 ? cardWidth : '100%' }}
+                    aria-hidden={!isActive}
+                  >
+                    <ParentNoticePopupCard
+                      notice={notice}
+                      interactive={isActive}
+                      showDots={isActive}
+                      hasMultiple={hasMultiple}
+                      index={index}
+                      total={total}
+                      isForce={notice.popupType === 'force' && isActive}
+                      bodyRef={isActive ? bodyRef : undefined}
+                      bodyClamped={
+                        isActive ? bodyClamped : noticeBodyLikelyClamped(notice.body)
+                      }
+                      dontShowAgain={dontShow}
+                      onClose={close}
+                      onMore={() => handleMoreFor(notice.id)}
+                      onToggleDontShow={(checked) => toggleDontShowFor(notice.id, checked)}
+                      titleId={isActive ? 'parent-notice-popup-title' : undefined}
+                    />
+                  </div>
+                )
+              })}
+            </div>
           </div>
         </div>
+
+        {hasMultiple ? (
+          <PopupSlideSideHint
+            direction="next"
+            disabled={index >= total - 1 || sliding}
+            onPress={() => {
+              if (index < total - 1 && !sliding) completeSlide(1)
+            }}
+          />
+        ) : null}
       </div>
     </div>
   )

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { resolveApiActorChildId } from '@/lib/resolveApiActorChildId'
+import { grantMarketContentRewardsForPurchaseOnce } from '@/lib/contentTickets'
 
 /**
  * POST /api/market/complete-delivery
@@ -40,7 +41,7 @@ export async function POST(req: NextRequest) {
 
   const { data: row } = await supabase
     .from('purchase_requests')
-    .select('id, child_id, status')
+    .select('id, child_id, status, item_name, quantity, rewards_granted_at')
     .eq('id', requestId)
     .eq('child_id', actorChildId)
     .maybeSingle()
@@ -62,6 +63,14 @@ export async function POST(req: NextRequest) {
   if (error) {
     return NextResponse.json({ error: '저장에 실패했어요' }, { status: 500 })
   }
+
+  await grantMarketContentRewardsForPurchaseOnce(supabase, {
+    id: row.id as string,
+    child_id: actorChildId,
+    item_name: row.item_name as string,
+    quantity: typeof row.quantity === 'number' ? row.quantity : 1,
+    rewards_granted_at: row.rewards_granted_at as string | null | undefined,
+  })
 
   return NextResponse.json({ ok: true })
 }

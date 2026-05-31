@@ -4,6 +4,7 @@ import { resolveApiActorChildId } from '@/lib/resolveApiActorChildId'
 import { readChildStatInt } from '@/lib/childCreditsSplit'
 import { isCategoryExcludedFromMarket } from '@/lib/parentMarketMenuSections'
 import { fireGameTrigger } from '@/lib/gameLayer/fireGameTrigger'
+import { isQuantityPurchasableMarketItem } from '@/lib/contentTickets'
 
 /**
  * POST /api/market/request
@@ -22,11 +23,13 @@ export async function POST(req: NextRequest) {
   let itemId: string
   let childMessage: string | null
   let bodyChildId: unknown
+  let bodyQuantity: unknown
   try {
     const body = await req.json()
     itemId = body.itemId
     childMessage = body.childMessage ?? null
     bodyChildId = body.childId
+    bodyQuantity = body.quantity
   } catch {
     return NextResponse.json({ error: '요청 형식이 올바르지 않아요' }, { status: 400 })
   }
@@ -76,13 +79,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: '이 상품은 마켓에서 요청할 수 없어요' }, { status: 400 })
   }
 
+  const purchaseQuantity = isQuantityPurchasableMarketItem(item.name, item.category)
+    ? Math.min(99, Math.max(1, Math.floor(Number(bodyQuantity) || 1)))
+    : 1
+
   /** 자녀별 덮어쓰기가 있으면 그 크레딧으로 결제합니다(없거나 테이블 미적용 시 기본가). */
-  let effectivePrice = item.credit_price
+  let unitPrice = item.credit_price
   const creditOverride = creditOvRes.data
   const creditOvErr = creditOvRes.error
   if (!creditOvErr && typeof creditOverride?.credit_price === 'number') {
-    effectivePrice = creditOverride.credit_price
+    unitPrice = creditOverride.credit_price
   }
+
+  const effectivePrice = unitPrice * purchaseQuantity
 
   const stats = statsRes.data
   if (!stats) {
@@ -138,6 +147,7 @@ export async function POST(req: NextRequest) {
       item_name: item.name,
       item_price: effectivePrice,
       item_type: item.item_type,
+      quantity: purchaseQuantity,
       status: 'pending',
       child_message: childMessage,
       requested_at: new Date().toISOString(),

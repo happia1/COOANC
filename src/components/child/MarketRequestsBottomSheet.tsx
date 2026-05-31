@@ -74,6 +74,7 @@ function RequestRow({
       <div className="flex h-[2rem] w-[2rem] shrink-0 items-end justify-center overflow-hidden rounded-lg bg-amber-50/80 ring-1 ring-amber-100">
         <StoreItemThumbnail
           imageUrl={linked?.image_url}
+          itemName={r.item_name}
           frame={frame}
           height={28}
           className="max-h-[1.75rem] max-w-full object-contain object-bottom"

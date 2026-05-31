@@ -238,7 +238,7 @@ export type StoreItem = {
   image_url: string | null
   credit_price: number
   item_type: 'digital' | 'real'
-  category: 'food' | 'toy' | 'activity' | 'digital' | 'experience' | null
+  category: 'food' | 'toy' | 'activity' | 'digital' | 'experience' | 'content' | null
   level_required: number
   is_active: boolean
   stock: number | null
@@ -259,6 +259,10 @@ export type PurchaseRequest = {
   requested_at: string
   approved_at: string | null
   delivered_at: string | null
+  /** 구매 수량 — 콘텐츠 이용권 등 (기본 1) */
+  quantity?: number
+  /** 콘텐츠·미니게임 이용권 지급 완료 시각 (중복 지급 방지) */
+  rewards_granted_at?: string | null
 }
 
 export type BadgeRow = {
@@ -326,4 +330,36 @@ export type PublicHoliday = {
   date: string
   name: string
   created_at: string
+}
+
+/** 콘텐츠존 유튜브 채널·플레이리스트 카탈로그 */
+export type ContentChannel = {
+  id: string
+  title: string
+  thumbnail_url: string | null
+  playlist_url: string
+  category: string
+  order_index: number
+  created_at?: string
+}
+
+/** 자녀별 콘텐츠 이용권 보유 수 */
+export type ContentTicket = {
+  id: string
+  child_id: string
+  quantity: number
+  updated_at: string
+}
+
+/** 콘텐츠 30분 시청 세션 */
+export type ContentSession = {
+  id: string
+  child_id: string
+  started_at: string
+  duration_minutes: number
+  is_active: boolean
+  playlist_url: string | null
+  /** 남은 재생 시간(초) — 마이그레이션 106 */
+  remaining_play_seconds?: number | null
+  created_at?: string
 }

@@ -20,6 +20,7 @@
  *   L4. 패널 오버레이 (마켓: 항상 하단 슬라이드 / 꾸미기: 세로는 하단·가로는 우측 / 스티커는 별도 시트)
  */
 
+import dynamic from 'next/dynamic'
 import { Fragment, useRef, useState, useCallback, useMemo, useEffect, memo } from 'react'
 import { flushSync } from 'react-dom'
 import Image from 'next/image'
@@ -39,11 +40,12 @@ import {
 } from '@/lib/childHomeCharacterFromAvatar'
 import { BACKGROUND_ANCHORS } from '@/constants/backgroundAnchors'
 import { ICONS } from '@/constants/sprites'
-import { getUnlockedFeatures } from '@/constants/childScreenFeatures'
+import { getUnlockedFeatures, STICKER_UNLOCK_MIN_LEVEL, CONTENT_ZONE_UNLOCK_MIN_LEVEL } from '@/constants/childScreenFeatures'
 import { usePlantPot } from '@/hooks/usePlantPot'
 import { useContainerSize } from '@/hooks/useContainerSize'
 import ChildMissionCard from '@/components/child/ChildMissionCard'
 import ChildAppTransitionOverlay from '@/components/child/ChildAppTransitionOverlay'
+import { useChildEnterTransition } from '@/components/child/ChildEnterTransitionProvider'
 import ChildPanelOverlay, { type PanelType } from '@/components/child/ChildPanelOverlay'
 import ChildLevelStatsCard from '@/components/child/ChildLevelStatsCard'
 import ChildHomePiggyBank from '@/components/child/ChildHomePiggyBank'
@@ -72,6 +74,8 @@ import type {
   PurchaseRequest,
   PraiseStickerGrant,
   PraiseStickerPlacement,
+  ContentChannel,
+  ContentSession,
 } from '@/types/database'
 import { createClient } from '@/lib/supabase/client'
 import { fireMissionCardConfetti } from '@/lib/missionCardConfetti'
@@ -80,6 +84,11 @@ import AllMissionCompleteOverlay from '@/components/child/AllMissionCompleteOver
 import PraiseGiftArrivalModal from '@/components/child/PraiseGiftArrivalModal'
 import ChildAlarmClockPopup from '@/components/child/ChildAlarmClockPopup'
 import ChildMusicPopup from '@/components/child/ChildMusicPopup'
+const ChildContentZonePopup = dynamic(() => import('@/components/child/ChildContentZonePopup'), {
+  ssr: false,
+})
+import { remainingContentSeconds, toYouTubeContentEmbedUrl } from '@/lib/youtubeContent'
+import { CHILD_CONTENT_TREASURE_ICON_URL, isChildContentMenuAvailable } from '@/constants/childContentMenu'
 import PlantPot from '@/components/child/PlantPot'
 import SeedSelectModal from '@/components/child/SeedSelectModal'
 import PlantStageCelebrationModal from '@/components/child/PlantStageCelebrationModal'
@@ -88,6 +97,8 @@ import MorningWakeScreen from '@/components/child/MorningWakeScreen'
 import SleepReadyPopup from '@/components/child/SleepReadyPopup'
 import SchoolTimePopup from '@/components/child/SchoolTimePopup'
 import PiggyBankUnlockFlowModal from '@/components/child/PiggyBankUnlockFlowModal'
+import StickerUnlockFlowModal from '@/components/child/StickerUnlockFlowModal'
+import ContentZoneUnlockFlowModal from '@/components/child/ContentZoneUnlockFlowModal'
 import { readRoutineAlarmPrefs } from '@/lib/routineAlarmLocalPrefs'
 import { resolveRoutineAlarmSoundUrl } from '@/lib/routineAlarmSounds'
 import { installChildRoutineAudioUnlockOnFirstGesture } from '@/lib/childAudio'
@@ -143,6 +154,15 @@ function piggyUnlockSeenStorageKey(childId: string): string {
 }
 function piggyTutorialSkipStorageKey(childId: string): string {
   return `cooanc:piggy-tutorial-skip:${childId}`
+}
+function stickerUnlockSeenStorageKey(childId: string): string {
+  return `cooanc:sticker-unlock-seen:${childId}`
+}
+function stickerTutorialSkipStorageKey(childId: string): string {
+  return `cooanc:sticker-tutorial-skip:${childId}`
+}
+function contentZoneUnlockSeenStorageKey(childId: string): string {
+  return `cooanc:content-zone-unlock-seen:${childId}`
 }
 
 /**
@@ -403,6 +423,15 @@ type Props = {
 
   /** 부모 화면으로 이동하는 href */
   exitHref: string
+
+  /** 콘텐츠존 채널 목록 */
+  contentChannels: ContentChannel[]
+  /** 보유 영상 시청권 수 */
+  initialContentVideoTicketQuantity: number
+  /** 보유 미니게임 이용권 수 */
+  initialMinigameTicketQuantity: number
+  /** 진행 중 시청 세션 (있으면 복구) */
+  initialActiveContentSession: ContentSession | null
 }
 
 // ─── 파티클 서브 컴포넌트 ──────────────────────────────────────────────────
@@ -546,6 +575,10 @@ export default function ChildScreen({
   initialWishlistEntries,
   initialUnlockedItemIndexes,
   exitHref,
+  contentChannels,
+  initialContentVideoTicketQuantity,
+  initialMinigameTicketQuantity,
+  initialActiveContentSession,
 }: Props) {
   /**
    * 효과음 공통 재생기:
@@ -570,6 +603,8 @@ export default function ChildScreen({
 
   /** 크레딧 배지 ref — 동전 파티클이 날아가는 목적지(숫자·아이콘 줄) */
   const creditBadgeRef = useRef<HTMLDivElement>(null)
+  /** 미션 섹션 ref — 콘텐츠 시간 종료 후 스크롤 이동 */
+  const missionSectionRef = useRef<HTMLDivElement>(null)
   /** Mission Complete 하트 5칸 ref — **애정 하트(미션 보상)** 파티클 목적지 */
   const levelHeartsRef = useRef<HTMLDivElement>(null)
   /** 현재 화면에 떠 있는 파티클 목록 */
@@ -579,6 +614,23 @@ export default function ChildScreen({
   const [badgeShine, setBadgeShine] = useState(false)
 
   const router = useRouter()
+  const { endChildEnter } = useChildEnterTransition()
+
+  /** 부모→자녀 진입 오버레이 — 자녀 홈 배경이 한 프레임 그려진 뒤 끕니다 */
+  useEffect(() => {
+    let outer = 0
+    let inner = 0
+    outer = requestAnimationFrame(() => {
+      inner = requestAnimationFrame(() => {
+        endChildEnter()
+      })
+    })
+    return () => {
+      cancelAnimationFrame(outer)
+      cancelAnimationFrame(inner)
+    }
+  }, [endChildEnter])
+
   /**
    * 클라이언트 기준 "서울 오늘 날짜" 키.
    * 서버 props(`today`)가 자정 이후 늦게 갱신되는 틈을 메우기 위해 별도로 유지합니다.
@@ -594,8 +646,8 @@ export default function ChildScreen({
     window.location.reload()
   }, [])
 
-  /** 자녀 홈 최초 진입 시 미션·UI가 순차로 나타나게 합니다 */
-  const [enterReveal, setEnterReveal] = useState(false)
+  /** 자녀 홈 본문 — SSR 직후 바로 보이게 (추가 rAF 대기 없음) */
+  const [enterReveal, setEnterReveal] = useState(true)
 
   /** 나가기 문 — 누르자마자 전환 오버레이를 보여 준 뒤 실제 이동합니다 */
   const [isExiting, setIsExiting] = useState(false)
@@ -917,47 +969,6 @@ export default function ChildScreen({
   useEffect(() => {
     installChildRoutineAudioUnlockOnFirstGesture()
   }, [])
-
-  /** 이전 디버그 빌드에서 남은 좌상단 오버레이가 있으면 제거합니다 */
-  useEffect(() => {
-    document.getElementById('cooanc-debug-box')?.remove()
-  }, [])
-
-  /** 로딩 오버레이 뒤 본문(미션 카드 등)이 순차로 페이드인 됩니다 */
-  useEffect(() => {
-    const frame = requestAnimationFrame(() => setEnterReveal(true))
-    return () => cancelAnimationFrame(frame)
-  }, [])
-
-  /** 자녀 홈 진입 시 서버 `today`와 미션 행 수를 기록 — 자정 리셋 동작 확인용 */
-  useEffect(() => {
-    const missionDates = dailyMissions.map((dm) => {
-      const raw = dm.date
-      if (typeof raw === 'string') return raw.slice(0, 10)
-      return String(raw ?? '')
-    })
-    // #region agent log
-    fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '65823a' },
-      body: JSON.stringify({
-        sessionId: '65823a',
-        location: 'ChildScreen.tsx:mount-mission-day',
-        message: 'child home mission day snapshot',
-        data: {
-          serverToday: today,
-          clientSeoulDayKey: seoulDayKey,
-          datesMatch: today === seoulDayKey,
-          missionCount: dailyMissions.length,
-          uniqueMissionDates: [...new Set(missionDates)],
-          incompleteCount: dailyMissions.filter((dm) => !dm.is_completed).length,
-        },
-        hypothesisId: 'midnight-reset',
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {})
-    // #endregion
-  }, [dailyMissions, seoulDayKey, today])
 
   useEffect(() => {
     /** 서버 배열로 목록을 맞추되, 방금 완료 요청을 보낸 행(`optimisticDailyMissionCompleteIdsRef`)은 서버가 아직 `is_completed=false` 인 한 `done` 에 남깁니다. */
@@ -1772,6 +1783,63 @@ export default function ChildScreen({
   // ── 패널 상태 ──────────────────────────────────────────────────────────────
 
   const [activePanel, setActivePanel] = useState<PanelType>(null)
+  const [marketInitialScrollSection, setMarketInitialScrollSection] = useState<
+    import('@/lib/parentMarketMenuSections').ParentMarketSectionId | null
+  >(null)
+  const [contentZoneOpen, setContentZoneOpen] = useState(false)
+  const [videoTicketQty, setVideoTicketQty] = useState(initialContentVideoTicketQuantity)
+  const [minigameTicketQty, setMinigameTicketQty] = useState(initialMinigameTicketQuantity)
+
+  useEffect(() => {
+    setVideoTicketQty(initialContentVideoTicketQuantity)
+  }, [initialContentVideoTicketQuantity])
+
+  useEffect(() => {
+    setMinigameTicketQty(initialMinigameTicketQuantity)
+  }, [initialMinigameTicketQuantity])
+
+  const minigameContentAvailable = isChildContentMenuAvailable('minigame')
+  const totalContentTicketQty =
+    videoTicketQty + (minigameContentAvailable ? minigameTicketQty : 0)
+
+  const refreshContentTicketBalances = useCallback(async () => {
+    try {
+      const res = await fetch(
+        `/api/content/ticket-balances?childId=${encodeURIComponent(childId)}`,
+        { credentials: 'same-origin' },
+      )
+      if (!res.ok) return
+      const json = (await res.json()) as { videoQuantity?: number; minigameQuantity?: number }
+      if (typeof json.videoQuantity === 'number') setVideoTicketQty(json.videoQuantity)
+      if (typeof json.minigameQuantity === 'number') setMinigameTicketQty(json.minigameQuantity)
+    } catch {
+      /* 네트워크 실패 시 기존 표시 유지 */
+    }
+  }, [childId])
+
+  const openContentZone = useCallback(() => {
+    void refreshContentTicketBalances()
+    setContentZoneOpen(true)
+  }, [refreshContentTicketBalances])
+
+  const openMarketToContent = useCallback(() => {
+    setMarketInitialScrollSection('content')
+    setActivePanel('market')
+  }, [])
+
+  const handlePanelClose = useCallback(() => {
+    setActivePanel(null)
+    setMarketInitialScrollSection(null)
+  }, [])
+
+  const handleMarketInitialScrollDone = useCallback(() => {
+    setMarketInitialScrollSection(null)
+  }, [])
+
+  const handleContentTicketBalancesChange = useCallback((video: number, minigame: number) => {
+    setVideoTicketQty(video)
+    setMinigameTicketQty(minigame)
+  }, [])
 
   const openBearFromGift = useCallback(() => {
     setActivePanel('sticker')
@@ -1784,6 +1852,23 @@ export default function ChildScreen({
     () => getUnlockedFeatures(stats?.current_level ?? 0, ageYears),
     [stats?.current_level, ageYears],
   )
+
+  /** 진행 중 시청 세션이 있으면 콘텐츠존을 자동으로 엽니다 (보물상자 해금 후) */
+  useEffect(() => {
+    if (!features.contentZone) return
+    if (!initialActiveContentSession?.playlist_url) return
+    const rem =
+      initialActiveContentSession.remaining_play_seconds != null &&
+      initialActiveContentSession.remaining_play_seconds > 0
+        ? initialActiveContentSession.remaining_play_seconds
+        : remainingContentSeconds(
+            initialActiveContentSession.started_at,
+            initialActiveContentSession.duration_minutes,
+          )
+    if (rem > 0 && toYouTubeContentEmbedUrl(initialActiveContentSession.playlist_url)) {
+      setContentZoneOpen(true)
+    }
+  }, [initialActiveContentSession, openContentZone, features.contentZone])
 
   // ── 캐릭터 스프라이트 ─────────────────────────────────────────────────────
 
@@ -1902,6 +1987,19 @@ export default function ChildScreen({
   const piggyUnlockSeenRef = useRef(false)
   const piggyTutorialSkipRef = useRef(false)
   const piggyBootstrapDoneRef = useRef(false)
+  /** 스티커 아이콘(레벨 1) 해금 축하 모달 */
+  const [stickerUnlockFlowOpen, setStickerUnlockFlowOpen] = useState(false)
+  const stickerUnlockSeenRef = useRef(false)
+  const stickerTutorialSkipRef = useRef(false)
+  const stickerBootstrapDoneRef = useRef(false)
+  /** 레벨 0→5 등 한 번에 여러 기능이 풀릴 때 저금통 팝업을 스티커 뒤로 미룹니다 */
+  const pendingPiggyUnlockAfterStickerRef = useRef(false)
+  /** 스티커·저금통 축하 뒤 보물상자 팝업을 미룹니다 */
+  const pendingContentZoneUnlockRef = useRef(false)
+  /** 보물상자(레벨 8) 해금 축하 모달 */
+  const [contentZoneUnlockFlowOpen, setContentZoneUnlockFlowOpen] = useState(false)
+  const contentZoneUnlockSeenRef = useRef(false)
+  const contentZoneBootstrapDoneRef = useRef(false)
   const prevLevelRef = useRef(stats?.current_level ?? 0)
 
   /**
@@ -1933,25 +2031,127 @@ export default function ChildScreen({
   }, [childId, piggyUnlockLevel, stats?.current_level])
 
   /**
-   * 레벨업 직후 해금 조건 체크:
-   * - 이전 레벨 < 5 && 현재 레벨 >= 5 인 "교차 순간"에만 해금 연출을 띄웁니다.
+   * 레벨업 직후 기능 해금(스티커·저금통) — 교차 순간에만 축하 팝업
    */
   useEffect(() => {
     if (typeof window === 'undefined') return
-    if (!piggyBootstrapDoneRef.current) return
+    if (!piggyBootstrapDoneRef.current || !stickerBootstrapDoneRef.current || !contentZoneBootstrapDoneRef.current) return
     const currentLevel = stats?.current_level ?? 0
     const previousLevel = prevLevelRef.current
-    if (
+
+    const stickerCross =
+      previousLevel < STICKER_UNLOCK_MIN_LEVEL &&
+      currentLevel >= STICKER_UNLOCK_MIN_LEVEL &&
+      !stickerUnlockSeenRef.current
+
+    const piggyCross =
       previousLevel < piggyUnlockLevel &&
       currentLevel >= piggyUnlockLevel &&
       !piggyUnlockSeenRef.current
-    ) {
+
+    const contentZoneCross =
+      previousLevel < CONTENT_ZONE_UNLOCK_MIN_LEVEL &&
+      currentLevel >= CONTENT_ZONE_UNLOCK_MIN_LEVEL &&
+      !contentZoneUnlockSeenRef.current
+
+    if (stickerCross) {
+      stickerUnlockSeenRef.current = true
+      window.localStorage.setItem(stickerUnlockSeenStorageKey(childId), '1')
+      setStickerUnlockFlowOpen(true)
+    }
+
+    if (piggyCross) {
       piggyUnlockSeenRef.current = true
       window.localStorage.setItem(piggyUnlockSeenStorageKey(childId), '1')
-      setPiggyUnlockFlowOpen(true)
+      if (stickerCross) {
+        pendingPiggyUnlockAfterStickerRef.current = true
+      } else {
+        setPiggyUnlockFlowOpen(true)
+      }
     }
+
+    if (contentZoneCross) {
+      contentZoneUnlockSeenRef.current = true
+      window.localStorage.setItem(contentZoneUnlockSeenStorageKey(childId), '1')
+      if (stickerCross || piggyCross) {
+        pendingContentZoneUnlockRef.current = true
+      } else {
+        setContentZoneUnlockFlowOpen(true)
+      }
+    }
+
     prevLevelRef.current = currentLevel
   }, [childId, piggyUnlockLevel, stats?.current_level])
+
+  /**
+   * 스티커 아이콘 해금(레벨 1) — 기존 사용자 bootstrap
+   */
+  useEffect(() => {
+    stickerBootstrapDoneRef.current = false
+  }, [childId])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    if (stickerBootstrapDoneRef.current) return
+    const currentLevel = stats?.current_level
+    if (typeof currentLevel !== 'number') return
+    const seenKey = stickerUnlockSeenStorageKey(childId)
+    const skipKey = stickerTutorialSkipStorageKey(childId)
+    const seen = window.localStorage.getItem(seenKey) === '1'
+    const skipped = window.localStorage.getItem(skipKey) === '1'
+    stickerUnlockSeenRef.current = seen
+    stickerTutorialSkipRef.current = skipped
+    stickerBootstrapDoneRef.current = true
+
+    if (currentLevel >= STICKER_UNLOCK_MIN_LEVEL && !seen) {
+      window.localStorage.setItem(seenKey, '1')
+      stickerUnlockSeenRef.current = true
+    }
+  }, [childId, stats?.current_level])
+
+  /**
+   * 보물상자(레벨 8) — 기존 사용자 bootstrap
+   */
+  useEffect(() => {
+    contentZoneBootstrapDoneRef.current = false
+  }, [childId])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    if (contentZoneBootstrapDoneRef.current) return
+    const currentLevel = stats?.current_level
+    if (typeof currentLevel !== 'number') return
+    const seenKey = contentZoneUnlockSeenStorageKey(childId)
+    const seen = window.localStorage.getItem(seenKey) === '1'
+    contentZoneUnlockSeenRef.current = seen
+    contentZoneBootstrapDoneRef.current = true
+
+    if (currentLevel >= CONTENT_ZONE_UNLOCK_MIN_LEVEL && !seen) {
+      window.localStorage.setItem(seenKey, '1')
+      contentZoneUnlockSeenRef.current = true
+    }
+  }, [childId, stats?.current_level])
+
+  const closeStickerUnlockFlow = useCallback(() => {
+    setStickerUnlockFlowOpen(false)
+    if (pendingPiggyUnlockAfterStickerRef.current) {
+      pendingPiggyUnlockAfterStickerRef.current = false
+      setPiggyUnlockFlowOpen(true)
+      return
+    }
+    if (pendingContentZoneUnlockRef.current) {
+      pendingContentZoneUnlockRef.current = false
+      setContentZoneUnlockFlowOpen(true)
+    }
+  }, [])
+
+  const closePiggyUnlockFlow = useCallback(() => {
+    setPiggyUnlockFlowOpen(false)
+    if (pendingContentZoneUnlockRef.current) {
+      pendingContentZoneUnlockRef.current = false
+      setContentZoneUnlockFlowOpen(true)
+    }
+  }, [])
 
   /** 저금통 팝업에서 지갑·저금 잔액만 반영합니다. */
   const patchWalletPiggyFromHome = useCallback((p: { credits_wallet: number; credits_piggy: number }) => {
@@ -1960,7 +2160,9 @@ export default function ChildScreen({
 
   return (
     <>
-      {isExiting ? <ChildAppTransitionOverlay statusMessage={exitStatusMessage} /> : null}
+      {isExiting ? (
+        <ChildAppTransitionOverlay statusMessage={exitStatusMessage} background="parent" />
+      ) : null}
       {/**
        * 전체 화면 컨테이너 — fixed inset-0 로 ChildNavBar(z-50), 레이아웃 나가기 버튼(z-50) 위에 올립니다.
        * 비개발자 설명: 이 화면이 기존 탭 바를 완전히 가리고 단일 화면으로 동작합니다.
@@ -2147,6 +2349,34 @@ export default function ChildScreen({
                     />
                   </button>
                 )}
+                {features.contentZone && (
+                  <button
+                    type="button"
+                    onClick={openContentZone}
+                    className={`${CHILD_HOME_EXIT_STICKER_CART_GLASS_CLASS} relative border-0 bg-transparent p-0 transition active:scale-95`}
+                    style={CHILD_HOME_TOP_BAR_GLASS_STYLE}
+                    aria-label={
+                      minigameContentAvailable
+                        ? `보물상자 열기, 영상 이용권 ${videoTicketQty}개, 미니게임 이용권 ${minigameTicketQty}개`
+                        : `보물상자 열기, 영상 이용권 ${videoTicketQty}개`
+                    }
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={CHILD_CONTENT_TREASURE_ICON_URL}
+                      alt=""
+                      width={32}
+                      height={32}
+                      className="h-8 w-8 object-contain drop-shadow-md"
+                      draggable={false}
+                    />
+                    {totalContentTicketQty > 0 ? (
+                      <span className="absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-black text-white ring-2 ring-white">
+                        {totalContentTicketQty > 99 ? '99+' : totalContentTicketQty}
+                      </span>
+                    ) : null}
+                  </button>
+                )}
                 {features.market && (
                   <button
                     type="button"
@@ -2284,6 +2514,7 @@ export default function ChildScreen({
            * `overflow-y-auto` 로 이 구역 안에서만 위아래로 살짝 움직이게 해 잘림을 막습니다.
            */}
           <div
+            ref={missionSectionRef}
             className="pointer-events-auto relative flex max-h-[45vh] min-h-0 flex-col overflow-x-hidden overflow-y-auto overscroll-y-contain"
             style={{ paddingBottom: 'max(20px, env(safe-area-inset-bottom))' }}
           >
@@ -2301,7 +2532,7 @@ export default function ChildScreen({
               className={`mb-2 flex shrink-0 items-center justify-between gap-2 px-5 transition-all duration-500 ease-out min-[400px]:px-6 ${
                 enterReveal ? 'translate-y-0 opacity-100' : 'translate-y-2 opacity-0'
               }`}
-              style={{ transitionDelay: '80ms' }}
+              style={{ transitionDelay: '50ms' }}
             >
               <p className="min-w-0 text-[clamp(0.875rem,calc(0.8rem+0.2vw),1.125rem)] font-black text-white drop-shadow">
                 오늘의 미션
@@ -2390,7 +2621,7 @@ export default function ChildScreen({
                   const showMorningAfternoonDivider =
                     prev != null && !isAfternoonMission(prev) && isAfternoonMission(mission)
 
-                  const revealDelayMs = Math.min(idx, 8) * 70 + 140
+                  const revealDelayMs = Math.min(idx, 6) * 45 + 60
 
                   return (
                     <Fragment key={mission.id}>
@@ -2433,7 +2664,7 @@ export default function ChildScreen({
       {/* ── L5: 패널 오버레이 ─────────────────────────────────────────────── */}
       <ChildPanelOverlay
         active={activePanel}
-        onClose={() => setActivePanel(null)}
+        onClose={handlePanelClose}
         childId={childId}
         features={features}
         marketEligibleItems={marketEligibleItems}
@@ -2442,6 +2673,8 @@ export default function ChildScreen({
         initialWishlistEntries={initialWishlistEntries}
         creditsTotal={totalCredits}
         level={stats?.current_level ?? 0}
+        marketInitialScrollSection={marketInitialScrollSection}
+        onMarketInitialScrollDone={handleMarketInitialScrollDone}
         unlockedItemIndexes={initialUnlockedItemIndexes}
         praiseGrants={grants}
         praisePlacements={placements}
@@ -2491,13 +2724,30 @@ export default function ChildScreen({
 
       <PiggyBankUnlockFlowModal
         open={piggyUnlockFlowOpen}
-        onClose={() => setPiggyUnlockFlowOpen(false)}
+        onClose={closePiggyUnlockFlow}
         onSkipTutorial={() => {
           piggyTutorialSkipRef.current = true
           if (typeof window !== 'undefined') {
             window.localStorage.setItem(piggyTutorialSkipStorageKey(childId), '1')
           }
         }}
+      />
+
+      <StickerUnlockFlowModal
+        open={stickerUnlockFlowOpen}
+        onClose={closeStickerUnlockFlow}
+        onSkipTutorial={() => {
+          stickerTutorialSkipRef.current = true
+          if (typeof window !== 'undefined') {
+            window.localStorage.setItem(stickerTutorialSkipStorageKey(childId), '1')
+          }
+        }}
+      />
+
+      <ContentZoneUnlockFlowModal
+        open={contentZoneUnlockFlowOpen}
+        onClose={() => setContentZoneUnlockFlowOpen(false)}
+        onGoToMarketContent={openMarketToContent}
       />
 
       {showSchoolTime && !isSleeping && !showMorningWake ? (
@@ -2546,6 +2796,19 @@ export default function ChildScreen({
        */}
       <ChildAlarmClockPopup open={clockPopupOpen} onClose={() => setClockPopupOpen(false)} />
       <ChildMusicPopup open={musicPopupOpen} onClose={() => setMusicPopupOpen(false)} />
+      <ChildContentZonePopup
+        open={contentZoneOpen}
+        onClose={() => setContentZoneOpen(false)}
+        childId={childId}
+        channels={contentChannels}
+        initialVideoTicketQuantity={videoTicketQty}
+        initialMinigameTicketQuantity={minigameTicketQty}
+        initialActiveSession={initialActiveContentSession}
+        onTicketBalancesChange={handleContentTicketBalancesChange}
+        onGoToMissions={() => {
+          missionSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+        }}
+      />
     </>
   )
 }

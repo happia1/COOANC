@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { grantMarketContentRewardsForPurchaseOnce, isQuantityPurchasableMarketItem } from '@/lib/contentTickets'
 
 /**
  * POST /api/market/approve
@@ -44,7 +45,7 @@ export async function POST(req: NextRequest) {
 
   const { data: request } = await supabase
     .from('purchase_requests')
-    .select('id, child_id, status')
+    .select('id, child_id, status, item_name, quantity, rewards_granted_at')
     .eq('id', requestId)
     .maybeSingle()
 
@@ -128,5 +129,27 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: '이미 처리됐거나 대기 상태가 아니에요' }, { status: 409 })
   }
 
-  return NextResponse.json({ status: 'delivered' })
+  const purchaseQty = typeof request.quantity === 'number' ? request.quantity : 1
+  const grantedQty = await grantMarketContentRewardsForPurchaseOnce(supabase, {
+    id: request.id as string,
+    child_id: childId,
+    item_name: request.item_name as string,
+    quantity: purchaseQty,
+    rewards_granted_at: request.rewards_granted_at as string | null | undefined,
+  })
+
+  const isContentRewardItem = isQuantityPurchasableMarketItem(request.item_name as string)
+  if (isContentRewardItem && grantedQty == null) {
+    console.error('[market/approve] content ticket grant failed', {
+      requestId,
+      childId,
+      itemName: request.item_name,
+      quantity: purchaseQty,
+    })
+  }
+
+  return NextResponse.json({
+    status: 'delivered',
+    contentRewardGranted: isContentRewardItem ? grantedQty != null : undefined,
+  })
 }

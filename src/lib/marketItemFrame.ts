@@ -1,4 +1,6 @@
 import type { MarketItemImageKey } from '@/constants/marketItemImages'
+import { marketFrameKeyForItemName } from '@/constants/marketItemImages'
+import { canonicalSnackCatalogName } from '@/constants/betaMarketConfig'
 
 /**
  * 상품 UUID(또는 이름)로 골라 쓰는 마켓 기본 그림 키 타입입니다.
@@ -41,6 +43,9 @@ const ITEM_FRAMES: MarketItemImageKey[] = [
  * - DB에 그림 필드가 없어도 카드·승인 카드에서 같은 상품은 같은 일러스트를 씁니다.
  */
 export function marketFrameKeyForItemId(itemId: string | null, itemName: string): MarketItemFrameKey {
+  const fromName = marketFrameKeyForItemName(canonicalSnackCatalogName(itemName))
+  if (fromName) return fromName
+
   const key = (itemId ?? itemName).trim() || 'default'
   let h = 0
   for (let i = 0; i < key.length; i++) {

@@ -13,9 +13,9 @@ import { useCallback, useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { piggyBankVisualFrameIndexFromSavedCredits, piggyBankVisualUrlFromSavedCredits } from '@/lib/piggyBankHomeStage'
 
-/** 사용자 제공 효과음 경로 — 파일을 `public` 아래에 두면 재생됩니다. */
+/** 저금통 팝업에서 동전 1개 저금할 때 재생하는 효과음 */
 export const CHILD_PIGGY_DEPOSIT_SOUND_SRC =
-  '/assets/audio/missions/success_reward-fairy-arcade-sparkle-866.wav' as const
+  `/assets/audio/effects/${encodeURIComponent('ElevenLabs_귀여운_동전_떨어지는_소리_효과.mp3')}` as const
 /** 저금통 PNG 단계가 올라갈 때(14단계 중 다음 그림으로 넘어갈 때) 재생할 효과음 */
 export const CHILD_PIGGY_STAGE_UP_SOUND_SRC =
   '/assets/audio/effects/level_up-magic-festive-melody-2986.wav' as const
