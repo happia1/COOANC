@@ -44,8 +44,9 @@ import { getUnlockedFeatures, STICKER_UNLOCK_MIN_LEVEL, CONTENT_ZONE_UNLOCK_MIN_
 import { usePlantPot } from '@/hooks/usePlantPot'
 import { useContainerSize } from '@/hooks/useContainerSize'
 import ChildMissionCard from '@/components/child/ChildMissionCard'
-import ChildAppTransitionOverlay from '@/components/child/ChildAppTransitionOverlay'
 import { useChildEnterTransition } from '@/components/child/ChildEnterTransitionProvider'
+import { parseJsonFromResponse } from '@/lib/parseJsonResponse'
+import { PARENT_EXIT_CHILD_UI_JSON_HREF } from '@/lib/parentExitChildUi'
 import ChildPanelOverlay, { type PanelType } from '@/components/child/ChildPanelOverlay'
 import ChildLevelStatsCard from '@/components/child/ChildLevelStatsCard'
 import ChildHomePiggyBank from '@/components/child/ChildHomePiggyBank'
@@ -614,10 +615,11 @@ export default function ChildScreen({
   const [badgeShine, setBadgeShine] = useState(false)
 
   const router = useRouter()
-  const { endChildEnter } = useChildEnterTransition()
+  const { childEnterActive, endChildEnter, beginParentExit } = useChildEnterTransition()
 
   /** 부모→자녀 진입 오버레이 — 자녀 홈 배경이 한 프레임 그려진 뒤 끕니다 */
   useEffect(() => {
+    if (!childEnterActive) return
     let outer = 0
     let inner = 0
     outer = requestAnimationFrame(() => {
@@ -629,7 +631,7 @@ export default function ChildScreen({
       cancelAnimationFrame(outer)
       cancelAnimationFrame(inner)
     }
-  }, [endChildEnter])
+  }, [childEnterActive, endChildEnter])
 
   /**
    * 클라이언트 기준 "서울 오늘 날짜" 키.
@@ -649,16 +651,29 @@ export default function ChildScreen({
   /** 자녀 홈 본문 — SSR 직후 바로 보이게 (추가 rAF 대기 없음) */
   const [enterReveal, setEnterReveal] = useState(true)
 
-  /** 나가기 문 — 누르자마자 전환 오버레이를 보여 준 뒤 실제 이동합니다 */
+  /** 나가기 — 전역 오버레이 + 클라이언트 라우팅(전체 새로고침 없음) */
   const [isExiting, setIsExiting] = useState(false)
-  const exitStatusMessage = exitHref.includes('exit-child-ui')
-    ? '부모 화면으로 이동 중…'
-    : '화면을 전환하는 중…'
-  const handleExitClick = useCallback(() => {
+  const handleExitClick = useCallback(async () => {
     if (isExiting) return
-    flushSync(() => setIsExiting(true))
-    window.location.assign(exitHref)
-  }, [exitHref, isExiting])
+    const isParentPreviewExit = exitHref.includes('exit-child-ui')
+    flushSync(() => {
+      setIsExiting(true)
+      beginParentExit()
+    })
+    try {
+      if (isParentPreviewExit) {
+        const res = await fetch(PARENT_EXIT_CHILD_UI_JSON_HREF, { credentials: 'include' })
+        const { data, parseError } = await parseJsonFromResponse<{ ok?: boolean; redirectTo?: string }>(res)
+        if (!res.ok || parseError || !data?.ok) throw new Error('exit-child-ui failed')
+        router.push(data.redirectTo ?? '/parent/home')
+      } else {
+        router.push(exitHref)
+      }
+    } catch {
+      setIsExiting(false)
+      window.location.assign(exitHref)
+    }
+  }, [beginParentExit, exitHref, isExiting, router])
 
   // ── 통계(크레딧/하트) ──────────────────────────────────────────────────────
 
@@ -2160,9 +2175,6 @@ export default function ChildScreen({
 
   return (
     <>
-      {isExiting ? (
-        <ChildAppTransitionOverlay statusMessage={exitStatusMessage} background="parent" />
-      ) : null}
       {/**
        * 전체 화면 컨테이너 — fixed inset-0 로 ChildNavBar(z-50), 레이아웃 나가기 버튼(z-50) 위에 올립니다.
        * 비개발자 설명: 이 화면이 기존 탭 바를 완전히 가리고 단일 화면으로 동작합니다.

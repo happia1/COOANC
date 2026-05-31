@@ -27,7 +27,7 @@ import {
   templatePoolForMissionDay,
   type MissionDayRoutineType,
 } from '@/lib/missionDayTemplatePool'
-import ChildScreen from '@/components/child/ChildScreen'
+import ChildHomeScreenClient from '@/components/child/ChildHomeScreenClient'
 import type {
   ChildStats,
   DailyMissionWithTemplate,
@@ -381,7 +381,7 @@ export default async function ChildHomePage() {
    */
 
   return (
-    <ChildScreen
+    <ChildHomeScreenClient
       childId={childId}
       childName={childName}
       ageYears={ageYears}

@@ -18,25 +18,6 @@ export async function GET() {
 
     const plan = await resolvePostLoginRedirectForUser(supabase, user)
 
-    // #region agent log
-    fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '65823a' },
-      body: JSON.stringify({
-        sessionId: '65823a',
-        location: 'post-login-redirect/route.ts:GET',
-        message: 'post-login redirect plan',
-        data: {
-          authenticated: plan.authenticated,
-          role: plan.authenticated ? plan.role : null,
-          kind: plan.authenticated && plan.role === 'parent' ? plan.kind : null,
-        },
-        hypothesisId: 'auto-login-hops',
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {})
-    // #endregion
-
     return NextResponse.json(plan)
   } catch (error) {
     console.error('[api/auth/post-login-redirect]', error)

@@ -10,6 +10,7 @@ import ParentNewPurchaseRequestModal from '@/components/parent/ParentNewPurchase
 import ParentStickerBoardCompleteModal from '@/components/parent/ParentStickerBoardCompleteModal'
 import ParentSettingsSheet from '@/components/parent/ParentSettingsSheet'
 import ParentSettingsDeepLink from '@/components/parent/ParentSettingsDeepLink'
+import ParentExitTransitionEnd from '@/components/parent/ParentExitTransitionEnd'
 import ParentNoticePopup from '@/components/parent/ParentNoticePopup'
 
 type Props = {
@@ -49,6 +50,7 @@ export default function ParentAppChrome({ pendingApprovalCount, children }: Prop
 
   return (
     <div className="flex h-screen flex-col bg-gradient-to-b from-sky-50 via-white to-blue-50">
+      <ParentExitTransitionEnd />
       <Suspense fallback={null}>
         <ParentSettingsDeepLink onOpenSettings={openSettings} />
       </Suspense>

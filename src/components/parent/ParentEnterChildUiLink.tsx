@@ -32,14 +32,14 @@ export default function ParentEnterChildUiLink({
   children,
 }: Props) {
   const router = useRouter()
-  const { active, beginChildEnter, endChildEnter } = useChildEnterTransition()
+  const { childEnterActive, beginChildEnter, endChildEnter } = useChildEnterTransition()
   const [entering, setEntering] = useState(false)
   const href = parentEnterChildUiHref(childId)
 
   const handleClick = useCallback(
     async (event: MouseEvent<HTMLAnchorElement>) => {
       event.preventDefault()
-      if (entering || active) return
+      if (entering || childEnterActive) return
 
       flushSync(() => {
         setEntering(true)
@@ -60,7 +60,7 @@ export default function ParentEnterChildUiLink({
         window.location.assign(href)
       }
     },
-    [active, beginChildEnter, childId, endChildEnter, entering, href, onClick, router],
+    [childEnterActive, beginChildEnter, childId, endChildEnter, entering, href, onClick, router],
   )
 
   return (
@@ -70,7 +70,7 @@ export default function ParentEnterChildUiLink({
       className={className}
       aria-label={ariaLabel}
       onClick={handleClick}
-      aria-busy={entering || active}
+      aria-busy={entering || childEnterActive}
     >
       {children}
     </Link>

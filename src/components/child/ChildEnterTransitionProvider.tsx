@@ -1,81 +1,83 @@
 'use client'
 
 /**
- * 부모 → 자녀 진입 시 화면 전체를 덮는 오버레이 상태입니다.
- * 루트 레이아웃에 두어 라우트가 바뀌어도 깜빡임 없이 유지됩니다.
+ * 부모↔자녀 화면 전환 시 루트에 유지되는 오버레이 상태입니다.
+ * 라우트가 바뀌어도 깜빡임 없이 한 장의 로딩 화면만 보여 줍니다.
  */
 
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react'
 import ChildAppTransitionOverlay from '@/components/child/ChildAppTransitionOverlay'
 
+type OverlayMode = 'child-enter' | 'parent-exit' | null
+
 type Ctx = {
-  active: boolean
+  childEnterActive: boolean
+  parentExitActive: boolean
   beginChildEnter: () => void
   endChildEnter: () => void
+  beginParentExit: () => void
+  endParentExit: () => void
 }
 
-const ChildEnterTransitionContext = createContext<Ctx | null>(null)
+const noop = () => {}
 
-const ENTER_STATUS_MESSAGE = '자녀 화면을 불러오는 중…'
+const fallbackCtx: Ctx = {
+  childEnterActive: false,
+  parentExitActive: false,
+  beginChildEnter: noop,
+  endChildEnter: noop,
+  beginParentExit: noop,
+  endParentExit: noop,
+}
+
+const AppTransitionContext = createContext<Ctx | null>(null)
+
+const CHILD_ENTER_MESSAGE = '자녀 화면을 불러오는 중…'
+const PARENT_EXIT_MESSAGE = '부모 화면으로 이동 중…'
 
 export function ChildEnterTransitionProvider({ children }: { children: ReactNode }) {
-  const [active, setActive] = useState(false)
+  const [overlay, setOverlay] = useState<OverlayMode>(null)
 
-  const beginChildEnter = useCallback(() => {
-    setActive(true)
-    // #region agent log
-    fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '65823a' },
-      body: JSON.stringify({
-        sessionId: '65823a',
-        location: 'ChildEnterTransitionProvider:begin',
-        message: 'child enter overlay on',
-        data: {},
-        hypothesisId: 'parent-child-flicker',
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {})
-    // #endregion
-  }, [])
-
-  const endChildEnter = useCallback(() => {
-    setActive(false)
-    // #region agent log
-    fetch('http://127.0.0.1:7447/ingest/9dd0682d-d3af-41fb-8d82-be18fff89b7a', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '65823a' },
-      body: JSON.stringify({
-        sessionId: '65823a',
-        location: 'ChildEnterTransitionProvider:end',
-        message: 'child enter overlay off',
-        data: {},
-        hypothesisId: 'parent-child-flicker',
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {})
-    // #endregion
-  }, [])
+  const beginChildEnter = useCallback(() => setOverlay('child-enter'), [])
+  const endChildEnter = useCallback(
+    () => setOverlay((prev) => (prev === 'child-enter' ? null : prev)),
+    [],
+  )
+  const beginParentExit = useCallback(() => setOverlay('parent-exit'), [])
+  const endParentExit = useCallback(
+    () => setOverlay((prev) => (prev === 'parent-exit' ? null : prev)),
+    [],
+  )
 
   const value = useMemo(
-    () => ({ active, beginChildEnter, endChildEnter }),
-    [active, beginChildEnter, endChildEnter],
+    (): Ctx => ({
+      childEnterActive: overlay === 'child-enter',
+      parentExitActive: overlay === 'parent-exit',
+      beginChildEnter,
+      endChildEnter,
+      beginParentExit,
+      endParentExit,
+    }),
+    [overlay, beginChildEnter, endChildEnter, beginParentExit, endParentExit],
   )
 
   return (
-    <ChildEnterTransitionContext.Provider value={value}>
-      {active ? (
-        <ChildAppTransitionOverlay statusMessage={ENTER_STATUS_MESSAGE} background="child" />
+    <AppTransitionContext.Provider value={value}>
+      {overlay === 'child-enter' ? (
+        <ChildAppTransitionOverlay statusMessage={CHILD_ENTER_MESSAGE} background="child" />
+      ) : null}
+      {overlay === 'parent-exit' ? (
+        <ChildAppTransitionOverlay statusMessage={PARENT_EXIT_MESSAGE} background="parent" />
       ) : null}
       {children}
-    </ChildEnterTransitionContext.Provider>
+    </AppTransitionContext.Provider>
   )
 }
 
+/** Provider 밖·HMR 중에도 throw 하지 않습니다 */
 export function useChildEnterTransition(): Ctx {
-  const ctx = useContext(ChildEnterTransitionContext)
-  if (!ctx) {
-    throw new Error('useChildEnterTransition must be used within ChildEnterTransitionProvider')
-  }
-  return ctx
+  return useContext(AppTransitionContext) ?? fallbackCtx
 }
+
+/** @deprecated 이름 호환 — `useChildEnterTransition` 과 동일 */
+export const useAppTransition = useChildEnterTransition

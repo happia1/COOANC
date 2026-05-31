@@ -1,21 +1,15 @@
-'use client'
-
 /**
- * 자녀 앱 전환 로딩 UI — 부모→자녀 진입 중에는 루트 전역 오버레이가 이미 덮고 있으므로
- * 중복 스켈레톤을 그리지 않습니다.
+ * 자녀 앱(`(child)` 세그먼트, 주로 `/home`) 전환 시 잠깐 보이는 로딩 UI 입니다.
+ *
+ * 비개발자 설명:
+ * - 부모→자녀 진입 중에는 루트 `ChildEnterTransitionProvider` 오버레이(z-200)가 위를 덮습니다.
+ * - 이 스켈레톤은 직접 `/home` 접속 등 다른 경로용입니다.
  */
 
 import TabTransitionSkeleton from '@/components/ui/TabTransitionSkeleton'
 import { ASSETS, CHILD_HOME_BACKGROUND_CACHE_BUST } from '@/constants/assets'
-import { useChildEnterTransition } from '@/components/child/ChildEnterTransitionProvider'
 
 export default function ChildSegmentLoading() {
-  const { active } = useChildEnterTransition()
-
-  if (active) {
-    return null
-  }
-
   const childBgSrc = `${ASSETS.layouts.childHomeBackgroundSecondScreen}?v=${CHILD_HOME_BACKGROUND_CACHE_BUST}`
 
   return (
