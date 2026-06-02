@@ -1,48 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { resolveApiActorChildId } from '@/lib/resolveApiActorChildId'
-import { creditsFloating, readChildStatInt } from '@/lib/childCreditsSplit'
+import { readChildStatInt } from '@/lib/childCreditsSplit'
 import { fireGameTrigger } from '@/lib/gameLayer/fireGameTrigger'
-import { usesSingleBucket, ageYearsFromProfileRow } from '@/constants/childAgeConfig'
+import { isPiggyBankUnlocked } from '@/constants/childAgeConfig'
 
 /**
  * POST /api/child/credits/transfer
  * body: { kind, amount, childId? }
- * - kind: 지갑·저금통·가용(돈바구니) 사이 이동. 총 credits 는 변하지 않습니다.
+ *
+ * - `credits_to_piggy`: 레벨 블록 가용 크레딧(`credits`) → 저금통(`credits_piggy`)으로 옮깁니다.
+ * - `piggy_to_credits`: 저금통(`credits_piggy`) → 가용 크레딧(`credits`)으로 옮깁니다.
  */
-const KINDS = [
-  'float_to_wallet',
-  'float_to_piggy',
-  'wallet_to_float',
-  'piggy_to_float',
-  'wallet_to_piggy',
-  'piggy_to_wallet',
-] as const
+const KINDS = ['credits_to_piggy', 'piggy_to_credits'] as const
 
 type Kind = (typeof KINDS)[number]
-
-type CreditBucket = 'basket' | 'piggy' | 'wallet'
-
-/**
- * API 의 kind(영문 코드)를 DB credit_transfer_logs 의 bucket 이름으로 바꿉니다.
- * - basket: child_stats 기준 「가용」= credits - wallet - piggy (앱에서는 돈바구니/float)
- */
-function bucketsForTransferKind(kind: Kind): { from_bucket: CreditBucket; to_bucket: CreditBucket } {
-  switch (kind) {
-    case 'float_to_wallet':
-      return { from_bucket: 'basket', to_bucket: 'wallet' }
-    case 'float_to_piggy':
-      return { from_bucket: 'basket', to_bucket: 'piggy' }
-    case 'wallet_to_float':
-      return { from_bucket: 'wallet', to_bucket: 'basket' }
-    case 'piggy_to_float':
-      return { from_bucket: 'piggy', to_bucket: 'basket' }
-    case 'wallet_to_piggy':
-      return { from_bucket: 'wallet', to_bucket: 'piggy' }
-    case 'piggy_to_wallet':
-      return { from_bucket: 'piggy', to_bucket: 'wallet' }
-  }
-}
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
@@ -76,14 +48,12 @@ export async function POST(req: NextRequest) {
   if (resolved.ok === false) return resolved.response
   const childId = resolved.childId
 
-  const [statsRes, profileRes] = await Promise.all([
-    supabase
-      .from('child_stats')
-      .select('credits, credits_wallet, credits_piggy, current_level')
-      .eq('child_id', childId)
-      .maybeSingle(),
-    supabase.from('profiles').select('age, birth_date').eq('id', childId).maybeSingle(),
-  ])
+  const statsRes = await supabase
+    .from('child_stats')
+    .select('credits, credits_piggy, current_level')
+    .eq('child_id', childId)
+    .maybeSingle()
+
   const stats = statsRes.data
   const statsErr = statsRes.error
 
@@ -99,58 +69,42 @@ export async function POST(req: NextRequest) {
   if (!stats) return NextResponse.json({ error: '스탯 정보를 찾을 수 없어요' }, { status: 404 })
 
   const level = stats.current_level ?? 0
-  const ageYears = ageYearsFromProfileRow(profileRes.data)
-  if (usesSingleBucket(level, ageYears)) {
-    return NextResponse.json({ ok: true, skipped: true })
+  if (!isPiggyBankUnlocked(level)) {
+    return NextResponse.json({ error: '저금통은 레벨 5부터 사용할 수 있어요' }, { status: 403 })
   }
 
-  const w = readChildStatInt(stats.credits_wallet)
-  const p = readChildStatInt(stats.credits_piggy)
-  const row = { credits: readChildStatInt(stats.credits), credits_wallet: w, credits_piggy: p }
-  const float = creditsFloating(row)
+  const available = readChildStatInt(stats.credits)
+  const piggy = readChildStatInt(stats.credits_piggy)
 
-  let nw = w
-  let np = p
-  switch (kind as Kind) {
-    case 'float_to_wallet':
-      if (amount > float) return NextResponse.json({ error: '돈바구니에 있는 크레딧이 부족해요' }, { status: 400 })
-      nw = w + amount
-      break
-    case 'float_to_piggy':
-      if (amount > float) return NextResponse.json({ error: '돈바구니에 있는 크레딧이 부족해요' }, { status: 400 })
-      np = p + amount
-      break
-    case 'wallet_to_float':
-      if (amount > w) return NextResponse.json({ error: '지갑 크레딧이 부족해요' }, { status: 400 })
-      nw = w - amount
-      break
-    case 'piggy_to_float':
-      if (amount > p) return NextResponse.json({ error: '저금통 크레딧이 부족해요' }, { status: 400 })
-      np = p - amount
-      break
-    case 'wallet_to_piggy':
-      if (amount > w) return NextResponse.json({ error: '지갑 크레딧이 부족해요' }, { status: 400 })
-      nw = w - amount
-      np = p + amount
-      break
-    case 'piggy_to_wallet':
-      if (amount > p) return NextResponse.json({ error: '저금통 크레딧이 부족해요' }, { status: 400 })
-      np = p - amount
-      nw = w + amount
-      break
-    default:
-      return NextResponse.json({ error: '옮기기 종류가 올바르지 않아요' }, { status: 400 })
-  }
+  let nextCredits = available
+  let nextPiggy = piggy
+  let fromBucket: 'basket' | 'piggy'
+  let toBucket: 'basket' | 'piggy'
 
-  if (nw + np > stats.credits) {
-    return NextResponse.json({ error: '크레딧 합계가 맞지 않아요' }, { status: 500 })
+  if (kind === 'credits_to_piggy') {
+    if (amount > available) {
+      return NextResponse.json({ error: '크레딧이 부족해요' }, { status: 400 })
+    }
+    nextCredits = available - amount
+    nextPiggy = piggy + amount
+    fromBucket = 'basket'
+    toBucket = 'piggy'
+  } else {
+    if (amount > piggy) {
+      return NextResponse.json({ error: '저금통에 크레딧이 부족해요' }, { status: 400 })
+    }
+    nextCredits = available + amount
+    nextPiggy = piggy - amount
+    fromBucket = 'piggy'
+    toBucket = 'basket'
   }
 
   const { error } = await supabase
     .from('child_stats')
     .update({
-      credits_wallet: nw,
-      credits_piggy: np,
+      credits: nextCredits,
+      credits_piggy: nextPiggy,
+      credits_wallet: 0,
       updated_at: new Date().toISOString(),
     })
     .eq('child_id', childId)
@@ -159,36 +113,29 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: '저장에 실패했어요' }, { status: 500 })
   }
 
-  // 이체 감사 로그: 응답 속도에 영향 없이 백그라운드로 적재 (실패는 서버 로그만)
-  const { from_bucket, to_bucket } = bucketsForTransferKind(kind as Kind)
   void supabase
     .from('credit_transfer_logs')
     .insert({
       child_id: childId,
-      from_bucket,
-      to_bucket,
+      from_bucket: fromBucket,
+      to_bucket: toBucket,
       amount,
     })
     .then(({ error: logErr }) => {
       if (logErr) console.error('[credit_transfer_logs]', logErr.message)
     })
 
-  // ── 게임 트리거 ──
-  let triggerResult = { fired: false, unlockedItemIndex: null as number | null }
-  if (kind === 'float_to_piggy') {
-    triggerResult = await fireGameTrigger(supabase, childId, 'FIRST_SAVE')
-  } else if (kind === 'float_to_wallet') {
-    triggerResult = await fireGameTrigger(supabase, childId, 'FIRST_WALLET_USE')
-  }
+  const triggerResult =
+    kind === 'credits_to_piggy'
+      ? await fireGameTrigger(supabase, childId, 'FIRST_SAVE')
+      : { fired: false, unlockedItemIndex: null }
 
-  const totalC = row.credits
   return NextResponse.json({
-    credits: totalC,
-    credits_wallet: nw,
-    credits_piggy: np,
-    credits_floating: totalC - nw - np,
-    itemUnlocked: triggerResult.fired && triggerResult.unlockedItemIndex !== null
-      ? { index: triggerResult.unlockedItemIndex, triggerKey: kind === 'float_to_piggy' ? 'FIRST_SAVE' : 'FIRST_WALLET_USE' }
-      : null,
+    credits: nextCredits,
+    credits_piggy: nextPiggy,
+    itemUnlocked:
+      triggerResult.fired && triggerResult.unlockedItemIndex !== null
+        ? { index: triggerResult.unlockedItemIndex, triggerKey: 'FIRST_SAVE' }
+        : null,
   })
 }

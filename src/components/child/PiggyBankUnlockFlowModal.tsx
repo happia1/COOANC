@@ -23,7 +23,7 @@ const TUTORIAL_STEPS: TutorialStep[] = [
   },
   {
     title: '2. 코인 획득',
-    description: '완료 보상 코인이 돈바구니에 쌓여요!',
+    description: '완료 보상 코인이 레벨 카드에 쌓여요!',
     emoji: '🪙',
   },
   {

@@ -9,12 +9,14 @@
 import Image from 'next/image'
 import { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { getPlantStageCelebrationTitle, STAGE_IMAGE, type PlantStage } from '@/constants/plantTrees'
+import { getPlantStageCelebrationTitle, getStageImage, type PlantStage, type PlantTreeId } from '@/constants/plantTrees'
 
 type Props = {
   open: boolean
   /** 방금 물 준 뒤 도달한 단계(1~7) — 0이면 렌더하지 않음 */
   stage: PlantStage | null
+  /** 어떤 나무인지 — 단계 그림 경로에 사용 */
+  treeId?: PlantTreeId
   onClose: () => void
 }
 
@@ -48,7 +50,7 @@ function fireCelebrateConfetti() {
   })
 }
 
-export default function PlantStageCelebrationModal({ open, stage, onClose }: Props) {
+export default function PlantStageCelebrationModal({ open, stage, treeId = 'apple', onClose }: Props) {
   const confettiFired = useRef(false)
 
   useEffect(() => {
@@ -67,7 +69,7 @@ export default function PlantStageCelebrationModal({ open, stage, onClose }: Pro
   if (!open || stage === null || stage < 1 || typeof window === 'undefined') return null
 
   const title = getPlantStageCelebrationTitle(stage)
-  const imgSrc = STAGE_IMAGE[stage]
+  const imgSrc = getStageImage(treeId, stage)
 
   const modal = (
     <div

@@ -14,11 +14,10 @@ import StoreItemThumbnail from '@/components/common/StoreItemThumbnail'
 import { ICONS } from '@/constants/sprites'
 import { formatMarketCreditLabel } from '@/lib/applyStoreItemCreditOverrides'
 import { marketFrameKeyForItemId } from '@/lib/marketItemFrame'
-import { walletImageSrcByStage, walletStageIndexByCredits } from '@/lib/walletStages'
-/** 요청사항: 물건이 담긴 장바구니 아이콘(공용 정적 이미지) */
-const BASKET_FILLED_SRC = '/assets/img/common/ui/basket_filled.png'
+import { CHILD_CREDIT_COIN_PNG_SRC } from '@/lib/childCreditDisplay'
 
-/** 지갑 일러스트: `walletStages`(9단계)와 미션·마켓과 동일 규칙 */
+/** 마켓 장바구니 아이콘 */
+const BASKET_FILLED_SRC = '/assets/img/common/ui/basket_filled.png'
 
 type Props = {
   /** 시트를 열지 닫지 */
@@ -31,7 +30,8 @@ type Props = {
   /** 장바구니 상품 크레딧 합계 */
   wishlistTotalCredits: number
   /** 지갑(마켓) 잔액 — 부족분 안내에 사용 */
-  currentWallet: number
+  /** 레벨 블록과 같은 가용 크레딧 */
+  currentCredits: number
   /** 합계 − 지갑 (0 이상) */
   wishlistShortage: number
   /** 수량/삭제 처리 중인 상품 id */
@@ -48,7 +48,7 @@ export default function MarketWishlistBottomSheet({
   wishlistEntries,
   wishlistCount,
   wishlistTotalCredits,
-  currentWallet,
+  currentCredits,
   wishlistShortage,
   busyItemId,
   onRemoveItem,
@@ -56,7 +56,7 @@ export default function MarketWishlistBottomSheet({
 }: Props) {
   if (!open) return null
   /** 지갑 - 장바구니 합계: +면 충분, -면 부족 */
-  const balanceDiff = currentWallet - wishlistTotalCredits
+  const balanceDiff = currentCredits - wishlistTotalCredits
   const canPurchase = balanceDiff >= 0
 
   return (
@@ -157,24 +157,22 @@ export default function MarketWishlistBottomSheet({
             </div>
           </section>
 
-          {/* 하단 요약 블록: 장바구니 / 지갑 / 차액을 크게 보여줌 */}
+          {/* 하단 요약: 보유 크레딧 / 장바구니 합계 */}
           <section className="mt-3 grid grid-cols-2 gap-2">
-            {/* 요청사항: 순서 변경(내 지갑 먼저, 장바구니 다음) */}
             <div className="rounded-2xl bg-white p-3 text-center shadow-sm ring-1 ring-black/[0.06]">
-              {/* 요청사항: 마켓 탭과 동일한 지갑 스프라이트 사용 */}
               <div className="flex justify-center" aria-hidden>
                 <Image
-                  src={walletImageSrcByStage(walletStageIndexByCredits(currentWallet))}
+                  src={CHILD_CREDIT_COIN_PNG_SRC}
                   alt=""
-                  width={40}
-                  height={40}
-                  className="h-auto w-9 select-none object-contain"
+                  width={36}
+                  height={36}
+                  className="h-9 w-9 select-none object-contain"
                   draggable={false}
                 />
               </div>
-              <p className="mt-1 text-[11px] font-black text-brand-blue">내 지갑</p>
+              <p className="mt-1 text-[11px] font-black text-brand-blue">내 크레딧</p>
               <p className="mt-0.5 text-base font-black tabular-nums text-brand-blue">
-                {currentWallet.toLocaleString('ko-KR')}
+                {currentCredits.toLocaleString('ko-KR')}
               </p>
             </div>
             <div className="rounded-2xl bg-white p-3 text-center shadow-sm ring-1 ring-black/[0.06]">

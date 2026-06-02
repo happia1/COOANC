@@ -37,25 +37,51 @@ export function getPlantStageCelebrationTitle(stage: PlantStage): string {
   return CELEBRATION_BY_STAGE[stage] ?? '식물이 한 단계 자랐어요!'
 }
 
-/** 이미지 경로 — /public/assets/img/missions/routine/plant/ */
-const PLANT_BASE = '/assets/img/missions/routine/plant'
+/** 이미지 루트 — /public/assets/img/missions/routine/plant/ */
+export const PLANT_BASE = '/assets/img/missions/routine/plant'
 
-/** 단계별 식물 일러스트(`PlantPot` 등에서 사용) */
-export const STAGE_IMAGE: Record<PlantStage, string> = {
-  0: `${PLANT_BASE}/0.png`,
-  1: `${PLANT_BASE}/1.png`,
-  2: `${PLANT_BASE}/2.png`,
-  3: `${PLANT_BASE}/3.png`,
-  4: `${PLANT_BASE}/4.png`,
-  5: `${PLANT_BASE}/5.png`,
-  6: `${PLANT_BASE}/6.png`,
-  7: `${PLANT_BASE}/7.png`,
+/**
+ * 화분 팝업 도구 — 물조리개 이미지는 plant 루트의 200/300.png 를 씁니다.
+ */
+
+/** 물조리개 — 하트 없음(빈) / 하트 있음(채움) */
+export const WATERING_CAN_EMPTY_SRC = `${PLANT_BASE}/200.png`
+export const WATERING_CAN_FULL_SRC = `${PLANT_BASE}/300.png`
+
+/** 나무 종류별 단계 일러스트 — `apple/0.png` … `apple/7.png` 형식 */
+export function getStageImage(treeId: PlantTreeId, stage: PlantStage): string {
+  return `${PLANT_BASE}/${treeId}/${stage}.png`
 }
 
-/** 완성 팝업 등에 쓸 사과 이미지 */
-export const APPLE_REWARD_IMAGE = `${PLANT_BASE}/apple.png`
-/** 씨앗 선택 등에 쓸 씨앗 이미지 */
-export const SEED_IMAGE = `${PLANT_BASE}/seed.png`
+/** 나무 종류별 씨앗 그림 */
+export function getSeedImage(treeId: PlantTreeId): string {
+  return `${PLANT_BASE}/${treeId}/seed.png`
+}
+
+/** 완성 보상·열매 그림 — 사과나무는 `apple.png`, 그 외는 7단계 그림 */
+export function getRewardImage(treeId: PlantTreeId): string {
+  if (treeId === 'apple') return `${PLANT_BASE}/apple/apple.png`
+  return `${PLANT_BASE}/${treeId}/7.png`
+}
+
+/**
+ * @deprecated `getStageImage(treeId, stage)` 사용 — 사과나무 기본값만 유지
+ */
+export const STAGE_IMAGE: Record<PlantStage, string> = {
+  0: getStageImage('apple', 0),
+  1: getStageImage('apple', 1),
+  2: getStageImage('apple', 2),
+  3: getStageImage('apple', 3),
+  4: getStageImage('apple', 4),
+  5: getStageImage('apple', 5),
+  6: getStageImage('apple', 6),
+  7: getStageImage('apple', 7),
+}
+
+/** @deprecated `getRewardImage('apple')` 사용 */
+export const APPLE_REWARD_IMAGE = getRewardImage('apple')
+/** @deprecated `getSeedImage(treeId)` 사용 */
+export const SEED_IMAGE = getSeedImage('apple')
 
 /**
  * 단계 → 다음 단계까지 필요한 하트 수

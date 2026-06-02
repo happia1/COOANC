@@ -12,6 +12,7 @@ import SpriteImage from '@/components/common/SpriteImage'
 import { ICONS } from '@/constants/sprites'
 import type { ChildStats } from '@/types/database'
 import { CHILD_HOME_TOP_BAR_GLASS_CLASS, CHILD_HOME_TOP_BAR_GLASS_STYLE } from '@/lib/childHomeTopBarGlass'
+import { CHILD_CREDIT_COIN_PNG_SRC, formatChildCreditsDisplay } from '@/lib/childCreditDisplay'
 
 interface ChildLevelStatsCardProps {
   stats: Pick<ChildStats, 'current_level' | 'exp' | 'exp_to_next_level' | 'credits'>
@@ -30,8 +31,7 @@ interface ChildLevelStatsCardProps {
 }
 
 function formatCredits(value: number): string {
-  if (value >= 10_000) return `${(value / 10_000).toFixed(1).replace(/\.0$/, '')}만`
-  return value.toLocaleString('ko-KR')
+  return formatChildCreditsDisplay(value)
 }
 
 export default function ChildLevelStatsCard({
@@ -113,7 +113,7 @@ export default function ChildLevelStatsCard({
         <div ref={creditRef} className="flex min-w-0 max-w-full items-center gap-1.5">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={`/assets/img/common/ui/${encodeURIComponent('크레딧.png')}`}
+            src={CHILD_CREDIT_COIN_PNG_SRC}
             alt=""
             width={18}
             height={18}

@@ -14,7 +14,6 @@ import MarketWishlistBottomSheet from '@/components/child/MarketWishlistBottomSh
 import { marketFrameKeyForItemId, type MarketItemFrameKey } from '@/lib/marketItemFrame'
 import { formatMarketCreditLabel } from '@/lib/applyStoreItemCreditOverrides'
 import { readChildStatInt } from '@/lib/childCreditsSplit'
-import { walletImageSrcByStage, walletStageIndexByCredits } from '@/lib/walletStages'
 import {
   PARENT_MARKET_MENU_SECTIONS,
   parentMarketSectionIdForItem,
@@ -108,13 +107,7 @@ export default function MarketTab({
    * 비개발자: 화면 상단 레벨 카드에 보이는 크레딧 숫자 그대로 마켓에서 사용됩니다.
    */
   const marketSpendable = useMemo(() => creditsTotal, [creditsTotal])
-  const [currentWallet, setCurrentWallet] = useState(marketSpendable)
-  /**
-   * 마켓탭 지갑도 미션탭과 같이 9단계 PNG를 쓰고, 잔액 변화 시 한 단계씩 따라가게 합니다.
-   */
-  const walletTargetIdx = walletStageIndexByCredits(currentWallet)
-  const [animatedWalletIdx, setAnimatedWalletIdx] = useState(walletTargetIdx)
-  const animatedWalletIdxRef = useRef(animatedWalletIdx)
+  const [currentCredits, setCurrentCredits] = useState(marketSpendable)
   /** 상품별 장바구니 수량(1 이상) */
   const [wishlistQuantities, setWishlistQuantities] = useState<Record<string, number>>(() => {
     const base: Record<string, number> = {}
@@ -139,22 +132,6 @@ export default function MarketTab({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- initialHiddenStoreItemIds 는 hiddenBootstrapKey 에 반영됨
   }, [hiddenBootstrapKey])
 
-  useEffect(() => {
-    animatedWalletIdxRef.current = animatedWalletIdx
-  }, [animatedWalletIdx])
-
-  useEffect(() => {
-    if (walletTargetIdx === animatedWalletIdxRef.current) return
-    /** 목표 단계까지 1칸씩 이동해 지갑 이미지가 자연스럽게 바뀌게 합니다. */
-    const tick = setInterval(() => {
-      setAnimatedWalletIdx((prev) => {
-        if (prev === walletTargetIdx) return prev
-        return prev + (walletTargetIdx > prev ? 1 : -1)
-      })
-    }, 160)
-    return () => clearInterval(tick)
-  }, [walletTargetIdx])
-
   const wishlistBootstrapKey = useMemo(
     () =>
       `${childId}|${[...initialWishlistEntries]
@@ -172,7 +149,7 @@ export default function MarketTab({
   }, [wishlistBootstrapKey, initialWishlistEntries])
 
   useEffect(() => {
-    setCurrentWallet(marketSpendable)
+    setCurrentCredits(marketSpendable)
   }, [marketSpendable])
 
   /** 장바구니가 비면 열린 시트를 자동으로 닫아 빈 화면을 막음 */
@@ -335,7 +312,7 @@ export default function MarketTab({
     () => wishlistEntriesResolved.reduce((acc, e) => acc + e.quantity, 0),
     [wishlistEntriesResolved],
   )
-  const wishlistShortage = Math.max(0, wishlistTotalCredits - currentWallet)
+  const wishlistShortage = Math.max(0, wishlistTotalCredits - currentCredits)
 
   const shelfBlockedItemIds = useMemo(() => {
     const s = new Set<string>()
@@ -578,7 +555,6 @@ export default function MarketTab({
           hiddenStoreItemIds: string[]
           purchaseRequests: PurchaseRequest[]
           credits: number | null
-          creditsWallet: number | null
           partial?: boolean
         }
         const { data: json, parseError } = await parseJsonFromResponse<ChildSyncPayload>(res)
@@ -588,7 +564,7 @@ export default function MarketTab({
         }
         setHiddenStoreItemIds([...json.hiddenStoreItemIds].sort())
         const totalFromApi = json.credits != null ? readChildStatInt(json.credits) : null
-        if (totalFromApi != null) setCurrentWallet(totalFromApi)
+        if (totalFromApi != null) setCurrentCredits(totalFromApi)
         const next = json.purchaseRequests
         const prev = prevPurchaseRequestsRef.current
         for (const row of next) {
@@ -600,7 +576,7 @@ export default function MarketTab({
             setParentShopNoticeOpen(true)
           }
           if (row.status === 'rejected' && (old?.status === 'pending' || old?.status === 'parent_buying')) {
-            setCurrentWallet((w) => w + row.item_price)
+            setCurrentCredits((w) => w + row.item_price)
           }
         }
         prevPurchaseRequestsRef.current = next
@@ -665,24 +641,24 @@ export default function MarketTab({
   const openPurchaseFromShelfAction = useCallback(() => {
     if (!shelfActionFor) return
     const { item, frame } = shelfActionFor
-    if (currentWallet < item.credit_price || level < item.level_required) return
+    if (currentCredits < item.credit_price || level < item.level_required) return
     setShelfActionFor(null)
     setSelected({ item, frame })
-  }, [shelfActionFor, currentWallet, level])
+  }, [shelfActionFor, currentCredits, level])
 
   /** 액션 시트에 쓰는 구매 가능 여부·안내 문구(카드 탭 시점의 상품 기준) */
   const shelfActionBuyMeta = useMemo(() => {
     if (!shelfActionFor) return null
     const it = shelfActionFor.item
     const levelOk = level >= it.level_required
-    const affordOk = currentWallet >= it.credit_price
+    const affordOk = currentCredits >= it.credit_price
     return {
       it,
       canBuy: levelOk && affordOk,
       levelOk,
       affordOk,
     }
-  }, [shelfActionFor, level, currentWallet])
+  }, [shelfActionFor, level, currentCredits])
 
   /** 구매 요청 API — 성공 시 다이얼로그가 바로 닫힘 */
   async function submitPurchaseRequest(quantity = 1): Promise<boolean> {
@@ -709,8 +685,8 @@ export default function MarketTab({
         showToast(json.error ?? '요청에 실패했어요', false)
         return false
       }
-      if (typeof json.credits === 'number') setCurrentWallet(readChildStatInt(json.credits))
-      else setCurrentWallet((w) => w - item.credit_price * purchaseQty)
+      if (typeof json.credits === 'number') setCurrentCredits(readChildStatInt(json.credits))
+      else setCurrentCredits((w) => w - item.credit_price * purchaseQty)
       if (json.request) setMyRequests((prev) => [json.request as PurchaseRequest, ...prev])
       /** 축하 오버레이에서 안내하므로 별도 토스트는 띄우지 않음(문구 겹침 방지) */
       return true
@@ -813,7 +789,7 @@ export default function MarketTab({
           {betaItems.map((item, itemIdx) => {
             const frameKey = marketFrameKeyForItemId(item.id, item.name)
             const isPending = shelfBlockedItemIds.has(item.id)
-            const canAfford = currentWallet >= item.credit_price
+            const canAfford = currentCredits >= item.credit_price
             /** 첫 몇 장만 우선 로드 */
             const thumbPriority = itemIdx < 4
 
@@ -927,7 +903,7 @@ export default function MarketTab({
         wishlistEntries={wishlistEntriesResolved}
         wishlistCount={wishlistTotalCount}
         wishlistTotalCredits={wishlistTotalCredits}
-        currentWallet={currentWallet}
+        currentCredits={currentCredits}
         wishlistShortage={wishlistShortage}
         busyItemId={wishBusy}
         onRemoveItem={removeWishlistItem}
@@ -1072,7 +1048,7 @@ export default function MarketTab({
       {selected && (
         <MarketPurchaseConfirmDialog
           selected={selected}
-          balanceBefore={currentWallet}
+          balanceBefore={currentCredits}
           onClose={dismissPurchaseDialog}
           onSubmit={submitPurchaseRequest}
           onSuccessDismiss={onPurchaseDialogSuccessDismiss}

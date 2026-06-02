@@ -206,8 +206,7 @@ export async function POST(req: NextRequest) {
     newStreak = stats.last_mission_date === yesterday ? newStreak + 1 : 1
   }
 
-  /** 보상 크레딧은 총액만 증가 → 잔디(가용)에 쌓임. 지갑·저금통 숫자는 그대로 둡니다. */
-  const keepWallet = readChildStatInt(stats.credits_wallet)
+  /** 보상 크레딧은 레벨 블록 가용(`credits`)에 더합니다. 저금통은 그대로 둡니다. */
   const keepPiggy = readChildStatInt(stats.credits_piggy)
   const baseCredits = readChildStatInt(stats.credits)
   const baseHearts = readChildStatInt(stats.hearts)
@@ -248,7 +247,7 @@ export async function POST(req: NextRequest) {
     .from('child_stats')
     .update({
       credits: baseCredits + creditEarned,
-      credits_wallet: keepWallet,
+      credits_wallet: 0,
       credits_piggy: keepPiggy,
       hearts: baseHearts + heartEarned,
       total_credits_earned: baseTotalCreditsEarned + creditEarned,

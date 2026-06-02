@@ -107,11 +107,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: '이미 요청 중인 상품이에요' }, { status: 409 })
   }
 
-  const piggy = typeof stats.credits_piggy === 'number' ? stats.credits_piggy : 0
-  const wallet = readChildStatInt(stats.credits_wallet)
-  const totalCredits = readChildStatInt(stats.credits)
+  const piggy = readChildStatInt(stats.credits_piggy)
+  const available = readChildStatInt(stats.credits)
 
-  if (totalCredits < effectivePrice) {
+  if (available < effectivePrice) {
     return NextResponse.json(
       { error: '코인이 부족해요. 미션을 더 완료해서 코인을 모아보세요!' },
       { status: 400 },
@@ -122,14 +121,12 @@ export async function POST(req: NextRequest) {
    * 마켓 결제는 레벨 블록 총 코인(`credits`)을 기준으로 통일합니다.
    * 비개발자: 화면에 보이는 총 크레딧만 충분하면 구매가 되며, 결제 후 그 숫자에서 차감됩니다.
    */
-  const nextCredits = totalCredits - effectivePrice
-  // 총액보다 지갑이 커지지 않도록 안전하게 맞춥니다.
-  const nextWallet = Math.min(wallet, nextCredits)
+  const nextCredits = available - effectivePrice
   const { error: deductErr } = await supabase
     .from('child_stats')
     .update({
       credits: nextCredits,
-      credits_wallet: nextWallet,
+      credits_wallet: 0,
       credits_piggy: piggy,
       updated_at: new Date().toISOString(),
     })
@@ -160,7 +157,7 @@ export async function POST(req: NextRequest) {
       .from('child_stats')
       .update({
         credits: stats.credits,
-        credits_wallet: wallet,
+        credits_wallet: 0,
         credits_piggy: piggy,
       })
       .eq('child_id', childId)
@@ -173,7 +170,7 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({
     request,
     credits: nextCredits,
-    credits_wallet: nextWallet,
+    credits_wallet: 0,
     credits_piggy: piggy,
     itemUnlocked: triggerResult.fired && triggerResult.unlockedItemIndex !== null
       ? { index: triggerResult.unlockedItemIndex, triggerKey: 'FIRST_PURCHASE' }

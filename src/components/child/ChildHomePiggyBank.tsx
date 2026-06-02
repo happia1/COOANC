@@ -1,32 +1,32 @@
 'use client'
 
 /**
- * 자녀 홈 발 옆 저금통 — 탭 시 팝업에서 지갑 크레딧 확인·저금(지갑→저금통)합니다.
+ * 자녀 홈 발 옆 저금통 — 가용 크레딧과 저금통 사이를 1개씩 옮깁니다.
  *
  * 비개발자 설명:
- * - 바깥에는 현재 저금통에 쌓인 만큼에 맞는 돼지 그림이 보입니다(최대 1000까지 14단계).
- * - 팝업에서는 「지갑에 있는 크레딧」 숫자를 크게 보여 주고, 저금통을 누르면 1코인씩 저금합니다.
- * - 레벨이 낮거나 나이가 어려 멀티 버킷이 아니면 저금 버튼 대신 안내만 나옵니다.
+ * - 레벨 5부터 토끼 발 옆에 저금통이 보입니다.
+ * - 팝업에서 왼쪽(크레딧)을 누르면 저금통 → 크레딧, 오른쪽(저금통)을 누르면 크레딧 → 저금통으로 1개씩 이동합니다.
  */
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { piggyBankVisualFrameIndexFromSavedCredits, piggyBankVisualUrlFromSavedCredits } from '@/lib/piggyBankHomeStage'
+import { markPiggyBonusPeriodStarted } from '@/lib/piggyBankBonus'
+import { PIGGY_BANK_UNLOCK_MIN_LEVEL } from '@/constants/childAgeConfig'
+import { CHILD_CREDIT_COIN_PNG_SRC, formatChildCreditsDisplay } from '@/lib/childCreditDisplay'
 
-/** 저금통 팝업에서 동전 1개 저금할 때 재생하는 효과음 */
 export const CHILD_PIGGY_DEPOSIT_SOUND_SRC =
   `/assets/audio/effects/${encodeURIComponent('ElevenLabs_귀여운_동전_떨어지는_소리_효과.mp3')}` as const
-/** 저금통 PNG 단계가 올라갈 때(14단계 중 다음 그림으로 넘어갈 때) 재생할 효과음 */
 export const CHILD_PIGGY_STAGE_UP_SOUND_SRC =
   '/assets/audio/effects/level_up-magic-festive-melody-2986.wav' as const
+
+type TransferKind = 'credits_to_piggy' | 'piggy_to_credits'
 
 function playDepositSound() {
   try {
     const audio = new Audio(CHILD_PIGGY_DEPOSIT_SOUND_SRC)
     audio.volume = 0.85
-    void audio.play().catch(() => {
-      /* 브라우저 자동재생 정책 등으로 실패해도 조용히 무시 */
-    })
+    void audio.play().catch(() => {})
   } catch {
     /* noop */
   }
@@ -36,39 +36,67 @@ function playPiggyStageUpSound() {
   try {
     const audio = new Audio(CHILD_PIGGY_STAGE_UP_SOUND_SRC)
     audio.volume = 0.92
-    void audio.play().catch(() => {
-      /* 브라우저 자동재생 정책 등으로 실패해도 조용히 무시 */
-    })
+    void audio.play().catch(() => {})
   } catch {
     /* noop */
   }
 }
 
+/** 저금통 슬롯 위에서 동전이 떨어지기 시작하는 높이(px) */
+const PIGGY_COIN_DROP_OFFSET_PX = 44
+
+function piggyTransferHintSeenKey(childId: string): string {
+  return `cooanc:piggy-transfer-hint-seen:${childId}`
+}
+
+function hasSeenPiggyTransferHint(childId: string): boolean {
+  if (typeof window === 'undefined') return true
+  return window.localStorage.getItem(piggyTransferHintSeenKey(childId)) === '1'
+}
+
+function markPiggyTransferHintSeen(childId: string): void {
+  if (typeof window === 'undefined') return
+  window.localStorage.setItem(piggyTransferHintSeenKey(childId), '1')
+}
+
+type FlyCoin = {
+  id: number
+  fromX: number
+  fromY: number
+  toX: number
+  toY: number
+}
+
 type Props = {
-  walletCredits: number
+  /** 레벨 블록과 같은 `child_stats.credits`(가용) */
+  availableCredits: number
   piggyCredits: number
   childId: string
-  /** false 이면 지갑/저금 분리 없음 — 저금 API 비활성 */
-  multiBucket: boolean
-  /** 저금 성공 후 상단 통계만 맞추면 됩니다(`credits` 합계는 변하지 않음). */
-  onWalletPiggyUpdate: (patch: { credits_wallet: number; credits_piggy: number }) => void
+  depositEnabled: boolean
+  /** @deprecated 팝업 내 좌·우 패널 좌표를 씁니다. 호출부 호환용 */
+  levelCreditRef?: React.RefObject<HTMLDivElement | null>
+  onPiggyUpdate: (patch: { credits: number; credits_piggy: number }) => void
 }
 
 export default function ChildHomePiggyBank({
-  walletCredits,
+  availableCredits,
   piggyCredits,
   childId,
-  multiBucket,
-  onWalletPiggyUpdate,
+  depositEnabled,
+  onPiggyUpdate,
 }: Props) {
   const [sheetOpen, setSheetOpen] = useState(false)
   const [portalReady, setPortalReady] = useState(false)
-  const [busy, setBusy] = useState(false)
-  /** 저금 직후 돼지에 살짝 튀는 연출 */
-  const [bounceKey, setBounceKey] = useState(0)
-  /** 지갑 → 저금통으로 코인이 내려가는 짧은 이펙트 */
-  const [coinFlyKey, setCoinFlyKey] = useState(0)
-  /** 이미지 로드 실패 시 항상 1단계 그림으로 폴백 */
+  const [piggyBounceKey, setPiggyBounceKey] = useState(0)
+  const [creditsBounceKey, setCreditsBounceKey] = useState(0)
+  const [transferHintVisible, setTransferHintVisible] = useState(false)
+  const [flyCoins, setFlyCoins] = useState<FlyCoin[]>([])
+  const flyIdRef = useRef(0)
+  const creditsPanelRef = useRef<HTMLDivElement>(null)
+  const piggyTargetRef = useRef<HTMLDivElement>(null)
+  const optimisticCreditsRef = useRef(availableCredits)
+  const optimisticPiggyRef = useRef(piggyCredits)
+  const apiQueueRef = useRef(Promise.resolve())
   const [piggySrc, setPiggySrc] = useState(piggyBankVisualUrlFromSavedCredits(piggyCredits))
 
   useEffect(() => {
@@ -76,105 +104,278 @@ export default function ChildHomePiggyBank({
   }, [])
 
   useEffect(() => {
+    optimisticCreditsRef.current = availableCredits
+    optimisticPiggyRef.current = piggyCredits
+  }, [availableCredits, piggyCredits])
+
+  useEffect(() => {
     setPiggySrc(piggyBankVisualUrlFromSavedCredits(piggyCredits))
   }, [piggyCredits])
 
-  const depositOne = useCallback(async () => {
-    if (!multiBucket || busy || walletCredits < 1) return
-    playDepositSound()
-    setBusy(true)
-    try {
+  const spawnFlyCoin = useCallback((kind: TransferKind) => {
+    const piggyEl = piggyTargetRef.current
+    const creditsEl = creditsPanelRef.current
+    if (!piggyEl || !creditsEl) return
+
+    const piggy = piggyEl.getBoundingClientRect()
+    const credits = creditsEl.getBoundingClientRect()
+    const piggyCenterX = piggy.left + piggy.width / 2
+    const piggySlotY = piggy.top + piggy.height * 0.42
+    const creditsCenterX = credits.left + credits.width / 2
+    const creditsCenterY = credits.top + credits.height / 2
+
+    const fromX = kind === 'credits_to_piggy' ? piggyCenterX : piggyCenterX
+    const fromY = kind === 'credits_to_piggy' ? piggy.top - PIGGY_COIN_DROP_OFFSET_PX : piggySlotY
+    const toX = kind === 'credits_to_piggy' ? piggyCenterX : creditsCenterX
+    const toY = kind === 'credits_to_piggy' ? piggySlotY : creditsCenterY
+
+    const id = ++flyIdRef.current
+    setFlyCoins((prev) => [...prev, { id, fromX, fromY, toX, toY }])
+    window.setTimeout(() => {
+      setFlyCoins((prev) => prev.filter((c) => c.id !== id))
+    }, 580)
+  }, [])
+
+  const rollbackOptimistic = useCallback(
+    (kind: TransferKind) => {
+      if (kind === 'credits_to_piggy') {
+        optimisticCreditsRef.current += 1
+        optimisticPiggyRef.current = Math.max(0, optimisticPiggyRef.current - 1)
+      } else {
+        optimisticCreditsRef.current = Math.max(0, optimisticCreditsRef.current - 1)
+        optimisticPiggyRef.current += 1
+      }
+      onPiggyUpdate({
+        credits: optimisticCreditsRef.current,
+        credits_piggy: optimisticPiggyRef.current,
+      })
+    },
+    [onPiggyUpdate],
+  )
+
+  const syncTransferToServer = useCallback(
+    async (kind: TransferKind) => {
       const res = await fetch('/api/child/credits/transfer', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          kind: 'wallet_to_piggy',
+          kind,
           amount: 1,
           childId,
         }),
       })
       const json = (await res.json()) as {
         error?: string
-        credits_wallet?: number
+        credits?: number
         credits_piggy?: number
       }
-      if (!res.ok || json.error) {
+      if (
+        !res.ok ||
+        json.error ||
+        typeof json.credits !== 'number' ||
+        typeof json.credits_piggy !== 'number'
+      ) {
+        rollbackOptimistic(kind)
         console.warn('[ChildHomePiggyBank] transfer failed', json.error ?? res.status)
         return
       }
-      if (typeof json.credits_wallet === 'number' && typeof json.credits_piggy === 'number') {
-        const prevFrame = piggyBankVisualFrameIndexFromSavedCredits(piggyCredits)
-        const nextFrame = piggyBankVisualFrameIndexFromSavedCredits(json.credits_piggy)
-        onWalletPiggyUpdate({
-          credits_wallet: json.credits_wallet,
-          credits_piggy: json.credits_piggy,
+      optimisticCreditsRef.current = json.credits
+      optimisticPiggyRef.current = json.credits_piggy
+      onPiggyUpdate({ credits: json.credits, credits_piggy: json.credits_piggy })
+    },
+    [childId, onPiggyUpdate, rollbackOptimistic],
+  )
+
+  const enqueueTransfer = useCallback(
+    (kind: TransferKind) => {
+      apiQueueRef.current = apiQueueRef.current
+        .then(() => syncTransferToServer(kind))
+        .catch((err) => {
+          console.warn('[ChildHomePiggyBank] transfer queue failed', err)
         })
-        // 실제로 저금통 그림 단계가 올라간 경우에만 레벨업 사운드를 재생합니다.
-        if (nextFrame > prevFrame) {
-          playPiggyStageUpSound()
-        }
-        setCoinFlyKey((k) => k + 1)
-        setBounceKey((k) => k + 1)
-      }
-    } finally {
-      setBusy(false)
+    },
+    [syncTransferToServer],
+  )
+
+  const depositOne = useCallback(() => {
+    if (!depositEnabled || optimisticCreditsRef.current < 1) return
+
+    const prevPiggy = optimisticPiggyRef.current
+    const nextCredits = optimisticCreditsRef.current - 1
+    const nextPiggy = optimisticPiggyRef.current + 1
+    optimisticCreditsRef.current = nextCredits
+    optimisticPiggyRef.current = nextPiggy
+
+    playDepositSound()
+    spawnFlyCoin('credits_to_piggy')
+    setTransferHintVisible(false)
+    markPiggyTransferHintSeen(childId)
+    markPiggyBonusPeriodStarted(childId)
+
+    const prevFrame = piggyBankVisualFrameIndexFromSavedCredits(prevPiggy)
+    const nextFrame = piggyBankVisualFrameIndexFromSavedCredits(nextPiggy)
+    onPiggyUpdate({ credits: nextCredits, credits_piggy: nextPiggy })
+    if (nextFrame > prevFrame) playPiggyStageUpSound()
+    setPiggyBounceKey((k) => k + 1)
+
+    enqueueTransfer('credits_to_piggy')
+  }, [depositEnabled, childId, onPiggyUpdate, spawnFlyCoin, enqueueTransfer])
+
+  const withdrawOne = useCallback(() => {
+    if (!depositEnabled || optimisticPiggyRef.current < 1) return
+
+    const nextCredits = optimisticCreditsRef.current + 1
+    const nextPiggy = optimisticPiggyRef.current - 1
+    optimisticCreditsRef.current = nextCredits
+    optimisticPiggyRef.current = nextPiggy
+
+    playDepositSound()
+    spawnFlyCoin('piggy_to_credits')
+    setTransferHintVisible(false)
+    markPiggyTransferHintSeen(childId)
+    onPiggyUpdate({ credits: nextCredits, credits_piggy: nextPiggy })
+    setCreditsBounceKey((k) => k + 1)
+
+    enqueueTransfer('piggy_to_credits')
+  }, [depositEnabled, onPiggyUpdate, spawnFlyCoin, enqueueTransfer])
+
+  const openSheet = useCallback(() => {
+    setSheetOpen(true)
+    if (!depositEnabled) {
+      setTransferHintVisible(false)
+      return
     }
-  }, [multiBucket, busy, walletCredits, childId, onWalletPiggyUpdate])
+    const showHint = !hasSeenPiggyTransferHint(childId)
+    setTransferHintVisible(showHint)
+    if (showHint) markPiggyTransferHintSeen(childId)
+  }, [childId, depositEnabled])
+
+  const canDeposit = depositEnabled && availableCredits >= 1
+  const canWithdraw = depositEnabled && piggyCredits >= 1
+
+  const flyLayer =
+    flyCoins.length > 0 && portalReady ? (
+      <div className="pointer-events-none fixed inset-0 z-[200]" aria-hidden>
+        {flyCoins.map((coin) => (
+          <img
+            key={coin.id}
+            src={CHILD_CREDIT_COIN_PNG_SRC}
+            alt=""
+            width={22}
+            height={22}
+            className="absolute h-[22px] w-[22px] object-contain drop-shadow-md"
+            style={
+              {
+                left: coin.fromX,
+                top: coin.fromY,
+                marginLeft: -11,
+                marginTop: -11,
+                animation: 'piggyCreditFly 0.55s ease-in forwards',
+                '--fly-dx': `${coin.toX - coin.fromX}px`,
+                '--fly-dy': `${coin.toY - coin.fromY}px`,
+              } as React.CSSProperties
+            }
+          />
+        ))}
+      </div>
+    ) : null
 
   const popup =
     sheetOpen && portalReady ? (
-      <div className="fixed inset-0 z-[175] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="저금통">
+      <div className="fixed inset-0 z-[175] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="저금하기">
         <button
           type="button"
           className="absolute inset-0 bg-black/35"
           aria-label="저금통 닫기"
           onClick={() => setSheetOpen(false)}
         />
-        <div className="relative z-[1] w-full max-w-xs rounded-2xl border border-amber-100 bg-white p-4 shadow-xl">
-          <p className="text-center text-xs font-bold text-amber-800/90">저금통</p>
-          <p className="mt-1 text-center text-2xl font-black tabular-nums text-amber-950">
-            {piggyCredits.toLocaleString('ko-KR')}
+        <div className="relative z-[1] flex w-full max-w-sm flex-col rounded-3xl border border-amber-100 bg-gradient-to-b from-amber-50 to-white p-5 shadow-xl">
+          <h2 className="text-center text-lg font-black text-amber-900">저금하기</h2>
+          <p className="mb-4 mt-2 text-center text-xs font-semibold text-amber-900/90">
+            저금을 하면 일주일에 1번 보너스 크레딧이 생겨요!
           </p>
-
-          <button
-            type="button"
-            onClick={() => void depositOne()}
-            disabled={!multiBucket || busy || walletCredits < 1}
-            className="relative mx-auto mt-4 flex w-36 flex-col items-center gap-1 rounded-xl border-0 bg-transparent p-2 transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-45"
-            aria-label={multiBucket ? '저금통에 크레딧 넣기' : '저금통'}
-          >
-            {coinFlyKey > 0 ? (
-              <span
-                key={coinFlyKey}
-                className="pointer-events-none absolute left-1/2 top-[-8px] text-2xl leading-none"
-                style={{ animation: 'piggyCoinIntoBank 0.55s ease-in forwards' }}
-                aria-hidden
-              >
-                🪙
-              </span>
-            ) : null}
-            <div
-              key={bounceKey}
-              className="relative h-28 w-28"
-              style={{
-                animation: bounceKey ? 'piggyDepositBump 0.55s ease-out' : undefined,
-              }}
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={withdrawOne}
+              disabled={!canWithdraw}
+              className="flex min-h-[11.5rem] flex-col items-center rounded-2xl border-2 border-sky-100/90 bg-white/90 px-2 py-3 shadow-sm transition active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-45"
+              aria-label="저금통에서 크레딧 꺼내기"
             >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={piggySrc}
-                alt=""
-                width={112}
-                height={112}
-                className="h-28 w-28 object-contain drop-shadow-md"
-                draggable={false}
-                onError={() => setPiggySrc('/assets/img/items/rewards/piggybank/piggy_bank1.png')}
-              />
-            </div>
-            <span className="text-[11px] font-black text-gray-600">
-              {multiBucket ? '저금통을 눌러 크레딧을 모아요' : '레벨 5부터 열려요'}
-            </span>
-          </button>
+              <p className="text-center text-[11px] font-bold leading-tight text-amber-800/75">크레딧</p>
+              <div
+                ref={creditsPanelRef}
+                key={creditsBounceKey}
+                className="mt-3 flex flex-1 flex-col items-center justify-center"
+                style={{
+                  animation: creditsBounceKey ? 'piggyDepositBump 0.55s ease-out' : undefined,
+                }}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={CHILD_CREDIT_COIN_PNG_SRC}
+                  alt=""
+                  width={72}
+                  height={72}
+                  className="h-[4.5rem] w-[4.5rem] object-contain drop-shadow-md"
+                  draggable={false}
+                />
+                <span
+                  className="mt-2 font-black tabular-nums leading-none text-[#7A4F00]"
+                  style={{ fontSize: 24, letterSpacing: '-0.5px' }}
+                >
+                  {formatChildCreditsDisplay(availableCredits)}
+                </span>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={depositOne}
+              disabled={!canDeposit}
+              className="flex min-h-[11.5rem] flex-col items-center rounded-2xl border-2 border-amber-100/90 bg-white/90 px-2 py-3 shadow-sm transition active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-45"
+              aria-label={depositEnabled ? '저금통에 크레딧 넣기' : `저금통 — 레벨 ${PIGGY_BANK_UNLOCK_MIN_LEVEL}부터`}
+            >
+              <p className="text-center text-[11px] font-bold leading-tight text-amber-800/75">
+                저금통에 모은 크레딧
+              </p>
+              <div
+                ref={piggyTargetRef}
+                key={piggyBounceKey}
+                className="mt-3 flex flex-1 flex-col items-center justify-center"
+                style={{
+                  animation: piggyBounceKey ? 'piggyDepositBump 0.55s ease-out' : undefined,
+                }}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={piggySrc}
+                  alt=""
+                  width={72}
+                  height={72}
+                  className="h-[4.5rem] w-[4.5rem] object-contain drop-shadow-md"
+                  draggable={false}
+                  onError={() => setPiggySrc('/assets/img/items/rewards/piggybank/piggy_bank1.png')}
+                />
+                <span
+                  className="mt-2 font-black tabular-nums leading-none text-[#7A4F00]"
+                  style={{ fontSize: 24, letterSpacing: '-0.5px' }}
+                >
+                  {formatChildCreditsDisplay(piggyCredits)}
+                </span>
+              </div>
+            </button>
+          </div>
+
+          {transferHintVisible && depositEnabled ? (
+            <p className="mt-3 text-center text-xs font-black text-gray-600">
+              저금통을 누르면 모으고, 크레딧을 누르면 꺼내요
+            </p>
+          ) : !depositEnabled ? (
+            <p className="mt-3 text-center text-xs font-black text-gray-600">
+              {`레벨 ${PIGGY_BANK_UNLOCK_MIN_LEVEL}부터 저금할 수 있어요`}
+            </p>
+          ) : null}
 
           <button
             type="button"
@@ -190,14 +391,14 @@ export default function ChildHomePiggyBank({
             35% { transform: scale(1.08); }
             100% { transform: scale(1); }
           }
-          @keyframes piggyCoinIntoBank {
+          @keyframes piggyCreditFly {
             0% {
-              transform: translate(-50%, 0) scale(1.1);
+              transform: translate(0, 0) scale(1.1);
               opacity: 1;
             }
             100% {
-              transform: translate(-50%, 88px) scale(0.75);
-              opacity: 0.25;
+              transform: translate(var(--fly-dx), var(--fly-dy)) scale(0.9);
+              opacity: 0.4;
             }
           }
         `}</style>
@@ -208,7 +409,7 @@ export default function ChildHomePiggyBank({
     <>
       <button
         type="button"
-        onClick={() => setSheetOpen(true)}
+        onClick={openSheet}
         className="relative flex shrink-0 flex-col items-center border-0 bg-transparent p-0 transition-transform active:scale-95"
         aria-label="저금통 열기"
       >
@@ -225,6 +426,7 @@ export default function ChildHomePiggyBank({
           />
         </div>
       </button>
+      {portalReady && flyLayer ? createPortal(flyLayer, document.body) : null}
       {portalReady && popup ? createPortal(popup, document.body) : null}
     </>
   )

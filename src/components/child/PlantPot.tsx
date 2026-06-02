@@ -4,24 +4,27 @@
  * 화분 UI — 캐릭터 옆 작은 성장 위젯입니다.
  *
  * 비개발자 설명:
- * - 바깥 화면에는 화분 그림만 보입니다. 물조리개는 **화분을 눌렀을 때 나오는 팝업 안**에 있습니다.
- * - 팝업 상단에는 지금 식물 단계 이름이 제목으로 나옵니다.
- * - 물조리개를 누르면 물방울이 아래로 떨어지는 효과만 보이고, 예전처럼 하트가 날아가지는 않습니다.
- * - 화분 아래 막대는 「다음 단계까지」 하트 진행률을 보여 줍니다.
+ * - 바깥 화면에는 화분 그림만 보입니다. 탭하면 팝업이 열립니다.
+ * - 팝업 가운데에 화분, 오른쪽에 물조리개가 있습니다.
+ * - 물조리개: 물방울 연출과 함께 식물이 자랍니다(하트 1 소모).
  */
 
 import { useEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import Image from 'next/image'
 import { createPortal } from 'react-dom'
-import { STAGE_IMAGE, STAGE_LABELS, type PlantStage } from '@/constants/plantTrees'
+import {
+  getStageImage,
+  STAGE_LABELS,
+  type PlantStage,
+} from '@/constants/plantTrees'
 import type { PotState, WaterResult } from '@/hooks/usePlantPot'
 import WateringCanButton from '@/components/child/WateringCanButton'
 import SpriteImage from '@/components/common/SpriteImage'
 import { ICONS } from '@/constants/sprites'
 
-/** 물조리개 버튼 탭(클릭) 효과음 */
-const PLANT_CAN_CLICK_SOUND_SRC = '/assets/audio/effects/star-pop-click-2364.wav' as const
+/** 도구 탭 효과음 */
+const PLANT_TOOL_CLICK_SOUND_SRC = '/assets/audio/effects/star-pop-click-2364.wav' as const
 
 export type PlantPotWaterActions = {
   hearts: number
@@ -29,8 +32,7 @@ export type PlantPotWaterActions = {
   onNoHearts: () => void
   onGrowthCelebrate?: (newStage: PlantStage) => void
   /**
-   * 7단계(완성)에서는 하트가 0이어도 서버가 화분만 씨앗으로 돌립니다 — 버튼 잠금을 풉니다.
-   * 비개발자: 열매가 다 익은 뒤에는 하트가 없어도 물조리개를 누를 수 있어요.
+   * 7단계(완성)에서는 하트가 0이어도 서버가 화분만 씨앗으로 돌립니다 — 물조리개 잠금을 풉니다.
    */
   allowWaterWithoutHearts?: boolean
 }
@@ -73,6 +75,26 @@ function StarParticle({ index }: { index: number }) {
   )
 }
 
+/** 물조리개 탭 시 화분 위로 떨어지는 물방울 */
+function WaterDrop({ index }: { index: number }) {
+  const offsetX = (index - 1) * 10
+  return (
+    <span
+      className="pointer-events-none absolute left-1/2 top-0 text-sky-400"
+      style={{
+        marginLeft: offsetX,
+        fontSize: 14,
+        lineHeight: 1,
+        animation: 'plantWaterDrop 620ms ease-in forwards',
+        animationDelay: `${index * 90}ms`,
+      }}
+      aria-hidden
+    >
+      💧
+    </span>
+  )
+}
+
 export default function PlantPot({ pot, onRequestSeedSelect, waterActions }: Props) {
   const prevStage = useRef(pot.stage)
   const skipInitialFx = useRef(true)
@@ -81,18 +103,8 @@ export default function PlantPot({ pot, onRequestSeedSelect, waterActions }: Pro
   const [statusPopupOpen, setStatusPopupOpen] = useState(false)
   const [inspectWiggle, setInspectWiggle] = useState(false)
   const [portalReady, setPortalReady] = useState(false)
-  /** 물줄 때 팝업 안 하트 포물선 연출 데이터(시작점/도착점) */
-  const [heartBurst, setHeartBurst] = useState<{
-    id: number
-    startX: number
-    startY: number
-    dx: number
-    dy: number
-    arc: number
-  } | null>(null)
-  /** 물조리개 클릭 시 팝업 안에서 추가 흔들림(좌우) 연출 */
-  const [canShakeBurst, setCanShakeBurst] = useState(false)
-  /** 포물선 좌표 계산용: 같은 팝업 내부 기준 좌표 */
+  /** 물조리개 탭 시 화분 위 물방울 연출 */
+  const [waterPourBurst, setWaterPourBurst] = useState(false)
   const arcWrapRef = useRef<HTMLDivElement>(null)
   const canVisualRef = useRef<HTMLDivElement>(null)
   const potVisualRef = useRef<HTMLDivElement>(null)
@@ -121,7 +133,7 @@ export default function PlantPot({ pot, onRequestSeedSelect, waterActions }: Pro
     prevStage.current = pot.stage
   }, [pot.stage])
 
-  const imgSrc = STAGE_IMAGE[pot.stage]
+  const imgSrc = getStageImage(pot.treeId, pot.stage)
   const label = STAGE_LABELS[pot.stage]
   const isSeedStage = pot.stage === 0
   const progressPct =
@@ -131,9 +143,9 @@ export default function PlantPot({ pot, onRequestSeedSelect, waterActions }: Pro
         ? 100
         : 0
 
-  function playCanClickSound() {
+  function playToolClickSound() {
     try {
-      const audio = new Audio(PLANT_CAN_CLICK_SOUND_SRC)
+      const audio = new Audio(PLANT_TOOL_CLICK_SOUND_SRC)
       audio.volume = 0.88
       void audio.play().catch(() => {
         /* noop */
@@ -149,43 +161,13 @@ export default function PlantPot({ pot, onRequestSeedSelect, waterActions }: Pro
     window.setTimeout(() => setInspectWiggle(false), 420)
   }
 
-  /** 팝업 안 물주기 — 탭 직후 하트 포물선을 먼저 띄우고 API는 뒤에서 처리합니다. */
+  /** 물조리개 — 물방울 연출 + 성장 API */
   async function handleWaterInPopup(): Promise<WaterResult> {
-    playCanClickSound()
-    setCanShakeBurst(true)
-    window.setTimeout(() => setCanShakeBurst(false), 340)
+    playToolClickSound()
+    setWaterPourBurst(true)
+    window.setTimeout(() => setWaterPourBurst(false), 720)
     if (!waterActions) return 'ok'
-
-    const shouldFlyHeart = waterActions.hearts > 0 && !waterActions.allowWaterWithoutHearts
-
-    if (shouldFlyHeart) {
-      const wrap = arcWrapRef.current
-      const canEl = canVisualRef.current
-      const potEl = potVisualRef.current
-      if (wrap && canEl && potEl) {
-        const ww = wrap.getBoundingClientRect()
-        const cw = canEl.getBoundingClientRect()
-        const pw = potEl.getBoundingClientRect()
-        const startX = cw.left + cw.width * 0.28 - ww.left
-        const startY = cw.top + cw.height * 0.54 - ww.top
-        const targetX = pw.left + pw.width * 0.5 - ww.left
-        const targetY = pw.top + pw.height * 0.5 - ww.top
-        const dx = targetX - startX
-        const dy = targetY - startY
-        const arc = Math.max(18, Math.abs(dx) * 0.24)
-        const id = Date.now()
-        setHeartBurst({ id, startX, startY, dx, dy, arc })
-        window.setTimeout(() => {
-          setHeartBurst((prev) => (prev && prev.id === id ? null : prev))
-        }, 700)
-      }
-    }
-
-    const r = await waterActions.water()
-    if (r === 'no_hearts') {
-      setHeartBurst(null)
-    }
-    return r
+    return waterActions.water()
   }
 
   const statusPopup = statusPopupOpen ? (
@@ -196,32 +178,37 @@ export default function PlantPot({ pot, onRequestSeedSelect, waterActions }: Pro
         aria-label="화분 상태 닫기"
         onClick={() => setStatusPopupOpen(false)}
       />
-      <div className="relative z-[1] flex min-h-[21.5rem] w-full max-w-[17.5rem] flex-col rounded-2xl border border-green-100 bg-white p-4 shadow-xl">
-        {/** 제목(예: 새싹)과 단계(예: 2단계) — 팝업 상단에서 조금 아래로 둡니다 */}
-        <h2 className="mt-5 text-center text-lg font-black leading-tight text-green-800">
+      <div className="relative z-[1] flex min-h-[20rem] w-full max-w-[18rem] flex-col rounded-2xl border border-green-100 bg-white p-4 shadow-xl">
+        <h2 className="mt-4 text-center text-lg font-black leading-tight text-green-800">
           {label}
           <span className="block text-sm font-bold text-green-700/90">{pot.stage + 1}단계</span>
         </h2>
 
         {waterActions ? (
-          <div className="mt-6 flex flex-1 translate-y-3 flex-col items-center justify-center gap-2">
-            <div ref={arcWrapRef} className="relative mx-auto flex w-[200px] items-end justify-center gap-7 px-1">
-              {/* 위치 교체: 화분을 왼쪽으로 보냅니다. */}
-              <div ref={potVisualRef} className="relative h-24 w-24 -translate-x-4">
+          <div className="mt-5 flex flex-1 flex-col items-center justify-center gap-2">
+            <div ref={arcWrapRef} className="relative mx-auto h-28 w-full">
+              {/* 화분 — 팝업 가로 중앙 */}
+              <div ref={potVisualRef} className="absolute left-1/2 top-0 h-28 w-28 -translate-x-1/2">
                 <Image
                   src={imgSrc}
                   alt={label}
                   fill
                   className={['object-contain', isSeedStage ? 'scale-50 translate-y-2' : ''].filter(Boolean).join(' ')}
-                  sizes="96px"
+                  sizes="112px"
                 />
+                {waterPourBurst ? (
+                  <div className="pointer-events-none absolute inset-x-0 top-2 flex justify-center">
+                    {[0, 1, 2].map((i) => (
+                      <WaterDrop key={i} index={i} />
+                    ))}
+                  </div>
+                ) : null}
               </div>
 
-              {/* 위치 교체: 물조리개를 오른쪽에 두고, 살짝 중앙(왼쪽)으로 당깁니다. */}
+              {/* 물조리개 — 화분 오른쪽 */}
               <div
                 ref={canVisualRef}
-                className="origin-bottom-right scale-[2] translate-x-3"
-                style={{ animation: canShakeBurst ? 'popupCanShake 0.34s ease-in-out' : undefined }}
+                className="absolute bottom-0 left-1/2 origin-bottom translate-x-[3.5rem] translate-y-1 scale-[1.55]"
               >
                 <WateringCanButton
                   hearts={waterActions.hearts}
@@ -232,39 +219,14 @@ export default function PlantPot({ pot, onRequestSeedSelect, waterActions }: Pro
                   onGrowthCelebrate={waterActions.onGrowthCelebrate}
                 />
               </div>
-
-              {/* 물주기 성공 시 하트가 화분으로 포물선을 그리며 날아갑니다. */}
-              {heartBurst ? (
-                <span
-                  key={heartBurst.id}
-                  className="pointer-events-none absolute left-0 top-0"
-                  style={{
-                    left: `${heartBurst.startX}px`,
-                    top: `${heartBurst.startY}px`,
-                    animation: 'plantPotHeartArc 620ms ease-out forwards',
-                    ['--dx' as string]: `${heartBurst.dx}px`,
-                    ['--dy' as string]: `${heartBurst.dy}px`,
-                    ['--arc' as string]: `${heartBurst.arc}px`,
-                  }}
-                >
-                  <SpriteImage
-                    sheet={ICONS}
-                    frame="heart"
-                    width={18}
-                    clipRotated={false}
-                    className="h-[18px] w-[18px] object-contain"
-                  />
-                </span>
-              ) : null}
             </div>
 
-            <div className="mx-auto mt-1 w-[78%] px-1">
+            <div className="mx-auto mt-2 w-[82%] px-1">
               <div className="relative h-2.5 w-full overflow-visible rounded-full bg-gray-300">
                 <div
                   className="h-full rounded-full bg-pink-300 transition-all duration-500 ease-out"
                   style={{ width: `${progressPct}%` }}
                 />
-                {/* 게이지 끝 하트 — 진행률에 따라 막대 끝을 따라 이동합니다. */}
                 <span
                   className="pointer-events-none absolute top-1/2 -translate-y-1/2"
                   style={{ left: `calc(${progressPct}% - 8px)` }}
@@ -303,29 +265,18 @@ export default function PlantPot({ pot, onRequestSeedSelect, waterActions }: Pro
         </button>
       </div>
       <style>{`
-        @keyframes plantPotHeartArc {
+        @keyframes plantWaterDrop {
           0% {
-            transform: translate(0, 0) scale(0.95);
-            opacity: 1;
+            transform: translateY(0) scale(0.7);
+            opacity: 0;
           }
-          55% {
-            transform: translate(
-              calc(var(--dx, 0px) * 0.55),
-              calc(var(--dy, 0px) * 0.55 - var(--arc, 24px))
-            ) scale(1.08);
+          15% {
             opacity: 1;
           }
           100% {
-            transform: translate(var(--dx, 0px), var(--dy, 0px)) scale(0.8);
-            opacity: 0.08;
+            transform: translateY(52px) scale(1);
+            opacity: 0;
           }
-        }
-        @keyframes popupCanShake {
-          0%   { transform: translateX(-4px) rotate(0deg) scale(2); }
-          20%  { transform: translateX(-4px) rotate(-8deg) scale(2); }
-          45%  { transform: translateX(-4px) rotate(7deg) scale(2); }
-          70%  { transform: translateX(-4px) rotate(-6deg) scale(2); }
-          100% { transform: translateX(-4px) rotate(0deg) scale(2); }
         }
       `}</style>
     </div>
@@ -395,7 +346,7 @@ export default function PlantPot({ pot, onRequestSeedSelect, waterActions }: Pro
               .filter(Boolean)
               .join(', ') || undefined,
           }}
-          aria-label={`화분: ${label} (탭해서 물주기)`}
+          aria-label={`화분: ${label} (탭해서 관리하기)`}
         >
           {showStars ? Array.from({ length: 8 }, (_, i) => <StarParticle key={i} index={i} />) : null}
 

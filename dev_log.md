@@ -396,6 +396,33 @@
 
 ---
 
+## [2026-05-29] - 화분 팝업·저금통·스페셜 미션 에셋 (세션 종료)
+- **Status:** ✅ 완료
+- **Files Created:**
+  - `src/components/child/ChildCreditAmountDisplay.tsx` — 크레딧 숫자 표시 공통
+  - `src/lib/childCreditDisplay.ts`, `src/lib/piggyBankBonus.ts`
+  - `supabase/migrations/107_child_stats_credits_available_model.sql` — `credits_available` 모델
+  - `supabase/migrations/108_pray_mission_icon_special_folder.sql` — 기도하기 PNG `special/pray.png`
+  - `public/assets/img/missions/routine/plant/{apple,lemon,cherry,...}/` — 종류별 성장 단계 에셋
+- **Files Modified (핵심):**
+  - `src/components/child/PlantPot.tsx`, `WateringCanButton.tsx` — 팝업 중앙 화분 + 물조리개, 물주기·연출
+  - `src/constants/plantTrees.ts` — `getStageImage(treeId, stage)` 종류별 폴더 경로
+  - `src/components/child/ChildHomePiggyBank.tsx`, `ChildScreen.tsx` — 저금통 UI·크레딧 available 연동
+  - `src/lib/specialMissionChips.ts`, `src/lib/routineMissionThumbnail.ts` — 머리빗기·이불·가글·로션 칩/PNG, 기도하기 경로 수정
+  - API: `credits/transfer`, `mission/complete`, `daily-mission/complete`, `market/*` — available 크레딧 반영
+- **Files Deleted:**
+  - `MissionCreditCards.tsx`, `MissionCreditMoveDialog.tsx`, `FloatingCreditsStackVisual.tsx` 등 — 미션 카드→저금통 옛 UI 제거
+  - `public/assets/img/missions/routine/plant/{0..7,apple}.png` — `apple/` 폴더로 이동
+- **Summary:**
+  - 화분 팝업을 **중앙 화분 + 물조리개** 레이아웃으로 정리하고, 식물 일러스트를 **종류별 하위 폴더**(`apple/` 등) 구조로 맞췄습니다.
+  - 저금통·마켓·미션 보상은 **`credits_available`** 기준으로 단순화하고, 예전 「미션 카드 더미」 크레딧 UI를 제거했습니다.
+  - 스페셜 미션 **머리빗기·이불 정리·가글·로션** 칩/썸네일을 추가하고, **기도하기** 이미지 404(`p.m/pray.png` → `special/pray.png`)를 수정했습니다.
+- **Next Steps:**
+  - Supabase에 `107`·`108` 마이그레이션 적용 (`supabase db push`)
+  - 실기기에서 화분 팝업·저금통 이체·신규 스페셜 미션 카드 썸네일 확인
+
+---
+
 ## 📑 Commit Message Protocol
 1. 모든 커밋 메시지는 이 로그의 최신 기록을 바탕으로 작성한다.
 2. **형식**: `type: [작업명] #이슈번호(선택)`

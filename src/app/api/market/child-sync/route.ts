@@ -55,9 +55,8 @@ export async function GET(req: NextRequest) {
         ? []
         : ((hiddenRes.data ?? []) as { store_item_id: string }[]).map((r) => r.store_item_id).sort(),
       purchaseRequests: (prRes.data ?? []) as PurchaseRequest[],
-      /** 총 코인(단일·멀티 공통) — `MarketTab`이 연령/레벨에 따라 총액·지갑 중 표시에 씀 */
+      /** 레벨 블록 가용 크레딧 */
       credits: srow && typeof srow.credits === 'number' ? readChildStatInt(srow.credits) : null,
-      creditsWallet: srow && srow.credits_wallet !== undefined ? readChildStatInt(srow.credits_wallet) : null,
       /** 숨김·통계 조회 오류는 비치명적 — 클라이언트가 이전 상태를 유지 */
       partial: Boolean(hiddenRes.error || statsRes.error),
     })

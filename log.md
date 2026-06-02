@@ -1,3 +1,22 @@
+# 2026-05-29 작업 로그
+
+## 오늘 한 일
+- **화분 팝업**: 중앙 화분 + 물조리개, 영양제 UI 제거, 물주기·물방울 연출. 식물 PNG를 `plant/apple/` 등 **종류별 폴더**로 정리.
+- **저금통·크레딧**: `credits_available` 모델(107 마이그레이션), 미션 카드 더미·이체 오버레이 등 구 UI 제거, `ChildHomePiggyBank` 중심으로 통합.
+- **스페셜 미션**: 머리빗기·이불 정리·가글·로션 칩/썸네일 추가. **기도하기** PNG 경로 `special/pray.png` 수정(108 마이그레이션).
+
+## 커밋/배포
+- (이번 push) — 화분·저금통·스페셜 미션 에셋
+
+## 메모
+- 화분: `PlantPot.tsx`, `plantTrees.ts` (`getStageImage`)
+- 기도하기 이미지: `routineMissionThumbnail.ts` + `108_pray_mission_icon_special_folder.sql`
+- DB: `supabase db push` 로 107·108 적용 필요
+
+## 다음에 이어서
+- 마이그레이션 적용 후 실기기에서 저금통 이체·화분·스페셜 카드 확인
+- lemon/peach 등 추가 나무는 `TREE_LIST`·폴더만 넣으면 확장 가능
+
 # 2026-05-31 작업 로그
 
 ## 오늘 한 일

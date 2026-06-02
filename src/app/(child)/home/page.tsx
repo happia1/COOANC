@@ -189,7 +189,6 @@ export default async function ChildHomePage() {
 
   const initialStats = (statsRes.data ?? null) as ChildStats | null
   const level = initialStats?.current_level ?? 0
-  const creditsWallet = readChildStatInt(initialStats?.credits_wallet)
 
   const childName = (profileRow?.name ?? '').trim() || '쿠앵이'
   const childAvatarUrl =

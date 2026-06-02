@@ -51,7 +51,7 @@ import ChildPanelOverlay, { type PanelType } from '@/components/child/ChildPanel
 import ChildLevelStatsCard from '@/components/child/ChildLevelStatsCard'
 import ChildHomePiggyBank from '@/components/child/ChildHomePiggyBank'
 import { normalizeChildStatsCreditsSplit, mergeChildStatsPatch, readChildStatInt } from '@/lib/childCreditsSplit'
-import { MULTI_BUCKET_MIN_LEVEL, usesSingleBucket } from '@/constants/childAgeConfig'
+import { PIGGY_BANK_UNLOCK_MIN_LEVEL, isPiggyBankUnlocked } from '@/constants/childAgeConfig'
 import { completionRateToHearts } from '@/lib/missionHeartCount'
 import { scaledMissionRewards } from '@/lib/missionRewardMultiplier'
 import { isSpecialSectionMission, isRetiredSpecialMissionTitle } from '@/lib/specialMissionChips'
@@ -1988,15 +1988,14 @@ export default function ChildScreen({
     return 3.2 * t
   }, [containerW])
 
-  /** 레벨·나이 기준으로 지갑/저금통 분리(멀티 버킷) 여부 — 단일 버킷이면 저금 API 를 막습니다. */
-  const multiBucketMode = useMemo(
-    () => !usesSingleBucket(stats?.current_level ?? 0, ageYears),
-    [stats?.current_level, ageYears],
+  /** 저금통 해금 기준 레벨 — 레벨 5 */
+  const piggyUnlockLevel = PIGGY_BANK_UNLOCK_MIN_LEVEL
+  /** 현재 저금통 UI·저금이 열린 상태인지 */
+  const piggyUnlocked = useMemo(
+    () => isPiggyBankUnlocked(stats?.current_level ?? 0),
+    [stats?.current_level],
   )
-  /** 저금통 해금 기준 레벨(Progressive Unlock) */
-  const piggyUnlockLevel = MULTI_BUCKET_MIN_LEVEL
-  /** 현재 저금통이 실제로 열린 상태인지 */
-  const piggyUnlocked = multiBucketMode
+  const piggyDepositEnabled = piggyUnlocked
   /** 해금 축하 + 튜토리얼 플로우 모달 */
   const [piggyUnlockFlowOpen, setPiggyUnlockFlowOpen] = useState(false)
   const piggyUnlockSeenRef = useRef(false)
@@ -2168,10 +2167,12 @@ export default function ChildScreen({
     }
   }, [])
 
-  /** 저금통 팝업에서 지갑·저금 잔액만 반영합니다. */
-  const patchWalletPiggyFromHome = useCallback((p: { credits_wallet: number; credits_piggy: number }) => {
+  /** 저금통 팝업에서 가용·저금통 잔액을 반영합니다. */
+  const patchPiggyFromHome = useCallback((p: { credits: number; credits_piggy: number }) => {
     setStats((prev) => (prev ? mergeChildStatsPatch(prev, p) : prev))
   }, [])
+
+  const availableCreditsForHome = readChildStatInt(stats?.credits)
 
   return (
     <>
@@ -2297,11 +2298,12 @@ export default function ChildScreen({
                     {piggyUnlocked && stats && (plantLoading || !pot) ? (
                       <div className="pointer-events-auto mt-6 flex w-max max-w-full justify-start">
                         <ChildHomePiggyBank
-                          walletCredits={readChildStatInt(stats.credits_wallet)}
+                          availableCredits={availableCreditsForHome}
                           piggyCredits={readChildStatInt(stats.credits_piggy)}
                           childId={childId}
-                          multiBucket={multiBucketMode}
-                          onWalletPiggyUpdate={patchWalletPiggyFromHome}
+                          depositEnabled={piggyDepositEnabled}
+                          levelCreditRef={creditBadgeRef}
+                          onPiggyUpdate={patchPiggyFromHome}
                         />
                       </div>
                     ) : null}
@@ -2434,11 +2436,12 @@ export default function ChildScreen({
                     }}
                   >
                     <ChildHomePiggyBank
-                      walletCredits={readChildStatInt(stats.credits_wallet)}
+                      availableCredits={availableCreditsForHome}
                       piggyCredits={readChildStatInt(stats.credits_piggy)}
                       childId={childId}
-                      multiBucket={multiBucketMode}
-                      onWalletPiggyUpdate={patchWalletPiggyFromHome}
+                      depositEnabled={piggyDepositEnabled}
+                      levelCreditRef={creditBadgeRef}
+                      onPiggyUpdate={patchPiggyFromHome}
                     />
                   </div>
                 </div>
@@ -2713,7 +2716,12 @@ export default function ChildScreen({
         }}
       />
 
-      <PlantStageCelebrationModal open={plantCelebrateStage !== null} stage={plantCelebrateStage} onClose={dismissPlantCelebrate} />
+      <PlantStageCelebrationModal
+        open={plantCelebrateStage !== null}
+        stage={plantCelebrateStage}
+        treeId={pot?.treeId ?? 'apple'}
+        onClose={dismissPlantCelebrate}
+      />
 
       <RapidTapConfirmModal
         open={rapidTapModalOpen}

@@ -102,7 +102,6 @@ export async function POST(req: NextRequest) {
     newStreak = stats.last_mission_date === yesterday ? newStreak + 1 : 1
   }
 
-  const keepWallet = readChildStatInt(stats.credits_wallet)
   const keepPiggy = readChildStatInt(stats.credits_piggy)
   const baseCredits = readChildStatInt(stats.credits)
 
@@ -110,7 +109,7 @@ export async function POST(req: NextRequest) {
     .from('child_stats')
     .update({
       credits: baseCredits + creditEarned,
-      credits_wallet: keepWallet,
+      credits_wallet: 0,
       credits_piggy: keepPiggy,
       hearts: stats.hearts + heartEarned,
       total_credits_earned: stats.total_credits_earned + creditEarned,
