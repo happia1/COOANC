@@ -18,7 +18,6 @@ import {
   useSensors,
   type DragEndEvent,
   type DraggableAttributes,
-  type SyntheticListenerMap,
 } from '@dnd-kit/core'
 import {
   SortableContext,
@@ -30,12 +29,15 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import type { Mission } from '@/types/database'
 
+/** useSortable listeners 타입 — @dnd-kit 버전별 export 이름 차이를 피합니다 */
+type MissionStripDragListeners = ReturnType<typeof useSortable>['listeners']
+
 /** 카드 루트에 붙일 드래그·정렬 바인딩 — renderCard 두 번째 인자 */
 export type MissionStripDragProps = {
   setNodeRef: (element: HTMLElement | null) => void
   style: CSSProperties
   attributes: DraggableAttributes
-  listeners: SyntheticListenerMap | undefined
+  listeners: MissionStripDragListeners
   isDragging: boolean
   /** 직전에 드래그로 순서를 바꿨으면 true — 탭(보상 편집) 열림을 막을 때 씁니다 */
   suppressNextClick: () => boolean
