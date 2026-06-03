@@ -100,7 +100,13 @@ import SchoolTimePopup from '@/components/child/SchoolTimePopup'
 import PiggyBankUnlockFlowModal from '@/components/child/PiggyBankUnlockFlowModal'
 import StickerUnlockFlowModal from '@/components/child/StickerUnlockFlowModal'
 import ContentZoneUnlockFlowModal from '@/components/child/ContentZoneUnlockFlowModal'
-import EmotionCardLockedModal from '@/components/child/EmotionCardLockedModal'
+import DiaryModal from '@/components/child/DiaryModal'
+import type { DiaryChildProfile } from '@/types/diaryModal'
+import { probeDiaryBackgroundAvailable } from '@/lib/diaryBackground'
+import {
+  isAllowedChildProfileAvatarUrl,
+  publicUrlForChildProfileAvatar,
+} from '@/lib/childProfileAvatar'
 import { readRoutineAlarmPrefs } from '@/lib/routineAlarmLocalPrefs'
 import { resolveRoutineAlarmSoundUrl } from '@/lib/routineAlarmSounds'
 import { installChildRoutineAudioUnlockOnFirstGesture } from '@/lib/childAudio'
@@ -598,12 +604,6 @@ export default function ChildScreen({
     }
   }, [])
 
-  /** 캐릭터 터치 → 감정카드 (Lv.10 미구현, 정식 출시 전까지 잠금 팝업만) */
-  const openEmotionCardFromCharacter = useCallback(() => {
-    /** 정식 출시 시 Lv.10+ 는 EmotionCardModal, 미만은 잠금 팝업 분기 예정 */
-    setEmotionCardLockedOpen(true)
-  }, [])
-
   /** 전체 화면을 감싸는 컨테이너 ref — 캐릭터 높이 + 파티클 좌표 기준 계산에 사용 */
   const containerRef = useRef<HTMLDivElement>(null)
   /** 레벨 카드 배율에 가로·캐릭터 높이에 세로 — 같은 전체 화면 컨테이너 실측값 사용 */
@@ -687,6 +687,25 @@ export default function ChildScreen({
   const [stats, setStats] = useState<ChildStats | null>(() =>
     initialStats ? normalizeChildStatsCreditsSplit(initialStats) : null,
   )
+
+  /** 다이어리 배경 PNG — 홈 진입 시 미리 확인(없으면 팝업에서 404 대기 없음) */
+  useEffect(() => {
+    void probeDiaryBackgroundAvailable()
+  }, [])
+
+  /** DiaryModal 왼쪽 프로필 — 홈에서 이미 알고 있는 자녀 정보 */
+  const diaryChildProfile = useMemo((): DiaryChildProfile => {
+    const avatarUrl =
+      childAvatarUrl && isAllowedChildProfileAvatarUrl(childAvatarUrl)
+        ? childAvatarUrl
+        : publicUrlForChildProfileAvatar('bunny_profile.png')
+    return {
+      name: childName.trim() || '친구',
+      avatarUrl,
+      ageYears,
+      currentLevel: stats?.current_level ?? 0,
+    }
+  }, [childAvatarUrl, childName, ageYears, stats?.current_level])
 
   /**
    * 물주기 API 가 저장한 하트·화분 진행을 레벨 카드 `stats` 에도 바로 반영합니다.
@@ -889,7 +908,8 @@ export default function ChildScreen({
    * 비개발자 설명: 상단 우측 타이머(유리 버튼)를 누르면 true 가 되고, 닫기로 false 가 됩니다.
    */
   const [clockPopupOpen, setClockPopupOpen] = useState(false)
-  const [emotionCardLockedOpen, setEmotionCardLockedOpen] = useState(false)
+  const [isDiaryOpen, setIsDiaryOpen] = useState(false)
+  const [diaryInitialDate, setDiaryInitialDate] = useState(today)
   /** 상단 우측 음악 아이콘 전용 팝업 열림 여부 */
   const [musicPopupOpen, setMusicPopupOpen] = useState(false)
 
@@ -2218,8 +2238,11 @@ export default function ChildScreen({
               top: `${anchor.characterFootY * 100}%`,
               transform: 'translate(-50%, -100%)',
             }}
-            onClick={openEmotionCardFromCharacter}
-            aria-label="내 감정 카드 열기"
+            onClick={() => {
+              setDiaryInitialDate(today)
+              setIsDiaryOpen(true)
+            }}
+            aria-label="그림일기 다이어리 열기"
           >
             <CharacterSprite
               character={characterSprite.character}
@@ -2780,9 +2803,13 @@ export default function ChildScreen({
         onGoToMarketContent={openMarketToContent}
       />
 
-      <EmotionCardLockedModal
-        open={emotionCardLockedOpen}
-        onClose={() => setEmotionCardLockedOpen(false)}
+      <DiaryModal
+        open={isDiaryOpen}
+        onClose={() => setIsDiaryOpen(false)}
+        childId={childId}
+        childProfile={diaryChildProfile}
+        initialDate={diaryInitialDate}
+        onInitialDateChange={setDiaryInitialDate}
       />
 
       {showSchoolTime && !isSleeping && !showMorningWake ? (
