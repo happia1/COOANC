@@ -54,7 +54,7 @@ import { normalizeChildStatsCreditsSplit, mergeChildStatsPatch, readChildStatInt
 import { PIGGY_BANK_UNLOCK_MIN_LEVEL, isPiggyBankUnlocked } from '@/constants/childAgeConfig'
 import { completionRateToHearts } from '@/lib/missionHeartCount'
 import { scaledMissionRewards } from '@/lib/missionRewardMultiplier'
-import { isSpecialSectionMission, isRetiredSpecialMissionTitle } from '@/lib/specialMissionChips'
+import { isSpecialSectionMission, isOrphanSpecialMissionTemplate } from '@/lib/specialMissionChips'
 import {
   compareRoutineFlowSortable,
   dedupeDailyRoutineMissionsByCanonicalKey,
@@ -1290,7 +1290,7 @@ export default function ChildScreen({
         const m = dm.missions
         /** 미션 템플릿이 삭제된 오늘 행은 조인이 없어 슬라이더에 못 넣음 — 제외해야 빈 화면 원인 진단이 맞음 */
         if (!m) return false
-        if (isRetiredSpecialMissionTitle(m.title)) return false
+        if (isSpecialSectionMission(m) && isOrphanSpecialMissionTemplate(m)) return false
         if (isRetiredRoutineMissionTitle(m.title)) return false
         return true
       }),

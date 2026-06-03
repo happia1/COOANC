@@ -31,6 +31,7 @@ insert into badges (badge_id, name, description, icon_emoji, badge_type, conditi
   ('first_real',    '첫 실물교환', '처음으로 진짜 물건으로 교환했어요!',        '📦', 'level',  '{"event":"first_real_purchase"}'),
   ('goal_achieved', '목표 달성자', '저금통 목표를 달성했어요!',                  '🎯', 'level',  '{"event":"savings_goal_achieved"}'),
   ('sharing_hero',  '나눔 영웅',   '선물하기와 기부를 모두 해봤어요!',          '💝', 'level',  '{"gift_count":1,"donation_count":1}'),
+  -- v3 Lv.5 단계명은 「저축왕」; 아래 title 「투자가」는 레거시 시드(행 데이터 호환 유지)
   ('investor',      '투자가',      '투자 농장에서 첫 수확을 했어요!',           '🚀', 'level',  '{"event":"farm_harvest"}'),
 
   -- 스트릭 뱃지

@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation'
 import { PARENT_TABS_MAIN_SCROLL_EL_ID } from '@/lib/parentTabsMainScrollId'
 import ParentNavBar from '@/components/parent/ParentNavBar'
 import ParentTopBar from '@/components/parent/ParentTopBar'
+import ParentChildLevelUpModal from '@/components/parent/ParentChildLevelUpModal'
 import ParentNewPurchaseRequestModal from '@/components/parent/ParentNewPurchaseRequestModal'
 import ParentStickerBoardCompleteModal from '@/components/parent/ParentStickerBoardCompleteModal'
 import ParentSettingsSheet from '@/components/parent/ParentSettingsSheet'
@@ -66,6 +67,7 @@ export default function ParentAppChrome({ pendingApprovalCount, children }: Prop
         </main>
       </div>
       <ParentNewPurchaseRequestModal />
+      <ParentChildLevelUpModal />
       <ParentStickerBoardCompleteModal />
       <ParentSettingsSheet open={settingsOpen} onClose={closeSettings} />
       {/* 앱 실행 시 조건에 맞는 공지 팝업 1개를 띄웁니다 (STEP 5~8) */}

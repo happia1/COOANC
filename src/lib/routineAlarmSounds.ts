@@ -79,7 +79,7 @@ export const ROUTINE_ALARM_SOUND_CATALOG: RoutineAlarmSoundCatalogItem[] = [
     url: '/assets/audio/alerts/이제 나갈시간이야.wav',
     category: 'schoolDepart',
   },
-  /** 기타: 짧은 효과음 둘(서로 다른 파일) */
+  /** 기타: 틱톡 WAV(`pomodoro/ten-second-tick.wav`) — 「잘 시간」 MP3 와 구분 */
   { id: 'tick_tock_timer', label: '틱톡 타이머', url: CHILD_AUDIO.tickTock, category: 'other' },
   {
     id: 'alarm_tick_clock',

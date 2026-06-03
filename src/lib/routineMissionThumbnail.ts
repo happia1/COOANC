@@ -217,6 +217,8 @@ const PNG_BY_TITLE: Record<string, string> = {
   // --- 스페셜 키워드 칩(짧은 제목) — `displaySpecialMissionTitle` 후에도 매칭되도록 ---
   식사준비: MEAL_PREP_HELP_ROUTINE_PNG,
   빨래통에넣기: `${BASE}/p.m/roundrybasket.png`,
+  빨래정리: `${BASE}/p.m/roundrybasket.png`,
+  '빨래 정리': `${BASE}/p.m/roundrybasket.png`,
   외투걸어놓기: `${BASE}/special/hanging_cloth.png`,
   어깨마사지: `${BASE}/special/parent_massage.png`,
   분리수거: `${BASE}/special/sort_recycle.png`,

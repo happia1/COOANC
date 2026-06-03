@@ -155,6 +155,23 @@ export default function SpecialMissionAddSheet({
         onToast(msg, false)
       }
 
+      /** 같은 칩에 daily·event 템플릿이 겹쳐 있으면 대표 행만 남기고 나머지는 먼저 지웁니다 */
+      for (const entry of Object.values(baseline)) {
+        for (const missionId of entry.duplicateMissionIds ?? []) {
+          const res = await fetch('/api/mission/delete-template', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ missionId }),
+          })
+          const json = await res.json().catch(() => ({}))
+          if (!res.ok) {
+            await fail(typeof json.error === 'string' ? json.error : '중복 미션을 정리하지 못했어요')
+            return
+          }
+          deleted += 1
+        }
+      }
+
       for (const chipId of Object.keys(baseline)) {
         if (selectedIds.includes(chipId)) continue
         const missionId = baseline[chipId].missionId
@@ -248,7 +265,7 @@ export default function SpecialMissionAddSheet({
 
   if (!open) return null
 
-  const selectedChips = selectedIds
+  const selectedChips = [...new Set(selectedIds)]
     .map((id) => SPECIAL_MISSION_CHIPS.find((c) => c.id === id))
     .filter((c): c is (typeof SPECIAL_MISSION_CHIPS)[number] => Boolean(c))
 

@@ -6,8 +6,7 @@
  */
 
 import type { ReactNode, TouchEvent } from 'react'
-
-const LEVEL_NAMES = ['씨앗', '새싹', '교환사', '저축왕', '나눔이', '투자가']
+import { childGrowthStageName } from '@/constants/childGrowthLevels'
 
 /** 홈 탭에서만 넘기면 카드 안에 오늘 미션 달성률 바가 붙습니다 */
 export type ProfileMissionSummary = {
@@ -77,13 +76,13 @@ export function CompactChildProfileCard({
   siblingNav = null,
   avatarEnterShortcut = false,
 }: CompactChildProfileCardProps) {
-  const lv = Math.min(Math.max(level, 0), LEVEL_NAMES.length - 1)
-  const stageName = LEVEL_NAMES[lv]
+  const lv = Math.max(0, level)
+  const stageName = childGrowthStageName(lv)
   /** 둘째 줄: 연령대·보육·나이를 `·`로 이은 문장(비어 있으면 해당 행 숨김) */
   const metaParts = [ageGroupLabel?.trim(), childcareLabel?.trim()].filter(Boolean) as string[]
   const secondaryParts = [...metaParts, ...(age != null ? [`${age}세`] : [])]
   const secondaryLine = secondaryParts.length > 0 ? secondaryParts.join('·') : null
-  const levelTitle = `레벨 ${lv} · ${stageName}`
+  const levelTitle = stageName === `레벨 ${lv}` ? stageName : `레벨 ${lv} · ${stageName}`
   const statsAria = `크레딧 ${credits.toLocaleString()}, 하트 ${hearts}, 연속 미션 ${streakDays}일`
 
   const statsGridFull = (

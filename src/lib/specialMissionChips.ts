@@ -118,6 +118,13 @@ export const SPECIAL_MISSION_CHIPS: SpecialMissionChipDef[] = [
     defaultPopupMessage: '입었던 옷을 빨래통에 넣어 두어요.',
   },
   {
+    id: 'sp-laundry-neat',
+    /** 「외투걸어놓기」와 별개 — 050 에서 잘못 합쳐졌던 항목을 다시 분리 */
+    title: '빨래정리',
+    emoji: '',
+    defaultPopupMessage: '빨래한 옷과 세탁 공간을 가지런히 정리해요.',
+  },
+  {
     id: 'sp-laundry-tidy',
     title: '외투걸어놓기',
     emoji: '',
@@ -163,6 +170,7 @@ export const SPECIAL_MISSION_CHIP_CATEGORIES: SpecialMissionChipCategoryDef[] = 
     chipIds: [
       'sp-fold-laundry',
       'sp-laundry-basket',
+      'sp-laundry-neat',
       'sp-laundry-tidy',
       'sp-clean-bed',
       'sp-meal',
@@ -207,6 +215,7 @@ const LEGACY_SPECIAL_TITLE_TO_SHORT: Record<string, string> = {
   가방정리하기: '가방정리',
   '빨래통에 넣기': '빨래통에넣기',
   '외투 걸어두기': '외투걸어놓기',
+  '빨래 정리': '빨래정리',
   '밥 다먹기': '밥 다 먹기',
   밥그릇비우기: '밥 다 먹기',
   '밥그릇 비우기': '밥 다 먹기',
@@ -214,8 +223,6 @@ const LEGACY_SPECIAL_TITLE_TO_SHORT: Record<string, string> = {
   식사후정리: '식사 후 정리하기',
   '식사후 정리': '식사 후 정리하기',
   '식사 후 정리': '식사 후 정리하기',
-  빨래정리: '외투걸어놓기',
-  '빨래 정리': '외투걸어놓기',
   /** 이불 정리 — 옛 표기·공백 차이 */
   이불개기: '이불 정리하기',
   '이불 개기': '이불 정리하기',
@@ -245,7 +252,27 @@ const RETIRED_SPECIAL_DISPLAY_TITLES = new Set<string>([
   '양말신기',
   /** 스페셜 「가방정리」 칩 제거 — 구 템플릿만 남은 경우 숨김 */
   '가방정리',
+  /** 현재 칩 목록에 없는 옛 스페셜 시드 */
+  '어른께인사하기',
+  '장난감정리하기',
+  '목욕하기',
+  '밥먹고 정리하기',
 ])
+
+/** 현재 스페셜 칩 제목(정규화 후) — DB 정리·UI 숨김 기준 */
+export const SPECIAL_MISSION_CANONICAL_CHIP_TITLES: readonly string[] = SPECIAL_MISSION_CHIPS.map(
+  (c) => c.title,
+)
+
+/** 칩에 없는 스페셜 템플릿(폐지·시드 잔여) — 부모 UI에서 숨김 */
+export function isOrphanSpecialMissionTemplate(
+  m: Pick<Mission, 'title' | 'repeat_type' | 'difficulty'>,
+): boolean {
+  if (!isSpecialSectionMission(m)) return false
+  if (isRetiredSpecialMissionTitle(m.title ?? '')) return true
+  const chipId = missionTitleToSpecialChipId(m.title ?? '')
+  return chipId === null
+}
 
 /** 저장된 제목이 폐지된 스페셜 키워드인지 (레거시 별칭을 짧은 제목으로 푼 뒤에도 검사) */
 export function isRetiredSpecialMissionTitle(storedTitle: string): boolean {
@@ -289,11 +316,51 @@ export function missionTitleToSpecialChipId(storedTitle: string): string | null 
   return SPECIAL_MISSION_CHIPS.find((c) => c.title === short)?.id ?? null
 }
 
+/** 같은 스페셜 키워드(칩)끼리 묶을 때 쓰는 키 — 칩 정의가 없으면 정규화 제목으로 구분 */
+export function specialMissionChipKey(m: Pick<Mission, 'title'>): string {
+  const chipId = missionTitleToSpecialChipId(m.title)
+  return chipId ?? `__custom__:${displaySpecialMissionTitle(m.title)}`
+}
+
+/**
+ * 같은 칩에 daily·event 템플릿이 둘 다 있을 때 어느 행을 대표로 쓸지 고릅니다.
+ * 매일(daily) > 오늘만(event), 활성 > 비활성 순으로 우선합니다.
+ */
+export function pickPreferredSpecialMissionDuplicate(a: Mission, b: Mission): Mission {
+  const score = (x: Mission) => {
+    let s = 0
+    if (x.repeat_type === 'daily') s += 4
+    if (x.is_active) s += 2
+    return s
+  }
+  const sa = score(a)
+  const sb = score(b)
+  return sa >= sb ? a : b
+}
+
+/**
+ * 부모 루틴·스페셜 시트 — 같은 칩(또는 같은 정규화 제목)당 템플릿 행 하나만 남깁니다.
+ * 정렬된 목록 순서는 유지하고, 남는 행은 `pickPreferredSpecialMissionDuplicate` 기준입니다.
+ */
+export function dedupeSpecialLinkedMissionsByChipId(missions: Mission[]): Mission[] {
+  const winnerByKey = new Map<string, Mission>()
+  for (const m of missions) {
+    const key = specialMissionChipKey(m)
+    const prev = winnerByKey.get(key)
+    winnerByKey.set(key, prev ? pickPreferredSpecialMissionDuplicate(prev, m) : m)
+  }
+  const winnerIds = new Set([...winnerByKey.values()].map((row) => row.id))
+  return missions.filter((m) => winnerIds.has(m.id))
+}
+
 /**
  * 스페셜 추가 시트를 열 때 — 이 자녀의 스페셜 템플릿을 칩 선택·데일리 체크·저장 시 비교용 베이스라인으로 씁니다.
- * 같은 칩에 행이 여러 개면 첫 행만 씁니다(중복 데이터는 희귀).
+ * 같은 칩에 행이 여러 개면 대표 행 하나만 쓰고, 나머지 id 는 저장 시 삭제합니다.
  */
-export type SpecialMissionSheetBaseline = Record<string, { missionId: string; wasDaily: boolean }>
+export type SpecialMissionSheetBaseline = Record<
+  string,
+  { missionId: string; wasDaily: boolean; duplicateMissionIds?: string[] }
+>
 
 export function deriveSpecialMissionSheetState(params: {
   missions: Mission[]
@@ -309,13 +376,27 @@ export function deriveSpecialMissionSheetState(params: {
   const list = params.missions.filter(
     (m) => m.linked_child_id === params.childId && isSpecialSectionMission(m),
   )
-  const baseline: SpecialMissionSheetBaseline = {}
+  const rowsByChipId = new Map<string, Mission[]>()
   for (const m of list) {
     const chipId = missionTitleToSpecialChipId(m.title)
-    if (!chipId || baseline[chipId]) continue
-    const wasDaily = m.repeat_type === 'daily' && m.difficulty === 'special'
-    baseline[chipId] = { missionId: m.id, wasDaily }
+    if (!chipId) continue
+    const bucket = rowsByChipId.get(chipId)
+    if (bucket) bucket.push(m)
+    else rowsByChipId.set(chipId, [m])
   }
+
+  const baseline: SpecialMissionSheetBaseline = {}
+  for (const [chipId, rows] of rowsByChipId) {
+    const winner = rows.reduce(pickPreferredSpecialMissionDuplicate)
+    const duplicateMissionIds = rows.filter((row) => row.id !== winner.id).map((row) => row.id)
+    baseline[chipId] = {
+      missionId: winner.id,
+      /** repeat_type daily 이면 매일 구역 — 레거시 기도하기(daily+easy)도 포함 */
+      wasDaily: winner.repeat_type === 'daily',
+      ...(duplicateMissionIds.length > 0 ? { duplicateMissionIds } : {}),
+    }
+  }
+
   const selectedIds = Object.keys(baseline)
   const dailyAutoIds = selectedIds.filter((id) => baseline[id].wasDaily)
   return { selectedIds, dailyAutoIds, baseline }

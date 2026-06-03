@@ -32,8 +32,9 @@ import type { Mission } from '@/types/database'
 import { uuidStringsEqual } from '@/lib/normalizeUuid'
 import { ROUTINE_HAS_SCHOOL_KEY } from '@/lib/routineAlarmLocalPrefs'
 import {
+  dedupeSpecialLinkedMissionsByChipId,
   displaySpecialMissionTitle,
-  isRetiredSpecialMissionTitle,
+  isOrphanSpecialMissionTemplate,
   isRoutineSectionMission,
   isSpecialSectionMission,
 } from '@/lib/specialMissionChips'
@@ -647,7 +648,12 @@ export default function RoutineTab({
   )
   /** 폐지된 스페셜 키워드(설거지·방청소·심부름 등)는 DB 에 남아 있어도 목록에서 제외 — `051` 마이그레이션으로 행 삭제 권장 */
   const specialOnly = useMemo(
-    () => missions.filter(isSpecialMission).filter((m) => !isRetiredSpecialMissionTitle(m.title)),
+    () =>
+      dedupeSpecialLinkedMissionsByChipId(
+        missions
+          .filter(isSpecialMission)
+          .filter((m) => !isOrphanSpecialMissionTemplate(m)),
+      ),
     [missions],
   )
 

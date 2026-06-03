@@ -25,7 +25,7 @@ create table if not exists missions (
 );
 
 -- ============================================================
--- 레벨별 초기 미션 데이터 (Lv.0 ~ Lv.5)
+-- 레벨별 초기 미션 시드 (missions.level 0~5; v3 단계명은 CURRICULUM.md 참고)
 -- ============================================================
 insert into missions (level_required, title, credit_reward, heart_reward, exp_reward, concept_tag, difficulty, repeat_type, icon_emoji) values
   -- Lv.0 씨앗 — 행동-보상 연결
@@ -36,7 +36,7 @@ insert into missions (level_required, title, credit_reward, heart_reward, exp_re
   (0, '인사하기',         1,  1,  10,  '미션', 'easy',    'daily',   '👋'),
   (0, '옷 스스로 입기',   2,  2,  20,  '미션', 'normal',  'daily',   '👕'),
 
-  -- Lv.1 새싹 — 교환의 개념
+  -- Lv.1 새싹 (v3: 칭찬 스티커 해금)
   (1, '동생 도와주기',        3,  1,  25,  '기여', 'normal',  'daily',   '🤝'),
   (1, '책 읽기 10분',         2,  1,  20,  '학습', 'normal',  'daily',   '📚'),
   (1, '심부름 하기',          3,  2,  25,  '미션', 'normal',  'weekly',  '🏃'),
@@ -45,7 +45,7 @@ insert into missions (level_required, title, credit_reward, heart_reward, exp_re
   (1, '일찍 자기',            2,  1,  20,  '습관', 'normal',  'daily',   '😴'),
   (1, '그림 그리기 완성',     3,  2,  25,  '학습', 'normal',  'event',   '🎨'),
 
-  -- Lv.2 교환사 — 실물 화폐 교환
+  -- missions.level=2 시드 (v3: 「교환사」단계명 없음, 마켓·실물 교환은 Lv.0~)
   (2, '청소 도와주기',        5,  2,  35,  '기여', 'normal',  'weekly',  '🧹'),
   (2, '독서록 쓰기',          8,  3,  50,  '학습', 'hard',    'event',   '📝'),
   (2, '운동 30분',            6,  2,  40,  '건강', 'normal',  'weekly',  '🏋️'),
@@ -53,21 +53,21 @@ insert into missions (level_required, title, credit_reward, heart_reward, exp_re
   (2, '일기 쓰기',            6,  3,  40,  '학습', 'normal',  'daily',   '✏️'),
   (2, '일주일 개근 보너스',  20,  5, 100,  '습관', 'special', 'weekly',  '🎯'),
 
-  -- Lv.3 저축왕 — 저축과 목표 설정
+  -- missions.level=3 시드 (v3: 단계명 저축왕=Lv.5·저금통 해금)
   (3, '목표 저금통 10% 달성', 10,  3,  60,  '저축', 'special', 'event',   '🐷'),
   (3, '스스로 공부 30분',     10,  4,  60,  '학습', 'hard',    'daily',   '📖'),
   (3, '어려운 도전 미션',     15,  5,  80,  '도전', 'hard',    'weekly',  '⚡'),
   (3, '집안일 프로젝트',      20,  7,  90,  '기여', 'hard',    'weekly',  '🏠'),
   (3, '한 달 꾸준히 달성',   50, 15, 200,  '습관', 'special', 'monthly', '🏆'),
 
-  -- Lv.4 나눔이 — 증여와 나눔
+  -- missions.level=4 시드 (v3: 「나눔이」폐기, Lv.10 감정카드·일기 향후)
   (4, '친구에게 크레딧 선물', 20,  8,  80,  '나눔', 'special', 'event',   '🎁'),
   (4, '기부 미션',            15, 10,  70,  '나눔', 'special', 'monthly', '🌳'),
   (4, '가족 감사 편지',       10,  5,  50,  '나눔', 'normal',  'weekly',  '💌'),
   (4, '친구 도와주기',         8,  5,  45,  '나눔', 'normal',  'event',   '🤗'),
   (4, '나눔 일기 쓰기',        8,  4,  40,  '나눔', 'normal',  'weekly',  '📓'),
 
-  -- Lv.5 투자가 — 투자와 리스크
+  -- missions.level=5 시드 (v3: Lv.5=저축왕·저금통, 「투자가」단계명 폐기)
   (5, '투자 농장 씨앗 심기',  0,  5,  30,  '투자', 'special', 'event',   '🌱'),
   (5, '경제 퀴즈 도전',      20,  5,  80,  '학습', 'hard',    'weekly',  '🧠'),
   (5, '투자 일기 쓰기',      10,  3,  50,  '투자', 'normal',  'weekly',  '📊'),

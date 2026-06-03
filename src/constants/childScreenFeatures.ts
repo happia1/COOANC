@@ -19,13 +19,15 @@ export function isContentZoneUnlocked(level: number): boolean {
   return level >= CONTENT_ZONE_UNLOCK_MIN_LEVEL
 }
 
+/** 감정카드·일기 해금 예정 — Lv.10 (미구현) */
+/** 과일·꽃 팔기 해금 예정 — Lv.12 (미구현) */
+
 export type UnlockedFeatures = {
   missions: boolean
   market: boolean
   contentZone: boolean
   /** 홈 저금통 — 레벨 5 이상 */
   piggyBank: boolean
-  dressUp: boolean
   sticker: boolean
 }
 
@@ -37,7 +39,6 @@ export function getUnlockedFeatures(level: number, ageYears: number | null): Unl
     market: true,
     contentZone: isContentZoneUnlocked(level),
     piggyBank: isPiggyBankUnlocked(level),
-    dressUp: level >= 2,
     sticker: level >= STICKER_UNLOCK_MIN_LEVEL,
   }
 }

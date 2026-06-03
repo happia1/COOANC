@@ -33,7 +33,7 @@ import { CalendarEventSheet } from '@/components/parent/CalendarSection'
 import { CompactChildProfileCard } from '@/components/parent/CompactChildProfileCard'
 import { useParentAgentReport } from '@/hooks/useParentAgentReport'
 import { buildPlaceholderCoachingGuide, buildPlaceholderEqDataFeedback } from '@/lib/childEqAiPlaceholders'
-import { CHILD_GROWTH_LEVELS } from '@/constants/childGrowthLevels'
+import { childGrowthStageName } from '@/constants/childGrowthLevels'
 import type { AgentLatestReportRow } from '@/lib/agentApi'
 import SpriteImage from '@/components/common/SpriteImage'
 import { ICONS } from '@/constants/sprites'
@@ -158,8 +158,7 @@ export default function HomeTab({
 
   /** 선택 자녀가 바뀌면 서버에서 받은 주간 막대 데이터로 맞춘 뒤, Realtime 으로 최신화합니다. */
   const [weeklyRoutine, setWeeklyRoutine] = useState<WeeklyRoutineDay[]>(child?.weeklyRoutine ?? [])
-  const growthStageName =
-    CHILD_GROWTH_LEVELS.find((it) => it.level === (s?.current_level ?? 0))?.name ?? '씨앗'
+  const growthStageName = childGrowthStageName(s?.current_level ?? 0)
   const shouldUseLocalFallbackReport =
     agentReport.runState === 'insufficient' &&
     selectedDaysWithData >= 7 &&

@@ -155,15 +155,39 @@ COOANC는 아이의 경제 개념 발달 단계에 맞춰 미션과 보상을 �
 - **이중 보상 구조**: 크레딧(경제적 보상) + 하트/XP(성취 보상)를 동시에 제공합니다.
 - **부모 최소 개입 원칙**: AI 에이전트가 레벨 판단, 미션 추천, 코칭 메시지를 자동으로 처리합니다.
 
-### 레벨 구조 요약
-| 레벨 | 이름 | 핵심 개념 | 권장 연령 |
-|------|------|-----------|-----------|
-| Lv.0 | 씨앗 | 행동-보상 연결 | 3~4세 |
-| Lv.1 | 새싹 | 교환의 개념 | 4~5세 |
-| Lv.2 | 교환사 | 실물 화폐 교환 | 5~6세 |
-| Lv.3 | 저축왕 | 저축과 목표 설정 | 6~7세 |
-| Lv.4 | 나눔이 | 증여와 나눔 | 7~8세 |
-| Lv.5 | 투자가 | 투자와 리스크 | 8~10세 |
+### 레벨·기능 해금 v3 (2026-06 확정, **앱 구현 기준**)
+
+| 구간 | 레벨 | 설명 |
+|------|------|------|
+| 정원 | Lv.0~4 | 적응·습관 |
+| 마을 | Lv.5~8 | 저축·소비 |
+| 항구 | Lv.9~12 | 거래·감정 (일부 향후) |
+| 바다 | Lv.13~ | 베타 이후 예정 |
+
+**성장 단계 이름** (해금 레벨만, 나머지 「레벨 N」)
+
+| 레벨 | 이름 | 구간 |
+|------|------|------|
+| Lv.0 | 씨앗 | 정원 |
+| Lv.1 | 새싹 | 정원 |
+| Lv.5 | 저축왕 | 마을 |
+| Lv.8 | 사업가 | 마을 |
+| Lv.10 | 탐험가 | 항구 (향후) |
+| Lv.12 | 선장 | 항구 (향후) |
+
+**기능 해금**
+
+| 레벨 | 기능 | 구현 |
+|------|------|------|
+| — | 미션·마켓 | ✅ Lv.0~ |
+| Lv.1 | 칭찬 스티커 | ✅ |
+| Lv.5 | 저금통 | ✅ |
+| Lv.8 | 보물상자(콘텐츠존) | ✅ |
+| Lv.10 | 감정카드·일기 | 🔲 향후 |
+| Lv.12 | 과일·꽃 팔기 | 🔲 향후 |
+
+- Lv.2 **캐릭터 꾸미기 레벨 해금**: v3 **제거**.
+- 아래 `[LEVEL-002]`~`[LEVEL-005]`의 **교환사·나눔이·투자가·Lv.3 저축왕** 서사는 **구버전 RAG**입니다.
 
 ### 승급 자동 판단 기준 (공통)
 1. 해당 레벨 미션 누적 달성률 ≥ 80%
@@ -335,13 +359,13 @@ parent_chunk: LEVEL-001
 
 ---
 
-## [LEVEL-002] Lv.2 교환사 단계 — 실물 화폐 교환
+## [LEVEL-002] (구버전 RAG) 실물 화폐 교환 — v3에서는 Lv.2 「교환사」 없음, 마켓은 Lv.0~
 
 ```
 chunk_id: LEVEL-002
 chunk_type: level_definition
-tags: [level_2, 교환사, 실물교환, 시장, 배송, 5세, 6세]
-retrieval_trigger: [레벨 2, 교환사, 실물, 진짜 물건, 집에 와, 5세, 6세, 구매 요청]
+tags: [level_2, 실물교환, 마을, 시장, 배송, 구버전서사]
+retrieval_trigger: [실물 교환, 마켓, 구매 요청, 구버전 교환사]
 parent_chunk: META-001
 ```
 
@@ -383,8 +407,8 @@ parent_chunk: META-001
 ```
 chunk_id: MISSION-002
 chunk_type: mission_pool
-tags: [level_2, mission, 교환사, 꾸준함, 기여]
-retrieval_trigger: [레벨 2 미션, 교환사 미션, 5세 미션, 6세 미션]
+tags: [level_2, mission, 실물교환, 꾸준함, 기여, 구버전서사]
+retrieval_trigger: [레벨 2 미션, 마을 미션, 구버전 교환사]
 parent_chunk: LEVEL-002
 ```
 
@@ -399,13 +423,13 @@ parent_chunk: LEVEL-002
 
 ---
 
-## [LEVEL-003] Lv.3 저축왕 단계 — 저축과 목표 설정
+## [LEVEL-003] (구버전 RAG) 저축·목표 — v3 **저축왕=Lv.5(저금통)**, Lv.3는 이름 없음
 
 ```
 chunk_id: LEVEL-003
 chunk_type: level_definition
-tags: [level_3, 저축왕, 저축, 목표설정, 기회비용, 지연만족, 6세, 7세]
-retrieval_trigger: [레벨 3, 저축왕, 저축, 목표, 모으면 더 큰 것, 기회비용, 6세, 7세]
+tags: [level_3, 저축, 목표설정, 마을, 구버전서사]
+retrieval_trigger: [저축, 목표 저금통, v3 저축왕은 레벨5]
 parent_chunk: META-001
 ```
 
@@ -445,8 +469,8 @@ parent_chunk: META-001
 ```
 chunk_id: MISSION-003
 chunk_type: mission_pool
-tags: [level_3, mission, 저축왕, 목표, 장기습관]
-retrieval_trigger: [레벨 3 미션, 저축왕 미션, 6세 미션, 7세 미션]
+tags: [level_3, mission, 저축, 목표, 장기습관, 구버전서사]
+retrieval_trigger: [레벨 3 미션, v3 저축왕은 레벨5]
 parent_chunk: LEVEL-003
 ```
 
@@ -460,13 +484,13 @@ parent_chunk: LEVEL-003
 
 ---
 
-## [LEVEL-004] Lv.4 나눔이 단계 — 증여와 나눔
+## [LEVEL-004] (구버전 RAG) 나눔·증여 — v3 **나눔이 폐기**, Lv.10 감정카드·일기(향후)
 
 ```
 chunk_id: LEVEL-004
 chunk_type: level_definition
-tags: [level_4, 나눔이, 증여, 선물, 기부, 공감, 7세, 8세]
-retrieval_trigger: [레벨 4, 나눔이, 선물, 기부, 친구에게 주기, 나눔, 7세, 8세]
+tags: [level_4, 나눔, 증여, 선물, 기부, 항구, 구버전서사]
+retrieval_trigger: [나눔, 선물, 기부, v3 Lv10 감정카드 향후]
 parent_chunk: META-001
 ```
 
@@ -502,8 +526,8 @@ parent_chunk: META-001
 ```
 chunk_id: MISSION-004
 chunk_type: mission_pool
-tags: [level_4, mission, 나눔이, 선물, 기부, 공감]
-retrieval_trigger: [레벨 4 미션, 나눔이 미션, 7세 미션, 8세 미션]
+tags: [level_4, mission, 나눔, 선물, 기부, 구버전서사]
+retrieval_trigger: [레벨 4 미션, v3 항구 향후]
 parent_chunk: LEVEL-004
 ```
 
@@ -517,13 +541,13 @@ parent_chunk: LEVEL-004
 
 ---
 
-## [LEVEL-005] Lv.5 투자가 단계 — 투자와 리스크
+## [LEVEL-005] (구버전 RAG) 투자·리스크 — v3 **Lv.5=저축왕(저금통)**, 투자가 단계명 폐기
 
 ```
 chunk_id: LEVEL-005
 chunk_type: level_definition
-tags: [level_5, 투자가, 투자, 리스크, 복리, 의사결정, 8세, 9세, 10세]
-retrieval_trigger: [레벨 5, 투자가, 투자, 리스크, 크레딧 불리기, 8세, 9세, 10세]
+tags: [level_5, 투자, 리스크, 마을, 구버전서사]
+retrieval_trigger: [투자, 리스크, v3 Lv5 저축왕 저금통]
 parent_chunk: META-001
 ```
 
@@ -557,8 +581,8 @@ parent_chunk: META-001
 ```
 chunk_id: MISSION-005
 chunk_type: mission_pool
-tags: [level_5, mission, 투자가, 투자, 의사결정]
-retrieval_trigger: [레벨 5 미션, 투자가 미션, 8세 미션, 9세 미션, 10세 미션]
+tags: [level_5, mission, 투자, 의사결정, 구버전서사]
+retrieval_trigger: [레벨 5 미션, v3 저축왕]
 parent_chunk: LEVEL-005
 ```
 
@@ -664,10 +688,10 @@ parent_chunk: META-001
 |------|--------|--------|-----------|
 | Lv.0 | 첫 크레딧 | 🪙 | 첫 미션 완료 |
 | Lv.1 | 첫 구매 | 🛒 | 첫 스토어 구매 |
-| Lv.2 | 첫 실물교환 | 📦 | 첫 실물 수령 |
+| Lv.2 | (구) 첫 실물교환 | 📦 | v3: 마켓 Lv.0~, 단계명 없음 |
 | Lv.3 | 목표 달성자 | 🎯 | 저금통 목표 달성 |
 | Lv.4 | 나눔 영웅 | 💝 | 선물+기부 완료 |
-| Lv.5 | 투자가 | 🚀 | 투자 농장 수확 |
+| Lv.5 | 저축왕(v3) / (구)투자가 배지 | 🚀 | v3: 저금통 해금; 배지명 `investor`는 레거시 |
 
 ### 특별 뱃지
 - 🔥 **불꽃 스트릭**: 7일/30일/100일 연속 달성

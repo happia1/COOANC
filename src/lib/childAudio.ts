@@ -1,36 +1,56 @@
 /**
  * 자녀 앱 공통 효과음 경로 + 재생 헬퍼
  *
- * 비개발자 설명: 미션 완료·수면 모드·아침 화면 등에서 같은 방식으로 소리를 냅니다.
- * 파일은 `public/assets/audio/alerts/` 아래에 두고, 여기서는 웹 주소만 모아 둡니다.
+ * 폴더 역할 (`public/assets/audio/`):
+ * - `pomodoro/` — 뽀모도로 타이머 전용(영문 파일명, `?v=` 캐시 버스트)
+ * - `alerts/` — 한글 음성 안내(기상·등원·잘 시간 등)
+ * - `alarm/` — 기상 벨소리 WAV
+ * - `countdown/` — (레거시) 예전 카운트다운·째깍 경로
+ * - `effects/` · `missions/` — UI·보상 효과음
  *
- * 루틴 「알람」만 특별해요:
- * - 크롬·사파리는 **화면을 눌렀을 때**(사용자 제스처)가 아니면 스피커 소리 재생을 막는 규칙이 있습니다.
- * - 그래서 앱 안에서 **처음 한 번** 손으로 화면을 짚을 때 귀에 거의 안 들리게 짧게 재생을 시도해서,
- *   브라우저가 「이 페이지는 소리 써도 된다」고 열어 두게 합니다.
- * - 그래도 막히면 알람 창에서 「소리 켜기」 버튼을 누르도록 안내합니다(버튼 누름 = 제스처).
+ * 배포(Vercel)에서 소리가 안 바뀌면:
+ * - `next.config.mjs` 가 `/assets/**` 에 1년 immutable 캐시를 줍니다.
+ * - 같은 URL의 파일만 교체하면 CDN·브라우저가 예전 바이트를 재사용할 수 있어,
+ *   `POMODORO_AUDIO_CACHE_BUST` 숫자를 올리거나 `pomodoro/` 아래 새 파일명을 씁니다.
+ *
+ * 루틴 「알람」 autoplay:
+ * - 첫 화면 터치 때 무음에 가깝게 짧게 재생해 이후 알람 재생 허용을 노립니다.
  */
 
+const AUDIO_BASE = '/assets/audio'
+
+/**
+ * 뽀모도로·루틴 「틱톡 타이머」 공통 캐시 버스트.
+ * WAV/MP3 내용만 바꿨는데 배포에서 예전 소리가 나면 이 값을 1 올리세요.
+ */
+export const POMODORO_AUDIO_CACHE_BUST = '1'
+
+/** 뽀모도로 10초 경고 + 루틴 알람 「틱톡 타이머」 */
+const POMODORO_TEN_SECOND_TICK = `${AUDIO_BASE}/pomodoro/ten-second-tick.wav?v=${POMODORO_AUDIO_CACHE_BUST}`
+
+/** 뽀모도로 00:00 종료 멜로디(정지 버튼으로 중단) */
+const POMODORO_TIMER_END = `${AUDIO_BASE}/pomodoro/timer-end.mp3?v=${POMODORO_AUDIO_CACHE_BUST}`
+
 export const CHILD_AUDIO = {
-  sleepReady: '/assets/audio/alerts/잘 준비.wav',
-  goodMorning: '/assets/audio/alerts/기분좋게 시작.wav',
-  morningGreet: '/assets/audio/alerts/아침인사.wav',
-  timeToGo: '/assets/audio/alerts/이제 나갈시간이야.wav',
-  dontLie: '/assets/audio/alerts/거짓말은 나 속상해.wav',
-  /** 실제 레포에 존재하는 파일로 고정(기존 tick-tock 경로는 파일 부재로 404). */
-  tickTock: '/assets/audio/alerts/잘시간.mp3',
-  /** 뽀모도로 타이머 — 남은 시간 10초가 되는 순간부터 재생하는 틱톡 경고음 */
-  pomodoroTenSecond: '/assets/audio/countdown/tick-tock-timer.wav',
-  /** 뽀모도로 타이머 — 00:00 도달 시 재생(정지 버튼으로 끔) */
-  pomodoroEnd: '/assets/audio/effects/뽀모도로 타이머 끝.mp3',
+  sleepReady: `${AUDIO_BASE}/alerts/잘 준비.wav`,
+  goodMorning: `${AUDIO_BASE}/alerts/기분좋게 시작.wav`,
+  morningGreet: `${AUDIO_BASE}/alerts/아침인사.wav`,
+  timeToGo: `${AUDIO_BASE}/alerts/이제 나갈시간이야.wav`,
+  dontLie: `${AUDIO_BASE}/alerts/거짓말은 나 속상해.wav`,
+  /** 루틴 알람 카탈로그 「틱톡 타이머」— 뽀모도로 10초 경고와 동일 */
+  tickTock: POMODORO_TEN_SECOND_TICK,
+  /** 뽀모도로 — 남은 10초 */
+  pomodoroTenSecond: POMODORO_TEN_SECOND_TICK,
+  /** 뽀모도로 — 타이머 종료 */
+  pomodoroEnd: POMODORO_TIMER_END,
   /** 미션 카드 탭 즉시 반응음 — 요청 경로의 성공 효과음으로 고정 */
-  cardTap: '/assets/audio/missions/success_reward-fairy-arcade-sparkle-866.wav',
-  /** 연속 탭 확인 팝업 등 보조 효과음 */
-  popupAlert: '/assets/audio/alerts/잘시간.mp3',
+  cardTap: `${AUDIO_BASE}/missions/success_reward-fairy-arcade-sparkle-866.wav`,
+  /** 연속 탭 확인 팝업 · 루틴 「잘 시간」 알람 */
+  popupAlert: `${AUDIO_BASE}/alerts/잘시간.mp3`,
   /** 마켓 계산대(크레딧 차감) 연출 */
-  marketCheckout: '/assets/audio/effects/floraphonic-coin-donation-6-183893.mp3',
+  marketCheckout: `${AUDIO_BASE}/effects/floraphonic-coin-donation-6-183893.mp3`,
   /** 마켓 구매 완료(낙하산·콘페티) 축하 */
-  marketPurchaseCheer: '/assets/audio/effects/환호성.mp3',
+  marketPurchaseCheer: `${AUDIO_BASE}/effects/환호성.mp3`,
 } as const
 
 export type PlayAudioTimedFadeOutOptions = {
