@@ -100,6 +100,7 @@ import SchoolTimePopup from '@/components/child/SchoolTimePopup'
 import PiggyBankUnlockFlowModal from '@/components/child/PiggyBankUnlockFlowModal'
 import StickerUnlockFlowModal from '@/components/child/StickerUnlockFlowModal'
 import ContentZoneUnlockFlowModal from '@/components/child/ContentZoneUnlockFlowModal'
+import EmotionCardLockedModal from '@/components/child/EmotionCardLockedModal'
 import { readRoutineAlarmPrefs } from '@/lib/routineAlarmLocalPrefs'
 import { resolveRoutineAlarmSoundUrl } from '@/lib/routineAlarmSounds'
 import { installChildRoutineAudioUnlockOnFirstGesture } from '@/lib/childAudio'
@@ -597,6 +598,12 @@ export default function ChildScreen({
     }
   }, [])
 
+  /** 캐릭터 터치 → 감정카드 (Lv.10 미구현, 정식 출시 전까지 잠금 팝업만) */
+  const openEmotionCardFromCharacter = useCallback(() => {
+    /** 정식 출시 시 Lv.10+ 는 EmotionCardModal, 미만은 잠금 팝업 분기 예정 */
+    setEmotionCardLockedOpen(true)
+  }, [])
+
   /** 전체 화면을 감싸는 컨테이너 ref — 캐릭터 높이 + 파티클 좌표 기준 계산에 사용 */
   const containerRef = useRef<HTMLDivElement>(null)
   /** 레벨 카드 배율에 가로·캐릭터 높이에 세로 — 같은 전체 화면 컨테이너 실측값 사용 */
@@ -882,6 +889,7 @@ export default function ChildScreen({
    * 비개발자 설명: 상단 우측 타이머(유리 버튼)를 누르면 true 가 되고, 닫기로 false 가 됩니다.
    */
   const [clockPopupOpen, setClockPopupOpen] = useState(false)
+  const [emotionCardLockedOpen, setEmotionCardLockedOpen] = useState(false)
   /** 상단 우측 음악 아이콘 전용 팝업 열림 여부 */
   const [musicPopupOpen, setMusicPopupOpen] = useState(false)
 
@@ -2202,28 +2210,30 @@ export default function ChildScreen({
 
         {/* ── L2: 캐릭터 ──────────────────────────────────────────────────── */}
         {characterDisplayH > 0 && (
-          <div
-            className="absolute z-10 pointer-events-none"
+          <button
+            type="button"
+            className="absolute z-10 cursor-pointer border-0 bg-transparent p-0"
             style={{
               left: `${anchor.rugCenterX * 100}%`,
               top: `${anchor.characterFootY * 100}%`,
-              /** translate(-50%, -100%): 캐릭터 발 중심을 앵커에 정확히 맞춥니다 */
               transform: 'translate(-50%, -100%)',
             }}
+            onClick={openEmotionCardFromCharacter}
+            aria-label="내 감정 카드 열기"
           >
             <CharacterSprite
               character={characterSprite.character}
               frame={characterSprite.frame}
               width={Math.round(characterDisplayH * (characterSprite.width / characterSprite.height))}
               height={characterDisplayH}
-              className="select-none"
+              className="pointer-events-none select-none"
               style={
                 characterSprite.character === 'chicks'
                   ? { clipPath: `inset(0 0 0 ${CHICK_HOME_ISLAND_CLIP_LEFT_PX}px)` }
                   : undefined
               }
             />
-          </div>
+          </button>
         )}
 
         {/* ── L3: UI 오버레이 ──────────────────────────────────────────────── */}
@@ -2768,6 +2778,11 @@ export default function ChildScreen({
         open={contentZoneUnlockFlowOpen}
         onClose={() => setContentZoneUnlockFlowOpen(false)}
         onGoToMarketContent={openMarketToContent}
+      />
+
+      <EmotionCardLockedModal
+        open={emotionCardLockedOpen}
+        onClose={() => setEmotionCardLockedOpen(false)}
       />
 
       {showSchoolTime && !isSleeping && !showMorningWake ? (

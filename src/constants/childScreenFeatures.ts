@@ -20,6 +20,7 @@ export function isContentZoneUnlocked(level: number): boolean {
 }
 
 /** 감정카드·일기 해금 예정 — Lv.10 (미구현) */
+export const EMOTION_CARD_UNLOCK_MIN_LEVEL = 10
 /** 과일·꽃 팔기 해금 예정 — Lv.12 (미구현) */
 
 export type UnlockedFeatures = {
