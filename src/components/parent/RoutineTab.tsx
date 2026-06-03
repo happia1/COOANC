@@ -55,11 +55,14 @@ import {
 } from '@/lib/routineMissionThumbnail'
 import { scaledMissionRewards } from '@/lib/missionRewardMultiplier'
 import { MissionRewardIconTriple } from '@/components/mission/MissionRewardIconTriple'
-import SortableHorizontalMissionStrip from '@/components/parent/SortableHorizontalMissionStrip'
+import SortableHorizontalMissionStrip, {
+  MISSION_CARD_DRAG_SURFACE_CLASS,
+  type MissionStripDragProps,
+} from '@/components/parent/SortableHorizontalMissionStrip'
 import RoutineAgentFab from '@/components/parent/RoutineAgentFab'
 
 /** 롱프레스(길게 누르기)로 간주할 기준 시간(ms) — 드래그 시작 전 팝업 오픈 방지 */
-const LONG_PRESS_MS = 220
+const LONG_PRESS_MS = 250
 
 /**
  * 루틴·스페셜 카드 상단 그림을 그립니다.
@@ -175,7 +178,15 @@ const SLIDE_SECTION_WITH_CARDS = 'border-t border-gray-100 pt-2 pb-2'
 /**
  * 일상 미션용 가로 슬라이드 카드(스페셜 SpecialMissionRow 와 같은 폭·스크롤 패턴)
  */
-function RoutineMissionSlideCard({ mission: m, onOpenRewardEditor }: { mission: Mission; onOpenRewardEditor: (m: Mission) => void }) {
+function RoutineMissionSlideCard({
+  mission: m,
+  onOpenRewardEditor,
+  sortable,
+}: {
+  mission: Mission
+  onOpenRewardEditor: (m: Mission) => void
+  sortable?: MissionStripDragProps | null
+}) {
   const pressStartedAtRef = useRef<number | null>(null)
   const suppressNextClickRef = useRef(false)
 
@@ -190,7 +201,12 @@ function RoutineMissionSlideCard({ mission: m, onOpenRewardEditor }: { mission: 
     suppressNextClickRef.current = Date.now() - started >= LONG_PRESS_MS
   }
 
-  function handleCardClick(e: React.MouseEvent<HTMLButtonElement>) {
+  function handleCardClick(e: React.MouseEvent<HTMLDivElement>) {
+    if (sortable?.suppressNextClick()) {
+      e.preventDefault()
+      e.stopPropagation()
+      return
+    }
     if (suppressNextClickRef.current) {
       e.preventDefault()
       e.stopPropagation()
@@ -201,18 +217,28 @@ function RoutineMissionSlideCard({ mission: m, onOpenRewardEditor }: { mission: 
   }
 
   return (
-    // w-full: li 칸 폭(min(25vw,88px))을 꽉 채워, 카드 옆에 빈 여백이 생기지 않게 함(간격이 넓어 보이는 착시 방지)
-    <button
-      type="button"
+    <div
+      ref={sortable?.setNodeRef}
+      style={sortable?.style}
+      {...(sortable?.attributes ?? {})}
+      {...(sortable?.listeners ?? {})}
+      role="button"
+      tabIndex={0}
       onClick={handleCardClick}
       onPointerDown={markPointerDown}
       onPointerUp={markPointerEnd}
       onPointerCancel={markPointerEnd}
       onContextMenu={(e) => e.preventDefault()}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          onOpenRewardEditor(m)
+        }
+      }}
       aria-label={`${m.title} 보상(크레딧·애정 하트) 수정`}
-      className={`flex h-full w-full min-h-[4.25rem] flex-col items-center justify-center gap-1.5 rounded-xl bg-white px-1.5 py-2 text-center shadow-sm ring-1 ${
+      className={`${MISSION_CARD_DRAG_SURFACE_CLASS} flex h-full w-full min-h-[4.25rem] flex-col items-center justify-center gap-1.5 rounded-xl bg-white px-1.5 py-2 text-center shadow-sm ring-1 ${
         m.is_active ? 'ring-gray-200' : 'ring-gray-100 opacity-80'
-      }`}
+      } ${sortable ? (sortable.isDragging ? 'cursor-grabbing shadow-md ring-2 ring-brand-blue/30' : 'cursor-grab active:cursor-grabbing') : ''}`}
     >
       {/* 아이콘(있으면 DB 값) 또는 제목 첫 글자 — ON/OFF는 키워드 시트에서 */}
       <span
@@ -230,7 +256,7 @@ function RoutineMissionSlideCard({ mission: m, onOpenRewardEditor }: { mission: 
           className={`mt-0.5 flex flex-wrap items-center justify-center gap-x-0.5 gap-y-0.5 text-[9px] font-black text-brand-blue`}
         />
       </div>
-    </button>
+    </div>
   )
 }
 
@@ -266,13 +292,8 @@ function RoutineMissionSortableStrip({
       missions={list}
       emptyHint={emptyHint}
       onReorderError={onReorderError}
-      renderCard={(m, dragHandle) => (
-        <div className="relative flex h-full min-h-[4.25rem] w-full flex-col">
-          {dragHandle ? (
-            <div className="pointer-events-auto absolute -top-0.5 left-1/2 z-[2] -translate-x-1/2">{dragHandle}</div>
-          ) : null}
-          <RoutineMissionSlideCard mission={m} onOpenRewardEditor={onOpenRewardEditor} />
-        </div>
+      renderCard={(m, drag) => (
+        <RoutineMissionSlideCard mission={m} onOpenRewardEditor={onOpenRewardEditor} sortable={drag} />
       )}
     />
   )
@@ -411,19 +432,15 @@ function SpecialDailyEventBlock({
       missions={list}
       emptyHint="없음"
       onReorderError={onReorderError}
-      renderCard={(m, dragHandle) => (
-        <div className="relative flex min-h-[5.5rem] w-full flex-col">
-          {dragHandle ? (
-            <div className="pointer-events-auto absolute -top-0.5 left-1/2 z-[2] -translate-x-1/2">{dragHandle}</div>
-          ) : null}
-          <SpecialMissionRow
-            mission={m}
-            assigning={isEventList && assigningId === m.id}
-            onOpenRewardEditor={() => onOpenRewardEditor(m)}
-            onStartEventAssignWithBonus={isEventList ? () => onStartEventAssignWithBonus(m) : undefined}
-            onOpenDailyBonusSettings={!isEventList ? () => onOpenDailyBonusSettings(m) : undefined}
-          />
-        </div>
+      renderCard={(m, drag) => (
+        <SpecialMissionRow
+          mission={m}
+          assigning={isEventList && assigningId === m.id}
+          onOpenRewardEditor={() => onOpenRewardEditor(m)}
+          onStartEventAssignWithBonus={isEventList ? () => onStartEventAssignWithBonus(m) : undefined}
+          onOpenDailyBonusSettings={!isEventList ? () => onOpenDailyBonusSettings(m) : undefined}
+          sortable={drag}
+        />
       )}
     />
   )
@@ -1101,15 +1118,14 @@ function SpecialMissionRow({
   onOpenRewardEditor,
   onStartEventAssignWithBonus,
   onOpenDailyBonusSettings,
+  sortable,
 }: {
   mission: Mission
   assigning: boolean
-  /** 카드 탭 시 보상 편집 팝업 열기 */
   onOpenRewardEditor: () => void
-  /** 오늘 하루만(event) — 보너스 적용 흐름으로 이어짐 */
   onStartEventAssignWithBonus?: () => void
-  /** 매일(daily) 스페셜 — 배율만 편집 */
   onOpenDailyBonusSettings?: () => void
+  sortable?: MissionStripDragProps | null
 }) {
   const pressStartedAtRef = useRef<number | null>(null)
   const suppressNextClickRef = useRef(false)
@@ -1126,6 +1142,11 @@ function SpecialMissionRow({
   }
 
   function handleCardClick(e: React.MouseEvent<HTMLDivElement>) {
+    if (sortable?.suppressNextClick()) {
+      e.preventDefault()
+      e.stopPropagation()
+      return
+    }
     if (suppressNextClickRef.current) {
       e.preventDefault()
       e.stopPropagation()
@@ -1137,8 +1158,11 @@ function SpecialMissionRow({
 
   const titleShort = displaySpecialMissionTitle(m.title)
   return (
-    // w-full: 일상 슬라이드와 같이 li 폭을 채워 카드 사이 간격만 gap 으로 보이게 함
     <div
+      ref={sortable?.setNodeRef}
+      style={sortable?.style}
+      {...(sortable?.attributes ?? {})}
+      {...(sortable?.listeners ?? {})}
       role="button"
       tabIndex={0}
       onClick={handleCardClick}
@@ -1153,9 +1177,9 @@ function SpecialMissionRow({
         }
       }}
       aria-label={`${m.title} 보상(크레딧·애정 하트) 수정`}
-      className={`flex min-h-[5.5rem] w-full flex-col items-center justify-center gap-1.5 rounded-xl bg-white px-1 py-1 text-center shadow-sm ring-1 ${
+      className={`${MISSION_CARD_DRAG_SURFACE_CLASS} flex min-h-[5.5rem] w-full flex-col items-center justify-center gap-1.5 rounded-xl bg-white px-1 py-1 text-center shadow-sm ring-1 ${
         m.is_active ? 'ring-violet-100' : 'ring-gray-100 opacity-80'
-      }`}
+      } ${sortable ? (sortable.isDragging ? 'cursor-grabbing shadow-md ring-2 ring-violet-300/50' : 'cursor-grab active:cursor-grabbing') : ''}`}
     >
       <span
         className="flex h-9 w-9 shrink-0 items-center justify-center text-sm font-black leading-none text-violet-800"
@@ -1176,6 +1200,8 @@ function SpecialMissionRow({
           <button
             type="button"
             disabled={!m.is_active || assigning}
+            onPointerDown={(e) => e.stopPropagation()}
+            onTouchStart={(e) => e.stopPropagation()}
             onClick={(e) => {
               e.stopPropagation()
               onStartEventAssignWithBonus()
@@ -1189,6 +1215,8 @@ function SpecialMissionRow({
           <button
             type="button"
             disabled={!m.is_active}
+            onPointerDown={(e) => e.stopPropagation()}
+            onTouchStart={(e) => e.stopPropagation()}
             onClick={(e) => {
               e.stopPropagation()
               onOpenDailyBonusSettings()

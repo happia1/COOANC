@@ -48,7 +48,7 @@ export const PM_CHIPS: ChipDef[] = [
   { id: 'pm-water', title: '저녁 물마시기', emoji: '', type: 'recommended', apiBlock: 'afternoon' },
   { id: 'pm-out', title: '야외놀이', emoji: '', type: 'optional', apiBlock: 'afternoon' },
   { id: 'pm-in', title: '실내놀이', emoji: '', type: 'optional', apiBlock: 'afternoon' },
-  { id: 'pm-hw', title: '숙제하기', emoji: '', type: 'optional', apiBlock: 'afternoon' },
+  { id: 'pm-hw', title: '숙제·공부하기', emoji: '', type: 'optional', apiBlock: 'afternoon' },
   /**
    * 저녁 루틴 식사 카드: 기존 `저녁식사`는 삭제하고, `저녁밥먹기`로 통일합니다.
    * 비개발자 설명: “같은 미션인데 이름이 달라서” 이미지/정렬/중복처리가 어긋나는 문제를 막기 위한 정리입니다.

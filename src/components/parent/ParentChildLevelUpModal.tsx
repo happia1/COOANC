@@ -232,15 +232,7 @@ export default function ParentChildLevelUpModal() {
                 ))}
               </ul>
             </>
-          ) : (
-            <p className="mt-3 text-center text-xs leading-relaxed text-gray-500">
-              이번 레벨에서는 새 아이콘이 추가되지 않았어요. 그래도 미션과 보상으로 계속 성장하고 있어요.
-            </p>
-          )}
-
-          <p className="mt-3 text-center text-[10px] leading-relaxed text-gray-400">
-            자녀 앱에서 미션을 완료하면 경험치가 쌓이고 레벨이 올라가요.
-          </p>
+          ) : null}
         </div>
 
         <div className="flex shrink-0 flex-row gap-2 border-t border-gray-100 px-5 py-4">

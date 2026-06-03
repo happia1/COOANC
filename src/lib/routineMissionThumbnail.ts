@@ -172,6 +172,7 @@ const PNG_BY_TITLE: Record<string, string> = {
   '잠자리 양치': `${BASE}/a.m/brush_teeth.png`,
   '잠옷 갈아입기': `${BASE}/p.m/pajama.png`,
   숙제하기: `${BASE}/special/diary_homework.png`,
+  '숙제·공부하기': `${BASE}/special/diary_homework.png`,
 
   // --- 스페셜 시드(046 긴 이름) ---
   스스로옷입기: `${BASE}/special/self_change.png`,

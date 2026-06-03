@@ -24,7 +24,9 @@ import { COOANC_CALENDAR_STORAGE_UPDATE_EVENT } from '@/lib/syncAgentEventToLoca
 import { createClient } from '@/lib/supabase/client'
 import {
   dedupeMergedCalendarEventsByTitleAndStart,
+  deleteParentCalendarEvent,
   fetchParentCalendarEventsFromServer,
+  filterOutDeletedCalendarEvents,
   mergeServerAndLocalCalendar,
 } from '@/lib/mergeParentCalendarEvents'
 
@@ -178,8 +180,8 @@ export default function CalendarSection({ childId, focusDate = null }: Props) {
   const [detailEvents, setDetailEvents] = useState<LocalCalendarEvent[] | null>(null)
   /** 일정이 없는 날을 눌렀을 때만 값이 있음(빈 날 시트 표시) */
   const [emptyDayKey, setEmptyDayKey] = useState<string | null>(null)
-  /** 이번 달 일정: 블록(제목·빈 안내) 클릭으로 펼침/접힘, 일정 행은 상세만 */
-  const [monthScheduleOpen, setMonthScheduleOpen] = useState(false)
+  /** 이번 달 일정 — 기본 펼침(접기 가능) */
+  const [monthScheduleOpen, setMonthScheduleOpen] = useState(true)
   /**
    * 상단 범례(유형 칩): null 이면 전체, 값이면 **격자·이번 달 일정 목록**만 해당 유형으로 쌓기.
    * 날짜 **상세 시트**는 `events`에서 그날 전체를 따로 뽑아 범례를 적용하지 않음.
@@ -216,7 +218,7 @@ export default function CalendarSection({ childId, focusDate = null }: Props) {
       }
       server = await fetchParentCalendarEventsFromServer(childId)
       merged = dedupeMergedCalendarEventsByTitleAndStart(
-        mergeServerAndLocalCalendar(server, local, childId),
+        filterOutDeletedCalendarEvents(mergeServerAndLocalCalendar(server, local, childId)),
       )
       /**
        * flushSync 로 events 를 먼저 플러시한 뒤 revision 을 올립니다.
@@ -315,6 +317,15 @@ export default function CalendarSection({ childId, focusDate = null }: Props) {
     [],
   )
 
+  const removeEventById = useCallback(
+    (id: string) => {
+      if (id.startsWith('__public_holiday__')) return
+      void deleteParentCalendarEvent(id)
+      saveEvents((prev) => prev.filter((e) => e.id !== id))
+    },
+    [saveEvents],
+  )
+
   const todayStr = getSeoulDateString()
 
   /**
@@ -347,7 +358,9 @@ export default function CalendarSection({ childId, focusDate = null }: Props) {
     })
   })
   /** 범례가 있으면 격자·이번 달 일정 **목록**에만 해당 유형(통합 칩 포함) */
-  const monthEvents = legendFilter ? monthEventsAll.filter(eventMatchesLegendFilter) : monthEventsAll
+  const monthEvents = (legendFilter ? monthEventsAll.filter(eventMatchesLegendFilter) : monthEventsAll).sort(
+    (a, b) => a.startDate.localeCompare(b.startDate) || a.title.localeCompare(b.title),
+  )
 
   /**
    * 날짜 → 일정 배열(격자 도트·칸에 쓰는 맵) — `monthEvents` = 범례 반영본이라 칩을 바꾸면 점이 바뀜.
@@ -646,7 +659,12 @@ export default function CalendarSection({ childId, focusDate = null }: Props) {
         aria-label={monthScheduleOpen ? '이번 달 일정, 접기' : '이번 달 일정, 펼치기'}
       >
         <div className="flex min-h-9 items-center justify-between gap-2">
-          <p className="text-[11px] font-bold text-gray-400">이번 달 일정</p>
+          <p className="text-[11px] font-bold text-gray-400">
+            이번 달 일정
+            {monthEventsAll.length > 0 ? (
+              <span className="ml-1 font-black text-gray-500">({monthEventsAll.length})</span>
+            ) : null}
+          </p>
           <span
             className={`flex h-5 w-5 shrink-0 items-center justify-center text-gray-400 transition-transform duration-200 ${
               monthScheduleOpen ? 'rotate-180' : ''
@@ -721,7 +739,7 @@ export default function CalendarSection({ childId, focusDate = null }: Props) {
           onDelete={
             sheet.existing
               ? (id) => {
-                  saveEvents((prev) => prev.filter((e) => e.id !== id))
+                  removeEventById(id)
                   closeSheet()
                 }
               : undefined
@@ -743,7 +761,7 @@ export default function CalendarSection({ childId, focusDate = null }: Props) {
             setSheet({ startDate: ev.startDate, endDate: ev.endDate, existing: ev })
           }}
           onDelete={(id) => {
-            saveEvents((prev) => prev.filter((e) => e.id !== id))
+            removeEventById(id)
             setDetailEvents((prev) => {
               if (!prev) return null
               const next = prev.filter((e) => e.id !== id)

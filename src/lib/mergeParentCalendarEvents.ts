@@ -5,6 +5,10 @@
  */
 import { createClient } from '@/lib/supabase/client'
 import type { LocalCalendarEvent } from '@/types/database'
+import {
+  addDeletedCalendarEventId,
+  readDeletedCalendarEventIds,
+} from '@/lib/localStorageChildScope'
 
 /** `calendar_events.event_type` 과 동일 허용값 — DB 스키마와 맞춤 */
 const EVENT_TYPES: LocalCalendarEvent['eventType'][] = [
@@ -106,6 +110,35 @@ const UUID_LIKE_ID =
 
 function looksLikeDbUuid(id: string): boolean {
   return UUID_LIKE_ID.test(id.trim())
+}
+
+/** 삭제 표시된 id(서버·로컬) 행 제외 */
+export function filterOutDeletedCalendarEvents(events: LocalCalendarEvent[]): LocalCalendarEvent[] {
+  const deleted = readDeletedCalendarEventIds()
+  if (deleted.size === 0) return events
+  return events.filter((e) => !deleted.has(e.id))
+}
+
+/**
+ * 캘린더 일정 삭제 — localStorage 반영은 호출 쪽에서 하고,
+ * DB UUID 행은 API로 서버에서도 지우며 tombstone id 를 남깁니다.
+ */
+export async function deleteParentCalendarEvent(eventId: string): Promise<void> {
+  if (typeof window === 'undefined' || !eventId || eventId.startsWith('__public_holiday__')) return
+
+  addDeletedCalendarEventId(eventId)
+
+  if (!looksLikeDbUuid(eventId)) return
+
+  try {
+    await fetch('/api/calendar-event/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ eventId }),
+    })
+  } catch {
+    /* tombstone 으로 UI 는 유지 */
+  }
 }
 
 /**

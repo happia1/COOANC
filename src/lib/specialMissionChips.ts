@@ -89,9 +89,9 @@ export const SPECIAL_MISSION_CHIPS: SpecialMissionChipDef[] = [
   },
   {
     id: 'sp-homework',
-    title: '숙제하기',
+    title: '숙제·공부하기',
     emoji: '',
-    defaultPopupMessage: '해야 할 숙제를 스스로 끝내 보아요.',
+    defaultPopupMessage: '숙제와 공부를 스스로 끝내 보아요.',
   },
   {
     id: 'sp-veggies',
@@ -229,6 +229,8 @@ const LEGACY_SPECIAL_TITLE_TO_SHORT: Record<string, string> = {
   '이불정리하기': '이불 정리하기',
   '머리 빗기': '머리빗기',
   '로션 바르기': '로션바르기',
+  /** 구버전 — 일상·스페셜 칩 표기 통일 */
+  숙제하기: '숙제·공부하기',
 }
 
 /** 루틴 탭 스페셜 카드 등에 표시할 짧은 제목 */

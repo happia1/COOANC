@@ -9,7 +9,11 @@
 /** 루틴 탭 CalendarSection 과 동일 키 — 자녀별 이벤트 범위 정리 시 사용 */
 export const COOANC_CALENDAR_EVENTS_STORAGE_KEY = 'cooanc_calendar_events_v1'
 
+/** 서버에서 삭제했거나 기기에서 지운 DB 일정 id — 새로고침 병합 시 다시 나오지 않게 */
+export const COOANC_CALENDAR_DELETED_IDS_STORAGE_KEY = 'cooanc_calendar_deleted_event_ids_v1'
+
 const CALENDAR_EVENTS_KEY = COOANC_CALENDAR_EVENTS_STORAGE_KEY
+const CALENDAR_DELETED_IDS_KEY = COOANC_CALENDAR_DELETED_IDS_STORAGE_KEY
 
 type CalendarEventRow = {
   childId?: string | null
@@ -34,4 +38,24 @@ export function removeLocalStorageScopedToChild(removedChildId: string): void {
   } catch {
     /* 손상된 JSON 등은 건드리지 않음 */
   }
+}
+
+export function readDeletedCalendarEventIds(): Set<string> {
+  if (typeof window === 'undefined') return new Set()
+  try {
+    const raw = window.localStorage.getItem(CALENDAR_DELETED_IDS_KEY)
+    if (!raw) return new Set()
+    const parsed: unknown = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return new Set()
+    return new Set(parsed.filter((id): id is string => typeof id === 'string' && id.length > 0))
+  } catch {
+    return new Set()
+  }
+}
+
+export function addDeletedCalendarEventId(eventId: string): void {
+  if (typeof window === 'undefined' || !eventId.trim() || eventId.startsWith('__public_holiday__')) return
+  const set = readDeletedCalendarEventIds()
+  set.add(eventId.trim())
+  window.localStorage.setItem(CALENDAR_DELETED_IDS_KEY, JSON.stringify([...set]))
 }

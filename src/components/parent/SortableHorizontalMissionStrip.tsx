@@ -2,19 +2,23 @@
 
 /**
  * 부모 루틴 탭 — 가로 미션 카드 줄에서 드래그로 순서를 바꿉니다.
- * 비개발자 요약: 카드 자체를 길게 눌러 옆으로 밀면 순서가 저장되고, 자녀 앱 미션 줄도 같은 순서를 따릅니다.
+ * - 데스크톱: 카드를 조금 끌면 순서 변경
+ * - 모바일: 카드를 길게 누른 뒤 옆으로 밀면 순서 변경(짧게 스와이프는 가로 스크롤)
  */
 
-import { useEffect, useState, type CSSProperties, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type MutableRefObject, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   DndContext,
   KeyboardSensor,
-  PointerSensor,
+  MouseSensor,
+  TouchSensor,
   closestCenter,
   useSensor,
   useSensors,
   type DragEndEvent,
+  type DraggableAttributes,
+  type SyntheticListenerMap,
 } from '@dnd-kit/core'
 import {
   SortableContext,
@@ -26,16 +30,33 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import type { Mission } from '@/types/database'
 
-type SortableLiProps = {
-  id: string
-  children: (dragHandle: ReactNode | null) => ReactNode
+/** 카드 루트에 붙일 드래그·정렬 바인딩 — renderCard 두 번째 인자 */
+export type MissionStripDragProps = {
+  setNodeRef: (element: HTMLElement | null) => void
+  style: CSSProperties
+  attributes: DraggableAttributes
+  listeners: SyntheticListenerMap | undefined
+  isDragging: boolean
+  /** 직전에 드래그로 순서를 바꿨으면 true — 탭(보상 편집) 열림을 막을 때 씁니다 */
+  suppressNextClick: () => boolean
 }
 
-/**
- * 한 장의 카드를 드래그 가능하게 감쌉니다.
- * 요청에 따라 중앙 손잡이 아이콘은 제거하고, 카드 영역 자체로 드래그합니다.
- */
-function SortableStripItem({ id, children }: SortableLiProps) {
+type SortableLiProps = {
+  id: string
+  suppressNextClickRef: MutableRefObject<boolean>
+  children: (drag: MissionStripDragProps) => ReactNode
+}
+
+/** 길게 누르기 후 드래그(TouchSensor) — RoutineTab LONG_PRESS_MS 와 맞춤 */
+const TOUCH_DRAG_DELAY_MS = 250
+const TOUCH_DRAG_TOLERANCE_PX = 8
+const MOUSE_DRAG_DISTANCE_PX = 8
+
+/** 텍스트 길게 눌러 선택·콜아웃이 뜨지 않게 */
+const MISSION_CARD_DRAG_SURFACE_CLASS =
+  'select-none [-webkit-user-select:none] [-webkit-touch-callout:none] [touch-action:manipulation]'
+
+function SortableStripItem({ id, children, suppressNextClickRef }: SortableLiProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id })
 
   const style: CSSProperties = {
@@ -45,15 +66,22 @@ function SortableStripItem({ id, children }: SortableLiProps) {
     zIndex: isDragging ? 2 : undefined,
   }
 
+  const drag: MissionStripDragProps = {
+    setNodeRef,
+    style,
+    attributes,
+    listeners,
+    isDragging,
+    suppressNextClick: () => {
+      if (!suppressNextClickRef.current) return false
+      suppressNextClickRef.current = false
+      return true
+    },
+  }
+
   return (
-    <li
-      ref={setNodeRef}
-      style={style}
-      className="w-[min(25vw,88px)] shrink-0 snap-start py-px"
-      {...attributes}
-      {...listeners}
-    >
-      {children(null)}
+    <li className="w-[min(25vw,88px)] shrink-0 snap-start py-px">
+      {children(drag)}
     </li>
   )
 }
@@ -63,15 +91,10 @@ export type SortableStripProps = {
   childId: string | null
   missions: Mission[]
   emptyHint: string
-  /** 카드 본문을 그립니다. (현재는 손잡이 UI를 쓰지 않아 두 번째 인자는 null) */
-  renderCard: (mission: Mission, dragHandle: ReactNode | null) => ReactNode
-  /** 저장 실패 시 부모 토스트 등에 넘깁니다 */
+  renderCard: (mission: Mission, drag: MissionStripDragProps | null) => ReactNode
   onReorderError?: (message: string) => void
 }
 
-/**
- * 가로 스크롤 미션 줄 — `missions` 순서가 바뀌면 DB `sort_order` 와 맞춘 뒤 페이지를 새로고침합니다.
- */
 export default function SortableHorizontalMissionStrip({
   childId,
   missions,
@@ -81,25 +104,28 @@ export default function SortableHorizontalMissionStrip({
 }: SortableStripProps) {
   const router = useRouter()
   const [items, setItems] = useState<Mission[]>(missions)
+  const suppressNextClickRef = useRef(false)
 
   useEffect(() => {
     setItems(missions)
   }, [missions])
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(MouseSensor, { activationConstraint: { distance: MOUSE_DRAG_DISTANCE_PX } }),
+    useSensor(TouchSensor, {
+      activationConstraint: { delay: TOUCH_DRAG_DELAY_MS, tolerance: TOUCH_DRAG_TOLERANCE_PX },
+    }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   )
 
   const ids = items.map((m) => m.id)
 
-  /** 자녀 미선택이면 예전처럼 드래그 없이 나열합니다 */
   if (!childId || items.length === 0) {
     if (items.length === 0) {
-      return <p className={`px-3 py-3 text-center text-[10px] font-normal leading-snug text-gray-400`}>{emptyHint}</p>
+      return <p className="px-3 py-3 text-center text-[10px] font-normal leading-snug text-gray-400">{emptyHint}</p>
     }
     return (
-      <div className="-mx-1 overflow-x-auto pb-0.5 [scrollbar-width:thin]">
+      <div className="-mx-1 overflow-x-auto pb-0.5 [scrollbar-width:thin] [touch-action:pan-x]">
         <ul className="m-0 flex w-max min-w-full list-none snap-x snap-mandatory gap-0.5 px-1.5 pb-1 pt-1">
           {items.map((m) => (
             <li key={m.id} className="w-[min(25vw,88px)] shrink-0 snap-start py-px">
@@ -142,17 +168,18 @@ export default function SortableHorizontalMissionStrip({
     if (oldIndex < 0 || newIndex < 0) return
     const next = arrayMove(items, oldIndex, newIndex)
     setItems(next)
+    suppressNextClickRef.current = true
     void persistOrder(next)
   }
 
   return (
-    <div className="-mx-1 overflow-x-auto pb-0.5 [scrollbar-width:thin]">
+    <div className="-mx-1 overflow-x-auto pb-0.5 [scrollbar-width:thin] [touch-action:pan-x]">
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext items={ids} strategy={horizontalListSortingStrategy}>
           <ul className="m-0 flex w-max min-w-full list-none snap-x snap-mandatory gap-0.5 px-1.5 pb-1 pt-1">
             {items.map((m) => (
-              <SortableStripItem key={m.id} id={m.id}>
-                {(handle) => renderCard(m, handle)}
+              <SortableStripItem key={m.id} id={m.id} suppressNextClickRef={suppressNextClickRef}>
+                {(drag) => renderCard(m, drag)}
               </SortableStripItem>
             ))}
           </ul>
@@ -161,3 +188,6 @@ export default function SortableHorizontalMissionStrip({
     </div>
   )
 }
+
+/** RoutineTab 카드 루트에 공통으로 붙일 클래스 */
+export { MISSION_CARD_DRAG_SURFACE_CLASS }
