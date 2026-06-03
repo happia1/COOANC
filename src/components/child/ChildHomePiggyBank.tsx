@@ -5,7 +5,7 @@
  *
  * 비개발자 설명:
  * - 레벨 5부터 토끼 발 옆에 저금통이 보입니다.
- * - 팝업에서 왼쪽(크레딧)을 누르면 저금통 → 크레딧, 오른쪽(저금통)을 누르면 크레딧 → 저금통으로 1개씩 이동합니다.
+ * - 팝업에서 저금통을 누르면 왼쪽 크레딧 동전이 저금통으로, 크레딧을 누르면 저금통에서 왼쪽 동전으로 1개씩 날아갑니다.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -42,8 +42,8 @@ function playPiggyStageUpSound() {
   }
 }
 
-/** 저금통 슬롯 위에서 동전이 떨어지기 시작하는 높이(px) */
-const PIGGY_COIN_DROP_OFFSET_PX = 44
+/** 저금통 입구(동전이 들어가는 지점) — 저금통 그림 기준 세로 % */
+const PIGGY_SLOT_Y_RATIO = 0.42
 
 function piggyTransferHintSeenKey(childId: string): string {
   return `cooanc:piggy-transfer-hint-seen:${childId}`
@@ -93,6 +93,7 @@ export default function ChildHomePiggyBank({
   const [flyCoins, setFlyCoins] = useState<FlyCoin[]>([])
   const flyIdRef = useRef(0)
   const creditsPanelRef = useRef<HTMLDivElement>(null)
+  const creditsCoinRef = useRef<HTMLImageElement>(null)
   const piggyTargetRef = useRef<HTMLDivElement>(null)
   const optimisticCreditsRef = useRef(availableCredits)
   const optimisticPiggyRef = useRef(piggyCredits)
@@ -115,19 +116,22 @@ export default function ChildHomePiggyBank({
   const spawnFlyCoin = useCallback((kind: TransferKind) => {
     const piggyEl = piggyTargetRef.current
     const creditsEl = creditsPanelRef.current
+    const creditsCoinEl = creditsCoinRef.current
     if (!piggyEl || !creditsEl) return
 
     const piggy = piggyEl.getBoundingClientRect()
     const credits = creditsEl.getBoundingClientRect()
+    const coinImg = creditsCoinEl?.getBoundingClientRect()
     const piggyCenterX = piggy.left + piggy.width / 2
-    const piggySlotY = piggy.top + piggy.height * 0.42
-    const creditsCenterX = credits.left + credits.width / 2
-    const creditsCenterY = credits.top + credits.height / 2
+    const piggySlotY = piggy.top + piggy.height * PIGGY_SLOT_Y_RATIO
+    /** 왼쪽 크레딧 동전 그림 중심 — 없으면 패널 중심으로 폴백 */
+    const creditsCoinCenterX = coinImg ? coinImg.left + coinImg.width / 2 : credits.left + credits.width / 2
+    const creditsCoinCenterY = coinImg ? coinImg.top + coinImg.height / 2 : credits.top + credits.height / 2
 
-    const fromX = kind === 'credits_to_piggy' ? piggyCenterX : piggyCenterX
-    const fromY = kind === 'credits_to_piggy' ? piggy.top - PIGGY_COIN_DROP_OFFSET_PX : piggySlotY
-    const toX = kind === 'credits_to_piggy' ? piggyCenterX : creditsCenterX
-    const toY = kind === 'credits_to_piggy' ? piggySlotY : creditsCenterY
+    const fromX = kind === 'credits_to_piggy' ? creditsCoinCenterX : piggyCenterX
+    const fromY = kind === 'credits_to_piggy' ? creditsCoinCenterY : piggySlotY
+    const toX = kind === 'credits_to_piggy' ? piggyCenterX : creditsCoinCenterX
+    const toY = kind === 'credits_to_piggy' ? piggySlotY : creditsCoinCenterY
 
     const id = ++flyIdRef.current
     setFlyCoins((prev) => [...prev, { id, fromX, fromY, toX, toY }])
@@ -313,6 +317,7 @@ export default function ChildHomePiggyBank({
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
+                  ref={creditsCoinRef}
                   src={CHILD_CREDIT_COIN_PNG_SRC}
                   alt=""
                   width={72}

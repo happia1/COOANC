@@ -12,7 +12,6 @@ import {
   type RoutineAlarmPrefsLoaded,
   type RoutineCustomAlarmStored,
 } from '@/lib/routineAlarmLocalPrefs'
-import { AUDIO } from '@/constants/audio'
 import { CHILD_AUDIO, createPreloadedAudio } from '@/lib/childAudio'
 
 type Props = {
@@ -340,7 +339,7 @@ export default function ChildAlarmClockPopup({ open, onClose }: Props) {
 
   /** 남은 10초 구간 알람 — 10초가 되는 순간 1회만 재생, 0초에서 끊음 */
   const pomodoroTenSecAlarmRef = useRef<HTMLAudioElement | null>(null)
-  /** 타이머 00:00 직후 종료 멜로디(`HAPPY_COUNTDOWN`) — 정지·팝업 닫기 등에서 끊기 위해 보관 */
+  /** 타이머 00:00 직후 종료 멜로디 — 정지·팝업 닫기 등에서 끊기 위해 보관 */
   const pomodoroEndMelodyRef = useRef<HTMLAudioElement | null>(null)
   /** 이번 실행에서 10초 알람을 이미 시작했는지(매 초 재시작 방지) */
   const tenSecondAlarmStartedRef = useRef(false)
@@ -353,7 +352,7 @@ export default function ChildAlarmClockPopup({ open, onClose }: Props) {
    */
   const ensurePomodoroTickAudio = useCallback((): HTMLAudioElement => {
     if (!pomodoroTenSecAlarmRef.current) {
-      pomodoroTenSecAlarmRef.current = createPreloadedAudio(CHILD_AUDIO.tickTock)
+      pomodoroTenSecAlarmRef.current = createPreloadedAudio(CHILD_AUDIO.pomodoroTenSecond)
     }
     return pomodoroTenSecAlarmRef.current
   }, [])
@@ -364,7 +363,7 @@ export default function ChildAlarmClockPopup({ open, onClose }: Props) {
    */
   const ensurePomodoroEndAudio = useCallback((): HTMLAudioElement => {
     if (!pomodoroEndMelodyRef.current) {
-      pomodoroEndMelodyRef.current = createPreloadedAudio(AUDIO.COUNTDOWN.HAPPY_COUNTDOWN)
+      pomodoroEndMelodyRef.current = createPreloadedAudio(CHILD_AUDIO.pomodoroEnd)
     }
     return pomodoroEndMelodyRef.current
   }, [])

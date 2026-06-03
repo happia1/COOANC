@@ -10,6 +10,7 @@ import { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import SpriteImage from '@/components/common/SpriteImage'
 import { SHOP_ANIMATIONS } from '@/constants/sprites'
+import { CHILD_AUDIO, playAudioWithTimedFadeOut } from '@/lib/childAudio'
 
 type Props = {
   open: boolean
@@ -25,14 +26,31 @@ export default function MarketPurchaseSuccessOverlay({
   autoCloseMs = 3600,
 }: Props) {
   const confettiFired = useRef(false)
+  const cheerSoundStopRef = useRef<(() => void) | null>(null)
+
+  useEffect(() => {
+    return () => {
+      cheerSoundStopRef.current?.()
+      cheerSoundStopRef.current = null
+    }
+  }, [])
 
   useEffect(() => {
     if (!open) {
       confettiFired.current = false
+      cheerSoundStopRef.current?.()
+      cheerSoundStopRef.current = null
       return
     }
     if (confettiFired.current) return
     confettiFired.current = true
+
+    cheerSoundStopRef.current?.()
+    cheerSoundStopRef.current = playAudioWithTimedFadeOut(CHILD_AUDIO.marketPurchaseCheer, {
+      playMs: 800,
+      fadeMs: 500,
+      volume: 0.9,
+    })
 
     let cancelled = false
     void import('canvas-confetti').then((mod) => {
@@ -56,6 +74,8 @@ export default function MarketPurchaseSuccessOverlay({
     return () => {
       cancelled = true
       window.clearTimeout(t)
+      cheerSoundStopRef.current?.()
+      cheerSoundStopRef.current = null
     }
   }, [open, onDismiss, autoCloseMs])
 

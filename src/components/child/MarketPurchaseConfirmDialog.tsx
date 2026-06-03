@@ -11,7 +11,7 @@
  * 장식이 보이는 구간은 본문·푸터에 고정 최소 높이를 둡니다.
  */
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { StoreItem } from '@/types/database'
 import SpriteImage from '@/components/common/SpriteImage'
@@ -22,22 +22,7 @@ import {
   formatVideoPassPurchaseDuration,
   isVideoViewingPassStoreItem,
 } from '@/lib/contentWatchTime'
-
-/** 「네, 살게요」 이후 계산대 연출(슬롯 차감·동전)에 재생하는 효과음 */
-const MARKET_CHECKOUT_SOUND_SRC =
-  '/assets/audio/effects/floraphonic-coin-donation-6-183893.mp3' as const
-
-function playMarketCheckoutSound() {
-  try {
-    const audio = new Audio(MARKET_CHECKOUT_SOUND_SRC)
-    audio.volume = 0.85
-    void audio.play().catch(() => {
-      /* 브라우저 자동재생 정책 등으로 실패해도 조용히 무시 */
-    })
-  } catch {
-    /* noop */
-  }
-}
+import { CHILD_AUDIO, playAudioWithTimedFadeOut } from '@/lib/childAudio'
 
 export type MarketPurchaseSelected = {
   item: StoreItem
@@ -185,6 +170,14 @@ export default function MarketPurchaseConfirmDialog({
   /** React Strict Mode 에서 입장 애니메이션이 두 번 도는 것을 줄이기 위해 다음 프레임에만 클래스 부여 */
   const [decoAnimate, setDecoAnimate] = useState(false)
   const [requestBusy, setRequestBusy] = useState(false)
+  const checkoutSoundStopRef = useRef<(() => void) | null>(null)
+
+  useEffect(() => {
+    return () => {
+      checkoutSoundStopRef.current?.()
+      checkoutSoundStopRef.current = null
+    }
+  }, [])
 
   useEffect(() => {
     setCheckoutStep('finalSure')
@@ -226,7 +219,12 @@ export default function MarketPurchaseConfirmDialog({
 
   /** 「정말 구매」확인 — 여기서부터 슬롯·동전 애니메이션 */
   function startCheckoutAnimation() {
-    playMarketCheckoutSound()
+    checkoutSoundStopRef.current?.()
+    checkoutSoundStopRef.current = playAudioWithTimedFadeOut(CHILD_AUDIO.marketCheckout, {
+      playMs: 800,
+      fadeMs: 500,
+      volume: 0.85,
+    })
     setCheckoutStep('animating')
     setPayRunId(Date.now())
   }

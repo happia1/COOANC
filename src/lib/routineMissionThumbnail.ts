@@ -53,8 +53,17 @@ const DINNER_PNG_CACHE_BUST = '2'
  */
 const SHOWER_PNG_CACHE_BUST = '1'
 
+/**
+ * 스페셜 「머리빗기」(`comb_hair.png`) PNG 캐시 무효화 버전입니다.
+ * - 같은 파일명으로 그림만 바꾼 뒤에도 예전 그림이 보이면 이 숫자만 1 올립니다.
+ */
+const COMB_HAIR_PNG_CACHE_BUST = '1'
+
 /** 샤워·씻기 루틴 공통 — `목욕/샤워` 옛 제목은 별칭으로 여기와 같은 파일을 씁니다 */
 const SHOWER_ROUTINE_PNG = `${BASE}/p.m/shower.png?v=${SHOWER_PNG_CACHE_BUST}`
+
+/** 스페셜 칩 「머리빗기」— `comb_hair.png` */
+const COMB_HAIR_ROUTINE_PNG = `${BASE}/special/comb_hair.png?v=${COMB_HAIR_PNG_CACHE_BUST}`
 
 /** 「식사 준비 돕기」계열 전용 PNG — 제목 표기가 조금 달라도 같은 파일을 씁니다. */
 const MEAL_PREP_HELP_ROUTINE_PNG = `${BASE}/special/put_cutrary.png?v=${MEAL_PREP_PNG_CACHE_BUST}`
@@ -192,8 +201,8 @@ const PNG_BY_TITLE: Record<string, string> = {
   저금하기: `${BASE}/special/saving.png`,
   저축하기: `${BASE}/special/saving.png`,
   손톱깎기: `${BASE}/special/nail_cliper.png`,
-  머리빗기: `${BASE}/special/comb_hair.png`,
-  '머리 빗기': `${BASE}/special/comb_hair.png`,
+  머리빗기: COMB_HAIR_ROUTINE_PNG,
+  '머리 빗기': COMB_HAIR_ROUTINE_PNG,
   '이불 정리하기': `${BASE}/special/clean_bed.png`,
   이불정리하기: `${BASE}/special/clean_bed.png`,
   이불개기: `${BASE}/special/clean_bed.png`,

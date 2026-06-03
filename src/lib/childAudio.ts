@@ -19,11 +19,83 @@ export const CHILD_AUDIO = {
   dontLie: '/assets/audio/alerts/거짓말은 나 속상해.wav',
   /** 실제 레포에 존재하는 파일로 고정(기존 tick-tock 경로는 파일 부재로 404). */
   tickTock: '/assets/audio/alerts/잘시간.mp3',
+  /** 뽀모도로 타이머 — 남은 시간 10초가 되는 순간부터 재생하는 틱톡 경고음 */
+  pomodoroTenSecond: '/assets/audio/countdown/tick-tock-timer.wav',
+  /** 뽀모도로 타이머 — 00:00 도달 시 재생(정지 버튼으로 끔) */
+  pomodoroEnd: '/assets/audio/effects/뽀모도로 타이머 끝.mp3',
   /** 미션 카드 탭 즉시 반응음 — 요청 경로의 성공 효과음으로 고정 */
   cardTap: '/assets/audio/missions/success_reward-fairy-arcade-sparkle-866.wav',
   /** 연속 탭 확인 팝업 등 보조 효과음 */
   popupAlert: '/assets/audio/alerts/잘시간.mp3',
+  /** 마켓 계산대(크레딧 차감) 연출 */
+  marketCheckout: '/assets/audio/effects/floraphonic-coin-donation-6-183893.mp3',
+  /** 마켓 구매 완료(낙하산·콘페티) 축하 */
+  marketPurchaseCheer: '/assets/audio/effects/환호성.mp3',
 } as const
+
+export type PlayAudioTimedFadeOutOptions = {
+  /** 페이드아웃 전 풀 볼륨으로 재생할 시간(ms) */
+  playMs?: number
+  /** 볼륨을 0까지 줄이는 시간(ms) */
+  fadeMs?: number
+  /** 시작 볼륨 0~1 */
+  volume?: number
+}
+
+/**
+ * 지정 시간만큼 재생한 뒤 볼륨을 서서히 줄여 끝냅니다.
+ * 반환 함수를 호출하면 타이머·페이드·재생을 즉시 중단합니다.
+ */
+export function playAudioWithTimedFadeOut(
+  src: string,
+  opts: PlayAudioTimedFadeOutOptions = {},
+): () => void {
+  if (typeof window === 'undefined') return () => {}
+
+  const { playMs = 2000, fadeMs = 500, volume = 1 } = opts
+  const audio = createPreloadedAudio(src)
+  audio.volume = volume
+
+  let cancelled = false
+  let fadeStartTimer: ReturnType<typeof setTimeout> | null = null
+  let rafId: number | null = null
+
+  const stopPlayback = () => {
+    try {
+      audio.pause()
+      audio.currentTime = 0
+    } catch {
+      /* ignore */
+    }
+  }
+
+  void audio.play().catch((e) => console.warn('[childAudio] timed fade play failed', e))
+
+  fadeStartTimer = window.setTimeout(() => {
+    if (cancelled) return
+    const startVol = audio.volume
+    const fadeStart = performance.now()
+
+    const step = (now: number) => {
+      if (cancelled) return
+      const t = Math.min(1, (now - fadeStart) / fadeMs)
+      audio.volume = Math.max(0, startVol * (1 - t))
+      if (t < 1) {
+        rafId = requestAnimationFrame(step)
+      } else {
+        stopPlayback()
+      }
+    }
+    rafId = requestAnimationFrame(step)
+  }, playMs)
+
+  return () => {
+    cancelled = true
+    if (fadeStartTimer !== null) window.clearTimeout(fadeStartTimer)
+    if (rafId !== null) cancelAnimationFrame(rafId)
+    stopPlayback()
+  }
+}
 
 /** `installChildRoutineAudioUnlockOnFirstGesture` 가 전역 리스너를 중복해서 붙지 않게 합니다 */
 let routineAudioGestureUnlockInstalled = false

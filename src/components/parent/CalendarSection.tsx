@@ -60,20 +60,38 @@ const EVENT_LEGEND_CHIP_SELECTED: Record<LocalCalendarEvent['eventType'], { bg: 
   travel: { bg: 'bg-sky-200', text: 'text-sky-950', dot: 'bg-sky-600' },
 }
 
-/** 표시 전용 이름 (special = 기념일, other = 그 외 일정) */
+/** 표시 전용 이름 — special/event·etc/other 는 UI 에서 통합 라벨 */
 const EVENT_TYPE_LABELS: Record<LocalCalendarEvent['eventType'], string> = {
   holiday: '공휴일',
   vacation: '방학',
   birthday: '생일',
-  etc: '기타(상세)',
+  etc: '기타',
   school: '학교',
-  special: '기념일',
+  special: '기념일/행사',
   other: '기타',
-  event: '행사',
+  event: '기념일/행사',
   travel: '여행',
 }
 
-/** 범례·일정 시트에서 쓰는 종류 순서 */
+/**
+ * 일정 추가·편집 시트 — 이벤트 종류 칩 (한 줄에 여러 개, etc/other·special/event 통합)
+ * `value` 는 저장 시 DB `event_type` 으로 씁니다.
+ */
+const EVENT_TYPE_PICKER_OPTIONS: {
+  value: LocalCalendarEvent['eventType']
+  label: string
+  matchTypes: LocalCalendarEvent['eventType'][]
+}[] = [
+  { value: 'holiday', label: '공휴일', matchTypes: ['holiday'] },
+  { value: 'vacation', label: '방학', matchTypes: ['vacation'] },
+  { value: 'travel', label: '여행', matchTypes: ['travel'] },
+  { value: 'birthday', label: '생일', matchTypes: ['birthday'] },
+  { value: 'school', label: '학교', matchTypes: ['school'] },
+  { value: 'special', label: '기념일/행사', matchTypes: ['special', 'event'] },
+  { value: 'etc', label: '기타', matchTypes: ['etc', 'other'] },
+]
+
+/** 범례·일정 시트에서 쓰는 종류 순서 (etc/other·special/event 는 각각 하나) */
 const EVENT_TYPES_ORDER: LocalCalendarEvent['eventType'][] = [
   'holiday',
   'vacation',
@@ -81,9 +99,7 @@ const EVENT_TYPES_ORDER: LocalCalendarEvent['eventType'][] = [
   'birthday',
   'school',
   'special',
-  'event',
   'etc',
-  'other',
 ]
 
 type OverrideType = LocalCalendarEvent['routineOverride']
@@ -312,6 +328,14 @@ export default function CalendarSection({ childId, focusDate = null }: Props) {
     return false
   }
 
+  /** 범례 필터 — 통합 라벨(special↔event, etc↔other)도 같이 걸러짐 */
+  function eventMatchesLegendFilter(ev: LocalCalendarEvent): boolean {
+    if (!legendFilter) return true
+    if (legendFilter === 'special') return ev.eventType === 'special' || ev.eventType === 'event'
+    if (legendFilter === 'etc') return ev.eventType === 'etc' || ev.eventType === 'other'
+    return ev.eventType === legendFilter
+  }
+
   /**
    * 이번 달에 걸리는 일정(범례 적용 전).
    */
@@ -322,10 +346,8 @@ export default function CalendarSection({ childId, focusDate = null }: Props) {
       return y === year && m - 1 === month
     })
   })
-  /** 범례가 있으면 격자·이번 달 일정 **목록**에만 `eventType` 일치 일정(공휴일만·여행만 등) */
-  const monthEvents = legendFilter
-    ? monthEventsAll.filter((ev) => ev.eventType === legendFilter)
-    : monthEventsAll
+  /** 범례가 있으면 격자·이번 달 일정 **목록**에만 해당 유형(통합 칩 포함) */
+  const monthEvents = legendFilter ? monthEventsAll.filter(eventMatchesLegendFilter) : monthEventsAll
 
   /**
    * 날짜 → 일정 배열(격자 도트·칸에 쓰는 맵) — `monthEvents` = 범례 반영본이라 칩을 바꾸면 점이 바뀜.
@@ -484,7 +506,10 @@ export default function CalendarSection({ childId, focusDate = null }: Props) {
         aria-label="일정 유형 범례 — 칩을 누르면 달의 점과 아래 이번 달 일정 목록이 해당 유형으로 좁혀짐(날짜 상세는 항상 그날 전체)"
       >
         {EVENT_TYPES_ORDER.map((type) => {
-          const selected = legendFilter === type
+          const selected =
+            legendFilter === type ||
+            (type === 'special' && legendFilter === 'event') ||
+            (type === 'etc' && legendFilter === 'other')
           const chip = selected ? EVENT_LEGEND_CHIP_SELECTED[type] : EVENT_COLORS[type]
           return (
             <button
@@ -885,22 +910,25 @@ export function CalendarEventSheet({
 
                 <div className="mt-4">
                   <label className="mb-2 block text-xs font-bold text-gray-500">이벤트 종류</label>
-                  {/* 네 칸은 한 줄에 넣기 어려워 2×2 그리드 */}
-                  <div className="grid grid-cols-2 gap-2">
-                    {EVENT_TYPES_ORDER.map((type) => (
-                      <button
-                        key={type}
-                        type="button"
-                        onClick={() => setType(type)}
-                        className={`rounded-xl border-2 py-2.5 text-xs font-bold transition-all ${
-                          eventType === type
-                            ? `border-current ${EVENT_COLORS[type].bg} ${EVENT_COLORS[type].text}`
-                            : 'border-gray-200 text-gray-400'
-                        }`}
-                      >
-                        {EVENT_TYPE_LABELS[type]}
-                      </button>
-                    ))}
+                  <div className="flex flex-wrap gap-1.5">
+                    {EVENT_TYPE_PICKER_OPTIONS.map((opt) => {
+                      const selected = opt.matchTypes.includes(eventType)
+                      const colors = EVENT_COLORS[opt.value]
+                      return (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => setType(opt.value)}
+                          className={`shrink-0 rounded-lg border-2 px-2.5 py-1.5 text-[11px] font-bold transition-all ${
+                            selected
+                              ? `border-current ${colors.bg} ${colors.text}`
+                              : 'border-gray-200 text-gray-400'
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      )
+                    })}
                   </div>
                 </div>
 
