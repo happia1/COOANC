@@ -57,7 +57,8 @@ export function playAudioWithTimedFadeOut(
   audio.volume = volume
 
   let cancelled = false
-  let fadeStartTimer: ReturnType<typeof setTimeout> | null = null
+  /** 브라우저 `setTimeout` id — Node `Timeout` 과 구분 */
+  let fadeStartTimer: number | null = null
   let rafId: number | null = null
 
   const stopPlayback = () => {
