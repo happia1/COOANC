@@ -18,12 +18,14 @@ const TIMER_KEYWORD_VIDEOS = [
   { label: '식사시간', url: 'https://youtu.be/OxVeowNwyFw?si=uMOJi03Hw7r4qkV1' },
   { label: '놀이시간', url: 'https://youtu.be/yBanUW7ja8M?si=j5COdu4hKoAfHzgl' },
   { label: '모두 제자리', url: 'https://www.youtube.com/watch?v=bs3ztX4TWHc' },
+  { label: '정리왕이 될 사람', url: 'https://www.youtube.com/watch?v=NOF42kxzExQ' },
   { label: '잠잘 준비', url: 'https://youtu.be/bdjyo0qsejI?si=XvMWVjb16aW91Hj4' },
   /** 잠잘 준비 다음 — 요청 URL의 `t=3541s` 는 embed `start` 로 넘겨 해당 시점부터 재생합니다 */
   {
     label: '뽀로로 수면음악',
     url: 'https://www.youtube.com/watch?v=875Gl5vFEek&t=3541s',
   },
+  { label: '잠자리 명상', url: 'https://www.youtube.com/watch?v=2kBWEfrKd9Y' },
 ] as const
 
 /**

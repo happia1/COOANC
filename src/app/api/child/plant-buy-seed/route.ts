@@ -61,6 +61,43 @@ export async function POST(req: NextRequest) {
 
     const currentCredits = readChildStatInt(row.credits)
     const piggy = readPiggyFromStatsRow(row)
+
+    /** 8초 안 같은 씨앗 중복 탭 — 추가 차감 없이 현재 상태 반환 */
+    const dedupeSince = new Date(Date.now() - 8000).toISOString()
+    const { data: recentDup } = await db
+      .from('plant_seed_purchases')
+      .select('id')
+      .eq('child_id', childId)
+      .eq('tree_id', treeId)
+      .gte('purchased_at', dedupeSince)
+      .order('purchased_at', { ascending: false })
+      .limit(1)
+
+    if (recentDup && recentDup.length > 0) {
+      const { data: after } = await db
+        .from('child_stats')
+        .select('credits, hearts, pot_stage, pot_hearts_used, pot_completed, pot_tree_id')
+        .eq('child_id', childId)
+        .maybeSingle()
+
+      const resolvedTreeId = after?.pot_tree_id
+        ? resolveTreeId(after.pot_tree_id as string)
+        : treeId
+
+      return NextResponse.json({
+        success: true,
+        hasChosenSeed: true,
+        deduped: true,
+        newCredits: after ? readChildStatInt(after.credits) : currentCredits,
+        treeId: resolvedTreeId as PlantTreeId,
+        hearts: after ? readChildStatInt(after.hearts) : readChildStatInt(row.hearts),
+        pot_stage: after ? readChildStatInt(after.pot_stage) : 0,
+        pot_hearts_used: after ? readChildStatInt(after.pot_hearts_used) : 0,
+        pot_completed: after ? Boolean(after.pot_completed) : false,
+        credits_piggy: piggy,
+      })
+    }
+
     if (currentCredits < cost) {
       return NextResponse.json(
         {
@@ -88,18 +125,28 @@ export async function POST(req: NextRequest) {
 
     await logSeedPurchaseSafe(db, childId, treeId, cost)
 
-    const { data: after } = await db
+    const { data: after, error: afterErr } = await db
       .from('child_stats')
-      .select('credits, hearts, pot_stage, pot_hearts_used, pot_completed')
+      .select('credits, hearts, pot_stage, pot_hearts_used, pot_completed, pot_tree_id')
       .eq('child_id', childId)
       .maybeSingle()
 
-    const resolvedTreeId = (after as { pot_tree_id?: string } | null)?.pot_tree_id
-      ? resolveTreeId((after as { pot_tree_id?: string }).pot_tree_id)
+    if (afterErr) {
+      console.warn('[plant-buy-seed] read after', afterErr.message)
+    }
+
+    const savedRaw = (after as { pot_tree_id?: string } | null)?.pot_tree_id
+    const resolvedTreeId = savedRaw
+      ? resolveTreeId(savedRaw)
       : treeId
+
+    if (after && savedRaw && resolveTreeId(savedRaw) !== treeId) {
+      console.warn('[plant-buy-seed] pot_tree_id mismatch', { expected: treeId, saved: savedRaw })
+    }
 
     return NextResponse.json({
       success: true,
+      hasChosenSeed: true,
       newCredits: after ? readChildStatInt(after.credits) : newCredits,
       treeId: resolvedTreeId as PlantTreeId,
       hearts: after ? readChildStatInt(after.hearts) : readChildStatInt(row.hearts),

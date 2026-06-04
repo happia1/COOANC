@@ -72,6 +72,7 @@ import {
   CHILD_HOME_TOP_BAR_GLASS_STYLE,
 } from '@/lib/childHomeTopBarGlass'
 import { ASSETS, CHILD_HOME_BACKGROUND_CACHE_BUST } from '@/constants/assets'
+import { getPlantPotHomeShellTransform } from '@/constants/plantPotVisual'
 import { needsPotSeedSelection, type PlantStage } from '@/constants/plantTrees'
 import type { PlantHarvestCelebrate } from '@/lib/plantHarvest'
 import { usePlantHarvest } from '@/hooks/usePlantHarvest'
@@ -738,7 +739,6 @@ export default function ChildScreen({
   const [plantHarvestCelebrate, setPlantHarvestCelebrate] = useState<PlantHarvestCelebrate | null>(null)
   /** 하트가 0일 때 물주기 시 잠깐 뜨는 안내 */
   const [plantHint, setPlantHint] = useState<string | null>(null)
-
   const handlePlantGrowthCelebrate = useCallback(
     (newStage: PlantStage, harvest?: PlantHarvestCelebrate) => {
       playUiSound(PLANT_STAGE_UP_SOUND_SRC, 0.9)
@@ -2492,7 +2492,11 @@ export default function ChildScreen({
                 style={{
                   left: `${plantFeetAnchorsPct.canPct + piggyPotExtraSpreadPct}%`,
                   top: `${anchor.characterFootY * 100}%`,
-                  transform: 'translate(-50%, calc(-90% - 28px))',
+                  transform: getPlantPotHomeShellTransform(
+                    pot.treeId,
+                    pot.stage,
+                    needsPotSeedSelection(pot),
+                  ),
                 }}
               >
                 <div

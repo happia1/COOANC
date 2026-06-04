@@ -99,6 +99,8 @@ export default function SeedSelectPicker({
         return
       }
       setFeedback('message' in result ? result.message : '씨앗 심기에 실패했어요.')
+    } catch {
+      setFeedback('씨앗 심기 중 오류가 났어요. 잠시 후 다시 시도해 주세요.')
     } finally {
       setBusy(false)
     }

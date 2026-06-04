@@ -5,7 +5,7 @@
  *
  * 비개발자 설명:
  * - 「물 주기」를 누르면 보유 하트가 1 줄고, 식물 진행 바가 조금 찹니다.
- * - 단계는 0(씨앗)부터 7(다 익은 열매)까지예요.
+ * - 사과는 0(씨앗)~7단계, 다른 과일은 1~7단계로 자라요.
  * - 한 단계 오를 때마다 `water()` 가 `{ type: 'grew', newStage }` 를 돌려주고, 화면(`PlantStageCelebrationModal`)에서 팝업·콘페티를 띄웁니다.
  * - 완성(7단계) 이후 「씨앗 고르기」는 `buySeed`로 크레딧을 쓰고 새 씨앗을 심습니다.
  * - `resetPot`은 크레딧 없이 진행만 초기화하는 보조 경로(API 폴백)입니다. 씨앗 모달과 함께 쓰지 마세요.
@@ -13,7 +13,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  HEARTS_PER_STAGE,
+  clampPotStageForTree,
+  getHeartsNeededForStage,
+  getInitialStageAfterSeed,
   normalizePlantPotProgress,
   needsPotSeedSelection,
   resolveTreeId,
@@ -24,6 +26,10 @@ import { createClient } from '@/lib/supabase/client'
 import { readChildStatInt } from '@/lib/childCreditsSplit'
 import type { PlantHarvestCelebrate } from '@/lib/plantHarvest'
 import { parseJsonFromResponse } from '@/lib/parseJsonResponse'
+import {
+  hasPlantChosenSeedInSession,
+  markPlantChosenSeedInSession,
+} from '@/lib/plantChosenSeedStorage'
 
 export type PotState = {
   treeId: PlantTreeId
@@ -64,15 +70,15 @@ function potStateFromWaterResponse(
   pot_completed: unknown,
   hasChosenSeed: boolean,
 ): PotState {
-  const stageDb = Math.min(7, Math.max(0, readChildStatInt(pot_stage))) as PlantStage
+  const stageDb = clampPotStageForTree(treeId, readChildStatInt(pot_stage))
   const heartsUsedRaw = readChildStatInt(pot_hearts_used)
   const completedRaw = Boolean(pot_completed)
-  const n = normalizePlantPotProgress(stageDb, heartsUsedRaw, completedRaw)
+  const n = normalizePlantPotProgress(stageDb, heartsUsedRaw, completedRaw, treeId)
   return {
     treeId,
     stage: n.stage,
     heartsUsed: n.heartsUsed,
-    heartsNeeded: HEARTS_PER_STAGE[n.stage],
+    heartsNeeded: getHeartsNeededForStage(treeId, n.stage),
     completed: n.completed,
     hasChosenSeed,
   }
@@ -88,10 +94,15 @@ async function loadHasChosenSeed(
     .select('id', { count: 'exact', head: true })
     .eq('child_id', childId)
 
-  if (!error) return (count ?? 0) > 0
+  if (!error) return (count ?? 0) > 0 || hasPlantChosenSeedInSession(childId)
 
-  /** 구매 이력 테이블 없음·RLS — 예전 진행 데이터가 있으면 이미 심은 것으로 간주 */
-  return normalized.stage > 0 || normalized.heartsUsed > 0 || normalized.completed
+  /** 구매 이력 테이블 없음·RLS — 세션·예전 진행 데이터로 보완 */
+  return (
+    hasPlantChosenSeedInSession(childId) ||
+    normalized.stage > 0 ||
+    normalized.heartsUsed > 0 ||
+    normalized.completed
+  )
 }
 
 export function usePlantPot(
@@ -155,12 +166,15 @@ export function usePlantPot(
 
     let data = initialData
 
+    const treeIdEarly = resolveTreeId(
+      typeof data.pot_tree_id === 'string' ? data.pot_tree_id : null,
+    )
     const stageRaw = readChildStatInt(data.pot_stage)
-    const stageDb = Math.min(7, Math.max(0, stageRaw)) as PlantStage
+    const stageDb = clampPotStageForTree(treeIdEarly, stageRaw)
     const heartsUsedDb = readChildStatInt(data.pot_hearts_used)
     const completedDb = data.pot_completed ?? false
 
-    const normalized = normalizePlantPotProgress(stageDb, heartsUsedDb, completedDb)
+    const normalized = normalizePlantPotProgress(stageDb, heartsUsedDb, completedDb, treeIdEarly)
     const needsDbRepair =
       normalized.stage !== stageDb ||
       normalized.heartsUsed !== heartsUsedDb ||
@@ -201,29 +215,34 @@ export function usePlantPot(
       }
     }
 
-    const stageRawFinal = readChildStatInt(data.pot_stage)
-    const stageDbFinal = Math.min(7, Math.max(0, stageRawFinal)) as PlantStage
-    const heartsUsedFinal = readChildStatInt(data.pot_hearts_used)
-    const completedFinal = data.pot_completed ?? false
-    const normalizedFinal = normalizePlantPotProgress(stageDbFinal, heartsUsedFinal, completedFinal)
-
     const treeId = resolveTreeId(
       typeof data.pot_tree_id === 'string' ? data.pot_tree_id : null,
     )
-
-    const hasChosenSeed = await loadHasChosenSeed(supabase, childId, normalizedFinal)
-
-    const nextPot: PotState = {
+    const stageRawFinal = readChildStatInt(data.pot_stage)
+    const stageDbFinal = clampPotStageForTree(treeId, stageRawFinal)
+    const heartsUsedFinal = readChildStatInt(data.pot_hearts_used)
+    const completedFinal = data.pot_completed ?? false
+    const normalizedFinal = normalizePlantPotProgress(
+      stageDbFinal,
+      heartsUsedFinal,
+      completedFinal,
       treeId,
-      stage: normalizedFinal.stage,
-      heartsUsed: normalizedFinal.heartsUsed,
-      heartsNeeded: HEARTS_PER_STAGE[normalizedFinal.stage],
-      completed: normalizedFinal.completed,
-      hasChosenSeed,
-    }
+    )
 
+    const purchasedFlag = await loadHasChosenSeed(supabase, childId, normalizedFinal)
+
+    setPot((prev) => {
+      const hasChosenSeed = purchasedFlag || Boolean(prev?.hasChosenSeed)
+      return {
+        treeId,
+        stage: normalizedFinal.stage,
+        heartsUsed: normalizedFinal.heartsUsed,
+        heartsNeeded: getHeartsNeededForStage(treeId, normalizedFinal.stage),
+        completed: normalizedFinal.completed,
+        hasChosenSeed,
+      }
+    })
     setHearts(readChildStatInt(data.hearts))
-    setPot(nextPot)
     setLoading(false)
   }, [childId, supabase, serverRepairPlantNormalize])
 
@@ -250,6 +269,38 @@ export function usePlantPot(
   useEffect(() => {
     void refresh()
   }, [refresh])
+
+  /** 중복 씨앗 구매(연타) 크레딧 — 홈 진입 시 1회 자동 환불 시도 */
+  const duplicateRefundRanRef = useRef(false)
+  useEffect(() => {
+    if (loading || duplicateRefundRanRef.current) return
+    duplicateRefundRanRef.current = true
+
+    void (async () => {
+      try {
+        const res = await fetch('/api/child/plant-refund-duplicate-seeds', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ childId }),
+          credentials: 'same-origin',
+        })
+        const json = (await res.json().catch(() => ({}))) as {
+          success?: boolean
+          refundedCredits?: number
+          newCredits?: number
+        }
+        if (res.ok && json.success && readChildStatInt(json.refundedCredits) > 0) {
+          onPlantStatsSyncedRef.current?.({
+            credits: readChildStatInt(json.newCredits),
+            credits_wallet: 0,
+          })
+          await refresh()
+        }
+      } catch {
+        /* noop */
+      }
+    })()
+  }, [loading, childId, refresh])
 
   /**
    * Realtime: 미션 완료 등으로 `child_stats` 가 바뀌면 즉시 반영합니다.
@@ -286,20 +337,25 @@ export function usePlantPot(
               const stageRaw = Object.prototype.hasOwnProperty.call(row, 'pot_stage')
                 ? readChildStatInt(row.pot_stage)
                 : prev.stage
-              const stageDb = Math.min(7, Math.max(0, stageRaw)) as PlantStage
+              const stageDb = clampPotStageForTree(treeId, stageRaw)
               const heartsUsedRaw = Object.prototype.hasOwnProperty.call(row, 'pot_hearts_used')
                 ? readChildStatInt(row.pot_hearts_used)
                 : prev.heartsUsed
               const completedRaw = Object.prototype.hasOwnProperty.call(row, 'pot_completed')
                 ? Boolean(row.pot_completed)
                 : prev.completed
-              const normalized = normalizePlantPotProgress(stageDb, heartsUsedRaw, completedRaw)
+              const normalized = normalizePlantPotProgress(
+                stageDb,
+                heartsUsedRaw,
+                completedRaw,
+                treeId,
+              )
               return {
                 ...prev,
                 treeId,
                 stage: normalized.stage,
                 heartsUsed: normalized.heartsUsed,
-                heartsNeeded: HEARTS_PER_STAGE[normalized.stage],
+                heartsNeeded: getHeartsNeededForStage(treeId, normalized.stage),
                 completed: normalized.completed,
               }
             })
@@ -339,7 +395,7 @@ export function usePlantPot(
         ...prevPot,
         stage: newStage,
         heartsUsed: newHeartsUsedAfter,
-        heartsNeeded: HEARTS_PER_STAGE[newStage],
+        heartsNeeded: getHeartsNeededForStage(prevPot.treeId, newStage),
         completed: isCompleted,
       })
       onPlantStatsSyncedRef.current?.({
@@ -429,10 +485,11 @@ export function usePlantPot(
       }
 
       if (full.grew === true && typeof full.newStage === 'number') {
-        const ns = Math.min(7, Math.max(0, Math.trunc(full.newStage)))
+        const tid = prevPot?.treeId ?? DEFAULT_TREE
+        const ns = clampPotStageForTree(tid, full.newStage)
         return {
           type: 'grew',
-          newStage: ns as PlantStage,
+          newStage: ns,
           harvest: full.harvest,
         }
       }
@@ -458,6 +515,7 @@ export function usePlantPot(
       })
       const { data: json, parseError } = await parseJsonFromResponse<{
         success?: boolean
+        hasChosenSeed?: boolean
         error?: string
         detail?: string
         code?: string
@@ -481,7 +539,10 @@ export function usePlantPot(
         }
       }
 
-      if (res.status === 400 && json.error === 'insufficient_credits') {
+      if (
+        res.status === 400 &&
+        (json.error === 'insufficient_credits' || json.code === 'insufficient_credits')
+      ) {
         const required = typeof json.required === 'number' ? json.required : 0
         const current = typeof json.current === 'number' ? json.current : 0
         const shortfall = Math.max(0, required - current)
@@ -510,11 +571,13 @@ export function usePlantPot(
       }
 
       const tid = resolveTreeId(json.treeId)
+      const initialStage = getInitialStageAfterSeed(tid)
+      markPlantChosenSeedInSession(childId)
       const newCredits = readChildStatInt(json.newCredits)
       const patch: Record<string, unknown> = {
         credits: newCredits,
         credits_wallet: 0,
-        pot_stage: 0,
+        pot_stage: initialStage,
         pot_hearts_used: 0,
         pot_completed: false,
         pot_tree_id: tid,
@@ -527,17 +590,15 @@ export function usePlantPot(
 
       setPot({
         treeId: tid,
-        stage: 0,
+        stage: initialStage,
         heartsUsed: 0,
-        heartsNeeded: HEARTS_PER_STAGE[0],
+        heartsNeeded: getHeartsNeededForStage(tid, initialStage),
         completed: false,
         hasChosenSeed: true,
       })
       if (typeof json.hearts === 'number') {
         setHearts(readChildStatInt(json.hearts))
       }
-
-      void refresh()
 
       return { ok: true as const, newCredits, treeId: tid }
     } catch (e) {

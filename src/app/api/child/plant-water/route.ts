@@ -4,7 +4,15 @@ import { createServiceRoleClient } from '@/lib/supabase/admin'
 import { resolveApiActorChildId } from '@/lib/resolveApiActorChildId'
 import { readChildStatInt } from '@/lib/childCreditsSplit'
 import { addPlantHarvest } from '@/lib/plantHarvest'
-import { HEARTS_PER_STAGE, normalizePlantPotProgress, resolveTreeId, type PlantStage } from '@/constants/plantTrees'
+import {
+  clampPotStageForTree,
+  getHeartsNeededForStage,
+  getMinGrowthStage,
+  needsPotSeedSelection,
+  normalizePlantPotProgress,
+  resolveTreeId,
+  type PlantStage,
+} from '@/constants/plantTrees'
 
 type PotRow = {
   hearts: unknown
@@ -15,11 +23,13 @@ type PotRow = {
 }
 
 function derivePot(row: PotRow) {
-  const stageDb = Math.min(7, Math.max(0, readChildStatInt(row.pot_stage))) as PlantStage
+  const treeId = resolveTreeId(row.pot_tree_id as string | undefined)
+  const stageDb = clampPotStageForTree(treeId, readChildStatInt(row.pot_stage))
   const heartsUsedDb = readChildStatInt(row.pot_hearts_used)
   const completedDb = Boolean(row.pot_completed ?? false)
-  const synced = normalizePlantPotProgress(stageDb, heartsUsedDb, completedDb)
+  const synced = normalizePlantPotProgress(stageDb, heartsUsedDb, completedDb, treeId)
   return {
+    treeId,
     freshHearts: readChildStatInt(row.hearts),
     synced,
     stageDb,
@@ -75,7 +85,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: '자녀 통계를 찾을 수 없어요' }, { status: 404 })
     }
 
-    let { freshHearts, synced, stageDb, heartsUsedDb, completedDb } = derivePot(row)
+    let { treeId, freshHearts, synced, stageDb, heartsUsedDb, completedDb } = derivePot(row)
 
     const needsDbRepair =
       synced.stage !== stageDb ||
@@ -99,7 +109,7 @@ export async function POST(req: NextRequest) {
       if (!row) {
         return NextResponse.json({ error: '통계를 다시 읽지 못했어요' }, { status: 500 })
       }
-      ;({ freshHearts, synced } = derivePot(row))
+      ;({ treeId, freshHearts, synced } = derivePot(row))
     }
 
     const stage = synced.stage
@@ -110,9 +120,10 @@ export async function POST(req: NextRequest) {
       .select('id', { count: 'exact', head: true })
       .eq('child_id', childId)
 
+    const minStage = getMinGrowthStage(treeId)
     const hasChosenSeed = !purchaseErr
       ? (purchaseCount ?? 0) > 0
-      : stage > 0 || heartsUsed > 0 || synced.completed
+      : stage >= minStage || heartsUsed > 0 || synced.completed
 
     if (!hasChosenSeed) {
       return NextResponse.json({ ok: false, code: 'NO_SEED_CHOSEN' as const }, { status: 400 })
@@ -144,12 +155,23 @@ export async function POST(req: NextRequest) {
       })
     }
 
+    if (
+      needsPotSeedSelection({
+        hasChosenSeed,
+        stage,
+        completed: synced.completed,
+        treeId,
+      })
+    ) {
+      return NextResponse.json({ ok: false, code: 'NO_SEED_CHOSEN' as const }, { status: 400 })
+    }
+
     if (freshHearts <= 0) {
       return NextResponse.json({ ok: false, code: 'NO_HEARTS' as const }, { status: 400 })
     }
 
     const newHeartsUsed = heartsUsed + 1
-    const needed = HEARTS_PER_STAGE[stage]
+    const needed = getHeartsNeededForStage(treeId, stage)
     const levelUp = needed > 0 && newHeartsUsed >= needed
     const newStage = levelUp ? (Math.min(stage + 1, 7) as PlantStage) : stage
     const newHeartsUsedAfter = levelUp ? 0 : newHeartsUsed

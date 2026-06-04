@@ -2,7 +2,10 @@
  * 식물(나무) 성장 단계·종류·씨앗 구매 비용
  */
 
-/** 성장 단계: 0(씨앗)~7(다 익은 열매) 8단계 */
+/**
+ * DB `pot_stage` 값 — 사과만 0(씨앗)~7, 나머지 과일은 1~7(에셋 1.png~7.png).
+ * 7단계에서 다 익으면 수확·이후 재심기.
+ */
 export type PlantStage = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7
 
 export const TREE_LIST = [
@@ -82,9 +85,30 @@ export function getPlantStageCelebrationTitle(stage: PlantStage): string {
 /** 이미지 루트 — /public/assets/img/missions/routine/plant/ */
 export const PLANT_BASE = '/assets/img/missions/routine/plant'
 
+/** 사과만 0단계(씨앗 심은 화분)부터 성장, 그 외는 1단계 그림부터 */
+export function usesAppleStageZero(treeId: PlantTreeId): boolean {
+  return treeId === 'apple'
+}
+
+/** 이 나무의 성장 `pot_stage` 최솟값 */
+export function getMinGrowthStage(treeId: PlantTreeId): PlantStage {
+  return usesAppleStageZero(treeId) ? 0 : 1
+}
+
+/** 씨앗 구매 직후 DB에 넣을 첫 단계 */
+export function getInitialStageAfterSeed(treeId: PlantTreeId): PlantStage {
+  return getMinGrowthStage(treeId)
+}
+
 /**
- * public 폴더명 매핑 — TREE_LIST id 와 디스크 폴더명이 다를 수 있음(예: blueberry → bluberry).
- * getStageImage / getSeedImage 는 6종 모두 `{PLANT_BASE}/{folder}/{stage}.png` 패턴을 씁니다.
+ * 화면에 보여 줄 「N단계」 번호 — 사과는 0→1번째, 나머지는 stage 그대로 1~7.
+ */
+export function getDisplayStepIndex(treeId: PlantTreeId, stage: PlantStage): number {
+  return usesAppleStageZero(treeId) ? stage + 1 : Math.max(1, stage)
+}
+
+/**
+ * public 폴더명 — TREE_LIST id 와 디스크 폴더명이 다를 수 있음(blueberry → bluberry).
  */
 const PLANT_ASSET_FOLDER: Record<PlantTreeId, string> = {
   apple: 'apple',
@@ -95,17 +119,50 @@ const PLANT_ASSET_FOLDER: Record<PlantTreeId, string> = {
   sunflower: 'sunflower',
 }
 
+/**
+ * 과일별 에셋 (public/assets/img/missions/routine/plant/)
+ * - apple: pot_stage 0~7 → 0.png~7.png
+ * - 그 외: pot_stage 1~7 → 1.png~7.png (0.png 미사용)
+ * - 미선택 안내·씨앗 카드는 과일명 PNG 또는 apple 0.png
+ */
+const FRUIT_ICON_FILENAME: Record<PlantTreeId, string> = {
+  apple: 'apple.png',
+  strawberry: 'strawberry.png',
+  lemon: 'lemon.png',
+  cherry: 'cherry.png',
+  blueberry: 'bluberry.png',
+  sunflower: '0.png',
+}
+
+/** 완성(7단계) 축하·수확 — 대부분 과일명 PNG, 해바라기만 7단계 그림 */
+const HARVEST_IMAGE_FILENAME: Record<PlantTreeId, string> = {
+  apple: 'apple.png',
+  strawberry: 'strawberry.png',
+  lemon: 'lemon.png',
+  cherry: 'cherry.png',
+  blueberry: 'bluberry.png',
+  sunflower: '7.png',
+}
+
 export function plantAssetFolder(treeId: PlantTreeId): string {
   return PLANT_ASSET_FOLDER[treeId] ?? treeId
+}
+
+function plantAssetSrc(folder: string, filename: string): string {
+  return `${PLANT_BASE}/${folder}/${filename}`
 }
 
 export const WATERING_CAN_EMPTY_SRC = `${PLANT_BASE}/200.png`
 export const WATERING_CAN_FULL_SRC = `${PLANT_BASE}/300.png`
 
-/** `{PLANT_BASE}/{treeId}/{stage}.png` — apple/0.png … sunflower/7.png */
+/** 화분·성장 단계 그림 — `pot_stage` 와 PNG 번호를 맞춥니다 */
 export function getStageImage(treeId: PlantTreeId, stage: PlantStage): string {
   const folder = plantAssetFolder(treeId)
-  return `${PLANT_BASE}/${folder}/${stage}.png`
+  if (usesAppleStageZero(treeId) && stage === 0) {
+    return plantAssetSrc(folder, '0.png')
+  }
+  const imageStage = Math.max(getMinGrowthStage(treeId), stage) as PlantStage
+  return plantAssetSrc(folder, `${imageStage}.png`)
 }
 
 /**
@@ -126,28 +183,31 @@ export function needsPotSeedSelection(pot: {
   hasChosenSeed: boolean
   stage: PlantStage
   completed: boolean
+  treeId: PlantTreeId
 }): boolean {
   if (!pot.hasChosenSeed) return true
-  return pot.stage === 7 && pot.completed
+  if (pot.stage === 7 && pot.completed) return true
+  /** 수확 후 화분 비우기(7단계 물주기)로 pot_stage 0이 된 경우 — 사과 외는 1부터 다시 심기 */
+  if (pot.hasChosenSeed && pot.stage < getMinGrowthStage(pot.treeId)) return true
+  return false
 }
 
 export function getSeedImage(treeId: PlantTreeId): string {
   const folder = plantAssetFolder(treeId)
-  return `${PLANT_BASE}/${folder}/seed.png`
+  const seedFile = treeId === 'apple' ? 'seed.png' : FRUIT_ICON_FILENAME[treeId]
+  return plantAssetSrc(folder, seedFile)
 }
 
+/** 완성 수확·축하 팝업 큰 그림 */
 export function getRewardImage(treeId: PlantTreeId): string {
   const folder = plantAssetFolder(treeId)
-  return `${PLANT_BASE}/${folder}/${folder}.png`
+  return plantAssetSrc(folder, HARVEST_IMAGE_FILENAME[treeId])
 }
 
-/**
- * 씨앗 선택 카드 미리보기 — 폴더 내 과일명 PNG(apple.png 등).
- * 해바라기만 성장 0단계(해바라기씨) 이미지를 그대로 씁니다.
- */
+/** 씨앗 선택 카드 미리보기 */
 export function getSeedSelectCardImage(treeId: PlantTreeId): string {
-  if (treeId === 'sunflower') return getStageImage('sunflower', 0)
-  return getRewardImage(treeId)
+  const folder = plantAssetFolder(treeId)
+  return plantAssetSrc(folder, FRUIT_ICON_FILENAME[treeId])
 }
 
 /** @deprecated `getStageImage('apple', stage)` 사용 */
@@ -173,17 +233,37 @@ export const HEARTS_PER_STAGE: Record<PlantStage, number> = {
   7: 0,
 }
 
+/** 현재 나무·단계에서 다음 단계로 가는 데 필요한 하트 수 */
+export function getHeartsNeededForStage(treeId: PlantTreeId, stage: PlantStage): number {
+  if (stage >= 7) return 0
+  if (!usesAppleStageZero(treeId) && stage < 1) return 0
+  return HEARTS_PER_STAGE[stage]
+}
+
+/** DB `pot_stage` 를 0~7 범위로만 맞춥니다(사과 외 0 = 수확 후 씨앗 고르기 대기). */
+export function clampPotStageForTree(_treeId: PlantTreeId, stageRaw: number): PlantStage {
+  const n = Number.isFinite(Number(stageRaw)) ? Math.trunc(Number(stageRaw)) : 0
+  return Math.min(7, Math.max(0, n)) as PlantStage
+}
+
 export function normalizePlantPotProgress(
   stageRaw: number,
   heartsUsedRaw: number,
   completedRaw: boolean,
+  treeId: PlantTreeId = 'apple',
 ): { stage: PlantStage; heartsUsed: number; completed: boolean } {
-  let stage = Math.min(7, Math.max(0, Math.trunc(Number(stageRaw)) || 0)) as PlantStage
+  let stage = clampPotStageForTree(treeId, stageRaw)
   let heartsUsed = Math.max(0, Math.trunc(Number(heartsUsedRaw)) || 0)
   let completed = Boolean(completedRaw)
 
+  /** 예전 DB에 딸기 등이 stage 0 으로 저장된 경우만 1단계로 올립니다 */
+  if (!usesAppleStageZero(treeId) && stage === 0 && (heartsUsed > 0 || completed)) {
+    stage = 1
+  }
+
   while (stage < 7) {
-    const needed = HEARTS_PER_STAGE[stage]
+    if (!usesAppleStageZero(treeId) && stage === 0) break
+    const needed = getHeartsNeededForStage(treeId, stage)
     if (needed <= 0) break
     if (heartsUsed < needed) break
     heartsUsed -= needed

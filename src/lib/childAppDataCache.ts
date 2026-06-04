@@ -1,6 +1,11 @@
 import { cache } from 'react'
 import { createClient } from '@/lib/supabase/server'
 import { isRetriableMissingColumnError } from '@/lib/supabase/childProfileSelect'
+import {
+  SUPABASE_FETCH_RETRY_DELAYS_MS,
+  delayMs,
+  isTransientFetchErrorMessage,
+} from '@/lib/supabase/transientFetchError'
 
 /**
  * 자녀 앱 RSC 트리에서 `getActorChildContext`·레이아웃·각 탭 페이지가
@@ -19,26 +24,49 @@ export type CachedChildProfileRow = {
   holiday_routine_mode?: 'as_weekday' | 'custom' | null
 }
 
+function logSupabaseCacheFailure(scope: string, message: string): void {
+  const hint = isTransientFetchErrorMessage(message)
+    ? ' Supabase URL·인터넷·프로젝트 상태를 확인하고 dev 서버를 재시작해 보세요.'
+    : ''
+  console.warn(`[childAppDataCache] ${scope}: ${message}.${hint}`)
+}
+
 /**
  * `profiles` 한 줄 — `avatar_url` 없는 구형 DB 는 name·role 만 재시도합니다.
  */
 export const getCachedProfileRowById = cache(async (id: string): Promise<CachedChildProfileRow | null> => {
-  const supabase = await createClient()
-  const res = await supabase
-    .from('profiles')
-    .select('name, role, avatar_url, holiday_routine_mode')
-    .eq('id', id)
-    .maybeSingle()
-  if (res.data) return res.data as CachedChildProfileRow
-  if (res.error) {
-    if (!isRetriableMissingColumnError(res.error)) return null
-    const fb = await supabase.from('profiles').select('name, role, avatar_url').eq('id', id).maybeSingle()
-    if (fb.data) return fb.data as CachedChildProfileRow
-    if (fb.error) {
-      if (!isRetriableMissingColumnError(fb.error)) return null
-      const fb2 = await supabase.from('profiles').select('name, role').eq('id', id).maybeSingle()
-      return (fb2.data as CachedChildProfileRow | null) ?? null
+  for (let attempt = 0; attempt < SUPABASE_FETCH_RETRY_DELAYS_MS.length; attempt++) {
+    await delayMs(SUPABASE_FETCH_RETRY_DELAYS_MS[attempt] ?? 0)
+    const supabase = await createClient()
+    const res = await supabase
+      .from('profiles')
+      .select('name, role, avatar_url, holiday_routine_mode')
+      .eq('id', id)
+      .maybeSingle()
+    if (res.data) return res.data as CachedChildProfileRow
+    if (res.error) {
+      if (!isRetriableMissingColumnError(res.error)) {
+        if (
+          isTransientFetchErrorMessage(res.error.message) &&
+          attempt < SUPABASE_FETCH_RETRY_DELAYS_MS.length - 1
+        ) {
+          continue
+        }
+        logSupabaseCacheFailure('profiles', res.error.message)
+        return null
+      }
+      const fb = await supabase.from('profiles').select('name, role, avatar_url').eq('id', id).maybeSingle()
+      if (fb.data) return fb.data as CachedChildProfileRow
+      if (fb.error) {
+        if (!isRetriableMissingColumnError(fb.error)) {
+          logSupabaseCacheFailure('profiles fallback', fb.error.message)
+          return null
+        }
+        const fb2 = await supabase.from('profiles').select('name, role').eq('id', id).maybeSingle()
+        return (fb2.data as CachedChildProfileRow | null) ?? null
+      }
     }
+    return null
   }
   return null
 })
@@ -49,13 +77,23 @@ export type CachedFamilyLinkRow = { id: string; parent_id: string }
  * 이 자녀에 연결된 `family_links` 전부 (마켓·미션이 같은 행을 씁니다).
  */
 export const getCachedFamilyLinksForChild = cache(async (childId: string): Promise<CachedFamilyLinkRow[]> => {
-  const supabase = await createClient()
-  const { data, error } = await supabase.from('family_links').select('id, parent_id').eq('child_id', childId)
-  if (error) {
-    console.error('[childAppDataCache] family_links', error.message)
+  for (let attempt = 0; attempt < SUPABASE_FETCH_RETRY_DELAYS_MS.length; attempt++) {
+    await delayMs(SUPABASE_FETCH_RETRY_DELAYS_MS[attempt] ?? 0)
+    const supabase = await createClient()
+    const { data, error } = await supabase.from('family_links').select('id, parent_id').eq('child_id', childId)
+    if (!error) {
+      return (data ?? []) as CachedFamilyLinkRow[]
+    }
+    if (
+      isTransientFetchErrorMessage(error.message) &&
+      attempt < SUPABASE_FETCH_RETRY_DELAYS_MS.length - 1
+    ) {
+      continue
+    }
+    logSupabaseCacheFailure('family_links', error.message)
     return []
   }
-  return (data ?? []) as CachedFamilyLinkRow[]
+  return []
 })
 
 export type CachedFamilyLinkChildRow = { child_id: string }
@@ -65,15 +103,25 @@ export type CachedFamilyLinkChildRow = { child_id: string }
  * `getCachedFamilyLinksForChild` 와 짝을 이루어 같은 테이블을 요청 단위로 한 번만 읽게 합니다.
  */
 export const getCachedFamilyLinksForParent = cache(async (parentId: string): Promise<CachedFamilyLinkChildRow[]> => {
-  const supabase = await createClient()
-  const { data, error } = await supabase
-    .from('family_links')
-    .select('child_id')
-    .eq('parent_id', parentId)
-    .order('created_at', { ascending: true })
-  if (error) {
-    console.error('[childAppDataCache] family_links by parent', error.message)
+  for (let attempt = 0; attempt < SUPABASE_FETCH_RETRY_DELAYS_MS.length; attempt++) {
+    await delayMs(SUPABASE_FETCH_RETRY_DELAYS_MS[attempt] ?? 0)
+    const supabase = await createClient()
+    const { data, error } = await supabase
+      .from('family_links')
+      .select('child_id')
+      .eq('parent_id', parentId)
+      .order('created_at', { ascending: true })
+    if (!error) {
+      return (data ?? []) as CachedFamilyLinkChildRow[]
+    }
+    if (
+      isTransientFetchErrorMessage(error.message) &&
+      attempt < SUPABASE_FETCH_RETRY_DELAYS_MS.length - 1
+    ) {
+      continue
+    }
+    logSupabaseCacheFailure('family_links by parent', error.message)
     return []
   }
-  return (data ?? []) as CachedFamilyLinkChildRow[]
+  return []
 })

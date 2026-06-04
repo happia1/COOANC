@@ -2,20 +2,27 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { resolveApiActorChildId } from '@/lib/resolveApiActorChildId'
 import { readChildStatInt } from '@/lib/childCreditsSplit'
-import { normalizePlantPotProgress, type PlantStage } from '@/constants/plantTrees'
+import {
+  clampPotStageForTree,
+  normalizePlantPotProgress,
+  resolveTreeId,
+  type PlantStage,
+} from '@/constants/plantTrees'
 
 type PotRow = {
   hearts: unknown
   pot_stage: unknown
   pot_hearts_used: unknown
   pot_completed: unknown | null
+  pot_tree_id?: unknown
 }
 
 function derivePot(row: PotRow) {
-  const stageDb = Math.min(7, Math.max(0, readChildStatInt(row.pot_stage))) as PlantStage
+  const treeId = resolveTreeId(row.pot_tree_id as string | undefined)
+  const stageDb = clampPotStageForTree(treeId, readChildStatInt(row.pot_stage))
   const heartsUsedDb = readChildStatInt(row.pot_hearts_used)
   const completedDb = Boolean(row.pot_completed ?? false)
-  const synced = normalizePlantPotProgress(stageDb, heartsUsedDb, completedDb)
+  const synced = normalizePlantPotProgress(stageDb, heartsUsedDb, completedDb, treeId)
   return { synced, stageDb, heartsUsedDb, completedDb }
 }
 
@@ -47,7 +54,7 @@ export async function POST(req: NextRequest) {
 
     const { data: row, error } = await supabase
       .from('child_stats')
-      .select('hearts, pot_stage, pot_hearts_used, pot_completed')
+      .select('hearts, pot_stage, pot_hearts_used, pot_completed, pot_tree_id')
       .eq('child_id', childId)
       .maybeSingle()
 

@@ -14,12 +14,15 @@ import type { CSSProperties } from 'react'
 import Image from 'next/image'
 import { createPortal } from 'react-dom'
 import {
+  getDisplayStepIndex,
+  getPlantTree,
   getStageImage,
   needsPotSeedSelection,
   STAGE_LABELS,
   type PlantStage,
   type PlantTreeId,
 } from '@/constants/plantTrees'
+import { getPlantPotVisualStyle } from '@/constants/plantPotVisual'
 import type { PlantHarvestCelebrate } from '@/lib/plantHarvest'
 import type { BuySeedResult, PotState, WaterResult } from '@/hooks/usePlantPot'
 import SeedSelectPicker from '@/components/child/SeedSelectPicker'
@@ -82,6 +85,65 @@ function StarParticle({ index }: { index: number }) {
       }
     >
       {emoji}
+    </div>
+  )
+}
+
+/** 성장 단계 PNG — 로드 실패 시 이모지로 대체(깨진 이미지 방지) */
+function PlantTreeStageImage({
+  treeId,
+  stage,
+  className,
+  sizes,
+  priority,
+  visualStyle,
+}: {
+  treeId: PlantTreeId
+  stage: PlantStage
+  className: string
+  sizes: string
+  priority?: boolean
+  visualStyle?: ReturnType<typeof getPlantPotVisualStyle>
+}) {
+  const [failed, setFailed] = useState(false)
+  const emoji = getPlantTree(treeId).emoji
+
+  if (failed) {
+    return (
+      <span
+        className={`absolute inset-0 flex items-center justify-center leading-none ${className}`}
+        style={{ fontSize: '2rem' }}
+        aria-hidden
+      >
+        {emoji}
+      </span>
+    )
+  }
+
+  const inner = (
+    <Image
+      src={getStageImage(treeId, stage)}
+      alt=""
+      fill
+      className={className}
+      sizes={sizes}
+      priority={priority}
+      unoptimized
+      onError={() => setFailed(true)}
+    />
+  )
+
+  if (!visualStyle) return inner
+
+  return (
+    <div
+      className="absolute inset-0 flex items-end justify-center"
+      style={{
+        transform: `translate(${visualStyle.translateX}px, ${visualStyle.translateY}px) scale(${visualStyle.scale})`,
+        transformOrigin: visualStyle.transformOrigin,
+      }}
+    >
+      <div className="relative h-full w-full">{inner}</div>
     </div>
   )
 }
@@ -153,22 +215,11 @@ export default function PlantPot({ pot, seedSelect, waterActions }: Props) {
       : null
   const displayTreeId = needsSeedSelection ? 'apple' : pot.treeId
   const displayStage = needsSeedSelection ? 0 : pot.stage
-  const imgSrc = getStageImage(displayTreeId, displayStage)
   const label = STAGE_LABELS[displayStage]
-  /** 0단계(씨앗 심긴 화분) — 예전처럼 버튼·팝업 안에서 그림만 작게 표시 */
-  const isCompactStageImage = displayStage === 0
-  const popupPotImageClass = [
-    'object-contain',
-    isCompactStageImage ? 'scale-50 translate-y-2' : '',
-  ]
-    .filter(Boolean)
-    .join(' ')
-  const homePotImageClass = [
-    'object-contain',
-    isCompactStageImage ? 'scale-50 translate-y-4' : '',
-  ]
-    .filter(Boolean)
-    .join(' ')
+  const homeVisual = getPlantPotVisualStyle(displayTreeId, displayStage, 'home')
+  const popupVisual = getPlantPotVisualStyle(displayTreeId, displayStage, 'popup')
+  const popupPotImageClass = 'object-contain'
+  const homePotImageClass = 'object-contain'
   const progressPct =
     pot.heartsNeeded > 0
       ? Math.max(0, Math.min(100, Math.round((pot.heartsUsed / pot.heartsNeeded) * 100)))
@@ -244,18 +295,20 @@ export default function PlantPot({ pot, seedSelect, waterActions }: Props) {
           <>
         <h2 className="mt-4 text-center text-lg font-black leading-tight text-green-800">
           {label}
-          <span className="block text-sm font-bold text-green-700/90">{pot.stage + 1}단계</span>
+          <span className="block text-sm font-bold text-green-700/90">
+            {getDisplayStepIndex(displayTreeId, displayStage)}단계
+          </span>
         </h2>
 
         {waterActions ? (
           <div className="mt-5 flex flex-1 flex-col items-center justify-center gap-2">
             <div ref={arcWrapRef} className="relative mx-auto h-28 w-full">
               {/* 화분 — 팝업 가로 중앙 */}
-              <div ref={potVisualRef} className="absolute left-1/2 top-0 h-28 w-28 -translate-x-1/2">
-                <Image
-                  src={imgSrc}
-                  alt={label}
-                  fill
+              <div ref={potVisualRef} className="relative left-1/2 top-0 h-28 w-28 -translate-x-1/2">
+                <PlantTreeStageImage
+                  treeId={displayTreeId}
+                  stage={displayStage}
+                  visualStyle={popupVisual}
                   className={popupPotImageClass}
                   sizes="112px"
                 />
@@ -308,10 +361,10 @@ export default function PlantPot({ pot, seedSelect, waterActions }: Props) {
         ) : (
           <div className="mx-auto mt-4 flex h-32 w-32 items-center justify-center">
             <div className="relative h-28 w-28">
-              <Image
-                src={imgSrc}
-                alt={label}
-                fill
+              <PlantTreeStageImage
+                treeId={displayTreeId}
+                stage={displayStage}
+                visualStyle={popupVisual}
                 className={popupPotImageClass}
                 sizes="112px"
               />
@@ -419,14 +472,16 @@ export default function PlantPot({ pot, seedSelect, waterActions }: Props) {
         >
           {showStars ? Array.from({ length: 8 }, (_, i) => <StarParticle key={i} index={i} />) : null}
 
-          <Image
-            src={imgSrc}
-            alt={label}
-            fill
-            className={homePotImageClass}
-            sizes="56px"
-            priority
-          />
+          <div className="relative h-full w-full overflow-visible">
+            <PlantTreeStageImage
+              treeId={displayTreeId}
+              stage={displayStage}
+              visualStyle={homeVisual}
+              className={homePotImageClass}
+              sizes="56px"
+              priority
+            />
+          </div>
         </button>
 
       </div>

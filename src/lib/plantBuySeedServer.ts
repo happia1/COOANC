@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { readChildStatInt } from '@/lib/childCreditsSplit'
-import type { PlantTreeId } from '@/constants/plantTrees'
+import { getInitialStageAfterSeed, type PlantTreeId } from '@/constants/plantTrees'
 
 type StatsRow = {
   credits: unknown
@@ -59,7 +59,7 @@ function buildSeedPatches(
     credits: newCredits,
     credits_wallet: 0,
     credits_piggy: piggy,
-    pot_stage: 0,
+    pot_stage: getInitialStageAfterSeed(treeId),
     pot_hearts_used: 0,
     pot_completed: false,
     pot_tree_id: treeId,
@@ -71,16 +71,16 @@ function buildSeedPatches(
   const withWalletNoTime = { ...withWalletNoTree }
   delete withWalletNoTime.updated_at
 
-  const minimal = {
+  const minimalWithTree = {
     credits: newCredits,
-    pot_stage: 0,
+    pot_stage: getInitialStageAfterSeed(treeId),
     pot_hearts_used: 0,
     pot_completed: false,
+    pot_tree_id: treeId,
   }
 
-  const minimalWithTree = { ...minimal, pot_tree_id: treeId }
-
-  return [withWallet, withWalletNoTree, withWalletNoTime, minimalWithTree, minimal]
+  /** pot_tree_id 없는 패치는 제외 — 크레딧만 빠지고 나무는 안 바뀌는 문제 방지 */
+  return [withWallet, withWalletNoTree, withWalletNoTime, minimalWithTree]
 }
 
 /**
