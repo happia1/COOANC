@@ -18,9 +18,11 @@ import {
   isPotAwaitingSeed,
   STAGE_LABELS,
   type PlantStage,
+  type PlantTreeId,
 } from '@/constants/plantTrees'
 import type { PlantHarvestCelebrate } from '@/lib/plantHarvest'
-import type { PotState, WaterResult } from '@/hooks/usePlantPot'
+import type { BuySeedResult, PotState, WaterResult } from '@/hooks/usePlantPot'
+import SeedSelectPicker from '@/components/child/SeedSelectPicker'
 import WateringCanButton from '@/components/child/WateringCanButton'
 import SpriteImage from '@/components/common/SpriteImage'
 import { ICONS } from '@/constants/sprites'
@@ -39,9 +41,16 @@ export type PlantPotWaterActions = {
   allowWaterWithoutHearts?: boolean
 }
 
+export type PlantPotSeedSelect = {
+  currentCredits: number
+  onSelect: (treeId: PlantTreeId) => Promise<BuySeedResult>
+  onPlanted?: () => void
+}
+
 type Props = {
   pot: PotState
-  onRequestSeedSelect?: () => void
+  /** 씨앗 고르기·미심기·수확 직후 — 화분 팝업 안에 씨앗 카드를 띄웁니다. */
+  seedSelect?: PlantPotSeedSelect
   /** 있으면 팝업 안에서 물조리개로 물을 줍니다. */
   waterActions?: PlantPotWaterActions
 }
@@ -97,7 +106,7 @@ function WaterDrop({ index }: { index: number }) {
   )
 }
 
-export default function PlantPot({ pot, onRequestSeedSelect, waterActions }: Props) {
+export default function PlantPot({ pot, seedSelect, waterActions }: Props) {
   const prevStage = useRef(pot.stage)
   const skipInitialFx = useRef(true)
   const [levelUpBurst, setLevelUpBurst] = useState(false)
@@ -137,6 +146,13 @@ export default function PlantPot({ pot, onRequestSeedSelect, waterActions }: Pro
 
   /** 미심기·완성 후 초기화 직후 — 사과 0단계(씨앗 심긴 화분) 미리보기 */
   const awaitingSeed = isPotAwaitingSeed(pot)
+  /** 수확 직후(7단계) 또는 아직 심지 않은 상태 — 팝업에서 씨앗 카드 선택 */
+  const showSeedPickerInPopup =
+    Boolean(seedSelect) && (awaitingSeed || (pot.stage === 7 && pot.completed))
+  const seedPickerIntro =
+    pot.stage === 7 && pot.completed
+      ? '수확을 모두 완료했어요! 새로운 씨앗을 심어볼까요?'
+      : null
   const displayTreeId = awaitingSeed ? 'apple' : pot.treeId
   const displayStage = awaitingSeed ? 0 : pot.stage
   const imgSrc = getStageImage(displayTreeId, displayStage)
@@ -190,14 +206,44 @@ export default function PlantPot({ pot, onRequestSeedSelect, waterActions }: Pro
   }
 
   const statusPopup = statusPopupOpen ? (
-    <div className="fixed inset-0 z-[170] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="화분 상태">
+    <div
+      className="fixed inset-0 z-[170] flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label={showSeedPickerInPopup ? '씨앗 고르기' : '화분 상태'}
+    >
       <button
         type="button"
         className="absolute inset-0 bg-black/35"
-        aria-label="화분 상태 닫기"
+        aria-label="닫기"
         onClick={() => setStatusPopupOpen(false)}
       />
-      <div className="relative z-[1] flex min-h-[20rem] w-full max-w-[18rem] flex-col rounded-2xl border border-green-100 bg-white p-4 shadow-xl">
+      <div
+        className={`relative z-[1] flex w-full flex-col rounded-2xl border border-green-100 bg-white p-4 shadow-xl ${
+          showSeedPickerInPopup ? 'max-w-sm' : 'min-h-[20rem] max-w-[18rem]'
+        }`}
+      >
+        {showSeedPickerInPopup && seedSelect ? (
+          <>
+            <SeedSelectPicker
+              currentCredits={seedSelect.currentCredits}
+              onSelect={seedSelect.onSelect}
+              intro={seedPickerIntro}
+              onPlanted={() => {
+                seedSelect.onPlanted?.()
+                setStatusPopupOpen(false)
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => setStatusPopupOpen(false)}
+              className="mt-2 flex h-11 w-full items-center justify-center rounded-2xl bg-gray-100 text-sm font-bold text-gray-600 transition active:scale-[0.98]"
+            >
+              나중에
+            </button>
+          </>
+        ) : (
+          <>
         <h2 className="mt-4 text-center text-lg font-black leading-tight text-green-800">
           {label}
           <span className="block text-sm font-bold text-green-700/90">{pot.stage + 1}단계</span>
@@ -282,6 +328,8 @@ export default function PlantPot({ pot, onRequestSeedSelect, waterActions }: Pro
         >
           닫기
         </button>
+          </>
+        )}
       </div>
       <style>{`
         @keyframes plantWaterDrop {
@@ -379,15 +427,6 @@ export default function PlantPot({ pot, onRequestSeedSelect, waterActions }: Pro
           />
         </button>
 
-        {pot.completed && pot.stage === 7 && typeof onRequestSeedSelect === 'function' ? (
-          <button
-            type="button"
-            onClick={onRequestSeedSelect}
-            className="pointer-events-auto mt-0.5 rounded-full bg-white/90 px-1.5 py-0.5 text-[8px] font-black text-pink-600 shadow-sm transition active:scale-95"
-          >
-            씨앗 고르기
-          </button>
-        ) : null}
       </div>
 
       {portalReady && statusPopup ? createPortal(statusPopup, document.body) : null}

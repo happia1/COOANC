@@ -86,6 +86,7 @@ export default function PlantStageCelebrationModal({
     : null
   const imgSrc = isFinalHarvest ? getRewardImage(treeId) : getStageImage(treeId, stage)
   const ctaLabel = isFinalHarvest ? '확인' : '물 주러가기'
+  const harvestHint = isFinalHarvest ? '화분을 눌러 어떤 씨앗을 골라볼까요?' : null
 
   const modal = (
     <div
@@ -107,7 +108,10 @@ export default function PlantStageCelebrationModal({
           {title}
         </h2>
         {subtitle ? (
-          <p className="mb-4 text-center text-base font-bold leading-snug text-amber-800">{subtitle}</p>
+          <p className="mb-2 text-center text-base font-bold leading-snug text-amber-800">{subtitle}</p>
+        ) : null}
+        {harvestHint ? (
+          <p className="mb-4 text-center text-sm font-semibold leading-snug text-gray-600">{harvestHint}</p>
         ) : null}
         <button
           type="button"

@@ -98,7 +98,6 @@ const ChildContentZonePopup = dynamic(() => import('@/components/child/ChildCont
 import { remainingContentSeconds, toYouTubeContentEmbedUrl } from '@/lib/youtubeContent'
 import { CHILD_CONTENT_TREASURE_ICON_URL, isChildContentMenuAvailable } from '@/constants/childContentMenu'
 import PlantPot from '@/components/child/PlantPot'
-import SeedSelectModal from '@/components/child/SeedSelectModal'
 import PlantStageCelebrationModal from '@/components/child/PlantStageCelebrationModal'
 import SleepModeScreen from '@/components/child/SleepModeScreen'
 import MorningWakeScreen from '@/components/child/MorningWakeScreen'
@@ -734,23 +733,17 @@ export default function ChildScreen({
   } = usePlantPot(childId, { onPlantStatsSynced })
   /** 완성 후 씨앗 고르기 모달 */
   const { refresh: refreshHarvestInventory } = usePlantHarvest(childId)
-  const [seedModalOpen, setSeedModalOpen] = useState(false)
   /** 성장 단계 축하 팝업 — 도달한 단계 번호(null 이메 닫힘) */
   const [plantCelebrateStage, setPlantCelebrateStage] = useState<PlantStage | null>(null)
   const [plantHarvestCelebrate, setPlantHarvestCelebrate] = useState<PlantHarvestCelebrate | null>(null)
-  /** 7단계 축하 팝업을 닫은 뒤에만 씨앗 선택 시트를 열지 표시 */
-  const openSeedAfterPlantCelebrateRef = useRef(false)
   /** 하트가 0일 때 물주기 시 잠깐 뜨는 안내 */
   const [plantHint, setPlantHint] = useState<string | null>(null)
-
-  const openSeedModal = useCallback(() => setSeedModalOpen(true), [])
 
   const handlePlantGrowthCelebrate = useCallback(
     (newStage: PlantStage, harvest?: PlantHarvestCelebrate) => {
       playUiSound(PLANT_STAGE_UP_SOUND_SRC, 0.9)
       setPlantCelebrateStage(newStage)
       if (newStage === 7) {
-        openSeedAfterPlantCelebrateRef.current = true
         setPlantHarvestCelebrate(harvest ?? null)
         if (harvest) void refreshHarvestInventory()
       } else {
@@ -763,10 +756,7 @@ export default function ChildScreen({
   const dismissPlantCelebrate = useCallback(() => {
     setPlantCelebrateStage(null)
     setPlantHarvestCelebrate(null)
-    const needSeed = openSeedAfterPlantCelebrateRef.current
-    openSeedAfterPlantCelebrateRef.current = false
-    if (needSeed) openSeedModal()
-  }, [openSeedModal])
+  }, [])
 
   /**
    * 레벨 카드·물조리개에 쓸 보유 하트.
@@ -2514,7 +2504,11 @@ export default function ChildScreen({
                 >
                   <PlantPot
                     pot={pot}
-                    onRequestSeedSelect={openSeedModal}
+                    seedSelect={{
+                      currentCredits: creditsAvailable(stats ?? { credits: 0 }),
+                      onSelect: buySeed,
+                      onPlanted: () => void refreshHarvestInventory(),
+                    }}
                     waterActions={{
                       /** 물조리개 그림·탭 판정은 레벨 카드와 같은 `heartsForHomeUi` 기준 */
                       hearts: heartsForHomeUi,
@@ -2784,17 +2778,6 @@ export default function ChildScreen({
       <ParentMissionRedoNoticeModal
         mission={parentRedoModalMission}
         onClose={() => setParentRedoModalMission(null)}
-      />
-
-      <SeedSelectModal
-        isOpen={seedModalOpen}
-        onClose={() => setSeedModalOpen(false)}
-        currentCredits={creditsAvailable(stats ?? { credits: 0 })}
-        onSelect={async (treeId) => {
-          const result = await buySeed(treeId)
-          if (result.ok) void refreshHarvestInventory()
-          return result
-        }}
       />
 
       <PiggyBankUnlockFlowModal
