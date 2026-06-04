@@ -54,6 +54,12 @@ export default function ParentNoticePopupCard({
   const typeLabel = NOTICE_TYPE_LABELS[notice.noticeType]
   const link = notice.linkUrl?.trim()
   const linkLabel = (notice.linkLabel && notice.linkLabel.trim()) || NOTICE_LINK_DEFAULT_LABEL
+  const isExternalLink = Boolean(link && /^https?:\/\//i.test(link))
+
+  const openExternalLink = () => {
+    if (!link || !isExternalLink) return
+    window.open(link, '_blank', 'noopener,noreferrer')
+  }
 
   return (
     <div className={`${PARENT_POPUP_CARD} ${isImportant ? 'ring-2 ring-[#4A90E2]' : ''}`}>
@@ -141,15 +147,14 @@ export default function ParentNoticePopupCard({
         <div className="relative z-10 shrink-0 bg-white px-5 pb-4 pt-1">
           {link ? (
             <div className="flex gap-2">
-              {/^https?:\/\//i.test(link) ? (
-                <a
-                  href={link}
-                  target="_blank"
-                  rel="noopener noreferrer"
+              {isExternalLink ? (
+                <button
+                  type="button"
+                  onClick={openExternalLink}
                   className={`${PARENT_POPUP_BTN} bg-[#4A90E2] text-white shadow-sm`}
                 >
                   {linkLabel}
-                </a>
+                </button>
               ) : (
                 <a
                   href={link.startsWith('/') ? link : `/${link}`}
