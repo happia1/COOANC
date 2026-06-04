@@ -27,7 +27,8 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ items })
   } catch (e) {
+    const detail = e instanceof Error ? e.message : String(e)
     console.error('[plant-harvest-inventory] unexpected', e)
-    return NextResponse.json({ error: '서버 오류가 발생했어요' }, { status: 500 })
+    return NextResponse.json({ error: '서버 오류가 발생했어요', detail }, { status: 500 })
   }
 }

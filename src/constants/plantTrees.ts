@@ -108,6 +108,18 @@ export function getStageImage(treeId: PlantTreeId, stage: PlantStage): string {
   return `${PLANT_BASE}/${folder}/${stage}.png`
 }
 
+/**
+ * 아직 씨앗을 심지 않은 화분 상태 — 0단계·하트 진행 0·미완성.
+ * 화면에는 사과 폴더 0단계(씨앗이 심긴 화분) 그림으로 보여 줍니다.
+ */
+export function isPotAwaitingSeed(pot: {
+  stage: PlantStage
+  heartsUsed: number
+  completed: boolean
+}): boolean {
+  return pot.stage === 0 && pot.heartsUsed === 0 && !pot.completed
+}
+
 export function getSeedImage(treeId: PlantTreeId): string {
   const folder = plantAssetFolder(treeId)
   return `${PLANT_BASE}/${folder}/seed.png`

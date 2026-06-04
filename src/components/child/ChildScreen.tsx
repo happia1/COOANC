@@ -73,10 +73,8 @@ import {
 } from '@/lib/childHomeTopBarGlass'
 import { ASSETS, CHILD_HOME_BACKGROUND_CACHE_BUST } from '@/constants/assets'
 import type { PlantStage } from '@/constants/plantTrees'
-import { PLANT_HARVEST_BASKET_ICON_SRC } from '@/constants/plantTrees'
 import type { PlantHarvestCelebrate } from '@/lib/plantHarvest'
 import { usePlantHarvest } from '@/hooks/usePlantHarvest'
-import PlantHarvestBasketModal from '@/components/child/PlantHarvestBasketModal'
 import type {
   ChildStats,
   DailyMissionWithTemplate,
@@ -735,14 +733,8 @@ export default function ChildScreen({
     rollbackMissionHeartsOptimistic,
   } = usePlantPot(childId, { onPlantStatsSynced })
   /** 완성 후 씨앗 고르기 모달 */
-  const {
-    items: harvestItems,
-    loading: harvestLoading,
-    totalCount: harvestTotalCount,
-    refresh: refreshHarvestInventory,
-  } = usePlantHarvest(childId)
+  const { refresh: refreshHarvestInventory } = usePlantHarvest(childId)
   const [seedModalOpen, setSeedModalOpen] = useState(false)
-  const [harvestBasketOpen, setHarvestBasketOpen] = useState(false)
   /** 성장 단계 축하 팝업 — 도달한 단계 번호(null 이메 닫힘) */
   const [plantCelebrateStage, setPlantCelebrateStage] = useState<PlantStage | null>(null)
   const [plantHarvestCelebrate, setPlantHarvestCelebrate] = useState<PlantHarvestCelebrate | null>(null)
@@ -2514,32 +2506,12 @@ export default function ChildScreen({
                 }}
               >
                 <div
-                  className="flex flex-col items-center gap-0.5"
+                  className="flex flex-col items-center"
                   style={{
                     transform: `scale(${plantFeetUiScale})`,
                     transformOrigin: 'center bottom',
                   }}
                 >
-                  <button
-                    type="button"
-                    onClick={() => setHarvestBasketOpen(true)}
-                    className="pointer-events-auto relative flex h-9 w-9 items-center justify-center rounded-full bg-white/90 shadow-md transition active:scale-95"
-                    aria-label={`수확한 과일 바구니${harvestTotalCount > 0 ? ` ${harvestTotalCount}개` : ''}`}
-                  >
-                    <Image
-                      src={PLANT_HARVEST_BASKET_ICON_SRC}
-                      alt=""
-                      width={28}
-                      height={28}
-                      className="h-7 w-7 object-contain"
-                      unoptimized
-                    />
-                    {harvestTotalCount > 0 ? (
-                      <span className="absolute -right-0.5 -top-0.5 min-w-[1rem] rounded-full bg-amber-500 px-1 text-[9px] font-black leading-none text-white">
-                        {harvestTotalCount > 99 ? '99+' : harvestTotalCount}
-                      </span>
-                    ) : null}
-                  </button>
                   <PlantPot
                     pot={pot}
                     onRequestSeedSelect={openSeedModal}
@@ -2801,13 +2773,6 @@ export default function ChildScreen({
         treeId={pot?.treeId ?? 'apple'}
         harvest={plantCelebrateStage === 7 ? plantHarvestCelebrate : null}
         onClose={dismissPlantCelebrate}
-      />
-
-      <PlantHarvestBasketModal
-        isOpen={harvestBasketOpen}
-        onClose={() => setHarvestBasketOpen(false)}
-        items={harvestItems}
-        loading={harvestLoading}
       />
 
       <RapidTapConfirmModal

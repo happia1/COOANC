@@ -47,18 +47,25 @@ export async function addPlantHarvest(
 
   const nextQty = (existing ? readChildStatInt(existing.quantity) : 0) + qty
 
-  const { error: upErr } = await db.from('plant_harvest_inventory').upsert(
-    {
+  let upErr = null
+  if (existing) {
+    const res = await db
+      .from('plant_harvest_inventory')
+      .update({ quantity: nextQty, updated_at: new Date().toISOString() })
+      .eq('child_id', childId)
+      .eq('fruit_id', fruitId)
+    upErr = res.error
+  } else {
+    const res = await db.from('plant_harvest_inventory').insert({
       child_id: childId,
       fruit_id: fruitId,
       quantity: nextQty,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: 'child_id,fruit_id' },
-  )
+    })
+    upErr = res.error
+  }
 
   if (upErr) {
-    console.warn('[plantHarvest] upsert', upErr.message)
+    console.warn('[plantHarvest] save', upErr.message, upErr.code)
     return null
   }
 

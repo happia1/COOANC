@@ -465,10 +465,9 @@ export function usePlantPot(
         console.warn('[usePlantPot] buySeed', res.status, json)
         const apiMsg = typeof json.error === 'string' ? json.error : null
         const detail = typeof json.detail === 'string' ? json.detail : null
-        const message =
-          apiMsg === '씨앗 심기에 실패했어요' && detail
-            ? `${apiMsg} (${detail})`
-            : apiMsg ?? '씨앗 심기에 실패했어요. 잠시 후 다시 시도해 주세요.'
+        const message = detail
+          ? `${apiMsg ?? '요청 실패'} (${detail})`
+          : apiMsg ?? '씨앗 심기에 실패했어요. 잠시 후 다시 시도해 주세요.'
         return {
           ok: false as const,
           code: 'error' as const,

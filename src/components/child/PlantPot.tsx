@@ -15,6 +15,7 @@ import Image from 'next/image'
 import { createPortal } from 'react-dom'
 import {
   getStageImage,
+  isPotAwaitingSeed,
   STAGE_LABELS,
   type PlantStage,
 } from '@/constants/plantTrees'
@@ -134,9 +135,26 @@ export default function PlantPot({ pot, onRequestSeedSelect, waterActions }: Pro
     prevStage.current = pot.stage
   }, [pot.stage])
 
-  const imgSrc = getStageImage(pot.treeId, pot.stage)
-  const label = STAGE_LABELS[pot.stage]
-  const isSeedStage = pot.stage === 0
+  /** 미심기·완성 후 초기화 직후 — 사과 0단계(씨앗 심긴 화분) 미리보기 */
+  const awaitingSeed = isPotAwaitingSeed(pot)
+  const displayTreeId = awaitingSeed ? 'apple' : pot.treeId
+  const displayStage = awaitingSeed ? 0 : pot.stage
+  const imgSrc = getStageImage(displayTreeId, displayStage)
+  const label = STAGE_LABELS[displayStage]
+  /** 0단계(씨앗 심긴 화분) — 예전처럼 버튼·팝업 안에서 그림만 작게 표시 */
+  const isCompactStageImage = displayStage === 0
+  const popupPotImageClass = [
+    'object-contain',
+    isCompactStageImage ? 'scale-50 translate-y-2' : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
+  const homePotImageClass = [
+    'object-contain',
+    isCompactStageImage ? 'scale-50 translate-y-4' : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
   const progressPct =
     pot.heartsNeeded > 0
       ? Math.max(0, Math.min(100, Math.round((pot.heartsUsed / pot.heartsNeeded) * 100)))
@@ -194,7 +212,7 @@ export default function PlantPot({ pot, onRequestSeedSelect, waterActions }: Pro
                   src={imgSrc}
                   alt={label}
                   fill
-                  className={['object-contain', isSeedStage ? 'scale-50 translate-y-2' : ''].filter(Boolean).join(' ')}
+                  className={popupPotImageClass}
                   sizes="112px"
                 />
                 {waterPourBurst ? (
@@ -250,7 +268,7 @@ export default function PlantPot({ pot, onRequestSeedSelect, waterActions }: Pro
                 src={imgSrc}
                 alt={label}
                 fill
-                className={['object-contain', isSeedStage ? 'scale-50 translate-y-2' : ''].filter(Boolean).join(' ')}
+                className={popupPotImageClass}
                 sizes="112px"
               />
             </div>
@@ -355,7 +373,7 @@ export default function PlantPot({ pot, onRequestSeedSelect, waterActions }: Pro
             src={imgSrc}
             alt={label}
             fill
-            className={['object-contain', isSeedStage ? 'scale-50 translate-y-4' : ''].filter(Boolean).join(' ')}
+            className={homePotImageClass}
             sizes="56px"
             priority
           />
