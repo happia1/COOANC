@@ -63,16 +63,17 @@ function scaleForGrowthPotStage(stage: PlantStage): number {
   return PLANT_POT_OTHER_FRUIT_STAGE1_SCALE
 }
 
-/**
- * 자녀 홈 — 모든 화분·모든 단계 공통 앵커(토끼 발 높이 `characterFootY` 기준).
- * 사과/딸기/레몬 등 종류·단계와 관계없이 동일합니다.
- */
+/** 자녀 홈 — 딸기·레몬 등(사과 제외) 화분 묶음 앵커 */
 export const PLANT_POT_HOME_SHELL_TRANSFORM =
   'translate(-50%, calc(-88% - 22px))' as const
 
-/** 사과 0단계만 — 그림이 화분 안에서 발 라인에 맞도록 하는 추가 이동(px) */
+/** 사과나무 심은 뒤(0~7단계) — 홈 앵커만 별도 조정 */
+const PLANT_POT_HOME_SHELL_TRANSFORM_APPLE =
+  'translate(-50%, calc(-92% - 30px))' as const
+
+/** 사과 0단계 — 화분 안 그림 위치(홈은 y를 줄여 전체가 덜 내려가 보이게) */
 const APPLE_SEED_IMAGE_OFFSET_PX: Record<PlantPotSurface, { x: number; y: number }> = {
-  home: { x: 0, y: 10 },
+  home: { x: 0, y: 2 },
   popup: { x: 0, y: 5 },
 }
 
@@ -134,12 +135,21 @@ export type PlantPotVisualStyle = {
   transformOrigin: string
 }
 
-/** @deprecated 파라미터는 호환용 — 항상 `PLANT_POT_HOME_SHELL_TRANSFORM` 반환 */
+/**
+ * 자녀 홈 화분·물조리개 묶음 transform.
+ * 씨앗 미선택 기본 사과 미리보기는 딸기 1단계와 동일 앵커(공통값).
+ */
 export function getPlantPotHomeShellTransform(
-  _treeId?: PlantTreeId,
+  treeId?: PlantTreeId,
   _stage?: PlantStage,
-  _needsSeedSelection?: boolean,
+  needsSeedSelection?: boolean,
 ): string {
+  if (needsSeedSelection) {
+    return PLANT_POT_HOME_SHELL_TRANSFORM
+  }
+  if (treeId != null && usesAppleStageZero(treeId)) {
+    return PLANT_POT_HOME_SHELL_TRANSFORM_APPLE
+  }
   return PLANT_POT_HOME_SHELL_TRANSFORM
 }
 
@@ -186,14 +196,23 @@ export function getAllPlantPotScaleTables(): Record<
   ) as Record<PlantTreeId, ReturnType<typeof getPlantPotScaleTable>>
 }
 
+export type PlantPotVisualOptions = {
+  /** 씨앗 미선택 기본 사과 — 홈에서 딸기 1단계와 같은 translate */
+  matchStrawberryStage1Home?: boolean
+}
+
 /** 화분 안 식물 PNG — 단계별 scale + 나무별·단계별 translate */
 export function getPlantPotVisualStyle(
   treeId: PlantTreeId,
   stage: PlantStage,
   surface: PlantPotSurface,
+  options?: PlantPotVisualOptions,
 ): PlantPotVisualStyle {
   const scale = getPlantPotStageScale(treeId, stage)
-  const offset = getPlantPotImageOffset(treeId, stage, surface)
+  const offset =
+    options?.matchStrawberryStage1Home && surface === 'home'
+      ? { x: SHADOW_SHIFT_RIGHT_OFFSET_PX.home, y: 0 }
+      : getPlantPotImageOffset(treeId, stage, surface)
   return {
     scale,
     translateX: offset.x,

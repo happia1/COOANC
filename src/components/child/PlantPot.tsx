@@ -216,7 +216,9 @@ export default function PlantPot({ pot, seedSelect, waterActions }: Props) {
   const displayTreeId = needsSeedSelection ? 'apple' : pot.treeId
   const displayStage = needsSeedSelection ? 0 : pot.stage
   const label = STAGE_LABELS[displayStage]
-  const homeVisual = getPlantPotVisualStyle(displayTreeId, displayStage, 'home')
+  const homeVisual = getPlantPotVisualStyle(displayTreeId, displayStage, 'home', {
+    matchStrawberryStage1Home: needsSeedSelection,
+  })
   const popupVisual = getPlantPotVisualStyle(displayTreeId, displayStage, 'popup')
   const popupPotImageClass = 'object-contain'
   const homePotImageClass = 'object-contain'
