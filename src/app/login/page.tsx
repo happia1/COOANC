@@ -5,49 +5,85 @@ import Image from 'next/image'
 import { AUTH_LOGO_SRC } from '@/constants/branding'
 import { BetaVersionMark } from '@/components/common/BetaVersionMark'
 import Link from 'next/link'
+import ChildAppTransitionOverlay from '@/components/child/ChildAppTransitionOverlay'
 import { createClient } from '@/lib/supabase/client'
 import { runSerializedBrowserAuthOp } from '@/lib/supabase/browserAuthQueue'
+import {
+  readAutoLoginEnabled,
+  writeAutoLoginEnabled,
+} from '@/lib/autoLoginPreference'
+import {
+  AUTO_LOGIN_CHECKING_MESSAGE,
+  getTransitionForAutoLoginTarget,
+  type AutoLoginTransitionPresentation,
+} from '@/lib/autoLoginTransitionPresentation'
 import { mapSupabaseClientErrorMessage } from '@/lib/mapSupabaseClientErrorMessage'
 import { parseJsonFromResponse } from '@/lib/parseJsonResponse'
 import { pickPostLoginNavigationTarget } from '@/lib/pickPostLoginNavigationTarget'
 import type { PostLoginRedirectPlan } from '@/lib/resolvePostLoginRedirect'
-
-const AUTO_LOGIN_STORAGE_KEY = 'cooanc:auto-login-enabled'
 
 export default function LoginPage() {
   const [email, setEmail]     = useState('')
   const [password, setPassword] = useState('')
   const [error, setError]     = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  /** localStorage 를 읽기 전에는 로그인 폼을 그리지 않습니다 */
+  const [autoLoginPrefsReady, setAutoLoginPrefsReady] = useState(false)
   const [autoLoginEnabled, setAutoLoginEnabled] = useState(true)
+  /** 자동 로그인 켜짐 — 세션 확인·이동 동안 로그인 폼 대신 전환 화면만 표시 */
+  const [autoLoginGateActive, setAutoLoginGateActive] = useState(false)
+  const [autoLoginTransition, setAutoLoginTransition] = useState<AutoLoginTransitionPresentation>({
+    message: AUTO_LOGIN_CHECKING_MESSAGE,
+    background: 'parent',
+  })
 
   useEffect(() => {
-    // 사용자가 이전에 선택한 자동 로그인 값을 복원합니다.
-    const saved = window.localStorage.getItem(AUTO_LOGIN_STORAGE_KEY)
-    if (saved === null) return
-    setAutoLoginEnabled(saved === 'true')
+    setAutoLoginEnabled(readAutoLoginEnabled())
+    setAutoLoginPrefsReady(true)
   }, [])
 
   useEffect(() => {
+    if (!autoLoginPrefsReady) return
+
+    if (!autoLoginEnabled) {
+      setAutoLoginGateActive(false)
+      return
+    }
+
+    setAutoLoginGateActive(true)
+    setAutoLoginTransition({
+      message: AUTO_LOGIN_CHECKING_MESSAGE,
+      background: 'parent',
+    })
+
     let cancelled = false
     async function redirectWhenAlreadySignedIn() {
-      if (!autoLoginEnabled) return
       try {
         const res = await fetch('/api/auth/post-login-redirect', { credentials: 'same-origin' })
         const { data, parseError } = await parseJsonFromResponse<PostLoginRedirectPlan>(res)
-        if (cancelled || parseError || !data?.authenticated) return
+        if (cancelled || parseError || !data?.authenticated) {
+          if (!cancelled) setAutoLoginGateActive(false)
+          return
+        }
         const target = pickPostLoginNavigationTarget(data)
-        if (!target || cancelled) return
+        if (!target || cancelled) {
+          if (!cancelled) setAutoLoginGateActive(false)
+          return
+        }
+        const presentation = getTransitionForAutoLoginTarget(target)
+        if (!cancelled) setAutoLoginTransition(presentation)
         window.location.replace(target)
       } catch {
-        /* 세션 확인 실패 시 로그인 폼 유지 */
+        if (!cancelled) setAutoLoginGateActive(false)
       }
     }
     void redirectWhenAlreadySignedIn()
     return () => {
       cancelled = true
     }
-  }, [autoLoginEnabled])
+  }, [autoLoginEnabled, autoLoginPrefsReady])
+
+  const showAutoLoginTransition = !autoLoginPrefsReady || autoLoginGateActive
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
@@ -78,7 +114,7 @@ export default function LoginPage() {
           '→ 브라우저 SDK 로 재시도합니다.',
         )
       } else if (apiRes.ok && payload.ok !== false) {
-        window.localStorage.setItem(AUTO_LOGIN_STORAGE_KEY, String(autoLoginEnabled))
+        writeAutoLoginEnabled(autoLoginEnabled)
         const navRes = await fetch('/api/auth/post-login-redirect', { credentials: 'same-origin' })
         const { data: plan, parseError: navParseError } =
           await parseJsonFromResponse<PostLoginRedirectPlan>(navRes)
@@ -140,7 +176,7 @@ export default function LoginPage() {
     }
 
     // 다음 접속 시 같은 선택을 유지하도록 자동 로그인 설정을 저장합니다.
-    window.localStorage.setItem(AUTO_LOGIN_STORAGE_KEY, String(autoLoginEnabled))
+    writeAutoLoginEnabled(autoLoginEnabled)
 
     const navRes = await fetch('/api/auth/post-login-redirect', { credentials: 'same-origin' })
     const { data: plan, parseError: navParseError } =
@@ -148,6 +184,15 @@ export default function LoginPage() {
     const target =
       !navParseError && plan?.authenticated ? pickPostLoginNavigationTarget(plan) : null
     window.location.replace(target ?? '/parent/home')
+  }
+
+  if (showAutoLoginTransition) {
+    return (
+      <ChildAppTransitionOverlay
+        statusMessage={autoLoginTransition.message}
+        background={autoLoginTransition.background}
+      />
+    )
   }
 
   return (
