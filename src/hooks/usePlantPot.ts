@@ -15,6 +15,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   HEARTS_PER_STAGE,
   normalizePlantPotProgress,
+  needsPotSeedSelection,
   resolveTreeId,
   type PlantStage,
   type PlantTreeId,
@@ -30,6 +31,8 @@ export type PotState = {
   heartsUsed: number
   heartsNeeded: number
   completed: boolean
+  /** `plant_seed_purchases` 또는 buySeed 성공 후 true — false 면 씨앗 선택만 가능 */
+  hasChosenSeed: boolean
 }
 
 /**
@@ -59,6 +62,7 @@ function potStateFromWaterResponse(
   pot_stage: unknown,
   pot_hearts_used: unknown,
   pot_completed: unknown,
+  hasChosenSeed: boolean,
 ): PotState {
   const stageDb = Math.min(7, Math.max(0, readChildStatInt(pot_stage))) as PlantStage
   const heartsUsedRaw = readChildStatInt(pot_hearts_used)
@@ -70,7 +74,24 @@ function potStateFromWaterResponse(
     heartsUsed: n.heartsUsed,
     heartsNeeded: HEARTS_PER_STAGE[n.stage],
     completed: n.completed,
+    hasChosenSeed,
   }
+}
+
+async function loadHasChosenSeed(
+  supabase: ReturnType<typeof createClient>,
+  childId: string,
+  normalized: { stage: PlantStage; heartsUsed: number; completed: boolean },
+): Promise<boolean> {
+  const { count, error } = await supabase
+    .from('plant_seed_purchases')
+    .select('id', { count: 'exact', head: true })
+    .eq('child_id', childId)
+
+  if (!error) return (count ?? 0) > 0
+
+  /** 구매 이력 테이블 없음·RLS — 예전 진행 데이터가 있으면 이미 심은 것으로 간주 */
+  return normalized.stage > 0 || normalized.heartsUsed > 0 || normalized.completed
 }
 
 export function usePlantPot(
@@ -190,14 +211,19 @@ export function usePlantPot(
       typeof data.pot_tree_id === 'string' ? data.pot_tree_id : null,
     )
 
-    setHearts(readChildStatInt(data.hearts))
-    setPot({
+    const hasChosenSeed = await loadHasChosenSeed(supabase, childId, normalizedFinal)
+
+    const nextPot: PotState = {
       treeId,
       stage: normalizedFinal.stage,
       heartsUsed: normalizedFinal.heartsUsed,
       heartsNeeded: HEARTS_PER_STAGE[normalizedFinal.stage],
       completed: normalizedFinal.completed,
-    })
+      hasChosenSeed,
+    }
+
+    setHearts(readChildStatInt(data.hearts))
+    setPot(nextPot)
     setLoading(false)
   }, [childId, supabase, serverRepairPlantNormalize])
 
@@ -290,6 +316,9 @@ export function usePlantPot(
   const water = useCallback(async (): Promise<WaterResult> => {
     const prevHearts = hearts
     const prevPot = pot
+    if (!prevPot?.hasChosenSeed || needsPotSeedSelection(prevPot)) {
+      return 'ok'
+    }
     const stage7Reset = prevPot?.stage === 7
 
     /**
@@ -352,6 +381,10 @@ export function usePlantPot(
         rollbackOptimistic()
         return 'no_hearts'
       }
+      if (res.status === 400 && json?.code === 'NO_SEED_CHOSEN') {
+        rollbackOptimistic()
+        return 'ok'
+      }
 
       if (!res.ok || json?.ok !== true) {
         console.warn('[usePlantPot] plant-water API', res.status, json)
@@ -390,6 +423,7 @@ export function usePlantPot(
             full.pot_stage,
             full.pot_hearts_used,
             full.pot_completed,
+            prev?.hasChosenSeed ?? false,
           ),
         )
       }
@@ -497,6 +531,7 @@ export function usePlantPot(
         heartsUsed: 0,
         heartsNeeded: HEARTS_PER_STAGE[0],
         completed: false,
+        hasChosenSeed: true,
       })
       if (typeof json.hearts === 'number') {
         setHearts(readChildStatInt(json.hearts))

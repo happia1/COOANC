@@ -72,7 +72,7 @@ import {
   CHILD_HOME_TOP_BAR_GLASS_STYLE,
 } from '@/lib/childHomeTopBarGlass'
 import { ASSETS, CHILD_HOME_BACKGROUND_CACHE_BUST } from '@/constants/assets'
-import type { PlantStage } from '@/constants/plantTrees'
+import { needsPotSeedSelection, type PlantStage } from '@/constants/plantTrees'
 import type { PlantHarvestCelebrate } from '@/lib/plantHarvest'
 import { usePlantHarvest } from '@/hooks/usePlantHarvest'
 import type {
@@ -2509,15 +2509,19 @@ export default function ChildScreen({
                       onSelect: buySeed,
                       onPlanted: () => void refreshHarvestInventory(),
                     }}
-                    waterActions={{
-                      /** 물조리개 그림·탭 판정은 레벨 카드와 같은 `heartsForHomeUi` 기준 */
-                      hearts: heartsForHomeUi,
-                      allowWaterWithoutHearts: pot.stage === 7,
-                      water,
-                      onNoHearts: () =>
-                        setPlantHint('하트가 부족해요! 미션을 하면 하트를 받을 수 있어요.'),
-                      onGrowthCelebrate: handlePlantGrowthCelebrate,
-                    }}
+                    waterActions={
+                      pot.hasChosenSeed && !needsPotSeedSelection(pot)
+                        ? {
+                            /** 물조리개 그림·탭 판정은 레벨 카드와 같은 `heartsForHomeUi` 기준 */
+                            hearts: heartsForHomeUi,
+                            allowWaterWithoutHearts: pot.stage === 7,
+                            water,
+                            onNoHearts: () =>
+                              setPlantHint('하트가 부족해요! 미션을 하면 하트를 받을 수 있어요.'),
+                            onGrowthCelebrate: handlePlantGrowthCelebrate,
+                          }
+                        : undefined
+                    }
                   />
                 </div>
               </div>

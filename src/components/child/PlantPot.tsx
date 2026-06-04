@@ -15,7 +15,7 @@ import Image from 'next/image'
 import { createPortal } from 'react-dom'
 import {
   getStageImage,
-  isPotAwaitingSeed,
+  needsPotSeedSelection,
   STAGE_LABELS,
   type PlantStage,
   type PlantTreeId,
@@ -144,17 +144,15 @@ export default function PlantPot({ pot, seedSelect, waterActions }: Props) {
     prevStage.current = pot.stage
   }, [pot.stage])
 
-  /** 미심기·완성 후 초기화 직후 — 사과 0단계(씨앗 심긴 화분) 미리보기 */
-  const awaitingSeed = isPotAwaitingSeed(pot)
-  /** 수확 직후(7단계) 또는 아직 심지 않은 상태 — 팝업에서 씨앗 카드 선택 */
-  const showSeedPickerInPopup =
-    Boolean(seedSelect) && (awaitingSeed || (pot.stage === 7 && pot.completed))
+  /** 씨앗 미선택·수확 후 재심기 — 홈·팝업 모두 사과 0단계 미리보기, 팝업은 카드만 */
+  const needsSeedSelection = needsPotSeedSelection(pot)
+  const showSeedPickerInPopup = Boolean(seedSelect) && needsSeedSelection
   const seedPickerIntro =
-    pot.stage === 7 && pot.completed
+    pot.hasChosenSeed && pot.stage === 7 && pot.completed
       ? '수확을 모두 완료했어요! 새로운 씨앗을 심어볼까요?'
       : null
-  const displayTreeId = awaitingSeed ? 'apple' : pot.treeId
-  const displayStage = awaitingSeed ? 0 : pot.stage
+  const displayTreeId = needsSeedSelection ? 'apple' : pot.treeId
+  const displayStage = needsSeedSelection ? 0 : pot.stage
   const imgSrc = getStageImage(displayTreeId, displayStage)
   const label = STAGE_LABELS[displayStage]
   /** 0단계(씨앗 심긴 화분) — 예전처럼 버튼·팝업 안에서 그림만 작게 표시 */
@@ -413,7 +411,11 @@ export default function PlantPot({ pot, seedSelect, waterActions }: Props) {
               .filter(Boolean)
               .join(', ') || undefined,
           }}
-          aria-label={`화분: ${label} (탭해서 관리하기)`}
+          aria-label={
+            needsSeedSelection
+              ? '화분: 씨앗을 골라 주세요'
+              : `화분: ${label} (탭해서 관리하기)`
+          }
         >
           {showStars ? Array.from({ length: 8 }, (_, i) => <StarParticle key={i} index={i} />) : null}
 

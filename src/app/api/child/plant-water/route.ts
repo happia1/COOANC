@@ -105,6 +105,19 @@ export async function POST(req: NextRequest) {
     const stage = synced.stage
     const heartsUsed = synced.heartsUsed
 
+    const { count: purchaseCount, error: purchaseErr } = await db
+      .from('plant_seed_purchases')
+      .select('id', { count: 'exact', head: true })
+      .eq('child_id', childId)
+
+    const hasChosenSeed = !purchaseErr
+      ? (purchaseCount ?? 0) > 0
+      : stage > 0 || heartsUsed > 0 || synced.completed
+
+    if (!hasChosenSeed) {
+      return NextResponse.json({ ok: false, code: 'NO_SEED_CHOSEN' as const }, { status: 400 })
+    }
+
     /**
      * 7단계(다 익은 열매)에서만 씨앗으로 돌아갑니다.
      * `completed` 단독 조건은 제거 — 잘못된 DB 플래그로 성장 분기가 막히던 문제를 막습니다.

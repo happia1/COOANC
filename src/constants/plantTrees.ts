@@ -109,8 +109,7 @@ export function getStageImage(treeId: PlantTreeId, stage: PlantStage): string {
 }
 
 /**
- * 아직 씨앗을 심지 않은 화분 상태 — 0단계·하트 진행 0·미완성.
- * 화면에는 사과 폴더 0단계(씨앗이 심긴 화분) 그림으로 보여 줍니다.
+ * @deprecated `needsPotSeedSelection` 사용 — DB 기본값만으로는 미선택을 구분할 수 없음
  */
 export function isPotAwaitingSeed(pot: {
   stage: PlantStage
@@ -118,6 +117,18 @@ export function isPotAwaitingSeed(pot: {
   completed: boolean
 }): boolean {
   return pot.stage === 0 && pot.heartsUsed === 0 && !pot.completed
+}
+
+/**
+ * 씨앗 카드로 고르기 전·수확 후 재심기 전 — 홈에는 사과 0단계만, 팝업에는 물조리개 없음
+ */
+export function needsPotSeedSelection(pot: {
+  hasChosenSeed: boolean
+  stage: PlantStage
+  completed: boolean
+}): boolean {
+  if (!pot.hasChosenSeed) return true
+  return pot.stage === 7 && pot.completed
 }
 
 export function getSeedImage(treeId: PlantTreeId): string {
