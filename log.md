@@ -38,3 +38,37 @@
 ## 다음에 이어서
 - Vercel·실기기에서 전환·자동 로그인 최종 확인
 - 필요 시 Supabase 플랜/쿼리 부하 점검
+
+# 2026-06-03 작업 로그
+
+## 오늘 한 일
+- **부모 캘린더**: 일정 삭제 후 새로고침 시 복원되던 문제 수정(tombstone API), 「이번 달 일정」 기본 펼침.
+- **부모 미션 탭**: 모바일 드래그앤드롭·텍스트 선택 개선(`TouchSensor` 250ms), Vercel `SyntheticListenerMap` 타입 오류 수정.
+- **미션명**: `숙제하기` → `숙제·공부하기` (`110_homework_study_mission_title.sql`).
+- **그림일기 DiaryModal** (캐릭터 터치 진입):
+  - `EmotionCardLockedModal` 삭제 → `DiaryModal`로 통합.
+  - 전체화면 → **슬라이드 팝업**(모바일 하단 시트 / 데스크톱 우측 패널).
+  - 스케치 레이아웃: 테두리 밖 **날짜·날씨**, 안쪽 **오늘 기분이 어때?** + **그리기·사진 영역**, 하단 **음성·녹음·이미지** 한 줄.
+  - 모바일 프로필 **2:8** 분할, 흰색 그림일기장 배경, 상단 × 버튼 제거.
+  - **바깥 터치·스와이프**로 닫기(핸들/프로필 아래·데스크톱 왼쪽 가장자리).
+  - 팝업 전체 **Phase1 잠금 오버레이**(`🔒 정식 앱버전 반영 예정`).
+  - 배경 PNG 404 시 빈 화면 방지: `src/lib/diaryBackground.ts` probe·캐시.
+  - `ChildHomeScreenClient` chunk 로드 실패 시 재시도·1회 새로고침.
+- **DB**: `supabase/migrations/010_emotion_diary.sql` 추가(감정일기 스키마, Phase2용).
+
+## 커밋/배포
+- `4a39995` — 캘린더 삭제·미션 DnD·숙제·공부하기
+- `ec1e136` — dnd-kit 타입 빌드 수정
+- `7a0b739` — 감정카드 잠금 팝업(이후 DiaryModal로 대체됨)
+- `01ece67` — **그림일기 DiaryModal 슬라이드 팝업 및 UI 통합** (`main` push 완료)
+
+## 메모
+- 핵심 파일: `DiaryModal.tsx`, `CalendarViewModal.tsx`, `ChildScreen.tsx`, `diaryBackground.ts`, `emotionDiary.ts`, `types/diaryModal.ts`
+- 배경 에셋 `public/assets/diary/diary_open.png` 는 **아직 없음** → fallback 분할 배경 + 흰색 패널 사용
+- 달력 보기: `CalendarViewModal` (더미 감정 데이터 fallback)
+- dev `ChunkLoadError` 시: dev 서버 재시작 또는 `.next` 삭제 후 `npm run dev`
+
+## 다음에 이어서
+- `010_emotion_diary.sql` Supabase 적용(`db push`)
+- Phase2: 감정·날씨·그림일기 DB 저장, 캔버스·사진·음성 입력 실제 연동
+- `diary_open.png` 디자인 에셋 반영 및 잠금 오버레이 제거(Lv.10 등 조건 확정 후)

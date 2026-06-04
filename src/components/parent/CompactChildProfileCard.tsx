@@ -6,7 +6,7 @@
  */
 
 import type { ReactNode, TouchEvent } from 'react'
-import { childGrowthStageName } from '@/constants/childGrowthLevels'
+import { getChildBadge } from '@/constants/childGrowthLevels'
 
 /** 홈 탭에서만 넘기면 카드 안에 오늘 미션 달성률 바가 붙습니다 */
 export type ProfileMissionSummary = {
@@ -77,19 +77,19 @@ export function CompactChildProfileCard({
   avatarEnterShortcut = false,
 }: CompactChildProfileCardProps) {
   const lv = Math.max(0, level)
-  const stageName = childGrowthStageName(lv)
+  const badge = getChildBadge(lv)
+  const avatarFallbackLabel = badge?.badge ?? `Lv.${lv}`
   /** 둘째 줄: 연령대·보육·나이를 `·`로 이은 문장(비어 있으면 해당 행 숨김) */
   const metaParts = [ageGroupLabel?.trim(), childcareLabel?.trim()].filter(Boolean) as string[]
   const secondaryParts = [...metaParts, ...(age != null ? [`${age}세`] : [])]
   const secondaryLine = secondaryParts.length > 0 ? secondaryParts.join('·') : null
-  const levelTitle = stageName === `레벨 ${lv}` ? stageName : `레벨 ${lv} · ${stageName}`
-  const statsAria = `크레딧 ${credits.toLocaleString()}, 하트 ${hearts}, 연속 미션 ${streakDays}일`
+  const statsAria = `크레딧 ${credits.toLocaleString()}, 하트 ${hearts}, 레벨 ${lv}`
 
   const statsGridFull = (
     <div className="mt-2 grid w-full grid-cols-3 overflow-hidden rounded-lg border border-gray-100 bg-white" aria-label={statsAria}>
       <StatCell value={credits.toLocaleString()} label="크레딧" valueClassName="text-gray-800" />
       <StatCell value={hearts.toLocaleString()} label="하트" valueClassName="text-gray-800" withDivider />
-      <StatCell value={`${streakDays}일`} label="연속" valueClassName="text-gray-800" withDivider />
+      <StatCell value={`Lv.${lv}`} label="레벨" valueClassName="text-[#4A90E2]" withDivider />
     </div>
   )
 
@@ -97,7 +97,7 @@ export function CompactChildProfileCard({
     <div className="grid min-w-[8.75rem] shrink-0 grid-cols-3 overflow-hidden rounded-lg border border-gray-100 bg-white" aria-label={statsAria}>
       <StatCell value={credits.toLocaleString()} label="크레딧" valueClassName="text-gray-800" dense />
       <StatCell value={hearts.toLocaleString()} label="하트" valueClassName="text-gray-800" withDivider dense />
-      <StatCell value={`${streakDays}일`} label="연속" valueClassName="text-gray-800" withDivider dense />
+      <StatCell value={`Lv.${lv}`} label="레벨" valueClassName="text-[#4A90E2]" withDivider dense />
     </div>
   )
 
@@ -105,15 +105,10 @@ export function CompactChildProfileCard({
     return (
       <div className={`rounded-xl bg-white px-3 py-2.5 ${className}`.trim()}>
         <div className="flex items-center gap-3">
-          <AvatarCircle avatarUrl={avatarUrl} stageName={stageName} boxClass="h-14 w-14" />
+          <AvatarCircle avatarUrl={avatarUrl} fallbackLabel={avatarFallbackLabel} boxClass="h-14 w-14" />
 
           <div className="min-w-0 flex-1 text-left">
-            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-              <p className="min-w-0 truncate text-base font-black leading-tight text-gray-900">{name}</p>
-              <p className="shrink-0 text-[11px] font-bold text-gray-600" title={levelTitle}>
-                Lv.{lv}
-              </p>
-            </div>
+            <p className="min-w-0 truncate text-base font-black leading-tight text-gray-900">{name}</p>
             {secondaryLine ? (
               <p className="mt-0.5 truncate text-[11px] font-bold leading-tight text-gray-500" title={secondaryLine}>
                 {secondaryLine}
@@ -163,7 +158,7 @@ export function CompactChildProfileCard({
               <div className="flex justify-center px-2">
                 <AvatarWithShortcut
                   avatarUrl={avatarUrl}
-                  stageName={stageName}
+                  fallbackLabel={avatarFallbackLabel}
                   /** 부모 화면 자녀 프로필 원형 아바타를 기존(4rem) 대비 1.6배(6.4rem)로 확대 */
                   boxClass="h-[6.4rem] w-[6.4rem]"
                   showShortcut={avatarEnterShortcut}
@@ -193,7 +188,7 @@ export function CompactChildProfileCard({
           <div className="flex w-full justify-center">
             <AvatarWithShortcut
               avatarUrl={avatarUrl}
-              stageName={stageName}
+              fallbackLabel={avatarFallbackLabel}
               /** 부모 화면 자녀 프로필 원형 아바타를 기존(4rem) 대비 1.6배(6.4rem)로 확대 */
               boxClass="h-[6.4rem] w-[6.4rem]"
               showShortcut={avatarEnterShortcut}
@@ -201,12 +196,7 @@ export function CompactChildProfileCard({
           </div>
         )}
 
-        <div className="mt-2 flex max-w-full items-baseline justify-center gap-1.5">
-          <p className="max-w-[70%] truncate text-base font-black leading-tight text-gray-900">{name}</p>
-          <p className="shrink-0 text-[11px] font-bold text-gray-600" title={levelTitle}>
-            Lv.{lv}
-          </p>
-        </div>
+        <p className="mt-2 max-w-full truncate text-base font-black leading-tight text-gray-900">{name}</p>
 
         {secondaryLine ? (
           <p className="mt-0.5 max-w-full truncate text-[11px] font-bold leading-tight text-gray-500" title={secondaryLine}>
@@ -229,18 +219,18 @@ export function CompactChildProfileCard({
 /** 캐릭터 원 + (선택) 오른쪽 아래 「바로가기」표시 — 뱃지는 장식만이라 터치는 부모 링크로 통과합니다 */
 function AvatarWithShortcut({
   avatarUrl,
-  stageName,
+  fallbackLabel,
   boxClass,
   showShortcut,
 }: {
   avatarUrl: string | null
-  stageName: string
+  fallbackLabel: string
   boxClass: string
   showShortcut: boolean
 }) {
   return (
     <div className="relative inline-flex shrink-0">
-      <AvatarCircle avatarUrl={avatarUrl} stageName={stageName} boxClass={boxClass} />
+      <AvatarCircle avatarUrl={avatarUrl} fallbackLabel={fallbackLabel} boxClass={boxClass} />
       {showShortcut ? (
         <span
           className="pointer-events-none absolute bottom-[-1px] right-[14px] z-[1] flex h-[1.125rem] w-[1.125rem] items-center justify-center rounded-full bg-white shadow-[0_1px_3px_rgba(15,23,42,0.12)] ring-1 ring-gray-200/90"
@@ -288,11 +278,11 @@ function SiblingNavArrow({
 
 function AvatarCircle({
   avatarUrl,
-  stageName,
+  fallbackLabel,
   boxClass,
 }: {
   avatarUrl: string | null
-  stageName: string
+  fallbackLabel: string
   boxClass: string
 }) {
   /**
@@ -316,7 +306,7 @@ function AvatarCircle({
         </div>
       ) : (
         <span className="flex h-full w-full items-center justify-center px-1 text-center text-[11px] font-black leading-tight text-gray-700">
-          {stageName}
+          {fallbackLabel}
         </span>
       )}
     </div>

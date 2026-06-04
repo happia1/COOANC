@@ -37,6 +37,11 @@ import {
   probeDiaryBackgroundAvailable,
 } from '@/lib/diaryBackground'
 import CalendarViewModal from '@/components/child/CalendarViewModal'
+import {
+  CHILD_ZONES,
+  getChildBadge,
+  getChildZone,
+} from '@/constants/childGrowthLevels'
 import type { DiaryModalProps } from '@/types/diaryModal'
 
 export type { DiaryChildProfile, DiaryModalProps } from '@/types/diaryModal'
@@ -264,6 +269,58 @@ function DiaryMediaToolbar() {
   )
 }
 
+/** 왼쪽 프로필 — 해당 레벨 뱃지(없으면 null) */
+function DiaryEarnedBadge({ level }: { level: number }) {
+  const badge = getChildBadge(level)
+  if (!badge) return null
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
+      🏅 {badge.badge}
+    </span>
+  )
+}
+
+/** 왼쪽 프로필 — 존별 미니 여정 지도 */
+function DiaryMiniJourneyMap({ level }: { level: number }) {
+  const zone = getChildZone(level)
+  return (
+    <div className="mt-2 w-full rounded-xl bg-white/50 p-3">
+      <p className="text-[10px] font-bold text-gray-600">나의 여정</p>
+      <div className="mt-2 flex flex-wrap items-end justify-center gap-1">
+        {CHILD_ZONES.map((z, i) => {
+          const isCurrent = z.zone === zone.zone
+          const reached = z.minLevel <= level
+          return (
+            <div key={z.zone} className="flex items-center gap-1">
+              <div
+                className={[
+                  'flex flex-col items-center transition-all',
+                  isCurrent ? 'scale-125 opacity-100' : reached ? 'opacity-100' : 'opacity-30',
+                ].join(' ')}
+              >
+                {isCurrent ? (
+                  <span className="mb-0.5 text-[8px] font-semibold text-gray-500">현재</span>
+                ) : (
+                  <span className="mb-0.5 h-[10px]" aria-hidden />
+                )}
+                <span className="text-lg leading-none">{z.emoji}</span>
+                {isCurrent ? (
+                  <span className="mt-0.5 text-[9px] font-bold text-gray-700">{z.zone}</span>
+                ) : null}
+              </div>
+              {i < CHILD_ZONES.length - 1 ? (
+                <span className="pb-1 text-xs text-gray-300" aria-hidden>
+                  →
+                </span>
+              ) : null}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 function ProfileRow({ icon, label, value, compact }: { icon: string; label: string; value: string; compact?: boolean }) {
   if (compact) {
     return (
@@ -421,7 +478,7 @@ export default function DiaryModal({
 
             <div className="relative z-10 flex min-h-0 flex-1 flex-col overflow-y-auto md:overflow-hidden">
               <div className="flex min-h-0 flex-1 flex-col md:h-full md:flex-row">
-                <section className="flex h-[20dvh] max-h-[20dvh] min-h-0 w-full shrink-0 flex-row items-center gap-2.5 overflow-hidden bg-amber-50/90 pl-6 pr-3 py-0 md:h-full md:max-h-none md:w-[38%] md:flex-col md:justify-center md:gap-2.5 md:overflow-visible md:px-3 md:pb-3 md:pt-7 lg:w-[34%]">
+                <section className="flex max-h-[36dvh] min-h-[20dvh] w-full shrink-0 flex-row items-center gap-2.5 overflow-y-auto bg-amber-50/90 pl-6 pr-3 py-2 md:h-full md:max-h-none md:w-[38%] md:flex-col md:justify-center md:gap-2.5 md:overflow-visible md:px-3 md:pb-3 md:pt-7 lg:w-[34%]">
                   <div
                     className="flex min-w-0 flex-1 touch-none select-none flex-row items-center gap-2.5 md:pointer-events-none md:contents"
                     {...dragHandlers}
@@ -435,6 +492,10 @@ export default function DiaryModal({
                       <ProfileRow compact icon="🎂" label="나이" value={ageLabel} />
                       <ProfileRow compact icon="⭐" label="레벨" value={`Lv.${currentLevel}`} />
                     </div>
+                    <div className="mt-1.5 flex flex-wrap items-center justify-center gap-1.5 md:justify-center">
+                      <DiaryEarnedBadge level={currentLevel} />
+                    </div>
+                    <DiaryMiniJourneyMap level={currentLevel} />
                   </div>
                   </div>
                 </section>

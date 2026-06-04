@@ -6,9 +6,14 @@
  * - 아이가 4→5레벨이 되면 「저금통」이 새로 열렸다고 부모 팝업에 보여 줍니다.
  */
 
-import { childGrowthStageName } from '@/constants/childGrowthLevels'
+import {
+  getChildBadge,
+  getChildZone,
+  getParentGuide,
+} from '@/constants/childGrowthLevels'
 
-export { childGrowthStageName }
+export { getChildBadge, getChildZone, getParentGuide }
+
 import {
   CONTENT_ZONE_UNLOCK_MIN_LEVEL,
   STICKER_UNLOCK_MIN_LEVEL,

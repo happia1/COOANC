@@ -88,6 +88,10 @@ type Props = {
   }[]
   /** 홈탭에서 공용 일정 등록 시트를 열 때 사용합니다. */
   onOpenCalendarEventSheet?: () => void
+  /** false 이면 「다가오는 일정」 블록을 숨깁니다(홈 좌측 열에만 둘 때). */
+  showCalendarBriefing?: boolean
+  /** false 이면 「AI 리포트」 블록을 숨깁니다(홈 우측 비활성 열에만 둘 때). */
+  showAiReport?: boolean
 }
 
 // ─── 공통 데이터 타입·훅 ─────────────────────────────────────────────────────
@@ -496,6 +500,8 @@ export default function ParentAgentHomeCards({
   calendarNoticeText,
   calendarUpcomingEvents = [],
   onOpenCalendarEventSheet,
+  showCalendarBriefing = true,
+  showAiReport = true,
 }: Props) {
   const { row, loading, runState, errorReason, distinctDays, reload } = agent
   // 핵심: insufficient 응답일 때는 에이전트가 실제 계산한 distinctDays를 우선 표시해야
@@ -519,7 +525,8 @@ export default function ParentAgentHomeCards({
 
   return (
     <div className="w-full space-y-4">
-      {/* 일정 브리핑 — 홈의 오늘의 진행도·EQ 블록과 동일한 중립 카드(`parentNeutralBlockStyle`) */}
+      {showCalendarBriefing ? (
+      /* 일정 브리핑 — 홈의 오늘의 진행도·EQ 블록과 동일한 중립 카드(`parentNeutralBlockStyle`) */
       <section className={`w-full ${PARENT_NEUTRAL_CARD_CLASSNAME} px-3 py-3`}>
         <div className="mb-2 flex items-center justify-between gap-2">
           <p className="text-sm font-bold text-gray-700">다가오는 일정</p>
@@ -558,9 +565,10 @@ export default function ParentAgentHomeCards({
           </div>
         )}
       </section>
+      ) : null}
 
-      {/* 부모 가이드 — 제목 바깥, 본문만 앰버 톤 박스 */}
-      {parsed.kind === 'json' && parsed.data.parent_guide?.trim() ? (
+      {showAiReport && parsed.kind === 'json' && parsed.data.parent_guide?.trim() ? (
+      /* 부모 가이드 — 제목 바깥, 본문만 앰버 톤 박스 */
         <section className="w-full">
           <div className="mb-2 flex items-center justify-between gap-2">
             <p className="text-sm font-bold text-gray-700">부모 가이드</p>
@@ -571,6 +579,7 @@ export default function ParentAgentHomeCards({
         </section>
       ) : null}
 
+      {showAiReport ? (
       <section className="w-full">
         <div className="mb-2 flex items-baseline justify-between gap-2">
           <p className="text-sm font-bold text-gray-700">AI 리포트</p>
@@ -644,6 +653,7 @@ export default function ParentAgentHomeCards({
           </div>
         ) : null}
       </section>
+      ) : null}
 
     </div>
   )

@@ -11,8 +11,11 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { getCachedParentChildIds } from '@/lib/browserParentAuthCache'
+import type { ChildBadgeEntry, ChildZone } from '@/constants/childGrowthLevels'
 import {
-  childGrowthStageName,
+  getChildBadge,
+  getChildZone,
+  getParentGuide,
   readParentLastNotifiedLevel,
   unlocksNewlyOpenedBetweenLevels,
   writeParentLastNotifiedLevel,
@@ -29,7 +32,9 @@ type LevelUpModalPayload = {
   childName: string
   newLevel: number
   previousLevel: number
-  growthName: string
+  zone: ChildZone
+  badge: ChildBadgeEntry | null
+  parentGuide: string | null
   unlocks: ParentChildUnlockMilestone[]
 }
 
@@ -83,7 +88,9 @@ export default function ParentChildLevelUpModal() {
         childName,
         newLevel,
         previousLevel: prevLevel,
-        growthName: childGrowthStageName(newLevel),
+        zone: getChildZone(newLevel),
+        badge: getChildBadge(newLevel),
+        parentGuide: getParentGuide(newLevel),
         unlocks: unlocksNewlyOpenedBetweenLevels(prevLevel, newLevel),
       })
     },
@@ -173,6 +180,7 @@ export default function ParentChildLevelUpModal() {
   if (!modal.open) return null
 
   const hasUnlocks = modal.unlocks.length > 0
+  const hasParentGuide = Boolean(modal.parentGuide?.trim())
 
   return (
     <div
@@ -190,21 +198,35 @@ export default function ParentChildLevelUpModal() {
           <p className="text-center text-3xl leading-none" aria-hidden>
             🎉
           </p>
-          <p
-            id="parent-child-level-up-title"
-            className="mt-2 text-center text-lg font-black leading-snug text-brand-text"
-          >
-            {modal.childName}님이 레벨 {modal.newLevel}이 되었어요!
+          <p className="mt-2 text-center text-sm font-bold text-gray-600">
+            {modal.childName}님이 레벨업했어요!
           </p>
-          <p className="mt-1 text-center text-sm font-bold text-sky-700">
-            성장 단계 · {modal.growthName}
-          </p>
+
+          <div className="mt-3 text-center">
+            <p
+              id="parent-child-level-up-title"
+              className="text-3xl font-black tabular-nums leading-none text-brand-text"
+            >
+              Lv.{modal.newLevel}
+            </p>
+            <p className="mt-2 text-base font-bold text-sky-800">
+              {modal.zone.emoji} {modal.zone.zone}
+            </p>
+            {modal.badge ? (
+              <p className="mt-1 text-sm font-bold text-amber-800">🏅 {modal.badge.badge}</p>
+            ) : null}
+          </div>
+
+          {hasParentGuide ? (
+            <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
+              <p className="text-xs font-semibold text-amber-700">💡 이 단계 부모 가이드</p>
+              <p className="mt-2 text-sm leading-relaxed text-gray-700">{modal.parentGuide}</p>
+            </div>
+          ) : null}
 
           {hasUnlocks ? (
             <>
-              <p className="mt-3 text-center text-xs font-bold text-gray-600">
-                아이 화면에 새로 열린 기능
-              </p>
+              <p className="mt-4 text-center text-xs font-bold text-gray-600">아이 화면에 새로 열린 기능</p>
               <ul
                 className={`mt-2 grid gap-2 ${
                   modal.unlocks.length >= 3 ? 'grid-cols-3' : modal.unlocks.length === 2 ? 'grid-cols-2' : 'grid-cols-1'

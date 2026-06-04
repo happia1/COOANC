@@ -34,6 +34,10 @@ type Props = {
   agentChildId?: string | null
   agentRow?: AgentLatestReportRow | null
   agentLoading?: boolean
+  /** false 이면 주간 루틴·완주율 블록 숨김(홈 좌측 활성 열용). */
+  showWeeklyRoutine?: boolean
+  /** false 이면 제목·EQ 지수 종합만 숨김(홈 우측 비활성 열용). */
+  showEqSummary?: boolean
 }
 
 // ─── 저축 습관 설명 모달 ──────────────────────────────────────────────────────
@@ -331,6 +335,8 @@ export default function EconomicEqPanel({
   childName,
   agentChildId,
   agentRow,
+  showWeeklyRoutine = true,
+  showEqSummary = true,
 }: Props) {
   const gradId = useId().replace(/:/g, '')
 
@@ -343,16 +349,18 @@ export default function EconomicEqPanel({
 
   return (
     <section className="w-full space-y-4">
-      <p className="text-sm font-bold text-gray-700">우리아이 경제 EQ 지수</p>
+      {showEqSummary ? (
+        <>
+          <p className="text-sm font-bold text-gray-700">우리아이 경제 EQ 지수</p>
+          <EqScoreCircles
+            eq={agentRow?.eq_scores as AgentEqScores | null}
+            gradSaveId={`eq-save-${gradId}`}
+            gradHabitId={`eq-habit-${gradId}`}
+          />
+        </>
+      ) : null}
 
-      {/* ── EQ 지수 종합 (저축 비율·저축 습관 원형 게이지) ──────────────── */}
-      <EqScoreCircles
-        eq={agentRow?.eq_scores as AgentEqScores | null}
-        gradSaveId={`eq-save-${gradId}`}
-        gradHabitId={`eq-habit-${gradId}`}
-      />
-
-      {/* ── 주간 루틴 완료율(7) + 루틴 완주율 게이지(3) 합산 블록 ─────────── */}
+      {showWeeklyRoutine ? (
       <div className={`${PARENT_NEUTRAL_CARD_CLASSNAME} px-3 py-3`}>
         <div className="flex gap-3">
           {/* 주간 루틴 완료율 막대 — 7/10 너비 (좌측) */}
@@ -384,6 +392,7 @@ export default function EconomicEqPanel({
           </div>
         </div>
       </div>
+      ) : null}
     </section>
   )
 }

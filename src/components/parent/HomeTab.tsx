@@ -12,7 +12,7 @@
  * - 「일정 브리핑」: 서울 기준 오늘부터 6일 후까지(7일) 구간에 들어오는 `calendar_events` + `public_holidays`(노동절·어린이날 등) + 기기 localStorage 일정을 합칩니다.
  */
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import ParentEnterChildUiLink from '@/components/parent/ParentEnterChildUiLink'
 import { createClient } from '@/lib/supabase/client'
@@ -33,7 +33,7 @@ import { CalendarEventSheet } from '@/components/parent/CalendarSection'
 import { CompactChildProfileCard } from '@/components/parent/CompactChildProfileCard'
 import { useParentAgentReport } from '@/hooks/useParentAgentReport'
 import { buildPlaceholderCoachingGuide, buildPlaceholderEqDataFeedback } from '@/lib/childEqAiPlaceholders'
-import { childGrowthStageName } from '@/constants/childGrowthLevels'
+import { childGrowthStageLabel, getChildBadge, getChildZone } from '@/constants/childGrowthLevels'
 import type { AgentLatestReportRow } from '@/lib/agentApi'
 import SpriteImage from '@/components/common/SpriteImage'
 import { ICONS } from '@/constants/sprites'
@@ -109,6 +109,29 @@ export type ChildSummary = {
   weeklyRoutine: WeeklyRoutineDay[]
 }
 
+/**
+ * AI 리포트·경제 EQ 지수 — 베타 홈에서 비활성(정식 론칭 때 해제)
+ */
+function ParentHomeAiEqComingSoon({ children }: { children: ReactNode }) {
+  return (
+    <div className="relative min-h-[10rem]" aria-disabled="true">
+      <div className="space-y-4 opacity-45 grayscale pointer-events-none select-none">
+        {children}
+      </div>
+      <div className="absolute inset-0 z-10 flex items-center justify-center rounded-2xl bg-gray-900/25 px-4 py-10">
+        <div className="max-w-xs rounded-2xl bg-white px-5 py-4 text-center shadow-lg ring-1 ring-gray-200/90">
+          <p className="text-sm font-black text-gray-800">🔒 준비 중</p>
+          <p className="mt-2 text-xs font-semibold leading-relaxed text-gray-600">
+            AI 리포트와 우리아이 경제 EQ 지수는
+            <br />
+            정식 론칭 버전에서 소개할 예정이에요
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 type Props = {
   childrenData: ChildSummary[]
   upcomingEvents: {
@@ -158,7 +181,16 @@ export default function HomeTab({
 
   /** 선택 자녀가 바뀌면 서버에서 받은 주간 막대 데이터로 맞춘 뒤, Realtime 으로 최신화합니다. */
   const [weeklyRoutine, setWeeklyRoutine] = useState<WeeklyRoutineDay[]>(child?.weeklyRoutine ?? [])
-  const growthStageName = childGrowthStageName(s?.current_level ?? 0)
+  const currentLevel = s?.current_level ?? 0
+  const growthZone = getChildZone(currentLevel)
+  const growthBadge = getChildBadge(currentLevel)
+  const growthStageName = childGrowthStageLabel(currentLevel)
+  const growthSummaryLabel = [
+    `${growthZone.emoji} ${growthZone.zone}`,
+    growthBadge ? `🏅 ${growthBadge.badge}` : null,
+  ]
+    .filter(Boolean)
+    .join(' ')
   const shouldUseLocalFallbackReport =
     agentReport.runState === 'insufficient' &&
     selectedDaysWithData >= 7 &&
@@ -178,7 +210,7 @@ export default function HomeTab({
           week_start: getSeoulMondayOfWeekContaining(getSeoulDateString()),
           report_text: JSON.stringify({
             version: 1,
-            level_comment: `${child.name}의 현재 성장 단계는 ${growthStageName}이에요.\n${buildPlaceholderEqDataFeedback({
+            level_comment: `${child.name}님 · Lv.${currentLevel} ${growthSummaryLabel}\n${buildPlaceholderEqDataFeedback({
               stats: {
                 eq_routine_rate: s.eq_routine_rate ?? 0,
                 eq_delay_score: s.eq_delay_score ?? 0,
@@ -491,9 +523,8 @@ export default function HomeTab({
           {/* ── 본문: md에서 2컬럼 그리드, 모바일에서 단일 컬럼 ───────────── */}
           <div className="grid w-full grid-cols-1 gap-4 md:grid-cols-2 md:gap-6">
 
-            {/* 좌 컬럼: 프로필 바 + 모바일 진행도 + AI 상태/코칭 카드 */}
+            {/* 좌측(활성): 프로필 · 오늘의 진행도 · 다가오는 일정 · 주간 루틴 */}
             <div className="flex flex-col gap-4">
-              {/* ── 상단: 통합 프로필 바 (아바타+이름 좌 / 코인·하트·연속 우) ── */}
               <ParentEnterChildUiLink
                 childId={child.id}
                 className="block w-full cursor-pointer rounded-2xl transition-opacity active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4A90E2] focus-visible:ring-offset-2"
@@ -521,8 +552,7 @@ export default function HomeTab({
                 />
               </ParentEnterChildUiLink>
 
-              {/* 모바일: 루틴 탭과 동일한 중립 카드(테두리·그림자) */}
-              <div className={`${PARENT_NEUTRAL_CARD_CLASSNAME} space-y-2 px-3 py-3 md:hidden`}>
+              <div className={`${PARENT_NEUTRAL_CARD_CLASSNAME} space-y-2 px-3 py-3`}>
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-sm font-bold text-gray-700">오늘의 진행도</p>
                   <span className="text-sm font-black tabular-nums text-[#4A90E2]">
@@ -543,55 +573,22 @@ export default function HomeTab({
                 )}
               </div>
 
-              {/**
-               * 요청 반영: "데이터 모으는 중" 카드가 포함된 AI 블록을 좌측으로 이동합니다.
-               * (`ParentAgentHomeCards`는 로딩/insufficient/코칭 상태를 공통으로 담당)
-               */}
               <ParentAgentHomeCards
                 agent={effectiveAgentReport}
                 daysWithData={selectedDaysWithData}
                 calendarNoticeText={calendarNoticeText}
                 calendarUpcomingEvents={effectiveUpcomingEvents.map((ev) => ({
                   id: ev.id ?? `${ev.start_date}-${ev.title ?? 'event'}`,
-                  // 홈 브리핑 항목 클릭 시 루틴 캘린더에서 이 날짜를 바로 열기 위한 원본 값입니다.
                   date: ev.start_date,
                   dateLabel: formatEventDate(ev.start_date),
                   title: ev.title?.trim() || getCategoryLabel(ev),
-                  impactLabel:
-                    ev.routine_override === 'none' ? '루틴 없음' : '루틴 조정 필요',
+                  impactLabel: ev.routine_override === 'none' ? '루틴 없음' : '루틴 조정 필요',
                 }))}
                 onOpenCalendarEventSheet={() => setCalendarEventSheetOpen(true)}
+                showCalendarBriefing
+                showAiReport={false}
               />
 
-            </div>
-
-            {/* 우 컬럼: 오늘의 진행도 + 우리아이 경제 EQ 지수 */}
-            <div className="flex flex-col gap-4">
-              {/* 데스크톱: 모바일과 동일 카드 스타일 */}
-              <div className={`hidden md:block ${PARENT_NEUTRAL_CARD_CLASSNAME} space-y-2 px-3 py-3`}>
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-sm font-bold text-gray-700">오늘의 진행도</p>
-                  <span className="text-sm font-black tabular-nums text-[#4A90E2]">
-                    {missionRate}%
-                    <span className="ml-1 text-[10px] font-normal text-gray-400">
-                      ({child.todayCompleted}/{child.totalMissions})
-                    </span>
-                  </span>
-                </div>
-                <div className="h-2 overflow-hidden rounded-full bg-gray-100">
-                  <div
-                    className="h-full rounded-full bg-gradient-to-r from-[#93C5FD] to-[#2563EB] transition-all"
-                    style={{ width: `${missionRate}%` }}
-                  />
-                </div>
-                {missionRate === 100 && child.totalMissions > 0 && (
-                  <p className="text-right text-[10px] font-bold text-[#2563EB]">오늘 미션 모두 완료!</p>
-                )}
-              </div>
-
-              {/**
-               * 요청 반영: "우리아이 경제 EQ 지수" 패널을 우측 컬럼으로 이동합니다.
-               */}
               <EconomicEqPanel
                 stats={{
                   eq_routine_rate: s?.eq_routine_rate ?? 0,
@@ -608,8 +605,39 @@ export default function HomeTab({
                 agentChildId={child.id}
                 agentRow={effectiveAgentReport.row}
                 agentLoading={effectiveAgentReport.loading}
+                showWeeklyRoutine
+                showEqSummary={false}
               />
             </div>
+
+            {/* 우측(비활성): AI 리포트 · 우리아이 경제 EQ 지수 */}
+            <ParentHomeAiEqComingSoon>
+              <ParentAgentHomeCards
+                agent={effectiveAgentReport}
+                daysWithData={selectedDaysWithData}
+                showCalendarBriefing={false}
+                showAiReport
+              />
+              <EconomicEqPanel
+                stats={{
+                  eq_routine_rate: s?.eq_routine_rate ?? 0,
+                  eq_delay_score: s?.eq_delay_score ?? 0,
+                  eq_save_ratio: s?.eq_save_ratio ?? 0,
+                  streak_days: s?.streak_days ?? 0,
+                  credits: s?.credits ?? 0,
+                  credits_wallet: s?.credits_wallet ?? 0,
+                  credits_piggy: s?.credits_piggy ?? 0,
+                  current_level: s?.current_level ?? 0,
+                }}
+                weeklyRoutine={weeklyRoutine}
+                childName={child.name}
+                agentChildId={child.id}
+                agentRow={effectiveAgentReport.row}
+                agentLoading={effectiveAgentReport.loading}
+                showWeeklyRoutine={false}
+                showEqSummary
+              />
+            </ParentHomeAiEqComingSoon>
           </div>
         </>
       )}
