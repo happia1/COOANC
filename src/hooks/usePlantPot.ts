@@ -7,13 +7,22 @@
  * - 「물 주기」를 누르면 보유 하트가 1 줄고, 식물 진행 바가 조금 찹니다.
  * - 단계는 0(씨앗)부터 7(다 익은 열매)까지예요.
  * - 한 단계 오를 때마다 `water()` 가 `{ type: 'grew', newStage }` 를 돌려주고, 화면(`PlantStageCelebrationModal`)에서 팝업·콘페티를 띄웁니다.
- * - 완성(7단계) 이후에는 물 주기 탭 시 초기화되거나, 「씨앗 고르기」에서 `resetPot`으로 나무를 다시 정합니다.
+ * - 완성(7단계) 이후 「씨앗 고르기」는 `buySeed`로 크레딧을 쓰고 새 씨앗을 심습니다.
+ * - `resetPot`은 크레딧 없이 진행만 초기화하는 보조 경로(API 폴백)입니다. 씨앗 모달과 함께 쓰지 마세요.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { HEARTS_PER_STAGE, normalizePlantPotProgress, type PlantStage, type PlantTreeId } from '@/constants/plantTrees'
+import {
+  HEARTS_PER_STAGE,
+  normalizePlantPotProgress,
+  resolveTreeId,
+  type PlantStage,
+  type PlantTreeId,
+} from '@/constants/plantTrees'
 import { createClient } from '@/lib/supabase/client'
 import { readChildStatInt } from '@/lib/childCreditsSplit'
+import type { PlantHarvestCelebrate } from '@/lib/plantHarvest'
+import { parseJsonFromResponse } from '@/lib/parseJsonResponse'
 
 export type PotState = {
   treeId: PlantTreeId
@@ -27,9 +36,19 @@ export type PotState = {
  * 물 주기 결과
  * - `grew`: 하트 소모 후 **새 성장 단계**에 도달(중간 레벨업이든 최종 완성이든 동일 — `newStage` 확인)
  */
-export type WaterResult = 'ok' | 'no_hearts' | { type: 'grew'; newStage: PlantStage }
+export type WaterResult =
+  | 'ok'
+  | 'no_hearts'
+  | { type: 'grew'; newStage: PlantStage; harvest?: PlantHarvestCelebrate }
+
+export type BuySeedResult =
+  | { ok: true; newCredits: number; treeId: PlantTreeId }
+  | { ok: false; code: 'insufficient_credits'; required: number; current: number; shortfall: number; message: string }
+  | { ok: false; code: 'error'; message: string }
 
 const DEFAULT_TREE: PlantTreeId = 'apple'
+
+const POT_SELECT = 'hearts, pot_stage, pot_hearts_used, pot_completed, pot_tree_id' as const
 
 /**
  * 물주기 API 성공 JSON으로 로컬 화분 상태를 만듭니다.
@@ -74,18 +93,9 @@ export function usePlantPot(
   const [pot, setPot] = useState<PotState | null>(null)
   const [hearts, setHearts] = useState(0)
   const [loading, setLoading] = useState(true)
-  /**
-   * DB 에 `pot_tree_id` 가 없어 서버에서는 나무 종류를 읽지 못합니다.
-   * 이 디바이스 세션 안에서만 `씨앗 고르기`로 선택한 나무를 기억합니다(자녀 바뀔 때 초기화).
-   */
-  const chosenTreeRef = useRef<PlantTreeId>(DEFAULT_TREE)
   /** 부모가 넘긴 콜백은 매 렌더마다 바뀔 수 있어 ref 로 최신만 읽습니다(물주기 `water` 의존성 안정화). */
   const onPlantStatsSyncedRef = useRef(options?.onPlantStatsSynced)
   onPlantStatsSyncedRef.current = options?.onPlantStatsSynced
-
-  useEffect(() => {
-    chosenTreeRef.current = DEFAULT_TREE
-  }, [childId])
 
   /**
    * 브라우저에서 pot_* 정규화 UPDATE 가 실패했을 때, 같은 작업을 서버 세션으로 한 번 더 시도합니다.
@@ -108,7 +118,7 @@ export function usePlantPot(
   const refresh = useCallback(async () => {
     const { data: initialData, error } = await supabase
       .from('child_stats')
-      .select('hearts, pot_stage, pot_hearts_used, pot_completed')
+      .select(POT_SELECT)
       .eq('child_id', childId)
       .maybeSingle()
 
@@ -151,7 +161,7 @@ export function usePlantPot(
         if (recovered) {
           const { data: dataAfter, error: refetchErr } = await supabase
             .from('child_stats')
-            .select('hearts, pot_stage, pot_hearts_used, pot_completed')
+            .select(POT_SELECT)
             .eq('child_id', childId)
             .maybeSingle()
           if (!refetchErr && dataAfter) {
@@ -161,7 +171,7 @@ export function usePlantPot(
       } else {
         const { data: dataAfter, error: refetchErr } = await supabase
           .from('child_stats')
-          .select('hearts, pot_stage, pot_hearts_used, pot_completed')
+          .select(POT_SELECT)
           .eq('child_id', childId)
           .maybeSingle()
         if (!refetchErr && dataAfter) {
@@ -176,9 +186,13 @@ export function usePlantPot(
     const completedFinal = data.pot_completed ?? false
     const normalizedFinal = normalizePlantPotProgress(stageDbFinal, heartsUsedFinal, completedFinal)
 
+    const treeId = resolveTreeId(
+      typeof data.pot_tree_id === 'string' ? data.pot_tree_id : null,
+    )
+
     setHearts(readChildStatInt(data.hearts))
     setPot({
-      treeId: chosenTreeRef.current,
+      treeId,
       stage: normalizedFinal.stage,
       heartsUsed: normalizedFinal.heartsUsed,
       heartsNeeded: HEARTS_PER_STAGE[normalizedFinal.stage],
@@ -235,10 +249,14 @@ export function usePlantPot(
           const hasPotField =
             Object.prototype.hasOwnProperty.call(row, 'pot_stage') ||
             Object.prototype.hasOwnProperty.call(row, 'pot_hearts_used') ||
-            Object.prototype.hasOwnProperty.call(row, 'pot_completed')
+            Object.prototype.hasOwnProperty.call(row, 'pot_completed') ||
+            Object.prototype.hasOwnProperty.call(row, 'pot_tree_id')
           if (hasPotField) {
             setPot((prev) => {
               if (!prev) return prev
+              const treeId = Object.prototype.hasOwnProperty.call(row, 'pot_tree_id')
+                ? resolveTreeId(row.pot_tree_id as string)
+                : prev.treeId
               const stageRaw = Object.prototype.hasOwnProperty.call(row, 'pot_stage')
                 ? readChildStatInt(row.pot_stage)
                 : prev.stage
@@ -252,6 +270,7 @@ export function usePlantPot(
               const normalized = normalizePlantPotProgress(stageDb, heartsUsedRaw, completedRaw)
               return {
                 ...prev,
+                treeId,
                 stage: normalized.stage,
                 heartsUsed: normalized.heartsUsed,
                 heartsNeeded: HEARTS_PER_STAGE[normalized.stage],
@@ -350,6 +369,7 @@ export function usePlantPot(
         pot_hearts_used?: number
         pot_completed?: boolean
         reset?: boolean
+        harvest?: PlantHarvestCelebrate
       }
       if (
         typeof full.hearts === 'number' &&
@@ -366,7 +386,7 @@ export function usePlantPot(
         setHearts(readChildStatInt(full.hearts))
         setPot((prev) =>
           potStateFromWaterResponse(
-            prev?.treeId ?? chosenTreeRef.current,
+            prev?.treeId ?? DEFAULT_TREE,
             full.pot_stage,
             full.pot_hearts_used,
             full.pot_completed,
@@ -376,7 +396,11 @@ export function usePlantPot(
 
       if (full.grew === true && typeof full.newStage === 'number') {
         const ns = Math.min(7, Math.max(0, Math.trunc(full.newStage)))
-        return { type: 'grew', newStage: ns as PlantStage }
+        return {
+          type: 'grew',
+          newStage: ns as PlantStage,
+          harvest: full.harvest,
+        }
       }
       return 'ok'
     } catch (e) {
@@ -387,16 +411,121 @@ export function usePlantPot(
     }
   }, [childId, hearts, pot, refresh])
 
-  /** 씨앗 고르기 확인 시 — 단계 초기화 + 선택한 나무 id 저장 */
+  /**
+   * 씨앗 구매 — 크레딧 차감 + 화분·나무 종류 초기화 (`/api/child/plant-buy-seed`)
+   */
+  const buySeed = useCallback(async (treeId: PlantTreeId): Promise<BuySeedResult> => {
+    try {
+      const res = await fetch('/api/child/plant-buy-seed', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ childId, treeId }),
+        credentials: 'same-origin',
+      })
+      const { data: json, parseError } = await parseJsonFromResponse<{
+        success?: boolean
+        error?: string
+        detail?: string
+        code?: string
+        required?: number
+        current?: number
+        newCredits?: number
+        treeId?: string
+        hearts?: number
+        pot_stage?: number
+        pot_hearts_used?: number
+        pot_completed?: boolean
+        credits_piggy?: number
+      }>(res)
+
+      if (parseError || !json) {
+        console.warn('[usePlantPot] buySeed parse', res.status)
+        return {
+          ok: false as const,
+          code: 'error' as const,
+          message: '서버 응답을 읽지 못했어요. 잠시 후 다시 시도해 주세요.',
+        }
+      }
+
+      if (res.status === 400 && json.error === 'insufficient_credits') {
+        const required = typeof json.required === 'number' ? json.required : 0
+        const current = typeof json.current === 'number' ? json.current : 0
+        const shortfall = Math.max(0, required - current)
+        return {
+          ok: false as const,
+          code: 'insufficient_credits' as const,
+          required,
+          current,
+          shortfall,
+          message: `크레딧이 ${shortfall}개 부족해요!`,
+        }
+      }
+
+      if (!res.ok || json.success !== true) {
+        console.warn('[usePlantPot] buySeed', res.status, json)
+        const apiMsg = typeof json.error === 'string' ? json.error : null
+        const detail = typeof json.detail === 'string' ? json.detail : null
+        const message =
+          apiMsg === '씨앗 심기에 실패했어요' && detail
+            ? `${apiMsg} (${detail})`
+            : apiMsg ?? '씨앗 심기에 실패했어요. 잠시 후 다시 시도해 주세요.'
+        return {
+          ok: false as const,
+          code: 'error' as const,
+          message,
+        }
+      }
+
+      const tid = resolveTreeId(json.treeId)
+      const newCredits = readChildStatInt(json.newCredits)
+      const patch: Record<string, unknown> = {
+        credits: newCredits,
+        credits_wallet: 0,
+        pot_stage: 0,
+        pot_hearts_used: 0,
+        pot_completed: false,
+        pot_tree_id: tid,
+      }
+      if (typeof json.credits_piggy === 'number') {
+        patch.credits_piggy = readChildStatInt(json.credits_piggy)
+      }
+      if (typeof json.hearts === 'number') patch.hearts = json.hearts
+      onPlantStatsSyncedRef.current?.(patch)
+
+      setPot({
+        treeId: tid,
+        stage: 0,
+        heartsUsed: 0,
+        heartsNeeded: HEARTS_PER_STAGE[0],
+        completed: false,
+      })
+      if (typeof json.hearts === 'number') {
+        setHearts(readChildStatInt(json.hearts))
+      }
+
+      void refresh()
+
+      return { ok: true as const, newCredits, treeId: tid }
+    } catch (e) {
+      console.warn('[usePlantPot] buySeed fetch', e)
+      return {
+        ok: false as const,
+        code: 'error' as const,
+        message: '네트워크 오류가 있어요. 연결을 확인한 뒤 다시 시도해 주세요.',
+      }
+    }
+  }, [childId, refresh])
+
+  /** 크레딧 없이 화분만 초기화(클라이언트 실패 시 API 폴백). 씨앗 모달과 병행 호출하지 않습니다. */
   const resetPot = useCallback(
     async (treeId: PlantTreeId = DEFAULT_TREE) => {
-      chosenTreeRef.current = treeId
       const { error } = await supabase
         .from('child_stats')
         .update({
           pot_stage: 0,
           pot_hearts_used: 0,
           pot_completed: false,
+          pot_tree_id: treeId,
         })
         .eq('child_id', childId)
       if (error) {
@@ -425,6 +554,7 @@ export function usePlantPot(
     hearts,
     loading,
     water,
+    buySeed,
     resetPot,
     refresh,
     bumpHeartsForMissionOptimistic,

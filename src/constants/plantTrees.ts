@@ -1,11 +1,58 @@
 /**
- * 식물(나무) 성장 단계 상수 — MVP 에서는 사과나무만 사용합니다.
+ * 식물(나무) 성장 단계·종류·씨앗 구매 비용
  */
 
 /** 성장 단계: 0(씨앗)~7(다 익은 열매) 8단계 */
 export type PlantStage = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7
 
-export type PlantTreeId = 'apple'
+export const TREE_LIST = [
+  { id: 'apple', name: '사과나무', emoji: '🍎', creditCost: 10 },
+  { id: 'strawberry', name: '딸기', emoji: '🍓', creditCost: 30 },
+  { id: 'lemon', name: '레몬', emoji: '🍋', creditCost: 50 },
+  { id: 'cherry', name: '체리', emoji: '🍒', creditCost: 80 },
+  { id: 'blueberry', name: '블루베리', emoji: '🫐', creditCost: 100 },
+  { id: 'sunflower', name: '해바라기', emoji: '🌻', creditCost: 150 },
+] as const
+
+export type PlantTreeId = (typeof TREE_LIST)[number]['id']
+
+export type PlantTreeDefinition = (typeof TREE_LIST)[number]
+
+/** 알 수 없는 코드 → apple */
+export function resolveTreeId(id: string | null | undefined): PlantTreeId {
+  const hit = TREE_LIST.find((t) => t.id === id)
+  return hit?.id ?? 'apple'
+}
+
+export function getPlantTree(id: PlantTreeId): PlantTreeDefinition {
+  return TREE_LIST.find((t) => t.id === id) ?? TREE_LIST[0]
+}
+
+export function getPlantTreeCreditCost(id: PlantTreeId): number {
+  return getPlantTree(id).creditCost
+}
+
+/** 수확 메시지·인벤토리에 쓰는 과일 이름 */
+export const HARVEST_FRUIT_NAME: Record<PlantTreeId, string> = {
+  apple: '사과',
+  strawberry: '딸기',
+  lemon: '레몬',
+  cherry: '체리',
+  blueberry: '블루베리',
+  sunflower: '해바라기',
+}
+
+export function getHarvestFruitName(treeId: PlantTreeId): string {
+  return HARVEST_FRUIT_NAME[treeId] ?? HARVEST_FRUIT_NAME.apple
+}
+
+/** 완성 수확량 1~5개 (서버·클라이언트 동일 규칙) */
+export function randomHarvestAmount(): number {
+  return 1 + Math.floor(Math.random() * 5)
+}
+
+/** 임시 과일 바구니 아이콘 — 추후 전용 에셋으로 교체 예정 */
+export const PLANT_HARVEST_BASKET_ICON_SRC = '/assets/img/common/ui/basket_filled.png'
 
 export const STAGE_LABELS: Record<PlantStage, string> = {
   0: '씨앗',
@@ -18,10 +65,6 @@ export const STAGE_LABELS: Record<PlantStage, string> = {
   7: '다 익은 열매',
 }
 
-/**
- * 물 주기로 단계가 1단계 오를 때마다 팝업에 보여 줄 짧은 축하 문구(도달한 단계 번호 기준).
- * 비개발자: 씨앗(0)에서는 팝업을 쓰지 않고, 1부터 7까지 각각 다른 문장을 띄웁니다.
- */
 const CELEBRATION_BY_STAGE: Partial<Record<PlantStage, string>> = {
   1: '싹이 나왔어요!',
   2: '어린 나무가 되었어요!',
@@ -29,10 +72,9 @@ const CELEBRATION_BY_STAGE: Partial<Record<PlantStage, string>> = {
   4: '예쁜 꽃이 폈어요!',
   5: '작은 열매가 맺혔어요!',
   6: '열매가 빨개지고 있어요!',
-  7: '사과가 다 익었어요!',
+  7: '열매가 다 익었어요!',
 }
 
-/** 축하 팝업 메인 카피 — 알 수 없는 단계면 보수적 한 줄 */
 export function getPlantStageCelebrationTitle(stage: PlantStage): string {
   return CELEBRATION_BY_STAGE[stage] ?? '식물이 한 단계 자랐어요!'
 }
@@ -41,32 +83,51 @@ export function getPlantStageCelebrationTitle(stage: PlantStage): string {
 export const PLANT_BASE = '/assets/img/missions/routine/plant'
 
 /**
- * 화분 팝업 도구 — 물조리개 이미지는 plant 루트의 200/300.png 를 씁니다.
+ * public 폴더명 매핑 — TREE_LIST id 와 디스크 폴더명이 다를 수 있음(예: blueberry → bluberry).
+ * getStageImage / getSeedImage 는 6종 모두 `{PLANT_BASE}/{folder}/{stage}.png` 패턴을 씁니다.
  */
+const PLANT_ASSET_FOLDER: Record<PlantTreeId, string> = {
+  apple: 'apple',
+  strawberry: 'strawberry',
+  lemon: 'lemon',
+  cherry: 'cherry',
+  blueberry: 'bluberry',
+  sunflower: 'sunflower',
+}
 
-/** 물조리개 — 하트 없음(빈) / 하트 있음(채움) */
+export function plantAssetFolder(treeId: PlantTreeId): string {
+  return PLANT_ASSET_FOLDER[treeId] ?? treeId
+}
+
 export const WATERING_CAN_EMPTY_SRC = `${PLANT_BASE}/200.png`
 export const WATERING_CAN_FULL_SRC = `${PLANT_BASE}/300.png`
 
-/** 나무 종류별 단계 일러스트 — `apple/0.png` … `apple/7.png` 형식 */
+/** `{PLANT_BASE}/{treeId}/{stage}.png` — apple/0.png … sunflower/7.png */
 export function getStageImage(treeId: PlantTreeId, stage: PlantStage): string {
-  return `${PLANT_BASE}/${treeId}/${stage}.png`
+  const folder = plantAssetFolder(treeId)
+  return `${PLANT_BASE}/${folder}/${stage}.png`
 }
 
-/** 나무 종류별 씨앗 그림 */
 export function getSeedImage(treeId: PlantTreeId): string {
-  return `${PLANT_BASE}/${treeId}/seed.png`
+  const folder = plantAssetFolder(treeId)
+  return `${PLANT_BASE}/${folder}/seed.png`
 }
 
-/** 완성 보상·열매 그림 — 사과나무는 `apple.png`, 그 외는 7단계 그림 */
 export function getRewardImage(treeId: PlantTreeId): string {
-  if (treeId === 'apple') return `${PLANT_BASE}/apple/apple.png`
-  return `${PLANT_BASE}/${treeId}/7.png`
+  const folder = plantAssetFolder(treeId)
+  return `${PLANT_BASE}/${folder}/${folder}.png`
 }
 
 /**
- * @deprecated `getStageImage(treeId, stage)` 사용 — 사과나무 기본값만 유지
+ * 씨앗 선택 카드 미리보기 — 폴더 내 과일명 PNG(apple.png 등).
+ * 해바라기만 성장 0단계(해바라기씨) 이미지를 그대로 씁니다.
  */
+export function getSeedSelectCardImage(treeId: PlantTreeId): string {
+  if (treeId === 'sunflower') return getStageImage('sunflower', 0)
+  return getRewardImage(treeId)
+}
+
+/** @deprecated `getStageImage('apple', stage)` 사용 */
 export const STAGE_IMAGE: Record<PlantStage, string> = {
   0: getStageImage('apple', 0),
   1: getStageImage('apple', 1),
@@ -78,30 +139,17 @@ export const STAGE_IMAGE: Record<PlantStage, string> = {
   7: getStageImage('apple', 7),
 }
 
-/** @deprecated `getRewardImage('apple')` 사용 */
-export const APPLE_REWARD_IMAGE = getRewardImage('apple')
-/** @deprecated `getSeedImage(treeId)` 사용 */
-export const SEED_IMAGE = getSeedImage('apple')
-
-/**
- * 단계 → 다음 단계까지 필요한 하트 수
- * 7단계(완성)는 다음이 없으므로 0
- */
 export const HEARTS_PER_STAGE: Record<PlantStage, number> = {
-  0: 3, // 씨앗 → 새싹
-  1: 5, // 새싹 → 어린나무
-  2: 8, // 어린나무 → 꽃봉오리
-  3: 10, // 꽃봉오리 → 꽃핌
-  4: 15, // 꽃핌 → 작은 열매
-  5: 20, // 작은 열매 → 익어가는 열매
-  6: 25, // 익어가는 열매 → 다 익은 열매
-  7: 0, // 완성 (자동 리셋 대기)
+  0: 3,
+  1: 5,
+  2: 8,
+  3: 10,
+  4: 15,
+  5: 20,
+  6: 25,
+  7: 0,
 }
 
-/**
- * DB 의 `pot_stage` / `pot_hearts_used` 가 어긋날 때(한쪽만 반영된 경우) 보정합니다.
- * 비개발자: 막대는 꽉 찼는데 단계 숫자가 안 올라가는 것처럼 보이면, 쌓인 하트만큼 단계를 몇 칸 올려 맞춥니다.
- */
 export function normalizePlantPotProgress(
   stageRaw: number,
   heartsUsedRaw: number,
@@ -119,12 +167,6 @@ export function normalizePlantPotProgress(
     stage = Math.min(7, stage + 1) as PlantStage
   }
 
-  /**
-   * 완성(열매) 플래그는 **7단계에서만** true 입니다.
-   * DB 에 잘못 저장된 `pot_completed`(예: 5단계인데 true)가 있으면
-   * 예전 서버가 `stage === 7 || completed` 로 분기할 때 **항상 씨앗 리셋**만 하려 해
-   * 물주기·막대가 멈춘 것처럼 보일 수 있어, 7단계가 아니면 여기서 false 로 맞춥니다.
-   */
   if (stage < 7) {
     completed = false
   }
@@ -135,18 +177,4 @@ export function normalizePlantPotProgress(
   }
 
   return { stage, heartsUsed, completed }
-}
-
-export type PlantTreeDefinition = {
-  id: PlantTreeId
-  label: string
-  seedEmoji: string
-}
-
-export const TREE_LIST: PlantTreeDefinition[] = [{ id: 'apple', label: '사과나무', seedEmoji: '🍎' }]
-
-/** 알 수 없는 코드가 오면 apple 반환 */
-export function resolveTreeId(id: string | null | undefined): PlantTreeId {
-  if (id === 'apple') return 'apple'
-  return 'apple'
 }

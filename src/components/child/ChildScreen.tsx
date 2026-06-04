@@ -50,7 +50,12 @@ import { PARENT_EXIT_CHILD_UI_JSON_HREF } from '@/lib/parentExitChildUi'
 import ChildPanelOverlay, { type PanelType } from '@/components/child/ChildPanelOverlay'
 import ChildLevelStatsCard from '@/components/child/ChildLevelStatsCard'
 import ChildHomePiggyBank from '@/components/child/ChildHomePiggyBank'
-import { normalizeChildStatsCreditsSplit, mergeChildStatsPatch, readChildStatInt } from '@/lib/childCreditsSplit'
+import {
+  creditsAvailable,
+  normalizeChildStatsCreditsSplit,
+  mergeChildStatsPatch,
+  readChildStatInt,
+} from '@/lib/childCreditsSplit'
 import { PIGGY_BANK_UNLOCK_MIN_LEVEL, isPiggyBankUnlocked } from '@/constants/childAgeConfig'
 import { completionRateToHearts } from '@/lib/missionHeartCount'
 import { scaledMissionRewards } from '@/lib/missionRewardMultiplier'
@@ -68,6 +73,10 @@ import {
 } from '@/lib/childHomeTopBarGlass'
 import { ASSETS, CHILD_HOME_BACKGROUND_CACHE_BUST } from '@/constants/assets'
 import type { PlantStage } from '@/constants/plantTrees'
+import { PLANT_HARVEST_BASKET_ICON_SRC } from '@/constants/plantTrees'
+import type { PlantHarvestCelebrate } from '@/lib/plantHarvest'
+import { usePlantHarvest } from '@/hooks/usePlantHarvest'
+import PlantHarvestBasketModal from '@/components/child/PlantHarvestBasketModal'
 import type {
   ChildStats,
   DailyMissionWithTemplate,
@@ -721,14 +730,22 @@ export default function ChildScreen({
     hearts: plantHearts,
     loading: plantLoading,
     water,
-    resetPot,
+    buySeed,
     bumpHeartsForMissionOptimistic,
     rollbackMissionHeartsOptimistic,
   } = usePlantPot(childId, { onPlantStatsSynced })
   /** 완성 후 씨앗 고르기 모달 */
+  const {
+    items: harvestItems,
+    loading: harvestLoading,
+    totalCount: harvestTotalCount,
+    refresh: refreshHarvestInventory,
+  } = usePlantHarvest(childId)
   const [seedModalOpen, setSeedModalOpen] = useState(false)
+  const [harvestBasketOpen, setHarvestBasketOpen] = useState(false)
   /** 성장 단계 축하 팝업 — 도달한 단계 번호(null 이메 닫힘) */
   const [plantCelebrateStage, setPlantCelebrateStage] = useState<PlantStage | null>(null)
+  const [plantHarvestCelebrate, setPlantHarvestCelebrate] = useState<PlantHarvestCelebrate | null>(null)
   /** 7단계 축하 팝업을 닫은 뒤에만 씨앗 선택 시트를 열지 표시 */
   const openSeedAfterPlantCelebrateRef = useRef(false)
   /** 하트가 0일 때 물주기 시 잠깐 뜨는 안내 */
@@ -736,15 +753,24 @@ export default function ChildScreen({
 
   const openSeedModal = useCallback(() => setSeedModalOpen(true), [])
 
-  const handlePlantGrowthCelebrate = useCallback((newStage: PlantStage) => {
-    // 화분이 실제로 한 단계 올라간 시점에만 단계업 효과음을 재생합니다.
-    playUiSound(PLANT_STAGE_UP_SOUND_SRC, 0.9)
-    setPlantCelebrateStage(newStage)
-    if (newStage === 7) openSeedAfterPlantCelebrateRef.current = true
-  }, [playUiSound])
+  const handlePlantGrowthCelebrate = useCallback(
+    (newStage: PlantStage, harvest?: PlantHarvestCelebrate) => {
+      playUiSound(PLANT_STAGE_UP_SOUND_SRC, 0.9)
+      setPlantCelebrateStage(newStage)
+      if (newStage === 7) {
+        openSeedAfterPlantCelebrateRef.current = true
+        setPlantHarvestCelebrate(harvest ?? null)
+        if (harvest) void refreshHarvestInventory()
+      } else {
+        setPlantHarvestCelebrate(null)
+      }
+    },
+    [playUiSound, refreshHarvestInventory],
+  )
 
   const dismissPlantCelebrate = useCallback(() => {
     setPlantCelebrateStage(null)
+    setPlantHarvestCelebrate(null)
     const needSeed = openSeedAfterPlantCelebrateRef.current
     openSeedAfterPlantCelebrateRef.current = false
     if (needSeed) openSeedModal()
@@ -2488,12 +2514,32 @@ export default function ChildScreen({
                 }}
               >
                 <div
-                  className="flex flex-col items-center"
+                  className="flex flex-col items-center gap-0.5"
                   style={{
                     transform: `scale(${plantFeetUiScale})`,
                     transformOrigin: 'center bottom',
                   }}
                 >
+                  <button
+                    type="button"
+                    onClick={() => setHarvestBasketOpen(true)}
+                    className="pointer-events-auto relative flex h-9 w-9 items-center justify-center rounded-full bg-white/90 shadow-md transition active:scale-95"
+                    aria-label={`수확한 과일 바구니${harvestTotalCount > 0 ? ` ${harvestTotalCount}개` : ''}`}
+                  >
+                    <Image
+                      src={PLANT_HARVEST_BASKET_ICON_SRC}
+                      alt=""
+                      width={28}
+                      height={28}
+                      className="h-7 w-7 object-contain"
+                      unoptimized
+                    />
+                    {harvestTotalCount > 0 ? (
+                      <span className="absolute -right-0.5 -top-0.5 min-w-[1rem] rounded-full bg-amber-500 px-1 text-[9px] font-black leading-none text-white">
+                        {harvestTotalCount > 99 ? '99+' : harvestTotalCount}
+                      </span>
+                    ) : null}
+                  </button>
                   <PlantPot
                     pot={pot}
                     onRequestSeedSelect={openSeedModal}
@@ -2753,7 +2799,15 @@ export default function ChildScreen({
         open={plantCelebrateStage !== null}
         stage={plantCelebrateStage}
         treeId={pot?.treeId ?? 'apple'}
+        harvest={plantCelebrateStage === 7 ? plantHarvestCelebrate : null}
         onClose={dismissPlantCelebrate}
+      />
+
+      <PlantHarvestBasketModal
+        isOpen={harvestBasketOpen}
+        onClose={() => setHarvestBasketOpen(false)}
+        items={harvestItems}
+        loading={harvestLoading}
       />
 
       <RapidTapConfirmModal
@@ -2768,10 +2822,13 @@ export default function ChildScreen({
       />
 
       <SeedSelectModal
-        open={seedModalOpen}
+        isOpen={seedModalOpen}
         onClose={() => setSeedModalOpen(false)}
-        onConfirm={async (treeId) => {
-          await resetPot(treeId)
+        currentCredits={creditsAvailable(stats ?? { credits: 0 })}
+        onSelect={async (treeId) => {
+          const result = await buySeed(treeId)
+          if (result.ok) void refreshHarvestInventory()
+          return result
         }}
       />
 

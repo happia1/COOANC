@@ -12,6 +12,7 @@ import { forwardRef, useRef, useState } from 'react'
 import Image from 'next/image'
 import type { PlantStage } from '@/constants/plantTrees'
 import { WATERING_CAN_EMPTY_SRC, WATERING_CAN_FULL_SRC } from '@/constants/plantTrees'
+import type { PlantHarvestCelebrate } from '@/lib/plantHarvest'
 import type { WaterResult } from '@/hooks/usePlantPot'
 
 type Props = {
@@ -20,7 +21,7 @@ type Props = {
   onWater: () => Promise<WaterResult>
   onNoHearts: () => void
   allowWaterWithoutHearts?: boolean
-  onGrowthCelebrate?: (newStage: PlantStage) => void
+  onGrowthCelebrate?: (newStage: PlantStage, harvest?: PlantHarvestCelebrate) => void
 }
 
 const WateringCanButton = forwardRef<HTMLButtonElement, Props>(function WateringCanButton(
@@ -57,7 +58,7 @@ const WateringCanButton = forwardRef<HTMLButtonElement, Props>(function Watering
           return
         }
         if (typeof result === 'object' && result.type === 'grew') {
-          onGrowthCelebrate?.(result.newStage)
+          onGrowthCelebrate?.(result.newStage, result.harvest)
         }
       })
       .finally(() => {

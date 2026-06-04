@@ -18,6 +18,7 @@ import {
   STAGE_LABELS,
   type PlantStage,
 } from '@/constants/plantTrees'
+import type { PlantHarvestCelebrate } from '@/lib/plantHarvest'
 import type { PotState, WaterResult } from '@/hooks/usePlantPot'
 import WateringCanButton from '@/components/child/WateringCanButton'
 import SpriteImage from '@/components/common/SpriteImage'
@@ -30,7 +31,7 @@ export type PlantPotWaterActions = {
   hearts: number
   water: () => Promise<WaterResult>
   onNoHearts: () => void
-  onGrowthCelebrate?: (newStage: PlantStage) => void
+  onGrowthCelebrate?: (newStage: PlantStage, harvest?: PlantHarvestCelebrate) => void
   /**
    * 7단계(완성)에서는 하트가 0이어도 서버가 화분만 씨앗으로 돌립니다 — 물조리개 잠금을 풉니다.
    */

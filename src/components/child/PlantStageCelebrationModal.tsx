@@ -2,28 +2,33 @@
 
 /**
  * 화분이 한 단계 올라갈 때마다 뜨는 축하 팝업.
- * - 해당 단계 `STAGE_IMAGE` 일러스트 + 짧은 축하 문구
- * - 화면과 함께 canvas-confetti 로 콘페티(움직임 줄이기 설정 시에는 생략)
+ * 7단계(완성)에서는 수확 축하 문구를 함께 표시합니다.
  */
 
 import Image from 'next/image'
 import { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { getPlantStageCelebrationTitle, getStageImage, type PlantStage, type PlantTreeId } from '@/constants/plantTrees'
+import {
+  getPlantStageCelebrationTitle,
+  getRewardImage,
+  getStageImage,
+  type PlantStage,
+  type PlantTreeId,
+} from '@/constants/plantTrees'
+import type { PlantHarvestCelebrate } from '@/lib/plantHarvest'
 
 type Props = {
   open: boolean
-  /** 방금 물 준 뒤 도달한 단계(1~7) — 0이면 렌더하지 않음 */
   stage: PlantStage | null
-  /** 어떤 나무인지 — 단계 그림 경로에 사용 */
   treeId?: PlantTreeId
+  /** 7단계 완성 수확 정보 */
+  harvest?: PlantHarvestCelebrate | null
   onClose: () => void
 }
 
 function fireCelebrateConfetti() {
   void import('canvas-confetti').then((mod) => {
     const confetti = mod.default
-    /** 화분이 있는 화면 중앙 부근에서 퍼지도록 origin 을 약간 아래로 */
     confetti({
       particleCount: 110,
       spread: 82,
@@ -50,8 +55,15 @@ function fireCelebrateConfetti() {
   })
 }
 
-export default function PlantStageCelebrationModal({ open, stage, treeId = 'apple', onClose }: Props) {
+export default function PlantStageCelebrationModal({
+  open,
+  stage,
+  treeId = 'apple',
+  harvest,
+  onClose,
+}: Props) {
   const confettiFired = useRef(false)
+  const isFinalHarvest = open && stage === 7 && harvest != null
 
   useEffect(() => {
     if (!open || stage === null || stage < 1) {
@@ -68,8 +80,12 @@ export default function PlantStageCelebrationModal({ open, stage, treeId = 'appl
 
   if (!open || stage === null || stage < 1 || typeof window === 'undefined') return null
 
-  const title = getPlantStageCelebrationTitle(stage)
-  const imgSrc = getStageImage(treeId, stage)
+  const title = isFinalHarvest ? '축하해요!' : getPlantStageCelebrationTitle(stage)
+  const subtitle = isFinalHarvest
+    ? `${harvest.fruitName}를 ${harvest.amount}개 수확했어요!`
+    : null
+  const imgSrc = isFinalHarvest ? getRewardImage(treeId) : getStageImage(treeId, stage)
+  const ctaLabel = isFinalHarvest ? '확인' : '물 주러가기'
 
   const modal = (
     <div
@@ -82,21 +98,23 @@ export default function PlantStageCelebrationModal({ open, stage, treeId = 'appl
       <button type="button" className="absolute inset-0 bg-black/55" aria-label="닫기" onClick={onClose} />
       <div className="relative z-10 mx-4 flex w-full max-w-sm flex-col items-center rounded-[1.75rem] bg-white px-6 pb-6 pt-7 shadow-2xl">
         <p id="plant-celebrate-desc" className="sr-only">
-          성장 단계 안내 및 축하
+          {isFinalHarvest ? '수확 축하' : '성장 단계 안내'}
         </p>
-        {/* 단계별 화분 일러스트 — 기존 116px 대비 1.3배(약 151px), 정수 픽셀로 선명도 유지 */}
         <div className="relative mb-5 h-[151px] w-[151px] shrink-0">
           <Image src={imgSrc} alt="" fill className="object-contain drop-shadow-md" sizes="151px" priority />
         </div>
         <h2 id="plant-celebrate-title" className="mb-2 text-center text-xl font-black leading-snug text-gray-900 sm:text-2xl">
           {title}
         </h2>
+        {subtitle ? (
+          <p className="mb-4 text-center text-base font-bold leading-snug text-amber-800">{subtitle}</p>
+        ) : null}
         <button
           type="button"
           onClick={onClose}
           className="w-full rounded-2xl bg-[#63C964] py-3.5 text-base font-black text-white shadow-md transition-opacity active:opacity-85 sm:py-4"
         >
-          물 주러가기
+          {ctaLabel}
         </button>
       </div>
     </div>

@@ -1,35 +1,108 @@
 'use client'
 
 /**
- * 열매 완성 후 — 어떤 씨앗을 심을지 고르는 모달입니다.
- *
- * 비개발자 설명:
- * - 나무 종류 리스트(`TREE_LIST`)를 카드로 보여 줘요.
- * - 지금은 사과나무 하나만 있지만, 나중에 항목만 추가하면 자동으로 여러 카드가 뜹니다.
+ * 씨앗(나무 종류) 선택 모달 — 가로 슬라이드 카드 + 크레딧 비용 표시
  */
 
-import { useState } from 'react'
-import { TREE_LIST, type PlantTreeId } from '@/constants/plantTrees'
+import { useEffect, useState } from 'react'
+import Image from 'next/image'
+import {
+  TREE_LIST,
+  getPlantTree,
+  getPlantTreeCreditCost,
+  getSeedSelectCardImage,
+  type PlantTreeId,
+} from '@/constants/plantTrees'
+import { CHILD_CREDIT_COIN_PNG_SRC } from '@/lib/childCreditDisplay'
+import type { BuySeedResult } from '@/hooks/usePlantPot'
 
-type Props = {
-  open: boolean
+export interface SeedSelectModalProps {
+  isOpen: boolean
   onClose: () => void
-  /** 확인 시 DB 초기화 + 선택한 나무 id 저장 */
-  onConfirm: (treeId: PlantTreeId) => Promise<void>
+  /** 가용 크레딧 (`child_stats.credits`) */
+  currentCredits: number
+  onSelect: (treeId: PlantTreeId) => Promise<BuySeedResult>
 }
 
-export default function SeedSelectModal({ open, onClose, onConfirm }: Props) {
-  const [picked, setPicked] = useState<PlantTreeId>(TREE_LIST[0]?.id ?? 'apple')
+const FOOTER_BTN_CLASS =
+  'flex h-11 w-full items-center justify-center rounded-2xl text-sm font-black transition active:scale-[0.98] disabled:opacity-50'
+
+/** 레벨 블록(`ChildLevelStatsCard`)과 동일한 크레딧 동전 아이콘 */
+function CreditCoinIcon({ size = 18 }: { size?: number }) {
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={CHILD_CREDIT_COIN_PNG_SRC}
+      alt=""
+      width={size}
+      height={size}
+      className="shrink-0 object-contain select-none"
+      style={{ width: size, height: size }}
+      draggable={false}
+    />
+  )
+}
+
+function SeedCardImage({ treeId, emoji }: { treeId: PlantTreeId; emoji: string }) {
+  const [imgFailed, setImgFailed] = useState(false)
+  const src = getSeedSelectCardImage(treeId)
+
+  if (imgFailed) {
+    return <span className="text-4xl leading-none">{emoji}</span>
+  }
+
+  return (
+    <Image
+      src={src}
+      alt=""
+      width={72}
+      height={72}
+      className="h-12 w-12 object-contain"
+      onError={() => setImgFailed(true)}
+      unoptimized
+    />
+  )
+}
+
+export default function SeedSelectModal({
+  isOpen,
+  onClose,
+  currentCredits,
+  onSelect,
+}: SeedSelectModalProps) {
+  const [selected, setSelected] = useState<PlantTreeId>(TREE_LIST[0]?.id ?? 'apple')
   const [busy, setBusy] = useState(false)
+  /** 모달 안에서 보여 줄 안내(실패 시 plantHint 는 모달 뒤에 가려짐) */
+  const [feedback, setFeedback] = useState<string | null>(null)
 
-  if (!open) return null
+  useEffect(() => {
+    if (isOpen) {
+      setSelected(TREE_LIST[0]?.id ?? 'apple')
+      setFeedback(null)
+    }
+  }, [isOpen])
 
-  async function handleConfirm() {
+  if (!isOpen) return null
+
+  const tree = getPlantTree(selected)
+  const cost = getPlantTreeCreditCost(selected)
+  const canAfford = currentCredits >= cost
+
+  async function handlePlant() {
     if (busy) return
+    if (!canAfford) {
+      setFeedback(`크레딧이 ${Math.max(0, cost - currentCredits)}개 부족해요!`)
+      return
+    }
     setBusy(true)
+    setFeedback(null)
     try {
-      await onConfirm(picked)
-      onClose()
+      const result = await onSelect(selected)
+      if (result.ok) {
+        onClose()
+        return
+      }
+      setFeedback('message' in result ? result.message : '씨앗 심기에 실패했어요.')
     } finally {
       setBusy(false)
     }
@@ -42,53 +115,98 @@ export default function SeedSelectModal({ open, onClose, onConfirm }: Props) {
       aria-modal="true"
       aria-labelledby="seed-modal-title"
     >
-      <div className="w-full max-w-sm rounded-3xl bg-white p-5 shadow-xl">
-        <h2 id="seed-modal-title" className="text-center text-lg font-black text-gray-800">
-          새 씨앗을 골라요
+      <div className="w-full max-w-sm rounded-3xl bg-white px-3 pt-3 pb-3 shadow-xl">
+        <h2 id="seed-modal-title" className="text-center text-base font-black leading-tight text-gray-800">
+          🌱 어떤 씨앗을 심을까요?
         </h2>
-        <p className="mt-1 text-center text-xs text-gray-500">
-          완성한 나무는 쉬고, 새 싹이 올라올 거예요.
+        <p className="mt-1 flex items-center justify-center gap-1 text-sm text-gray-600">
+          <span>보유 크레딧:</span>
+          <CreditCoinIcon size={18} />
+          <span className="font-bold text-amber-700 tabular-nums">{currentCredits}</span>
         </p>
 
-        <ul className="mt-4 flex flex-col gap-2">
-          {TREE_LIST.map((tree) => {
-            const selected = picked === tree.id
-            return (
-              <li key={tree.id}>
-                <button
-                  type="button"
-                  onClick={() => setPicked(tree.id)}
-                  className={`flex w-full items-center gap-3 rounded-2xl border-2 px-3 py-2 text-left transition ${
-                    selected ? 'border-pink-400 bg-pink-50' : 'border-gray-100 bg-gray-50'
-                  }`}
-                >
-                  <span className="text-3xl" aria-hidden>
-                    {tree.seedEmoji}
-                  </span>
-                  <span className="flex-1 font-bold text-gray-800">{tree.label}</span>
-                  {selected ? <span className="text-xs font-black text-pink-500">선택</span> : null}
-                </button>
-              </li>
-            )
-          })}
-        </ul>
+        {/*
+          overflow-x-auto 는 세로 overflow 도 잘라 테두리가 잘립니다.
+          스크롤 박스 안쪽에 py 여유를 두고, ring 대신 border 만 써서 카드 박스 안에 맞춥니다.
+        */}
+        <div className="mt-2">
+          <div
+            className="overflow-x-auto snap-x snap-mandatory py-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            style={{ WebkitOverflowScrolling: 'touch' }}
+          >
+            <div className="flex w-max min-w-full items-center gap-2 px-[calc(50%-3rem)]">
+              {TREE_LIST.map((item) => {
+                const itemCost = item.creditCost
+                const affordable = currentCredits >= itemCost
+                const isSelected = selected === item.id
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setSelected(item.id)}
+                    className={`relative box-border flex h-[7.25rem] w-24 flex-shrink-0 snap-center flex-col items-center justify-between rounded-xl border-2 px-1 py-0.5 transition ${
+                      isSelected
+                        ? 'border-green-500 bg-green-50'
+                        : 'border-gray-200 bg-gray-50'
+                    } ${affordable ? '' : 'opacity-50'}`}
+                  >
+                    {!affordable ? (
+                      <span
+                        className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-[10px] bg-black/10 text-2xl"
+                        aria-hidden
+                      >
+                        🔒
+                      </span>
+                    ) : null}
+                    <div className="flex flex-1 items-center justify-center">
+                      <SeedCardImage treeId={item.id} emoji={item.emoji} />
+                    </div>
+                    <span className="text-center text-sm font-semibold leading-tight text-gray-800">
+                      {item.name}
+                    </span>
+                    <span
+                      className={`flex items-center justify-center gap-0.5 text-xs font-medium ${
+                        affordable ? 'text-amber-600' : 'text-red-400'
+                      }`}
+                    >
+                      <CreditCoinIcon size={14} />
+                      <span className="tabular-nums">{itemCost}</span>
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        </div>
 
-        <div className="mt-5 flex gap-2">
+        {feedback ? (
+          <p
+            role="alert"
+            className="mt-2 rounded-xl bg-red-50 px-2.5 py-2 text-center text-xs font-bold leading-snug text-red-600"
+          >
+            {feedback}
+          </p>
+        ) : null}
+
+        <div className="mt-2 flex flex-col gap-1.5">
+          <button
+            type="button"
+            onClick={handlePlant}
+            disabled={busy || !canAfford}
+            className={`${FOOTER_BTN_CLASS} shadow-md disabled:cursor-not-allowed ${
+              canAfford ? 'bg-green-500 text-white' : 'bg-gray-300 text-white'
+            }`}
+          >
+            {busy ? '심는 중…' : canAfford ? `${tree.name} 심기` : '크레딧이 부족해요'}
+          </button>
+
           <button
             type="button"
             onClick={onClose}
             disabled={busy}
-            className="flex-1 rounded-2xl bg-gray-100 py-3 text-sm font-bold text-gray-600 transition active:scale-[0.98] disabled:opacity-50"
+            className={`${FOOTER_BTN_CLASS} bg-gray-100 font-bold text-gray-600`}
           >
             닫기
-          </button>
-          <button
-            type="button"
-            onClick={handleConfirm}
-            disabled={busy}
-            className="flex-1 rounded-2xl bg-pink-500 py-3 text-sm font-black text-white shadow-md transition active:scale-[0.98] disabled:opacity-50"
-          >
-            {busy ? '심는 중…' : '심기'}
           </button>
         </div>
       </div>
