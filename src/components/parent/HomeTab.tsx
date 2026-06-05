@@ -14,7 +14,6 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
-import ParentEnterChildUiLink from '@/components/parent/ParentEnterChildUiLink'
 import { createClient } from '@/lib/supabase/client'
 import {
   addSeoulCalendarDays,
@@ -525,32 +524,23 @@ export default function HomeTab({
 
             {/* 좌측(활성): 프로필 · 오늘의 진행도 · 다가오는 일정 · 주간 루틴 */}
             <div className="flex flex-col gap-4">
-              <ParentEnterChildUiLink
-                childId={child.id}
-                className="block w-full cursor-pointer rounded-2xl transition-opacity active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4A90E2] focus-visible:ring-offset-2"
-                aria-label={`${child.name} 자녀용 앱 화면으로 들어가기`}
-                onClick={() => setSelectedChildId(child.id)}
-              >
-                {/**
-                 * 설정 탭과 동일한 자녀 프로필 카드 레이아웃을 재사용합니다.
-                 * - 이름 오른쪽: Lv.숫자
-                 * - 아래 줄: 미취학·유치원·3세 같은 메타 정보
-                 * - 오른쪽 끝: 크레딧·하트·연속일수 통계는 그대로 유지
-                 */}
-                <CompactChildProfileCard
-                  name={child.name}
-                  age={child.age}
-                  avatarUrl={child.avatarUrl}
-                  level={s?.current_level ?? 0}
-                  credits={s?.credits ?? 0}
-                  hearts={s?.hearts ?? 0}
-                  streakDays={s?.streak_days ?? 0}
-                  ageGroupLabel={child.ageGroupLabel}
-                  childcareLabel={child.childcareLabel}
-                  siblingNav={siblingNav}
-                  avatarEnterShortcut
-                />
-              </ParentEnterChildUiLink>
+              <CompactChildProfileCard
+                name={child.name}
+                age={child.age}
+                avatarUrl={child.avatarUrl}
+                level={s?.current_level ?? 0}
+                credits={s?.credits ?? 0}
+                hearts={s?.hearts ?? 0}
+                streakDays={s?.streak_days ?? 0}
+                ageGroupLabel={child.ageGroupLabel}
+                childcareLabel={child.childcareLabel}
+                siblingNav={siblingNav}
+                enterChildUi={{
+                  childId: child.id,
+                  ariaLabel: `${child.name} 자녀용 앱 화면으로 들어가기`,
+                  onSelectChild: () => setSelectedChildId(child.id),
+                }}
+              />
 
               <div className={`${PARENT_NEUTRAL_CARD_CLASSNAME} space-y-2 px-3 py-3`}>
                 <div className="flex items-center justify-between gap-2">

@@ -5,7 +5,7 @@ import { readChildStatInt } from '@/lib/childCreditsSplit'
 import {
   clampPotStageForTree,
   normalizePlantPotProgress,
-  resolveTreeId,
+  readPotTreeIdFromDb,
   type PlantStage,
 } from '@/constants/plantTrees'
 
@@ -18,7 +18,7 @@ type PotRow = {
 }
 
 function derivePot(row: PotRow) {
-  const treeId = resolveTreeId(row.pot_tree_id as string | undefined)
+  const treeId = readPotTreeIdFromDb(row.pot_tree_id)
   const stageDb = clampPotStageForTree(treeId, readChildStatInt(row.pot_stage))
   const heartsUsedDb = readChildStatInt(row.pot_hearts_used)
   const completedDb = Boolean(row.pot_completed ?? false)

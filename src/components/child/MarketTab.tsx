@@ -42,6 +42,8 @@ type Props = {
   /** 열릴 때 해당 구역(콘텐츠 등)으로 가로 스크롤 */
   initialScrollSection?: ParentMarketSectionId | null
   onInitialScrollDone?: () => void
+  /** 마켓 결제 성공 후 상단 레벨 카드 `stats.credits` 동기화 */
+  onMarketCreditsChanged?: (credits: number) => void
 }
 
 type SelectedInfo = {
@@ -101,6 +103,7 @@ export default function MarketTab({
   level,
   initialScrollSection = null,
   onInitialScrollDone,
+  onMarketCreditsChanged,
 }: Props) {
   /**
    * 마켓 결제 기준은 레벨 블록(총 코인)과 동일하게 맞춥니다.
@@ -147,10 +150,6 @@ export default function MarketTab({
     }
     setWishlistQuantities(next)
   }, [wishlistBootstrapKey, initialWishlistEntries])
-
-  useEffect(() => {
-    setCurrentCredits(marketSpendable)
-  }, [marketSpendable])
 
   /** 장바구니가 비면 열린 시트를 자동으로 닫아 빈 화면을 막음 */
   useEffect(() => {
@@ -342,6 +341,8 @@ export default function MarketTab({
   const [loading, setLoading] = useState<string | null>(null)
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null)
   const [selected, setSelected] = useState<SelectedInfo | null>(null)
+  /** API 성공 직후 팝업을 먼저 닫은 뒤 적용할 결제 결과(중간 렌더에서 단계가 되돌아가는 깜빡임 방지) */
+  const pendingPurchaseResultRef = useRef<{ credits: number; request: PurchaseRequest } | null>(null)
   /** 선반 카드 탭 시 — 구매 / 장바구니 담기 를 고르는 하단 액션 시트 */
   const [shelfActionFor, setShelfActionFor] = useState<SelectedInfo | null>(null)
   const [delivery, setDelivery] = useState<DeliveryOverlay | null>(null)
@@ -357,6 +358,12 @@ export default function MarketTab({
   }
 
   const dismissPurchaseDialog = useCallback(() => setSelected(null), [])
+
+  useEffect(() => {
+    // 구매 확인 팝업이 열려 있는 동안 부모 스냅샷이 로컬 잔액을 덮어쓰지 않게 합니다.
+    if (selected) return
+    setCurrentCredits(marketSpendable)
+  }, [marketSpendable, selected])
 
   const [wishBusy, setWishBusy] = useState<string | null>(null)
 
@@ -465,7 +472,14 @@ export default function MarketTab({
   const onPurchaseDialogSuccessDismiss = useCallback(() => {
     setSelected(null)
     setPurchaseCelebrationOpen(true)
-  }, [])
+    const pending = pendingPurchaseResultRef.current
+    if (pending) {
+      setCurrentCredits(pending.credits)
+      setMyRequests((prev) => [pending.request, ...prev])
+      onMarketCreditsChanged?.(pending.credits)
+      pendingPurchaseResultRef.current = null
+    }
+  }, [onMarketCreditsChanged])
 
   /** 다음 배달 연출을 꺼내거나, 대기 줄에 넣습니다 */
   const offerDelivery = useCallback(
@@ -661,8 +675,8 @@ export default function MarketTab({
   }, [shelfActionFor, level, currentCredits])
 
   /** 구매 요청 API — 성공 시 다이얼로그가 바로 닫힘 */
-  async function submitPurchaseRequest(quantity = 1): Promise<boolean> {
-    if (!selected) return false
+  async function submitPurchaseRequest(quantity = 1): Promise<{ ok: boolean; error?: string }> {
+    if (!selected) return { ok: false, error: '상품 정보를 찾을 수 없어요. 다시 시도해 주세요.' }
     const { item } = selected
     const purchaseQty = isQuantityPurchasableMarketItem(item.name, item.category)
       ? Math.min(99, Math.max(1, Math.floor(quantity)))
@@ -680,19 +694,39 @@ export default function MarketTab({
         }),
       })
       const text = await res.text()
-      const json = text ? JSON.parse(text) : {}
-      if (!res.ok) {
-        showToast(json.error ?? '요청에 실패했어요', false)
-        return false
+      let json: { error?: string; credits?: number; request?: PurchaseRequest } = {}
+      let parseFailed = false
+      try {
+        json = text ? JSON.parse(text) : {}
+      } catch {
+        parseFailed = true
       }
-      if (typeof json.credits === 'number') setCurrentCredits(readChildStatInt(json.credits))
-      else setCurrentCredits((w) => w - item.credit_price * purchaseQty)
-      if (json.request) setMyRequests((prev) => [json.request as PurchaseRequest, ...prev])
+      if (parseFailed) {
+        const msg = '네트워크 오류가 발생했어요'
+        showToast(msg, false)
+        return { ok: false, error: msg }
+      }
+      if (!res.ok) {
+        const msg = json.error ?? '요청에 실패했어요'
+        showToast(msg, false)
+        return { ok: false, error: msg }
+      }
+      const nextCredits =
+        typeof json.credits === 'number'
+          ? readChildStatInt(json.credits)
+          : currentCredits - item.credit_price * purchaseQty
+      if (json.request) {
+        pendingPurchaseResultRef.current = {
+          credits: nextCredits,
+          request: json.request as PurchaseRequest,
+        }
+      }
       /** 축하 오버레이에서 안내하므로 별도 토스트는 띄우지 않음(문구 겹침 방지) */
-      return true
+      return { ok: true }
     } catch {
-      showToast('네트워크 오류가 발생했어요', false)
-      return false
+      const msg = '네트워크 오류가 발생했어요'
+      showToast(msg, false)
+      return { ok: false, error: msg }
     } finally {
       setLoading(null)
     }
@@ -757,7 +791,7 @@ export default function MarketTab({
         typeof document !== 'undefined' &&
         createPortal(
           <div
-            className="fixed inset-0 z-[200] flex items-center justify-center px-5 pointer-events-none"
+            className="fixed inset-0 z-[220] flex items-center justify-center px-5 pointer-events-none"
             role="status"
             aria-live="polite"
           >

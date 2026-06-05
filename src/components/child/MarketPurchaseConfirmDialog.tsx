@@ -33,7 +33,7 @@ type Props = {
   selected: MarketPurchaseSelected
   balanceBefore: number
   onClose: () => void
-  onSubmit: (quantity: number) => Promise<boolean>
+  onSubmit: (quantity: number) => Promise<{ ok: boolean; error?: string }>
   /** API 성공 직후 호출 — 팝업 전체 닫기 */
   onSuccessDismiss: () => void
 }
@@ -170,7 +170,9 @@ export default function MarketPurchaseConfirmDialog({
   /** React Strict Mode 에서 입장 애니메이션이 두 번 도는 것을 줄이기 위해 다음 프레임에만 클래스 부여 */
   const [decoAnimate, setDecoAnimate] = useState(false)
   const [requestBusy, setRequestBusy] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
   const checkoutSoundStopRef = useRef<(() => void) | null>(null)
+  const prevItemIdRef = useRef(item.id)
 
   useEffect(() => {
     return () => {
@@ -180,11 +182,13 @@ export default function MarketPurchaseConfirmDialog({
   }, [])
 
   useEffect(() => {
+    if (prevItemIdRef.current === item.id) return
+    prevItemIdRef.current = item.id
     setCheckoutStep('finalSure')
     setPayRunId(0)
     setDecoAnimate(false)
     setPurchaseQty(1)
-  }, [item.id, balanceBefore])
+  }, [item.id, checkoutStep])
 
   const { current: slotBalance, done: slotDone } = useSlotBalanceSteps(
     balanceBefore,
@@ -213,7 +217,9 @@ export default function MarketPurchaseConfirmDialog({
   useEffect(() => {
     if (checkoutStep !== 'animating') return
     if (!slotDone) return
-    const t = window.setTimeout(() => setCheckoutStep('calcDone'), 420)
+    const t = window.setTimeout(() => {
+      setCheckoutStep('calcDone')
+    }, 420)
     return () => window.clearTimeout(t)
   }, [checkoutStep, slotDone])
 
@@ -231,10 +237,15 @@ export default function MarketPurchaseConfirmDialog({
 
   async function handleAcknowledgeAndSubmit() {
     if (requestBusy) return
+    setSubmitError(null)
     setRequestBusy(true)
     try {
-      const ok = await onSubmit(clampedQty)
-      if (ok) onSuccessDismiss()
+      const result = await onSubmit(clampedQty)
+      if (result.ok) {
+        onSuccessDismiss()
+      } else {
+        setSubmitError(result.error ?? '구매 요청에 실패했어요. 잠시 후 다시 시도해 주세요.')
+      }
     } finally {
       setRequestBusy(false)
     }
@@ -373,6 +384,9 @@ export default function MarketPurchaseConfirmDialog({
                 버튼을 같은 카드 안으로 넣어 박스가 여러 겹으로 보이지 않게 정리합니다.
                 단계별 높이 흔들림을 줄이기 위해 최소 높이는 유지합니다.
               */}
+              {submitError ? (
+                <p className="mb-2 px-1 text-center text-xs font-bold text-red-600">{submitError}</p>
+              ) : null}
               <div className="-mt-1 flex min-h-[46px] items-center gap-2.5 px-1 pb-0 pt-0.5">
                 {checkoutStep === 'finalSure' && (
                   <>

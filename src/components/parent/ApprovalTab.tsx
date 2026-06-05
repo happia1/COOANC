@@ -2,7 +2,7 @@
 
 /**
  * 부모 앱 — 승인 탭
- * - 상단은 홈과 같은 자녀 프로필 카드(다자녀 시 캐릭터 양 옆 ‹ ›·스와이프); 프로필 카드 탭 시 자녀 앱 진입(API); 구매 내역 등은 선택 자녀 기준.
+ * - 상단은 홈과 같은 자녀 프로필 카드(다자녀 시 ‹ ›·스와이프로 전환); 아바타 탭 시 자녀 앱 진입(API); 구매 내역 등은 선택 자녀 기준.
  * - 구매 요청·미션 롤백은 선택 중인 자녀 기준으로만 표시합니다.
  * - 구매 요청: 대기·외부구매 중 — 파란 「승인」으로 도착 완료 처리(반려 없음). 「구매 요청」제목과 같은 줄 오른쪽 「최근구매내역」링크로 하단 시트에서 과거 건 확인.
  * - 최근 구매(승인) 내역: 오늘 완료 미션과 같은 하단 슬라이드 시트 — 최근 3건 먼저, 「더보기」로 전체.
@@ -13,7 +13,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { usePathname } from 'next/navigation'
-import ParentEnterChildUiLink from '@/components/parent/ParentEnterChildUiLink'
 import { CompactChildProfileCard } from '@/components/parent/CompactChildProfileCard'
 import { useParentStore } from '@/store/parentStore'
 import { useChildSiblingAvatarNav, type ChildTab } from '@/components/parent/ChildProfileNav'
@@ -799,27 +798,23 @@ export default function ApprovalTab({
 
         {/* 통합 프로필 바 — RoutineTab과 동일 */}
         {currentChild && (
-          <ParentEnterChildUiLink
-            childId={currentChild.id}
-            className="block w-full cursor-pointer rounded-2xl transition-opacity active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4A90E2] focus-visible:ring-offset-2"
-            aria-label={`${currentChild.name} 자녀용 앱 화면으로 들어가기`}
-            onClick={() => setSelectedChildId(currentChild.id)}
-          >
-            {/** 설정 탭과 동일한 프로필 본문(이름+Lv, 메타 라인)으로 맞추고 우측 통계는 유지 */}
-            <CompactChildProfileCard
-              name={currentChild.name}
-              age={currentChild.age}
-              avatarUrl={currentChild.avatarUrl}
-              level={childLevel}
-              credits={currentChild.credits}
-              hearts={currentChild.hearts}
-              streakDays={currentChild.streakDays}
-              ageGroupLabel={currentChild.ageGroupLabel}
-              childcareLabel={currentChild.childcareLabel}
-              siblingNav={siblingNav}
-              avatarEnterShortcut
-            />
-          </ParentEnterChildUiLink>
+          <CompactChildProfileCard
+            name={currentChild.name}
+            age={currentChild.age}
+            avatarUrl={currentChild.avatarUrl}
+            level={childLevel}
+            credits={currentChild.credits}
+            hearts={currentChild.hearts}
+            streakDays={currentChild.streakDays}
+            ageGroupLabel={currentChild.ageGroupLabel}
+            childcareLabel={currentChild.childcareLabel}
+            siblingNav={siblingNav}
+            enterChildUi={{
+              childId: currentChild.id,
+              ariaLabel: `${currentChild.name} 자녀용 앱 화면으로 들어가기`,
+              onSelectChild: () => setSelectedChildId(currentChild.id),
+            }}
+          />
         )}
 
         {/**

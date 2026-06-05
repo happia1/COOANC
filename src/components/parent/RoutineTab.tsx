@@ -13,13 +13,12 @@
  * - 캘린더는 스페셜 미션처럼 제목·+가 흰 카드 밖에 두고, 우하단 **하단 독바 바로 위**에 작은 원형 파비콘으로 AI 루틴 도우미 패널을 엽니다.
  * - 도우미 창을 닫아도 **대화 내역은 유지**되며, 닫힌 상태에서 AI 분석이 끝나면 플로팅 버튼에 **미읽음 숫자**가 표시됩니다.
  * - 매일 스페셜은 「보상 배율」로만 배율을 바꿉니다(카드에 「보상 N배」 문구는 넣지 않음).
- * - 상단 자녀 프로필 카드에서 캐릭터 좌우 ‹ › 또는 스와이프로 다자녀 전환, 카드 탭 시 「부모가 이 자녀 앱 화면 보기」로 들어갑니다(API 쿠키 후 /home).
+ * - 상단 프로필: ‹ ›·스와이프로 다자녀 전환, 아바타 탭 시 「부모가 이 자녀 앱 화면 보기」(API 쿠키 후 /home).
  */
 
 import { useState, useEffect, useLayoutEffect, useMemo, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { usePathname, useSearchParams } from 'next/navigation'
-import ParentEnterChildUiLink from '@/components/parent/ParentEnterChildUiLink'
 import { CompactChildProfileCard } from '@/components/parent/CompactChildProfileCard'
 import { useParentStore } from '@/store/parentStore'
 import { useChildSiblingAvatarNav, type ChildTab } from '@/components/parent/ChildProfileNav'
@@ -826,27 +825,23 @@ export default function RoutineTab({
 
           {/* 통합 프로필 바 — 아바타+이름 좌 / 코인·하트·연속 우 */}
           {currentChild && (
-            <ParentEnterChildUiLink
-              childId={currentChild.id}
-              className="block w-full cursor-pointer rounded-2xl transition-opacity active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4A90E2] focus-visible:ring-offset-2"
-              aria-label={`${currentChild.name} 자녀용 앱 화면으로 들어가기`}
-              onClick={() => setSelectedChildId(currentChild.id)}
-            >
-              {/** 설정 탭과 동일한 왼쪽 프로필 정보 레이아웃 + 오른쪽 통계 영역을 공통 카드로 통일 */}
-              <CompactChildProfileCard
-                name={currentChild.name}
-                age={currentChild.age}
-                avatarUrl={currentChild.avatarUrl}
-                level={childLevel}
-                credits={currentChild.credits}
-                hearts={currentChild.hearts}
-                streakDays={currentChild.streakDays}
-                ageGroupLabel={currentChild.ageGroupLabel}
-                childcareLabel={currentChild.childcareLabel}
-                siblingNav={siblingNav}
-                avatarEnterShortcut
-              />
-            </ParentEnterChildUiLink>
+            <CompactChildProfileCard
+              name={currentChild.name}
+              age={currentChild.age}
+              avatarUrl={currentChild.avatarUrl}
+              level={childLevel}
+              credits={currentChild.credits}
+              hearts={currentChild.hearts}
+              streakDays={currentChild.streakDays}
+              ageGroupLabel={currentChild.ageGroupLabel}
+              childcareLabel={currentChild.childcareLabel}
+              siblingNav={siblingNav}
+              enterChildUi={{
+                childId: currentChild.id,
+                ariaLabel: `${currentChild.name} 자녀용 앱 화면으로 들어가기`,
+                onSelectChild: () => setSelectedChildId(currentChild.id),
+              }}
+            />
           )}
 
           {/* 활성 미션 — 헤더와 연필(키워드 시트) 동일 행 */}

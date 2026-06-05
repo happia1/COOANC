@@ -7,10 +7,10 @@ import { addPlantHarvest } from '@/lib/plantHarvest'
 import {
   clampPotStageForTree,
   getHeartsNeededForStage,
-  getMinGrowthStage,
   needsPotSeedSelection,
   normalizePlantPotProgress,
-  resolveTreeId,
+  readPotTreeIdFromDb,
+  resolveHasChosenSeed,
   type PlantStage,
 } from '@/constants/plantTrees'
 
@@ -23,7 +23,7 @@ type PotRow = {
 }
 
 function derivePot(row: PotRow) {
-  const treeId = resolveTreeId(row.pot_tree_id as string | undefined)
+  const treeId = readPotTreeIdFromDb(row.pot_tree_id)
   const stageDb = clampPotStageForTree(treeId, readChildStatInt(row.pot_stage))
   const heartsUsedDb = readChildStatInt(row.pot_hearts_used)
   const completedDb = Boolean(row.pot_completed ?? false)
@@ -120,10 +120,9 @@ export async function POST(req: NextRequest) {
       .select('id', { count: 'exact', head: true })
       .eq('child_id', childId)
 
-    const minStage = getMinGrowthStage(treeId)
-    const hasChosenSeed = !purchaseErr
-      ? (purchaseCount ?? 0) > 0
-      : stage >= minStage || heartsUsed > 0 || synced.completed
+    const hasChosenSeed = resolveHasChosenSeed(treeId, synced, {
+      purchaseCount: purchaseErr ? null : (purchaseCount ?? 0),
+    })
 
     if (!hasChosenSeed) {
       return NextResponse.json({ ok: false, code: 'NO_SEED_CHOSEN' as const }, { status: 400 })
@@ -200,7 +199,7 @@ export async function POST(req: NextRequest) {
 
     let harvest = null
     if (levelUp && newStage === 7) {
-      const treeId = resolveTreeId(row.pot_tree_id as string | undefined)
+      const treeId = readPotTreeIdFromDb(row.pot_tree_id)
       harvest = await addPlantHarvest(db, childId, treeId)
     }
 

@@ -9,6 +9,10 @@
  */
 
 import SpriteImage from '@/components/common/SpriteImage'
+import SlotCounter, {
+  CHILD_HOME_CREDIT_SLOT_TIMING,
+  CHILD_HOME_HEART_SLOT_TIMING,
+} from '@/components/common/SlotCounter'
 import { ICONS } from '@/constants/sprites'
 import type { ChildStats } from '@/types/database'
 import { CHILD_HOME_TOP_BAR_GLASS_CLASS, CHILD_HOME_TOP_BAR_GLASS_STYLE } from '@/lib/childHomeTopBarGlass'
@@ -50,16 +54,10 @@ export default function ChildLevelStatsCard({
 
   const totalCredits = credits ?? 0
 
+  const creditUsesCompactFormat = totalCredits >= 10_000
+
   return (
-    <>
-      <style>{`
-        @keyframes creditShine {
-          0%   { transform: scale(1);    color: #4A3520; }
-          30%  { transform: scale(1.18); color: #C47F00; filter: drop-shadow(0 0 6px #FFD700); }
-          100% { transform: scale(1);    color: #4A3520; }
-        }
-      `}</style>
-      <div
+    <div
         className={[
           CHILD_HOME_TOP_BAR_GLASS_CLASS,
           'relative pointer-events-none max-w-full min-w-0 w-fit px-3 pt-2.5 pb-2.5',
@@ -120,17 +118,32 @@ export default function ChildLevelStatsCard({
             className="h-[18px] w-[18px] shrink-0 object-contain select-none"
             draggable={false}
           />
-          <span
-            className="min-w-0 flex-1 truncate font-black tabular-nums leading-none"
-            style={{
-              fontSize: 20,
-              color: '#7A4F00',
-              animation: shine ? 'creditShine 0.6s ease-out' : undefined,
-              letterSpacing: '-0.5px',
-            }}
-          >
-            {formatCredits(totalCredits)}
-          </span>
+          {creditUsesCompactFormat ? (
+            <span
+              className="min-w-0 flex-1 truncate font-black tabular-nums leading-none"
+              style={{
+                fontSize: 20,
+                color: '#7A4F00',
+                letterSpacing: '-0.5px',
+                filter: shine ? 'drop-shadow(0 0 5px rgba(255, 215, 0, 0.75))' : undefined,
+                transition: 'filter 0.35s ease-out',
+              }}
+            >
+              {formatCredits(totalCredits)}
+            </span>
+          ) : (
+            <SlotCounter
+              value={totalCredits}
+              timing={CHILD_HOME_CREDIT_SLOT_TIMING}
+              className="min-w-0 flex-1 truncate"
+              style={{
+                fontSize: 20,
+                letterSpacing: '-0.5px',
+                filter: shine ? 'drop-shadow(0 0 5px rgba(255, 215, 0, 0.75))' : undefined,
+                transition: 'filter 0.35s ease-out',
+              }}
+            />
+          )}
         </div>
 
         {typeof heartsCount === 'number' ? (
@@ -146,16 +159,12 @@ export default function ChildLevelStatsCard({
                   className="h-[18px] w-[18px] shrink-0 select-none object-contain"
                 />
               </span>
-              <span
-                className="min-w-0 shrink-0 truncate font-black tabular-nums leading-none"
-                style={{
-                  fontSize: 20,
-                  color: '#7A4F00',
-                  letterSpacing: '-0.5px',
-                }}
-              >
-                {heartsCount}
-              </span>
+              <SlotCounter
+                value={heartsCount}
+                timing={CHILD_HOME_HEART_SLOT_TIMING}
+                className="min-w-0 shrink-0 truncate"
+                style={{ fontSize: 20, letterSpacing: '-0.5px' }}
+              />
             </div>
           </>
         ) : null}
@@ -191,6 +200,5 @@ export default function ChildLevelStatsCard({
           </button>
         ) : null}
       </div>
-    </>
   )
 }

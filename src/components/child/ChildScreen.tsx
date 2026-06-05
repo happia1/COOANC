@@ -2519,7 +2519,7 @@ export default function ChildScreen({
                             /** 물조리개 그림·탭 판정은 레벨 카드와 같은 `heartsForHomeUi` 기준 */
                             hearts: heartsForHomeUi,
                             allowWaterWithoutHearts: pot.stage === 7,
-                            water,
+                            water: () => water(heartsForHomeUi),
                             onNoHearts: () =>
                               setPlantHint('하트가 부족해요! 미션을 하면 하트를 받을 수 있어요.'),
                             onGrowthCelebrate: handlePlantGrowthCelebrate,
@@ -2743,6 +2743,9 @@ export default function ChildScreen({
         level={stats?.current_level ?? 0}
         marketInitialScrollSection={marketInitialScrollSection}
         onMarketInitialScrollDone={handleMarketInitialScrollDone}
+        onMarketCreditsChanged={(credits) =>
+          setStats((prev) => normalizeChildStatsCreditsSplit(mergeChildStatsPatch(prev, { credits })))
+        }
         unlockedItemIndexes={initialUnlockedItemIndexes}
         praiseGrants={grants}
         praisePlacements={placements}

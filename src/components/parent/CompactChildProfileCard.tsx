@@ -7,6 +7,7 @@
 
 import type { ReactNode, TouchEvent } from 'react'
 import { getChildBadge } from '@/constants/childGrowthLevels'
+import ParentEnterChildUiLink from '@/components/parent/ParentEnterChildUiLink'
 
 /** 홈 탭에서만 넘기면 카드 안에 오늘 미션 달성률 바가 붙습니다 */
 export type ProfileMissionSummary = {
@@ -52,8 +53,15 @@ export type CompactChildProfileCardProps = {
   /** 홈·루틴·승인: 자녀 2명 이상일 때만 넘김 → 아바타 양 옆 얇은 회색 화살표 */
   siblingNav?: CompactChildProfileSiblingNav | null
   /**
-   * 홈·루틴·승인에서 `ParentEnterChildUiLink` 로 카드를 감쌀 때만 true.
-   * 아바타 오른쪽 아래에 작은 「바로가기」표시가 붙어, 탭 시 자녀 화면으로 들어간다는 뜻을 보여 줍니다.
+   * 아바타만 자녀 앱 진입 링크 — 다자녀 ‹ › 는 링크 밖에 두어 프로필 전환만 됩니다.
+   */
+  enterChildUi?: {
+    childId: string
+    ariaLabel: string
+    onSelectChild?: () => void
+  } | null
+  /**
+   * @deprecated `enterChildUi` 사용 — 있으면 아바타에 ↗ 바로가기 표시
    */
   avatarEnterShortcut?: boolean
 }
@@ -74,8 +82,10 @@ export function CompactChildProfileCard({
   actions = null,
   profileLayout = 'stack',
   siblingNav = null,
+  enterChildUi = null,
   avatarEnterShortcut = false,
 }: CompactChildProfileCardProps) {
+  const showAvatarShortcut = Boolean(enterChildUi) || avatarEnterShortcut
   const lv = Math.max(0, level)
   const badge = getChildBadge(lv)
   const avatarFallbackLabel = badge?.badge ?? `Lv.${lv}`
@@ -151,17 +161,23 @@ export function CompactChildProfileCard({
                 onPointerDown={(e) => {
                   e.stopPropagation()
                 }}
+                onTouchStart={(e) => {
+                  e.stopPropagation()
+                }}
+                onTouchEnd={(e) => {
+                  e.stopPropagation()
+                }}
                 aria-hidden
               >
                 <SiblingNavArrow ariaLabel="이전 자녀로" orientation="prev" onPress={siblingNav.onPrev} />
               </div>
               <div className="flex justify-center px-2">
-                <AvatarWithShortcut
+                <ProfileAvatarEnterLink
+                  enterChildUi={enterChildUi}
                   avatarUrl={avatarUrl}
                   fallbackLabel={avatarFallbackLabel}
-                  /** 부모 화면 자녀 프로필 원형 아바타를 기존(4rem) 대비 1.6배(6.4rem)로 확대 */
                   boxClass="h-[6.4rem] w-[6.4rem]"
-                  showShortcut={avatarEnterShortcut}
+                  showShortcut={showAvatarShortcut}
                 />
               </div>
               <div
@@ -178,6 +194,12 @@ export function CompactChildProfileCard({
                 onPointerDown={(e) => {
                   e.stopPropagation()
                 }}
+                onTouchStart={(e) => {
+                  e.stopPropagation()
+                }}
+                onTouchEnd={(e) => {
+                  e.stopPropagation()
+                }}
                 aria-hidden
               >
                 <SiblingNavArrow ariaLabel="다음 자녀로" orientation="next" onPress={siblingNav.onNext} />
@@ -186,12 +208,12 @@ export function CompactChildProfileCard({
           </div>
         ) : (
           <div className="flex w-full justify-center">
-            <AvatarWithShortcut
+            <ProfileAvatarEnterLink
+              enterChildUi={enterChildUi}
               avatarUrl={avatarUrl}
               fallbackLabel={avatarFallbackLabel}
-              /** 부모 화면 자녀 프로필 원형 아바타를 기존(4rem) 대비 1.6배(6.4rem)로 확대 */
               boxClass="h-[6.4rem] w-[6.4rem]"
-              showShortcut={avatarEnterShortcut}
+              showShortcut={showAvatarShortcut}
             />
           </div>
         )}
@@ -216,7 +238,46 @@ export function CompactChildProfileCard({
   )
 }
 
-/** 캐릭터 원 + (선택) 오른쪽 아래 「바로가기」표시 — 뱃지는 장식만이라 터치는 부모 링크로 통과합니다 */
+/** 아바타만 자녀 앱 진입 — ‹ › 영역은 링크 밖 */
+function ProfileAvatarEnterLink({
+  enterChildUi,
+  avatarUrl,
+  fallbackLabel,
+  boxClass,
+  showShortcut,
+}: {
+  enterChildUi: CompactChildProfileCardProps['enterChildUi']
+  avatarUrl: string | null
+  fallbackLabel: string
+  boxClass: string
+  showShortcut: boolean
+}) {
+  const avatar = (
+    <AvatarWithShortcut
+      avatarUrl={avatarUrl}
+      fallbackLabel={fallbackLabel}
+      boxClass={boxClass}
+      showShortcut={showShortcut}
+    />
+  )
+
+  if (!enterChildUi) {
+    return avatar
+  }
+
+  return (
+    <ParentEnterChildUiLink
+      childId={enterChildUi.childId}
+      className="inline-flex rounded-full transition-opacity active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4A90E2] focus-visible:ring-offset-2"
+      aria-label={enterChildUi.ariaLabel}
+      onClick={enterChildUi.onSelectChild}
+    >
+      {avatar}
+    </ParentEnterChildUiLink>
+  )
+}
+
+/** 캐릭터 원 + (선택) 오른쪽 아래 「바로가기」표시 */
 function AvatarWithShortcut({
   avatarUrl,
   fallbackLabel,
@@ -267,6 +328,12 @@ function SiblingNavArrow({
         onPress()
       }}
       onPointerDown={(e) => {
+        e.stopPropagation()
+      }}
+      onTouchStart={(e) => {
+        e.stopPropagation()
+      }}
+      onTouchEnd={(e) => {
         e.stopPropagation()
       }}
       className="shrink-0 select-none border-0 bg-transparent px-1 py-0.5 text-[1.0625rem] font-extralight leading-none text-gray-400 transition-colors hover:text-gray-500 active:text-gray-600 focus-visible:rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4A90E2]/35"

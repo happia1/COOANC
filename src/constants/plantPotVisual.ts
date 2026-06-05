@@ -137,14 +137,14 @@ export type PlantPotVisualStyle = {
 
 /**
  * 자녀 홈 화분·물조리개 묶음 transform.
- * 씨앗 미선택 기본 사과 미리보기는 딸기 1단계와 동일 앵커(공통값).
+ * 첫 씨앗 선택 전(모종삽)·수확 후 재심기 미리보기는 공통 앵커.
  */
 export function getPlantPotHomeShellTransform(
   treeId?: PlantTreeId,
   _stage?: PlantStage,
-  needsSeedSelection?: boolean,
+  useCommonHomeAnchor?: boolean,
 ): string {
-  if (needsSeedSelection) {
+  if (useCommonHomeAnchor) {
     return PLANT_POT_HOME_SHELL_TRANSFORM
   }
   if (treeId != null && usesAppleStageZero(treeId)) {
@@ -197,8 +197,15 @@ export function getAllPlantPotScaleTables(): Record<
 }
 
 export type PlantPotVisualOptions = {
-  /** 씨앗 미선택 기본 사과 — 홈에서 딸기 1단계와 같은 translate */
+  /** 수확 후 재심기 등 사과 0 미리보기 — 홈에서 딸기 1단계와 같은 translate */
   matchStrawberryStage1Home?: boolean
+}
+
+/**
+ * 모종삽 아이콘 — 씨앗 미선택 때 보이던 화분(사과 0·딸기 1단계 정렬)과 동일 좌표.
+ */
+export function getPlantShovelHomeVisualStyle(): PlantPotVisualStyle {
+  return getPlantPotVisualStyle('apple', 0, 'home', { matchStrawberryStage1Home: true })
 }
 
 /** 화분 안 식물 PNG — 단계별 scale + 나무별·단계별 translate */

@@ -27,6 +27,19 @@ export function resolveTreeId(id: string | null | undefined): PlantTreeId {
   return hit?.id ?? 'apple'
 }
 
+/** DB `pot_tree_id` — 문자열·숫자 등 Postgres 타입 차이를 흡수합니다 */
+export function readPotTreeIdFromDb(raw: unknown): PlantTreeId {
+  if (raw == null) return 'apple'
+  if (typeof raw === 'string') {
+    const trimmed = raw.trim()
+    return trimmed ? resolveTreeId(trimmed) : 'apple'
+  }
+  if (typeof raw === 'number' && Number.isFinite(raw)) {
+    return resolveTreeId(String(raw))
+  }
+  return 'apple'
+}
+
 export function getPlantTree(id: PlantTreeId): PlantTreeDefinition {
   return TREE_LIST.find((t) => t.id === id) ?? TREE_LIST[0]
 }
@@ -155,6 +168,14 @@ function plantAssetSrc(folder: string, filename: string): string {
 export const WATERING_CAN_EMPTY_SRC = `${PLANT_BASE}/200.png`
 export const WATERING_CAN_FULL_SRC = `${PLANT_BASE}/300.png`
 
+/** 씨앗을 아직 고르지 않았을 때 홈에 보이는 모종삽 아이콘 */
+export const PLANT_UNSELECTED_SHOVEL_SRC = `${PLANT_BASE}/레이어 16.png`
+
+/** 한 번도 씨앗을 구매·선택하지 않은 상태 */
+export function isPotAwaitingFirstSeed(pot: { hasChosenSeed: boolean }): boolean {
+  return !pot.hasChosenSeed
+}
+
 /** 화분·성장 단계 그림 — `pot_stage` 와 PNG 번호를 맞춥니다 */
 export function getStageImage(treeId: PlantTreeId, stage: PlantStage): string {
   const folder = plantAssetFolder(treeId)
@@ -177,7 +198,9 @@ export function isPotAwaitingSeed(pot: {
 }
 
 /**
- * 씨앗 카드로 고르기 전·수확 후 재심기 전 — 홈에는 사과 0단계만, 팝업에는 물조리개 없음
+ * 씨앗 카드로 고르기 전·수확 후 재심기 전.
+ * - 첫 선택 전: 홈에는 모종삽 아이콘, 탭 시 씨앗 카드
+ * - 수확 후 재심기: 홈에는 사과 0단계 미리보기, 팝업에는 물조리개 없음
  */
 export function needsPotSeedSelection(pot: {
   hasChosenSeed: boolean
@@ -190,6 +213,34 @@ export function needsPotSeedSelection(pot: {
   /** 수확 후 화분 비우기(7단계 물주기)로 pot_stage 0이 된 경우 — 사과 외는 1부터 다시 심기 */
   if (pot.hasChosenSeed && pot.stage < getMinGrowthStage(pot.treeId)) return true
   return false
+}
+
+/**
+ * `child_stats` 진행도만으로 씨앗 선택 여부를 추정합니다.
+ * 사과 0단계·하트 0·미완료만으로는 첫 방문과 구분이 안 되어 false 입니다.
+ */
+export function inferHasChosenSeedFromPotProgress(
+  treeId: PlantTreeId,
+  normalized: { stage: PlantStage; heartsUsed: number; completed: boolean },
+): boolean {
+  /** 기본값 apple 이 아닌 나무가 DB 에 있으면 씨앗을 고른 상태(딸기 등) */
+  if (treeId !== 'apple') return true
+  if (normalized.heartsUsed > 0 || normalized.completed) return true
+  const min = getMinGrowthStage(treeId)
+  if (normalized.stage > min) return true
+  if (!usesAppleStageZero(treeId) && normalized.stage >= min && min >= 1) return true
+  return false
+}
+
+/** 구매 이력·세션·진행도를 합쳐 씨앗 선택 여부를 판별합니다 */
+export function resolveHasChosenSeed(
+  treeId: PlantTreeId,
+  normalized: { stage: PlantStage; heartsUsed: number; completed: boolean },
+  options?: { purchaseCount?: number | null; sessionFlag?: boolean },
+): boolean {
+  if ((options?.purchaseCount ?? 0) > 0) return true
+  if (options?.sessionFlag) return true
+  return inferHasChosenSeedFromPotProgress(treeId, normalized)
 }
 
 export function getSeedImage(treeId: PlantTreeId): string {

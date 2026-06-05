@@ -54,6 +54,8 @@ type Props = {
   /** 마켓 열릴 때 스크롤할 구역(콘텐츠 해금 안내 등) */
   marketInitialScrollSection?: ParentMarketSectionId | null
   onMarketInitialScrollDone?: () => void
+  /** 마켓 결제 성공 후 홈 상단 크레딧 카드 동기화 */
+  onMarketCreditsChanged?: (credits: number) => void
 
   /* ── 꾸미기 패널 props ── */
   unlockedItemIndexes: number[]
@@ -87,6 +89,7 @@ export default function ChildPanelOverlay({
   level,
   marketInitialScrollSection = null,
   onMarketInitialScrollDone,
+  onMarketCreditsChanged,
   unlockedItemIndexes,
   praiseGrants,
   praisePlacements,
@@ -192,6 +195,7 @@ export default function ChildPanelOverlay({
               level={level}
               initialScrollSection={marketInitialScrollSection}
               onInitialScrollDone={onMarketInitialScrollDone}
+              onMarketCreditsChanged={onMarketCreditsChanged}
             />
           )}
           {active === 'dressup' && (

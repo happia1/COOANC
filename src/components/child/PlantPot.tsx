@@ -17,12 +17,18 @@ import {
   getDisplayStepIndex,
   getPlantTree,
   getStageImage,
+  isPotAwaitingFirstSeed,
   needsPotSeedSelection,
+  PLANT_UNSELECTED_SHOVEL_SRC,
   STAGE_LABELS,
   type PlantStage,
   type PlantTreeId,
 } from '@/constants/plantTrees'
-import { getPlantPotVisualStyle } from '@/constants/plantPotVisual'
+import {
+  getPlantPotVisualStyle,
+  getPlantShovelHomeVisualStyle,
+  type PlantPotVisualStyle,
+} from '@/constants/plantPotVisual'
 import type { PlantHarvestCelebrate } from '@/lib/plantHarvest'
 import type { BuySeedResult, PotState, WaterResult } from '@/hooks/usePlantPot'
 import SeedSelectPicker from '@/components/child/SeedSelectPicker'
@@ -148,6 +154,58 @@ function PlantTreeStageImage({
   )
 }
 
+/** 씨앗 미선택 — 모종삽 아이콘(탭하면 씨앗 카드) */
+function PlantShovelImage({
+  className,
+  sizes,
+  priority,
+  visualStyle,
+}: {
+  className: string
+  sizes: string
+  priority?: boolean
+  visualStyle: PlantPotVisualStyle
+}) {
+  const [failed, setFailed] = useState(false)
+
+  if (failed) {
+    return (
+      <span
+        className={`absolute inset-0 flex items-center justify-center leading-none ${className}`}
+        style={{ fontSize: '2rem' }}
+        aria-hidden
+      >
+        🪴
+      </span>
+    )
+  }
+
+  const inner = (
+    <Image
+      src={PLANT_UNSELECTED_SHOVEL_SRC}
+      alt=""
+      fill
+      className={className}
+      sizes={sizes}
+      priority={priority}
+      unoptimized
+      onError={() => setFailed(true)}
+    />
+  )
+
+  return (
+    <div
+      className="absolute inset-0 flex items-end justify-center"
+      style={{
+        transform: `translate(${visualStyle.translateX}px, ${visualStyle.translateY}px) scale(${visualStyle.scale})`,
+        transformOrigin: visualStyle.transformOrigin,
+      }}
+    >
+      <div className="relative h-full w-full">{inner}</div>
+    </div>
+  )
+}
+
 /** 물조리개 탭 시 화분 위로 떨어지는 물방울 */
 function WaterDrop({ index }: { index: number }) {
   const offsetX = (index - 1) * 10
@@ -206,18 +264,21 @@ export default function PlantPot({ pot, seedSelect, waterActions }: Props) {
     prevStage.current = pot.stage
   }, [pot.stage])
 
-  /** 씨앗 미선택·수확 후 재심기 — 홈·팝업 모두 사과 0단계 미리보기, 팝업은 카드만 */
   const needsSeedSelection = needsPotSeedSelection(pot)
+  const awaitingFirstSeed = isPotAwaitingFirstSeed(pot)
+  /** 수확 후 재심기 등 — 홈에 사과 0단계 미리보기 */
+  const useAppleSeedPreview = needsSeedSelection && !awaitingFirstSeed
   const showSeedPickerInPopup = Boolean(seedSelect) && needsSeedSelection
   const seedPickerIntro =
     pot.hasChosenSeed && pot.stage === 7 && pot.completed
       ? '수확을 모두 완료했어요! 새로운 씨앗을 심어볼까요?'
       : null
-  const displayTreeId = needsSeedSelection ? 'apple' : pot.treeId
-  const displayStage = needsSeedSelection ? 0 : pot.stage
+  const displayTreeId = useAppleSeedPreview ? 'apple' : pot.treeId
+  const displayStage = useAppleSeedPreview ? 0 : pot.stage
   const label = STAGE_LABELS[displayStage]
+  const shovelHomeVisual = getPlantShovelHomeVisualStyle()
   const homeVisual = getPlantPotVisualStyle(displayTreeId, displayStage, 'home', {
-    matchStrawberryStage1Home: needsSeedSelection,
+    matchStrawberryStage1Home: useAppleSeedPreview,
   })
   const popupVisual = getPlantPotVisualStyle(displayTreeId, displayStage, 'popup')
   const popupPotImageClass = 'object-contain'
@@ -467,22 +528,33 @@ export default function PlantPot({ pot, seedSelect, waterActions }: Props) {
               .join(', ') || undefined,
           }}
           aria-label={
-            needsSeedSelection
-              ? '화분: 씨앗을 골라 주세요'
-              : `화분: ${label} (탭해서 관리하기)`
+            awaitingFirstSeed
+              ? '씨앗 심기: 탭해서 씨앗을 골라 주세요'
+              : needsSeedSelection
+                ? '화분: 씨앗을 골라 주세요'
+                : `화분: ${label} (탭해서 관리하기)`
           }
         >
           {showStars ? Array.from({ length: 8 }, (_, i) => <StarParticle key={i} index={i} />) : null}
 
           <div className="relative h-full w-full overflow-visible">
-            <PlantTreeStageImage
-              treeId={displayTreeId}
-              stage={displayStage}
-              visualStyle={homeVisual}
-              className={homePotImageClass}
-              sizes="56px"
-              priority
-            />
+            {awaitingFirstSeed ? (
+              <PlantShovelImage
+                visualStyle={shovelHomeVisual}
+                className={homePotImageClass}
+                sizes="56px"
+                priority
+              />
+            ) : (
+              <PlantTreeStageImage
+                treeId={displayTreeId}
+                stage={displayStage}
+                visualStyle={homeVisual}
+                className={homePotImageClass}
+                sizes="56px"
+                priority
+              />
+            )}
           </div>
         </button>
 
