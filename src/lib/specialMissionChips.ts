@@ -137,28 +137,10 @@ export const SPECIAL_MISSION_CHIPS: SpecialMissionChipDef[] = [
     defaultPopupMessage: '손톱을 깔끔하게 다듬어요.',
   },
   {
-    id: 'sp-comb-hair',
-    title: '머리빗기',
-    emoji: '',
-    defaultPopupMessage: '머리를 가지런히 빗어 정리해요.',
-  },
-  {
     id: 'sp-clean-bed',
     title: '이불 정리하기',
     emoji: '',
     defaultPopupMessage: '이불과 베개를 예쁘게 정리해요.',
-  },
-  {
-    id: 'sp-gargle',
-    title: '가글하기',
-    emoji: '',
-    defaultPopupMessage: '가글로 입안을 깨끗이 헹궈요.',
-  },
-  {
-    id: 'sp-lotion',
-    title: '로션바르기',
-    emoji: '',
-    defaultPopupMessage: '피부가 건조하지 않게 로션을 발라요.',
   },
 ]
 
@@ -187,7 +169,7 @@ export const SPECIAL_MISSION_CHIP_CATEGORIES: SpecialMissionChipCategoryDef[] = 
   {
     id: 'health-beauty',
     label: '건강/미용',
-    chipIds: ['sp-nails', 'sp-comb-hair', 'sp-gargle', 'sp-lotion', 'sp-meditation', 'sp-exercise', 'sp-veggies'],
+    chipIds: ['sp-nails', 'sp-meditation', 'sp-exercise', 'sp-veggies'],
   },
 ]
 
@@ -227,8 +209,6 @@ const LEGACY_SPECIAL_TITLE_TO_SHORT: Record<string, string> = {
   이불개기: '이불 정리하기',
   '이불 개기': '이불 정리하기',
   '이불정리하기': '이불 정리하기',
-  '머리 빗기': '머리빗기',
-  '로션 바르기': '로션바르기',
   /** 구버전 — 일상·스페셜 칩 표기 통일 */
   숙제하기: '숙제·공부하기',
 }
@@ -259,6 +239,13 @@ const RETIRED_SPECIAL_DISPLAY_TITLES = new Set<string>([
   '장난감정리하기',
   '목욕하기',
   '밥먹고 정리하기',
+  /** 오전 일상으로 옮김 — 남은 스페셜 템플릿 숨김 */
+  '가글하기',
+  '머리빗기',
+  '머리 빗기',
+  '로션바르기',
+  '로션 바르기',
+  '로션(선크림)바르기',
 ])
 
 /** 현재 스페셜 칩 제목(정규화 후) — DB 정리·UI 숨김 기준 */

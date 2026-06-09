@@ -256,7 +256,7 @@ function ProfileAvatarWithHint({
     <div className="flex flex-col items-center gap-1">
       {enterChildUi ? (
         <p className="max-w-[12rem] px-1 text-center text-[10px] font-medium leading-snug text-gray-400">
-          캐릭터를 클릭하면 자녀 앱 화면으로 이동합니다
+          캐릭터를 클릭하면 자녀 앱으로 이동합니다
         </p>
       ) : null}
       <ProfileAvatarEnterLink

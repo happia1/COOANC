@@ -2271,7 +2271,7 @@ export default function ChildScreen({
         <div className="absolute inset-0 z-20 flex flex-col pointer-events-none">
 
           {/*
-            상단: 왼쪽 레벨 카드(카드 아래: 뽀모도로·음악) / 발 옆 저금통·화분 / 우측 나가기·스티커…
+            상단: 왼쪽 레벨 카드(카드 아래: 뽀모도로·음악) / 발 옆 저금통·화분(절대 배치) / 우측 나가기·스티커…
           */}
           <div
             className="flex w-full items-start justify-between gap-3 px-4"
@@ -2333,21 +2333,6 @@ export default function ChildScreen({
                         </button>
                       </div>
                     </div>
-                    {/*
-                      화분 로딩 전·실패 시: 카드 아래에 저금통만 잠깐 둡니다(발 옆 자리로 옮기기 전).
-                    */}
-                    {piggyUnlocked && stats && (plantLoading || !pot) ? (
-                      <div className="pointer-events-auto mt-6 flex w-max max-w-full justify-start">
-                        <ChildHomePiggyBank
-                          availableCredits={availableCreditsForHome}
-                          piggyCredits={readChildStatInt(stats.credits_piggy)}
-                          childId={childId}
-                          depositEnabled={piggyDepositEnabled}
-                          levelCreditRef={creditBadgeRef}
-                          onPiggyUpdate={patchPiggyFromHome}
-                        />
-                      </div>
-                    ) : null}
                   </div>
                 </>
               ) : null}
@@ -2455,81 +2440,80 @@ export default function ChildScreen({
           </div>
 
           {/*
-            발 옆 — 저금통(`plantPct`), 화분(`canPct`). 간격은 과거 화분·물조리개와 같은 앵커 쌍입니다.
+            발 옆 — 저금통(`plantPct`)은 화분 로딩과 무관하게 바로 배치합니다.
+            화분(`canPct`)만 pot 데이터가 준비된 뒤 표시합니다(로딩 중 위치 점프 방지).
             물조리개는 화분 팝업 안에서만 사용합니다.
           */}
-          {!plantLoading && pot && stats ? (
-            <>
-              {piggyUnlocked ? (
-                <div
-                  className="pointer-events-auto absolute z-[21]"
-                  style={{
-                    left: `${plantFeetAnchorsPct.plantPct - piggyPotExtraSpreadPct}%`,
-                    top: `${anchor.characterFootY * 100}%`,
-                    transform: 'translate(-50%, calc(-90% - 28px))',
-                  }}
-                >
-                  <div
-                    className="flex flex-col items-center"
-                    style={{
-                      transform: `scale(${plantFeetUiScale})`,
-                      transformOrigin: 'center bottom',
-                    }}
-                  >
-                    <ChildHomePiggyBank
-                      availableCredits={availableCreditsForHome}
-                      piggyCredits={readChildStatInt(stats.credits_piggy)}
-                      childId={childId}
-                      depositEnabled={piggyDepositEnabled}
-                      levelCreditRef={creditBadgeRef}
-                      onPiggyUpdate={patchPiggyFromHome}
-                    />
-                  </div>
-                </div>
-              ) : null}
+          {piggyUnlocked && stats ? (
+            <div
+              className="pointer-events-auto absolute z-[21]"
+              style={{
+                left: `${plantFeetAnchorsPct.plantPct - piggyPotExtraSpreadPct}%`,
+                top: `${anchor.characterFootY * 100}%`,
+                transform: 'translate(-50%, calc(-90% - 28px))',
+              }}
+            >
               <div
-                className="pointer-events-auto absolute z-[21]"
+                className="flex flex-col items-center"
                 style={{
-                  left: `${plantFeetAnchorsPct.canPct + piggyPotExtraSpreadPct}%`,
-                  top: `${anchor.characterFootY * 100}%`,
-                  transform: getPlantPotHomeShellTransform(
-                    pot.treeId,
-                    pot.stage,
-                    needsPotSeedSelection(pot),
-                  ),
+                  transform: `scale(${plantFeetUiScale})`,
+                  transformOrigin: 'center bottom',
                 }}
               >
-                <div
-                  className="flex flex-col items-center"
-                  style={{
-                    transform: `scale(${plantFeetUiScale})`,
-                    transformOrigin: 'center bottom',
-                  }}
-                >
-                  <PlantPot
-                    pot={pot}
-                    seedSelect={{
-                      currentCredits: creditsAvailable(stats ?? { credits: 0 }),
-                      onSelect: buySeed,
-                      onPlanted: () => void refreshHarvestInventory(),
-                    }}
-                    waterActions={
-                      pot.hasChosenSeed && !needsPotSeedSelection(pot)
-                        ? {
-                            /** 물조리개 그림·탭 판정은 레벨 카드와 같은 `heartsForHomeUi` 기준 */
-                            hearts: heartsForHomeUi,
-                            allowWaterWithoutHearts: pot.stage === 7,
-                            water: () => water(heartsForHomeUi),
-                            onNoHearts: () =>
-                              setPlantHint('하트가 부족해요! 미션을 하면 하트를 받을 수 있어요.'),
-                            onGrowthCelebrate: handlePlantGrowthCelebrate,
-                          }
-                        : undefined
-                    }
-                  />
-                </div>
+                <ChildHomePiggyBank
+                  availableCredits={availableCreditsForHome}
+                  piggyCredits={readChildStatInt(stats.credits_piggy)}
+                  childId={childId}
+                  depositEnabled={piggyDepositEnabled}
+                  levelCreditRef={creditBadgeRef}
+                  onPiggyUpdate={patchPiggyFromHome}
+                />
               </div>
-            </>
+            </div>
+          ) : null}
+          {!plantLoading && pot && stats ? (
+            <div
+              className="pointer-events-auto absolute z-[21]"
+              style={{
+                left: `${plantFeetAnchorsPct.canPct + piggyPotExtraSpreadPct}%`,
+                top: `${anchor.characterFootY * 100}%`,
+                transform: getPlantPotHomeShellTransform(
+                  pot.treeId,
+                  pot.stage,
+                  needsPotSeedSelection(pot),
+                ),
+              }}
+            >
+              <div
+                className="flex flex-col items-center"
+                style={{
+                  transform: `scale(${plantFeetUiScale})`,
+                  transformOrigin: 'center bottom',
+                }}
+              >
+                <PlantPot
+                  pot={pot}
+                  seedSelect={{
+                    currentCredits: creditsAvailable(stats ?? { credits: 0 }),
+                    onSelect: buySeed,
+                    onPlanted: () => void refreshHarvestInventory(),
+                  }}
+                  waterActions={
+                    pot.hasChosenSeed && !needsPotSeedSelection(pot)
+                      ? {
+                          /** 물조리개 그림·탭 판정은 레벨 카드와 같은 `heartsForHomeUi` 기준 */
+                          hearts: heartsForHomeUi,
+                          allowWaterWithoutHearts: pot.stage === 7,
+                          water: () => water(heartsForHomeUi),
+                          onNoHearts: () =>
+                            setPlantHint('하트가 부족해요! 미션을 하면 하트를 받을 수 있어요.'),
+                          onGrowthCelebrate: handlePlantGrowthCelebrate,
+                        }
+                      : undefined
+                  }
+                />
+              </div>
+            </div>
           ) : null}
 
           {plantHint ? (

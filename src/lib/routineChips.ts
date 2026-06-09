@@ -28,6 +28,9 @@ export const AM_CHIPS: ChipDef[] = [
   { id: 'am-wake', title: '기상', emoji: '', type: 'fixed', apiBlock: 'morning' },
   { id: 'am-wash', title: '세수하기', emoji: '', type: 'recommended', apiBlock: 'morning' },
   { id: 'am-brush', title: '양치', emoji: '', type: 'recommended', apiBlock: 'morning' },
+  { id: 'am-gargle', title: '가글하기', emoji: '', type: 'recommended', apiBlock: 'morning' },
+  { id: 'am-lotion', title: '로션(선크림)바르기', emoji: '', type: 'recommended', apiBlock: 'morning' },
+  { id: 'am-comb', title: '머리빗기', emoji: '', type: 'recommended', apiBlock: 'morning' },
   { id: 'am-meal', title: '아침식사', emoji: '', type: 'recommended', apiBlock: 'morning' },
   /** 오전 물마시기 — 썸네일 `a.m/water.png` */
   { id: 'am-water', title: '물마시기', emoji: '', type: 'recommended', apiBlock: 'morning' },
