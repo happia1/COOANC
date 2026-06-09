@@ -172,7 +172,7 @@ export function CompactChildProfileCard({
                 <SiblingNavArrow ariaLabel="이전 자녀로" orientation="prev" onPress={siblingNav.onPrev} />
               </div>
               <div className="flex justify-center px-2">
-                <ProfileAvatarEnterLink
+                <ProfileAvatarWithHint
                   enterChildUi={enterChildUi}
                   avatarUrl={avatarUrl}
                   fallbackLabel={avatarFallbackLabel}
@@ -208,7 +208,7 @@ export function CompactChildProfileCard({
           </div>
         ) : (
           <div className="flex w-full justify-center">
-            <ProfileAvatarEnterLink
+            <ProfileAvatarWithHint
               enterChildUi={enterChildUi}
               avatarUrl={avatarUrl}
               fallbackLabel={avatarFallbackLabel}
@@ -234,6 +234,38 @@ export function CompactChildProfileCard({
       </div>
 
       {mission != null ? <MissionBlock mission={mission} /> : null}
+    </div>
+  )
+}
+
+/** 프로필 사진 위 안내 + 아바타(자녀 앱 진입 링크) */
+function ProfileAvatarWithHint({
+  enterChildUi,
+  avatarUrl,
+  fallbackLabel,
+  boxClass,
+  showShortcut,
+}: {
+  enterChildUi: CompactChildProfileCardProps['enterChildUi']
+  avatarUrl: string | null
+  fallbackLabel: string
+  boxClass: string
+  showShortcut: boolean
+}) {
+  return (
+    <div className="flex flex-col items-center gap-1">
+      {enterChildUi ? (
+        <p className="max-w-[12rem] px-1 text-center text-[10px] font-medium leading-snug text-gray-400">
+          캐릭터를 클릭하면 자녀 앱 화면으로 이동합니다
+        </p>
+      ) : null}
+      <ProfileAvatarEnterLink
+        enterChildUi={enterChildUi}
+        avatarUrl={avatarUrl}
+        fallbackLabel={fallbackLabel}
+        boxClass={boxClass}
+        showShortcut={showShortcut}
+      />
     </div>
   )
 }

@@ -188,7 +188,7 @@ export default function MarketPurchaseConfirmDialog({
     setPayRunId(0)
     setDecoAnimate(false)
     setPurchaseQty(1)
-  }, [item.id, checkoutStep])
+  }, [item.id])
 
   const { current: slotBalance, done: slotDone } = useSlotBalanceSteps(
     balanceBefore,
