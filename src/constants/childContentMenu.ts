@@ -47,11 +47,6 @@ export function isChildContentMenuAvailable(id: ChildContentMenuItemId, level: n
   return true
 }
 
-/** 잠긴 메뉴 항목에 보여줄 안내 문구 (열려 있으면 null) */
-export function childContentMenuLockLabel(id: ChildContentMenuItemId): string | null {
-  return id === 'minigame' ? `레벨 ${MINIGAME_UNLOCK_LEVEL}에 열려요` : null
-}
-
 /**
  * 자녀 마켓 콘텐츠 이용권(보물상자 이용권) 노출 여부.
  * 레벨 게이트는 보물상자 팝업의 「미니게임」 메뉴 진입에만 적용되고,

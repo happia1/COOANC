@@ -2884,6 +2884,7 @@ export default function ChildScreen({
         level={stats?.current_level ?? 0}
         initialChestTicketQuantity={chestTicketQty}
         initialActiveSession={initialActiveContentSession}
+        onOpenMarket={openMarketToContent}
         onChestTicketQuantityChange={handleChestTicketQuantityChange}
         onClawGrabPending={onClawGrabPending}
         onClawStatsSynced={onClawStatsSynced}

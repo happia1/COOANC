@@ -4,7 +4,6 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
   CHILD_CONTENT_MENU_ITEMS,
-  childContentMenuLockLabel,
   isChildContentMenuAvailable,
   type ChildContentMenuItemId,
 } from '@/constants/childContentMenu'
@@ -39,6 +38,8 @@ type Props = {
   initialActiveSession: ContentSession | null
   /** 「미션 하러 가기」 — 미션 카드 영역으로 스크롤 */
   onGoToMissions: () => void
+  /** 티켓 0장 상태에서 메뉴를 눌렀을 때 — 팝업을 닫고 마켓 콘텐츠 구역으로 이동 */
+  onOpenMarket: () => void
   onChestTicketQuantityChange: (quantity: number) => void
   /** 인형뽑기 그랩 API 요청 중임을 ChildScreen의 pendingStatsWritesRef 카운터에 알림 */
   onClawGrabPending: (pending: boolean) => void
@@ -113,6 +114,7 @@ export default function ChildContentZonePopup({
   initialChestTicketQuantity,
   initialActiveSession,
   onGoToMissions,
+  onOpenMarket,
   onChestTicketQuantityChange,
   onClawGrabPending,
   onClawStatsSynced,
@@ -120,7 +122,6 @@ export default function ChildContentZonePopup({
   const [portalReady, setPortalReady] = useState(false)
   const [chestTicketQty, setChestTicketQty] = useState(initialChestTicketQuantity)
   const [phase, setPhase] = useState<Phase>('menu')
-  const [comingSoonLabel, setComingSoonLabel] = useState<string | null>(null)
   const [selectedChannel, setSelectedChannel] = useState<ContentChannel | null>(null)
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [remainingPlaySeconds, setRemainingPlaySeconds] = useState(0)
@@ -239,7 +240,6 @@ export default function ChildContentZonePopup({
 
   const resetToMenu = useCallback(() => {
     setPhase('menu')
-    setComingSoonLabel(null)
     setSelectedChannel(null)
     setActiveVideoId(null)
     setIsVideoPlaying(false)
@@ -260,7 +260,6 @@ export default function ChildContentZonePopup({
 
     setChestTicketQty(initialChestTicketQuantity)
     endedRef.current = false
-    setComingSoonLabel(null)
     setActiveVideoId(null)
     setIsVideoPlaying(false)
     setPlaylistVideos([])
@@ -354,19 +353,17 @@ export default function ChildContentZonePopup({
   }, [])
 
   function handleMenuSelect(id: ChildContentMenuItemId) {
-    const item = CHILD_CONTENT_MENU_ITEMS.find((m) => m.id === id)
-    if (!item) return
+    if (!isChildContentMenuAvailable(id, level)) return
 
-    if (!isChildContentMenuAvailable(id, level)) {
-      setComingSoonLabel(childContentMenuLockLabel(id) ?? `${item.title}은(는) 곧 추가될 예정이에요!`)
+    if (chestTicketQty <= 0) {
+      onClose()
+      onOpenMarket()
       return
     }
 
     if (id === 'video') {
-      setComingSoonLabel(null)
       setPhase('browse')
     } else if (id === 'minigame') {
-      setComingSoonLabel(null)
       void startClawSession()
     }
   }
@@ -604,9 +601,6 @@ export default function ChildContentZonePopup({
                   />
                   <h3 className="text-base font-black text-gray-800">보물상자</h3>
                 </div>
-                <p className="mt-2 text-center text-[11px] font-bold leading-snug text-gray-400">
-                  마켓에서 이용권 구매 후 컨텐츠를 이용해보세요!
-                </p>
               </>
             ) : phase === 'browse' ? (
               <>
@@ -662,89 +656,74 @@ export default function ChildContentZonePopup({
               <ul className="flex flex-row items-stretch justify-center gap-3">
                 {CHILD_CONTENT_MENU_ITEMS.map((item) => {
                   const available = isChildContentMenuAvailable(item.id, level)
-                  const lockLabel = childContentMenuLockLabel(item.id)
                   return (
                     <li key={item.id} className="w-[min(42%,9.5rem)] max-w-[9.5rem]">
                       <button
                         type="button"
                         onClick={() => handleMenuSelect(item.id)}
-                        className={`flex h-full w-full flex-col items-center gap-2 rounded-2xl border px-2 py-3 text-center shadow-sm transition ${
-                          available
-                            ? 'border-gray-100 bg-white active:scale-[0.99]'
-                            : 'cursor-default border-gray-200 bg-gray-100 opacity-75'
+                        disabled={!available}
+                        aria-label={available ? item.title : `${item.title} — 잠김`}
+                        className={`flex h-full w-full flex-col items-center gap-2 rounded-2xl border border-gray-100 bg-white px-2 py-3 text-center shadow-sm transition ${
+                          available ? 'active:scale-[0.99]' : 'cursor-default opacity-60'
                         }`}
                       >
-                        {item.imageUrl ? (
-                          <span
-                            className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border p-1.5 ${
-                              available
-                                ? 'border-gray-100 bg-white'
-                                : 'border-gray-200 bg-white'
-                            }`}
-                          >
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                              src={item.imageUrl}
-                              alt=""
-                              width={48}
-                              height={48}
-                              className={`h-full w-full object-contain ${available ? '' : 'grayscale'}`}
-                              draggable={false}
-                            />
-                          </span>
-                        ) : null}
-                        <span className="flex flex-col items-center gap-0.5">
-                          <span className="flex flex-wrap items-center justify-center gap-1">
-                            <span
-                              className={`text-[13px] font-black leading-tight ${
-                                available ? 'text-gray-900' : 'text-gray-400'
-                              }`}
-                            >
-                              {item.title}
+                        {available ? (
+                          <>
+                            {item.imageUrl ? (
+                              <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-gray-100 bg-white p-1.5">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                  src={item.imageUrl}
+                                  alt=""
+                                  width={48}
+                                  height={48}
+                                  className="h-full w-full object-contain"
+                                  draggable={false}
+                                />
+                              </span>
+                            ) : null}
+                            <span className="flex flex-col items-center gap-0.5">
+                              <span className="text-[13px] font-black leading-tight text-gray-900">
+                                {item.title}
+                              </span>
+                              <span className="text-[10px] font-bold leading-snug text-gray-500">
+                                {item.description}
+                              </span>
                             </span>
-                          </span>
-                          <span
-                            className={`text-[10px] font-bold leading-snug ${
-                              available ? 'text-gray-500' : 'text-gray-400'
-                            }`}
-                          >
-                            {item.description}
-                          </span>
-                        </span>
-                        <span className="relative inline-flex min-h-[1.25rem] min-w-[1.25rem] items-center justify-center">
-                          <ContentTicketCountChip
-                            kind={item.id}
-                            quantity={chestTicketQty}
-                            size="sm"
-                            numbersOnly
-                            ariaHidden={!available}
-                          />
-                          {!available ? (
-                            <span
-                              className="absolute -inset-x-5 inset-y-0 flex items-center justify-center gap-1 rounded-md bg-gray-300 px-2 text-[9px] font-bold leading-none text-gray-600"
-                              aria-label={lockLabel ?? '준비중'}
-                            >
-                              {lockLabel ? (
-                                <>
-                                  <span aria-hidden>🔒</span>
-                                  {lockLabel}
-                                </>
-                              ) : (
-                                '준비중'
-                              )}
+                            <span className="relative inline-flex min-h-[1.25rem] min-w-[1.25rem] items-center justify-center">
+                              <ContentTicketCountChip
+                                kind={item.id}
+                                quantity={chestTicketQty}
+                                size="sm"
+                                numbersOnly
+                              />
                             </span>
-                          ) : null}
-                        </span>
+                          </>
+                        ) : (
+                          <>
+                            {item.imageUrl ? (
+                              <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-gray-100 bg-white p-1.5">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                  src={item.imageUrl}
+                                  alt=""
+                                  width={48}
+                                  height={48}
+                                  className="h-full w-full object-contain grayscale"
+                                  draggable={false}
+                                />
+                              </span>
+                            ) : null}
+                            <span className="flex flex-1 items-center justify-center text-3xl" aria-hidden>
+                              🔒
+                            </span>
+                          </>
+                        )}
                       </button>
                     </li>
                   )
                 })}
               </ul>
-              {comingSoonLabel ? (
-                <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-center text-[12px] font-bold text-amber-800">
-                  {comingSoonLabel}
-                </p>
-              ) : null}
             </div>
           ) : null}
 

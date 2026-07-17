@@ -21,7 +21,7 @@ import {
 } from '@/lib/parentMarketMenuSections'
 import { activeContentSortIndex, activeEventSortIndex, activeFoodSortIndex, BETA_MARKET_CONFIG, canonicalSnackCatalogName, isBetaActive, storeItemDisplayName } from '@/constants/betaMarketConfig'
 import { isContentZoneUnlocked } from '@/constants/childScreenFeatures'
-import { isQuantityPurchasableMarketItem } from '@/lib/contentTickets'
+import { CHEST_TICKET_ITEM_NAME, isQuantityPurchasableMarketItem } from '@/lib/contentTickets'
 import { parseJsonFromResponse } from '@/lib/parseJsonResponse'
 
 type Props = {
@@ -202,6 +202,9 @@ export default function MarketTab({
     return [...events, ...food, ...content]
   }, [visibleItems, contentZoneUnlocked])
 
+  /** 보물상자 팝업에서 티켓이 없을 때 등 — 잠깐 카드 테두리를 강조해 눈에 띄게 합니다 */
+  const [highlightedItemId, setHighlightedItemId] = useState<string | null>(null)
+
   /** 해금 안내 등에서 마켓 콘텐츠 구역으로 스크롤 */
   useEffect(() => {
     if (!initialScrollSection || betaItems.length === 0) return
@@ -217,7 +220,20 @@ export default function MarketTab({
       el?.scrollIntoView({ behavior: 'smooth', inline: 'start', block: 'nearest' })
       onInitialScrollDone?.()
     })
-    return () => cancelAnimationFrame(frame)
+
+    let highlightTimer: number | undefined
+    if (initialScrollSection === 'content') {
+      const chestItem = betaItems.find((item) => item.name.trim() === CHEST_TICKET_ITEM_NAME)
+      if (chestItem) {
+        setHighlightedItemId(chestItem.id)
+        highlightTimer = window.setTimeout(() => setHighlightedItemId(null), 2500)
+      }
+    }
+
+    return () => {
+      cancelAnimationFrame(frame)
+      if (highlightTimer != null) window.clearTimeout(highlightTimer)
+    }
   }, [initialScrollSection, betaItems, onInitialScrollDone])
 
   /**
@@ -826,6 +842,7 @@ export default function MarketTab({
             const canAfford = currentCredits >= item.credit_price
             /** 첫 몇 장만 우선 로드 */
             const thumbPriority = itemIdx < 4
+            const isHighlighted = highlightedItemId === item.id
 
             return (
               /*
@@ -834,7 +851,11 @@ export default function MarketTab({
                */
               <div
                 key={item.id}
-                className="relative flex w-[140px] flex-shrink-0 snap-start flex-col items-center gap-3 rounded-3xl border border-[#f0ece4] bg-white pt-5 px-3 pb-4 shadow-lg overflow-hidden"
+                className={`relative flex w-[140px] flex-shrink-0 snap-start flex-col items-center gap-3 rounded-3xl border bg-white pt-5 px-3 pb-4 shadow-lg overflow-hidden ${
+                  isHighlighted
+                    ? 'border-amber-400 animate-market-highlight-pulse'
+                    : 'border-[#f0ece4]'
+                }`}
               >
                 {/* 진행 중 요청 표시 */}
                 {isPending && (

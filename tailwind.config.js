@@ -51,11 +51,17 @@ module.exports = {
           '60%': { transform: 'rotate(8deg)' },
           '75%': { transform: 'rotate(-4deg)' },
         },
+        /** 마켓 선반: 특정 상품 카드를 잠깐 가리킬 때(테두리 링이 커졌다 작아지는 느낌) */
+        marketHighlightPulse: {
+          '0%, 100%': { boxShadow: '0 0 0 0 rgba(251, 191, 36, 0.55)' },
+          '50%': { boxShadow: '0 0 0 7px rgba(251, 191, 36, 0)' },
+        },
       },
       animation: {
         'market-parachute': 'marketParachuteDrop 2.4s cubic-bezier(0.22, 1, 0.36, 1) forwards',
         'market-moto': 'marketMotoBob 1.8s ease-in-out infinite',
         'parent-alarm-bell': 'parentAlarmBellWiggle 1.1s ease-in-out infinite',
+        'market-highlight-pulse': 'marketHighlightPulse 1s ease-in-out 3',
       },
       colors: {
         brand: {
