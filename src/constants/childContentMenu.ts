@@ -36,7 +36,7 @@ export const CHILD_CONTENT_MENU_ITEMS: ChildContentMenuItem[] = [
   {
     id: 'minigame',
     title: '미니게임',
-    description: '두뇌 개발 게임 플레이',
+    description: '두뇌발달을 돕는 게임',
     imageUrl: CONTENT_MINIGAME_TICKET_IMAGE_URL,
   },
 ]

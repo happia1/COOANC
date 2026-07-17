@@ -702,7 +702,7 @@ export default function ChildContentZonePopup({
                         ) : (
                           <>
                             {item.imageUrl ? (
-                              <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-gray-100 bg-white p-1.5">
+                              <span className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-gray-100 bg-white p-1.5">
                                 {/* eslint-disable-next-line @next/next/no-img-element */}
                                 <img
                                   src={item.imageUrl}
@@ -712,10 +712,21 @@ export default function ChildContentZonePopup({
                                   className="h-full w-full object-contain grayscale"
                                   draggable={false}
                                 />
+                                <span
+                                  className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-white text-[11px] shadow ring-1 ring-gray-200"
+                                  aria-hidden
+                                >
+                                  🔒
+                                </span>
                               </span>
                             ) : null}
-                            <span className="flex flex-1 items-center justify-center text-3xl" aria-hidden>
-                              🔒
+                            <span className="flex flex-col items-center gap-0.5">
+                              <span className="text-[13px] font-black leading-tight text-gray-900">
+                                {item.title}
+                              </span>
+                              <span className="text-[10px] font-bold leading-snug text-gray-500">
+                                {item.description}
+                              </span>
                             </span>
                           </>
                         )}
