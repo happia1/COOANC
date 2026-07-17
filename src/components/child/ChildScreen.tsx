@@ -1871,7 +1871,7 @@ export default function ChildScreen({
     setMinigameTicketQty(initialMinigameTicketQuantity)
   }, [initialMinigameTicketQuantity])
 
-  const minigameContentAvailable = isChildContentMenuAvailable('minigame')
+  const minigameContentAvailable = isChildContentMenuAvailable('minigame', stats?.current_level ?? 0)
   const totalContentTicketQty =
     videoTicketQty + (minigameContentAvailable ? minigameTicketQty : 0)
 
@@ -2890,6 +2890,7 @@ export default function ChildScreen({
         onClose={() => setContentZoneOpen(false)}
         childId={childId}
         channels={contentChannels}
+        level={stats?.current_level ?? 0}
         initialVideoTicketQuantity={videoTicketQty}
         initialMinigameTicketQuantity={minigameTicketQty}
         initialActiveSession={initialActiveContentSession}

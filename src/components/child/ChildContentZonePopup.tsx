@@ -2,7 +2,12 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { CHILD_CONTENT_MENU_ITEMS, type ChildContentMenuItemId } from '@/constants/childContentMenu'
+import {
+  CHILD_CONTENT_MENU_ITEMS,
+  childContentMenuLockLabel,
+  isChildContentMenuAvailable,
+  type ChildContentMenuItemId,
+} from '@/constants/childContentMenu'
 import ContentChannelThumbnail from '@/components/child/ContentChannelThumbnail'
 import {
   ContentTicketCountChip,
@@ -27,6 +32,8 @@ type Props = {
   onClose: () => void
   childId: string
   channels: ContentChannel[]
+  /** 자녀 현재 레벨 — 미니게임 메뉴 레벨 게이트(10)에 사용 */
+  level: number
   initialVideoTicketQuantity: number
   initialMinigameTicketQuantity: number
   initialActiveSession: ContentSession | null
@@ -60,6 +67,7 @@ export default function ChildContentZonePopup({
   onClose,
   childId,
   channels,
+  level,
   initialVideoTicketQuantity,
   initialMinigameTicketQuantity,
   initialActiveSession,
@@ -303,14 +311,16 @@ export default function ChildContentZonePopup({
     const item = CHILD_CONTENT_MENU_ITEMS.find((m) => m.id === id)
     if (!item) return
 
-    if (!item.available) {
-      setComingSoonLabel(item.title)
+    if (!isChildContentMenuAvailable(id, level)) {
+      setComingSoonLabel(childContentMenuLockLabel(id) ?? `${item.title}은(는) 곧 추가될 예정이에요!`)
       return
     }
 
     if (id === 'video') {
       setComingSoonLabel(null)
       setPhase('browse')
+    } else if (id === 'minigame') {
+      setComingSoonLabel(`${item.title}은(는) 곧 추가될 예정이에요!`)
     }
   }
 
@@ -500,78 +510,89 @@ export default function ChildContentZonePopup({
           {phase === 'menu' ? (
             <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
               <ul className="flex flex-row items-stretch justify-center gap-3">
-                {CHILD_CONTENT_MENU_ITEMS.map((item) => (
-                  <li key={item.id} className="w-[min(42%,9.5rem)] max-w-[9.5rem]">
-                    <button
-                      type="button"
-                      onClick={() => handleMenuSelect(item.id)}
-                      className={`flex h-full w-full flex-col items-center gap-2 rounded-2xl border px-2 py-3 text-center shadow-sm transition ${
-                        item.available
-                          ? 'border-gray-100 bg-white active:scale-[0.99]'
-                          : 'cursor-default border-gray-200 bg-gray-100 opacity-75'
-                      }`}
-                    >
-                      {item.imageUrl ? (
-                        <span
-                          className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border p-1.5 ${
-                            item.available
-                              ? 'border-gray-100 bg-white'
-                              : 'border-gray-200 bg-white'
-                          }`}
-                        >
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={item.imageUrl}
-                            alt=""
-                            width={48}
-                            height={48}
-                            className={`h-full w-full object-contain ${item.available ? '' : 'grayscale'}`}
-                            draggable={false}
-                          />
-                        </span>
-                      ) : null}
-                      <span className="flex flex-col items-center gap-0.5">
-                        <span className="flex flex-wrap items-center justify-center gap-1">
+                {CHILD_CONTENT_MENU_ITEMS.map((item) => {
+                  const available = isChildContentMenuAvailable(item.id, level)
+                  const lockLabel = childContentMenuLockLabel(item.id)
+                  return (
+                    <li key={item.id} className="w-[min(42%,9.5rem)] max-w-[9.5rem]">
+                      <button
+                        type="button"
+                        onClick={() => handleMenuSelect(item.id)}
+                        className={`flex h-full w-full flex-col items-center gap-2 rounded-2xl border px-2 py-3 text-center shadow-sm transition ${
+                          available
+                            ? 'border-gray-100 bg-white active:scale-[0.99]'
+                            : 'cursor-default border-gray-200 bg-gray-100 opacity-75'
+                        }`}
+                      >
+                        {item.imageUrl ? (
                           <span
-                            className={`text-[13px] font-black leading-tight ${
-                              item.available ? 'text-gray-900' : 'text-gray-400'
+                            className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border p-1.5 ${
+                              available
+                                ? 'border-gray-100 bg-white'
+                                : 'border-gray-200 bg-white'
                             }`}
                           >
-                            {item.title}
-                          </span>
-                        </span>
-                        <span
-                          className={`text-[10px] font-bold leading-snug ${
-                            item.available ? 'text-gray-500' : 'text-gray-400'
-                          }`}
-                        >
-                          {item.description}
-                        </span>
-                      </span>
-                      <span className="relative inline-flex min-h-[1.25rem] min-w-[1.25rem] items-center justify-center">
-                        <ContentTicketCountChip
-                          kind={item.id}
-                          quantity={item.id === 'video' ? videoTicketQty : minigameTicketQty}
-                          size="sm"
-                          numbersOnly
-                          ariaHidden={!item.available}
-                        />
-                        {!item.available ? (
-                          <span
-                            className="absolute -inset-x-5 inset-y-0 flex items-center justify-center rounded-md bg-gray-300 px-3 text-[9px] font-bold leading-none text-gray-600"
-                            aria-label="준비중"
-                          >
-                            준비중
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={item.imageUrl}
+                              alt=""
+                              width={48}
+                              height={48}
+                              className={`h-full w-full object-contain ${available ? '' : 'grayscale'}`}
+                              draggable={false}
+                            />
                           </span>
                         ) : null}
-                      </span>
-                    </button>
-                  </li>
-                ))}
+                        <span className="flex flex-col items-center gap-0.5">
+                          <span className="flex flex-wrap items-center justify-center gap-1">
+                            <span
+                              className={`text-[13px] font-black leading-tight ${
+                                available ? 'text-gray-900' : 'text-gray-400'
+                              }`}
+                            >
+                              {item.title}
+                            </span>
+                          </span>
+                          <span
+                            className={`text-[10px] font-bold leading-snug ${
+                              available ? 'text-gray-500' : 'text-gray-400'
+                            }`}
+                          >
+                            {item.description}
+                          </span>
+                        </span>
+                        <span className="relative inline-flex min-h-[1.25rem] min-w-[1.25rem] items-center justify-center">
+                          <ContentTicketCountChip
+                            kind={item.id}
+                            quantity={item.id === 'video' ? videoTicketQty : minigameTicketQty}
+                            size="sm"
+                            numbersOnly
+                            ariaHidden={!available}
+                          />
+                          {!available ? (
+                            <span
+                              className="absolute -inset-x-5 inset-y-0 flex items-center justify-center gap-1 rounded-md bg-gray-300 px-2 text-[9px] font-bold leading-none text-gray-600"
+                              aria-label={lockLabel ?? '준비중'}
+                            >
+                              {lockLabel ? (
+                                <>
+                                  <span aria-hidden>🔒</span>
+                                  {lockLabel}
+                                </>
+                              ) : (
+                                '준비중'
+                              )}
+                            </span>
+                          ) : null}
+                        </span>
+                      </button>
+                    </li>
+                  )
+                })}
               </ul>
               {comingSoonLabel ? (
                 <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-center text-[12px] font-bold text-amber-800">
-                  {comingSoonLabel}은(는) 곧 추가될 예정이에요!
+                  {comingSoonLabel}
                 </p>
               ) : null}
             </div>
