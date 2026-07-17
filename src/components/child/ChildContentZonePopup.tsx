@@ -5,13 +5,11 @@ import { createPortal } from 'react-dom'
 import {
   CHILD_CONTENT_MENU_ITEMS,
   isChildContentMenuAvailable,
+  MINIGAME_UNLOCK_LEVEL,
   type ChildContentMenuItemId,
 } from '@/constants/childContentMenu'
 import ContentChannelThumbnail from '@/components/child/ContentChannelThumbnail'
-import {
-  ContentTicketCountChip,
-  ContentVideoWatchBalanceRow,
-} from '@/components/child/ContentTicketBalanceDisplay'
+import { ContentVideoWatchBalanceRow } from '@/components/child/ContentTicketBalanceDisplay'
 import ContentWatchTimer from '@/components/child/ContentWatchTimer'
 import ContentYouTubePlayer from '@/components/child/ContentYouTubePlayer'
 import type { ContentChannel, ContentSession } from '@/types/database'
@@ -122,6 +120,8 @@ export default function ChildContentZonePopup({
   const [portalReady, setPortalReady] = useState(false)
   const [chestTicketQty, setChestTicketQty] = useState(initialChestTicketQuantity)
   const [phase, setPhase] = useState<Phase>('menu')
+  /** 잠긴 메뉴(레벨 미달)를 눌렀을 때 잠깐 보여줄 안내 문구 */
+  const [lockHint, setLockHint] = useState<string | null>(null)
   const [selectedChannel, setSelectedChannel] = useState<ContentChannel | null>(null)
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [remainingPlaySeconds, setRemainingPlaySeconds] = useState(0)
@@ -353,7 +353,11 @@ export default function ChildContentZonePopup({
   }, [])
 
   function handleMenuSelect(id: ChildContentMenuItemId) {
-    if (!isChildContentMenuAvailable(id, level)) return
+    if (!isChildContentMenuAvailable(id, level)) {
+      setLockHint(`레벨 ${MINIGAME_UNLOCK_LEVEL}에 열려요`)
+      window.setTimeout(() => setLockHint(null), 2000)
+      return
+    }
 
     if (chestTicketQty <= 0) {
       onClose()
@@ -661,80 +665,42 @@ export default function ChildContentZonePopup({
                       <button
                         type="button"
                         onClick={() => handleMenuSelect(item.id)}
-                        disabled={!available}
-                        aria-label={available ? item.title : `${item.title} — 잠김`}
+                        aria-label={available ? item.title : `${item.title} — 레벨 ${MINIGAME_UNLOCK_LEVEL}에 열려요`}
                         className={`flex h-full w-full flex-col items-center gap-2 rounded-2xl border border-gray-100 bg-white px-2 py-3 text-center shadow-sm transition ${
                           available ? 'active:scale-[0.99]' : 'cursor-default opacity-60'
                         }`}
                       >
-                        {available ? (
-                          <>
-                            {item.imageUrl ? (
-                              <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-gray-100 bg-white p-1.5">
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img
-                                  src={item.imageUrl}
-                                  alt=""
-                                  width={48}
-                                  height={48}
-                                  className="h-full w-full object-contain"
-                                  draggable={false}
-                                />
-                              </span>
-                            ) : null}
-                            <span className="flex flex-col items-center gap-0.5">
-                              <span className="text-[13px] font-black leading-tight text-gray-900">
-                                {item.title}
-                              </span>
-                              <span className="text-[10px] font-bold leading-snug text-gray-500">
-                                {item.description}
-                              </span>
-                            </span>
-                            <span className="relative inline-flex min-h-[1.25rem] min-w-[1.25rem] items-center justify-center">
-                              <ContentTicketCountChip
-                                kind={item.id}
-                                quantity={chestTicketQty}
-                                size="sm"
-                                numbersOnly
-                              />
-                            </span>
-                          </>
-                        ) : (
-                          <>
-                            {item.imageUrl ? (
-                              <span className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-gray-100 bg-white p-1.5">
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img
-                                  src={item.imageUrl}
-                                  alt=""
-                                  width={48}
-                                  height={48}
-                                  className="h-full w-full object-contain grayscale"
-                                  draggable={false}
-                                />
-                                <span
-                                  className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-white text-[11px] shadow ring-1 ring-gray-200"
-                                  aria-hidden
-                                >
-                                  🔒
-                                </span>
-                              </span>
-                            ) : null}
-                            <span className="flex flex-col items-center gap-0.5">
-                              <span className="text-[13px] font-black leading-tight text-gray-900">
-                                {item.title}
-                              </span>
-                              <span className="text-[10px] font-bold leading-snug text-gray-500">
-                                {item.description}
-                              </span>
-                            </span>
-                          </>
-                        )}
+                        {item.imageUrl ? (
+                          <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-gray-100 bg-white p-1.5">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={item.imageUrl}
+                              alt=""
+                              width={48}
+                              height={48}
+                              className={`h-full w-full object-contain ${available ? '' : 'grayscale'}`}
+                              draggable={false}
+                            />
+                          </span>
+                        ) : null}
+                        <span className="flex flex-col items-center gap-0.5">
+                          <span className="text-[13px] font-black leading-tight text-gray-900">
+                            {item.title}
+                          </span>
+                          <span className="text-[10px] font-bold leading-snug text-gray-500">
+                            {item.description}
+                          </span>
+                        </span>
                       </button>
                     </li>
                   )
                 })}
               </ul>
+              {lockHint ? (
+                <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-center text-[12px] font-bold text-amber-800">
+                  {lockHint}
+                </p>
+              ) : null}
             </div>
           ) : null}
 
