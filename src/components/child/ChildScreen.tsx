@@ -97,7 +97,7 @@ const ChildContentZonePopup = dynamic(() => import('@/components/child/ChildCont
   ssr: false,
 })
 import { remainingContentSeconds, toYouTubeContentEmbedUrl } from '@/lib/youtubeContent'
-import { CHILD_CONTENT_TREASURE_ICON_URL, isChildContentMenuAvailable } from '@/constants/childContentMenu'
+import { CHILD_CONTENT_TREASURE_ICON_URL } from '@/constants/childContentMenu'
 import PlantPot from '@/components/child/PlantPot'
 import PlantStageCelebrationModal from '@/components/child/PlantStageCelebrationModal'
 import SleepModeScreen from '@/components/child/SleepModeScreen'
@@ -441,10 +441,8 @@ type Props = {
 
   /** 콘텐츠존 채널 목록 */
   contentChannels: ContentChannel[]
-  /** 보유 영상 시청권 수 */
-  initialContentVideoTicketQuantity: number
-  /** 보유 미니게임 이용권 수 */
-  initialMinigameTicketQuantity: number
+  /** 보유 보물상자 티켓 수 (영상 시청·인형뽑기 미니게임 공용) */
+  initialChestTicketQuantity: number
   /** 진행 중 시청 세션 (있으면 복구) */
   initialActiveContentSession: ContentSession | null
 }
@@ -591,8 +589,7 @@ export default function ChildScreen({
   initialUnlockedItemIndexes,
   exitHref,
   contentChannels,
-  initialContentVideoTicketQuantity,
-  initialMinigameTicketQuantity,
+  initialChestTicketQuantity,
   initialActiveContentSession,
 }: Props) {
   /**
@@ -723,6 +720,15 @@ export default function ChildScreen({
   }, [])
 
   const onWaterPending = useCallback((pending: boolean) => {
+    pendingStatsWritesRef.current = Math.max(0, pendingStatsWritesRef.current + (pending ? 1 : -1))
+  }, [])
+
+  /** 인형뽑기 그랩 API가 저장한 하트·크레딧을 레벨 카드 `stats` 에도 바로 반영합니다. */
+  const onClawStatsSynced = useCallback((patch: Record<string, unknown>) => {
+    setStats((prev) => normalizeChildStatsCreditsSplit(mergeChildStatsPatch(prev, patch)))
+  }, [])
+
+  const onClawGrabPending = useCallback((pending: boolean) => {
     pendingStatsWritesRef.current = Math.max(0, pendingStatsWritesRef.current + (pending ? 1 : -1))
   }, [])
 
@@ -1860,20 +1866,11 @@ export default function ChildScreen({
     import('@/lib/parentMarketMenuSections').ParentMarketSectionId | null
   >(null)
   const [contentZoneOpen, setContentZoneOpen] = useState(false)
-  const [videoTicketQty, setVideoTicketQty] = useState(initialContentVideoTicketQuantity)
-  const [minigameTicketQty, setMinigameTicketQty] = useState(initialMinigameTicketQuantity)
+  const [chestTicketQty, setChestTicketQty] = useState(initialChestTicketQuantity)
 
   useEffect(() => {
-    setVideoTicketQty(initialContentVideoTicketQuantity)
-  }, [initialContentVideoTicketQuantity])
-
-  useEffect(() => {
-    setMinigameTicketQty(initialMinigameTicketQuantity)
-  }, [initialMinigameTicketQuantity])
-
-  const minigameContentAvailable = isChildContentMenuAvailable('minigame', stats?.current_level ?? 0)
-  const totalContentTicketQty =
-    videoTicketQty + (minigameContentAvailable ? minigameTicketQty : 0)
+    setChestTicketQty(initialChestTicketQuantity)
+  }, [initialChestTicketQuantity])
 
   const refreshContentTicketBalances = useCallback(async () => {
     try {
@@ -1882,9 +1879,8 @@ export default function ChildScreen({
         { credentials: 'same-origin' },
       )
       if (!res.ok) return
-      const json = (await res.json()) as { videoQuantity?: number; minigameQuantity?: number }
-      if (typeof json.videoQuantity === 'number') setVideoTicketQty(json.videoQuantity)
-      if (typeof json.minigameQuantity === 'number') setMinigameTicketQty(json.minigameQuantity)
+      const json = (await res.json()) as { chestTicketQuantity?: number }
+      if (typeof json.chestTicketQuantity === 'number') setChestTicketQty(json.chestTicketQuantity)
     } catch {
       /* 네트워크 실패 시 기존 표시 유지 */
     }
@@ -1909,9 +1905,8 @@ export default function ChildScreen({
     setMarketInitialScrollSection(null)
   }, [])
 
-  const handleContentTicketBalancesChange = useCallback((video: number, minigame: number) => {
-    setVideoTicketQty(video)
-    setMinigameTicketQty(minigame)
+  const handleChestTicketQuantityChange = useCallback((qty: number) => {
+    setChestTicketQty(qty)
   }, [])
 
   const openBearFromGift = useCallback(() => {
@@ -2421,11 +2416,7 @@ export default function ChildScreen({
                     onClick={openContentZone}
                     className={`${CHILD_HOME_EXIT_STICKER_CART_GLASS_CLASS} relative border-0 bg-transparent p-0 transition active:scale-95`}
                     style={CHILD_HOME_TOP_BAR_GLASS_STYLE}
-                    aria-label={
-                      minigameContentAvailable
-                        ? `보물상자 열기, 영상 이용권 ${videoTicketQty}개, 미니게임 이용권 ${minigameTicketQty}개`
-                        : `보물상자 열기, 영상 이용권 ${videoTicketQty}개`
-                    }
+                    aria-label={`보물상자 열기, 보물상자 티켓 ${chestTicketQty}개`}
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
@@ -2436,9 +2427,9 @@ export default function ChildScreen({
                       className="h-8 w-8 object-contain drop-shadow-md"
                       draggable={false}
                     />
-                    {totalContentTicketQty > 0 ? (
+                    {chestTicketQty > 0 ? (
                       <span className="absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-black text-white ring-2 ring-white">
-                        {totalContentTicketQty > 99 ? '99+' : totalContentTicketQty}
+                        {chestTicketQty > 99 ? '99+' : chestTicketQty}
                       </span>
                     ) : null}
                   </button>
@@ -2891,10 +2882,11 @@ export default function ChildScreen({
         childId={childId}
         channels={contentChannels}
         level={stats?.current_level ?? 0}
-        initialVideoTicketQuantity={videoTicketQty}
-        initialMinigameTicketQuantity={minigameTicketQty}
+        initialChestTicketQuantity={chestTicketQty}
         initialActiveSession={initialActiveContentSession}
-        onTicketBalancesChange={handleContentTicketBalancesChange}
+        onChestTicketQuantityChange={handleChestTicketQuantityChange}
+        onClawGrabPending={onClawGrabPending}
+        onClawStatsSynced={onClawStatsSynced}
         onGoToMissions={() => {
           missionSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
         }}

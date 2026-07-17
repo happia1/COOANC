@@ -3,18 +3,14 @@ import type { ContentChannel, ContentSession } from '@/types/database'
 
 export type ChildHomeContentZoneData = {
   channels: ContentChannel[]
-  videoTicketQuantity: number
-  minigameTicketQuantity: number
-  /** @deprecated `videoTicketQuantity` 사용 */
-  ticketQuantity: number
+  /** 영상 시청·인형뽑기 미니게임 공용 「보물상자 티켓」 수량 */
+  chestTicketQuantity: number
   activeSession: ContentSession | null
 }
 
 export const EMPTY_CHILD_HOME_CONTENT_ZONE: ChildHomeContentZoneData = {
   channels: [],
-  videoTicketQuantity: 0,
-  minigameTicketQuantity: 0,
-  ticketQuantity: 0,
+  chestTicketQuantity: 0,
   activeSession: null,
 }
 
@@ -37,14 +33,13 @@ export async function fetchChildHomeContentZoneData(
   childId: string,
 ): Promise<ChildHomeContentZoneData> {
   try {
-    const [channelsRes, ticketRes, minigameRes, sessionRes] = await Promise.all([
+    const [channelsRes, ticketRes, sessionRes] = await Promise.all([
       supabase.from('content_channels').select('*').order('order_index', { ascending: true }),
       supabase
         .from('content_tickets')
         .select('quantity, watch_seconds_remaining')
         .eq('child_id', childId)
         .maybeSingle(),
-      supabase.from('minigame_tickets').select('quantity').eq('child_id', childId).maybeSingle(),
       supabase
         .from('content_sessions')
         .select('*')
@@ -91,9 +86,7 @@ export async function fetchChildHomeContentZoneData(
 
     return {
       channels,
-      videoTicketQuantity: qty,
-      minigameTicketQuantity: readInt(minigameRes.data?.quantity),
-      ticketQuantity: qty,
+      chestTicketQuantity: qty,
       activeSession,
     }
   } catch (err) {

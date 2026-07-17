@@ -23,8 +23,7 @@ export async function GET(req: NextRequest) {
 
   const state = await fetchContentViewingState(supabase, resolved.childId)
   return NextResponse.json({
-    videoQuantity: state.videoTicketQuantity,
-    minigameQuantity: state.minigameTicketQuantity,
+    chestTicketQuantity: state.chestTicketQuantity,
     watchSecondsPool: state.watchSecondsPool,
     totalWatchSeconds: totalAvailableWatchSeconds(state),
     activeSession: state.activeSession,

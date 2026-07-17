@@ -397,8 +397,7 @@ export default async function ChildHomePage() {
       initialUnlockedItemIndexes={unlockedItemIndexes}
       exitHref={exitHref}
       contentChannels={contentZone.channels}
-      initialContentVideoTicketQuantity={contentZone.videoTicketQuantity}
-      initialMinigameTicketQuantity={contentZone.minigameTicketQuantity}
+      initialChestTicketQuantity={contentZone.chestTicketQuantity}
       initialActiveContentSession={contentZone.activeSession}
     />
   )

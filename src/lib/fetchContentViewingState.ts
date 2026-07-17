@@ -1,8 +1,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 export type ContentViewingState = {
-  videoTicketQuantity: number
-  minigameTicketQuantity: number
+  /** 영상 시청·인형뽑기 미니게임 공용 「보물상자 티켓」 수량 */
+  chestTicketQuantity: number
   watchSecondsPool: number
   activeSession: {
     id: string
@@ -12,8 +12,7 @@ export type ContentViewingState = {
 }
 
 const ZERO: ContentViewingState = {
-  videoTicketQuantity: 0,
-  minigameTicketQuantity: 0,
+  chestTicketQuantity: 0,
   watchSecondsPool: 0,
   activeSession: null,
 }
@@ -32,13 +31,12 @@ export async function fetchContentViewingState(
   childId: string,
 ): Promise<ContentViewingState> {
   try {
-    const [ticketRes, minigameRes, sessionRes] = await Promise.all([
+    const [ticketRes, sessionRes] = await Promise.all([
       supabase
         .from('content_tickets')
         .select('quantity, watch_seconds_remaining')
         .eq('child_id', childId)
         .maybeSingle(),
-      supabase.from('minigame_tickets').select('quantity').eq('child_id', childId).maybeSingle(),
       supabase
         .from('content_sessions')
         .select('id, remaining_play_seconds, duration_minutes, playlist_url, is_active')
@@ -78,8 +76,7 @@ export async function fetchContentViewingState(
         : null
 
     return {
-      videoTicketQuantity: qty,
-      minigameTicketQuantity: readInt(minigameRes.data?.quantity),
+      chestTicketQuantity: qty,
       watchSecondsPool,
       activeSession,
     }

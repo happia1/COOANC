@@ -34,12 +34,16 @@ type Props = {
   channels: ContentChannel[]
   /** 자녀 현재 레벨 — 미니게임 메뉴 레벨 게이트(10)에 사용 */
   level: number
-  initialVideoTicketQuantity: number
-  initialMinigameTicketQuantity: number
+  /** 영상 시청·인형뽑기 미니게임 공용 「보물상자 티켓」 수량 */
+  initialChestTicketQuantity: number
   initialActiveSession: ContentSession | null
   /** 「미션 하러 가기」 — 미션 카드 영역으로 스크롤 */
   onGoToMissions: () => void
-  onTicketBalancesChange: (videoQuantity: number, minigameQuantity: number) => void
+  onChestTicketQuantityChange: (quantity: number) => void
+  /** 인형뽑기 그랩 API 요청 중임을 ChildScreen의 pendingStatsWritesRef 카운터에 알림 */
+  onClawGrabPending: (pending: boolean) => void
+  /** 인형뽑기로 받은 하트·크레딧을 ChildScreen의 stats에 반영 */
+  onClawStatsSynced: (patch: Record<string, unknown>) => void
 }
 
 /** menu · browse · pickVideo(영상 선택) · watching · timeup */
@@ -68,15 +72,15 @@ export default function ChildContentZonePopup({
   childId,
   channels,
   level,
-  initialVideoTicketQuantity,
-  initialMinigameTicketQuantity,
+  initialChestTicketQuantity,
   initialActiveSession,
   onGoToMissions,
-  onTicketBalancesChange,
+  onChestTicketQuantityChange,
+  onClawGrabPending,
+  onClawStatsSynced,
 }: Props) {
   const [portalReady, setPortalReady] = useState(false)
-  const [videoTicketQty, setVideoTicketQty] = useState(initialVideoTicketQuantity)
-  const [minigameTicketQty, setMinigameTicketQty] = useState(initialMinigameTicketQuantity)
+  const [chestTicketQty, setChestTicketQty] = useState(initialChestTicketQuantity)
   const [phase, setPhase] = useState<Phase>('menu')
   const [comingSoonLabel, setComingSoonLabel] = useState<string | null>(null)
   const [selectedChannel, setSelectedChannel] = useState<ContentChannel | null>(null)
@@ -95,7 +99,7 @@ export default function ChildContentZonePopup({
 
   const totalAvailableSeconds = watchSecondsPool + (sessionId ? remainingPlaySeconds : 0)
   const displayWatchSeconds = totalVideoWatchSecondsFromBalances(
-    videoTicketQty,
+    chestTicketQty,
     watchSecondsPool,
     sessionId ? remainingPlaySeconds : 0,
   )
@@ -177,13 +181,12 @@ export default function ChildContentZonePopup({
     }
   }, [])
 
-  const syncTicketBalances = useCallback(
-    (video: number, minigame: number) => {
-      setVideoTicketQty(video)
-      setMinigameTicketQty(minigame)
-      onTicketBalancesChange(video, minigame)
+  const syncChestTicketQty = useCallback(
+    (quantity: number) => {
+      setChestTicketQty(quantity)
+      onChestTicketQuantityChange(quantity)
     },
-    [onTicketBalancesChange],
+    [onChestTicketQuantityChange],
   )
 
   const resetToMenu = useCallback(() => {
@@ -207,8 +210,7 @@ export default function ChildContentZonePopup({
     popupOpenedRef.current = true
     if (!isFirstOpen) return
 
-    setVideoTicketQty(initialVideoTicketQuantity)
-    setMinigameTicketQty(initialMinigameTicketQuantity)
+    setChestTicketQty(initialChestTicketQuantity)
     endedRef.current = false
     setComingSoonLabel(null)
     setActiveVideoId(null)
@@ -244,8 +246,7 @@ export default function ChildContentZonePopup({
     }
   }, [
     open,
-    initialVideoTicketQuantity,
-    initialMinigameTicketQuantity,
+    initialChestTicketQuantity,
     initialActiveSession,
     childId,
     channels,
@@ -263,8 +264,7 @@ export default function ChildContentZonePopup({
         )
         if (!res.ok) return
         const json = (await res.json()) as {
-          videoQuantity?: number
-          minigameQuantity?: number
+          chestTicketQuantity?: number
           watchSecondsPool?: number
           totalWatchSeconds?: number
           activeSession?: {
@@ -273,11 +273,10 @@ export default function ChildContentZonePopup({
             playlistUrl?: string | null
           } | null
         }
-        syncTicketBalances(
-          typeof json.videoQuantity === 'number' ? json.videoQuantity : initialVideoTicketQuantity,
-          typeof json.minigameQuantity === 'number'
-            ? json.minigameQuantity
-            : initialMinigameTicketQuantity,
+        syncChestTicketQty(
+          typeof json.chestTicketQuantity === 'number'
+            ? json.chestTicketQuantity
+            : initialChestTicketQuantity,
         )
         if (typeof json.watchSecondsPool === 'number') {
           setWatchSecondsPool(json.watchSecondsPool)
@@ -297,9 +296,8 @@ export default function ChildContentZonePopup({
   }, [
     open,
     childId,
-    initialVideoTicketQuantity,
-    initialMinigameTicketQuantity,
-    syncTicketBalances,
+    initialChestTicketQuantity,
+    syncChestTicketQty,
     phase,
   ])
 
@@ -353,7 +351,7 @@ export default function ChildContentZonePopup({
         return
       }
       if (typeof json.remainingQuantity === 'number') {
-        syncTicketBalances(json.remainingQuantity, minigameTicketQty)
+        syncChestTicketQty(json.remainingQuantity)
       }
       if (typeof json.watchSecondsPool === 'number') {
         setWatchSecondsPool(json.watchSecondsPool)
@@ -481,7 +479,7 @@ export default function ChildContentZonePopup({
                 </div>
                 <div className="mt-2 flex justify-center">
                   <ContentVideoWatchBalanceRow
-                    ticketQuantity={videoTicketQty}
+                    ticketQuantity={chestTicketQty}
                     watchTimeLabel={formatWatchTimeClock(displayWatchSeconds)}
                   />
                 </div>
@@ -494,7 +492,7 @@ export default function ChildContentZonePopup({
                 <h3 className="text-center text-base font-black text-gray-800">시청 시작</h3>
                 <div className="mt-2 flex justify-center">
                   <ContentVideoWatchBalanceRow
-                    ticketQuantity={videoTicketQty}
+                    ticketQuantity={chestTicketQty}
                     watchTimeLabel={formatWatchTimeClock(
                       sessionId && remainingPlaySeconds > 0
                         ? remainingPlaySeconds
@@ -564,7 +562,7 @@ export default function ChildContentZonePopup({
                         <span className="relative inline-flex min-h-[1.25rem] min-w-[1.25rem] items-center justify-center">
                           <ContentTicketCountChip
                             kind={item.id}
-                            quantity={item.id === 'video' ? videoTicketQty : minigameTicketQty}
+                            quantity={chestTicketQty}
                             size="sm"
                             numbersOnly
                             ariaHidden={!available}
