@@ -46,8 +46,46 @@ type Props = {
   onClawStatsSynced: (patch: Record<string, unknown>) => void
 }
 
-/** menu · browse · pickVideo(영상 선택) · watching · timeup */
-type Phase = 'menu' | 'browse' | 'pickVideo' | 'watching' | 'timeup'
+/** menu · browse · pickVideo(영상 선택) · watching · timeup · clawMachine(인형뽑기) */
+type Phase = 'menu' | 'browse' | 'pickVideo' | 'watching' | 'timeup' | 'clawMachine'
+
+type ClawPrize =
+  | { type: 'hearts'; amount: number }
+  | { type: 'credits'; amount: number }
+  | { type: 'seed'; treeId: string }
+  | { type: 'ticket'; amount: number }
+  | { type: 'snack'; storeItemId: string; storeItemName: string; storeItemImageUrl: string | null }
+
+type ClawSlotData = { position: number; prize: ClawPrize }
+/** 유리장 6칸 — 고정 길이 배열, 당첨된 자리는 null(위치 정보는 그대로 유지) */
+type ClawSlot = ClawSlotData | null
+
+const CLAW_SLOT_COUNT = 6
+/** 좌/우 버튼 1회 탭당 이동량(%) — 히트 반경(~12.5%) 대비 슬롯 사이를 충분히 세밀하게 조준 가능 */
+const CLAW_STEP_PCT = 4
+
+const CLAW_PRIZE_ICON: Record<ClawPrize['type'], string> = {
+  hearts: '❤️',
+  credits: '🪙',
+  seed: '🌱',
+  ticket: '🎟️',
+  snack: '🍪',
+}
+
+function clawPrizeLabel(prize: ClawPrize): string {
+  switch (prize.type) {
+    case 'hearts':
+      return `하트 +${prize.amount}`
+    case 'credits':
+      return `크레딧 +${prize.amount}`
+    case 'seed':
+      return '화분 씨앗 1개'
+    case 'ticket':
+      return `보물상자 티켓 +${prize.amount}`
+    case 'snack':
+      return prize.storeItemName
+  }
+}
 
 function readSessionRemainingSeconds(session: ContentSession): number {
   if (
@@ -96,6 +134,16 @@ export default function ChildContentZonePopup({
   const endedRef = useRef(false)
   /** 팝업이 이미 열린 상태인지 — 이용권 갱신 시 메뉴로 롤백하지 않기 위함 */
   const popupOpenedRef = useRef(false)
+
+  // ── 인형뽑기(클로우 머신) ──────────────────────────────────────────────
+  const [clawSessionId, setClawSessionId] = useState<string | null>(null)
+  const [clawSlots, setClawSlots] = useState<ClawSlot[]>([])
+  const [clawTriesLeft, setClawTriesLeft] = useState(5)
+  const [clawPosition, setClawPosition] = useState(50)
+  const [clawBusy, setClawBusy] = useState(false)
+  const [clawReveal, setClawReveal] = useState<{ hit: boolean; prize?: ClawPrize } | null>(null)
+  const [clawSessionOver, setClawSessionOver] = useState(false)
+  const [clawWonThisSession, setClawWonThisSession] = useState<ClawPrize[]>([])
 
   const totalAvailableSeconds = watchSecondsPool + (sessionId ? remainingPlaySeconds : 0)
   const displayWatchSeconds = totalVideoWatchSecondsFromBalances(
@@ -318,8 +366,112 @@ export default function ChildContentZonePopup({
       setComingSoonLabel(null)
       setPhase('browse')
     } else if (id === 'minigame') {
-      setComingSoonLabel(`${item.title}은(는) 곧 추가될 예정이에요!`)
+      setComingSoonLabel(null)
+      void startClawSession()
     }
+  }
+
+  async function startClawSession() {
+    if (clawBusy) return
+    setClawBusy(true)
+    onClawGrabPending(true)
+    try {
+      const res = await fetch('/api/child/minigame/claw-session-start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ childId }),
+      })
+      const json = (await res.json().catch(() => ({}))) as {
+        error?: string
+        sessionId?: string
+        layout?: ClawSlotData[]
+        triesLeft?: number
+        chestTicketQuantity?: number
+      }
+      if (!res.ok || !json.sessionId) {
+        window.alert(json.error ?? '게임을 시작할 수 없어요')
+        return
+      }
+      const slots: ClawSlot[] = Array.from({ length: CLAW_SLOT_COUNT }, (_, i) =>
+        (json.layout ?? []).find((s) => s.position === i) ?? null,
+      )
+      setClawSessionId(json.sessionId)
+      setClawSlots(slots)
+      setClawTriesLeft(typeof json.triesLeft === 'number' ? json.triesLeft : 5)
+      setClawPosition(50)
+      setClawSessionOver(false)
+      setClawWonThisSession([])
+      setClawReveal(null)
+      if (typeof json.chestTicketQuantity === 'number') {
+        syncChestTicketQty(json.chestTicketQuantity)
+      }
+      setPhase('clawMachine')
+    } finally {
+      setClawBusy(false)
+      onClawGrabPending(false)
+    }
+  }
+
+  function nudgeClaw(direction: -1 | 1) {
+    if (clawBusy || clawReveal) return
+    setClawPosition((p) => Math.max(0, Math.min(100, p + direction * CLAW_STEP_PCT)))
+  }
+
+  async function handleClawGrab() {
+    if (clawBusy || clawReveal || clawTriesLeft <= 0 || !clawSessionId) return
+    setClawBusy(true)
+    onClawGrabPending(true)
+    try {
+      const res = await fetch('/api/child/minigame/claw-grab', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ childId, sessionId: clawSessionId, clawPosition }),
+      })
+      const json = (await res.json().catch(() => ({}))) as {
+        error?: string
+        hit?: boolean
+        prize?: ClawPrize
+        wonPosition?: number
+        triesLeft?: number
+        sessionStatus?: 'active' | 'completed'
+        statsPatch?: Record<string, unknown>
+        chestTicketQuantity?: number
+      }
+      if (!res.ok) {
+        window.alert(json.error ?? '뽑기에 실패했어요')
+        return
+      }
+
+      const hit = Boolean(json.hit)
+      const prize = json.prize
+      setClawReveal({ hit, prize })
+      if (typeof json.triesLeft === 'number') setClawTriesLeft(json.triesLeft)
+      if (hit && prize && typeof json.wonPosition === 'number') {
+        const wonPosition = json.wonPosition
+        setClawSlots((prev) => prev.map((s) => (s && s.position === wonPosition ? null : s)))
+        setClawWonThisSession((prev) => [...prev, prize])
+      }
+      if (json.statsPatch) onClawStatsSynced(json.statsPatch)
+      if (typeof json.chestTicketQuantity === 'number') syncChestTicketQty(json.chestTicketQuantity)
+
+      const sessionCompleted = json.sessionStatus === 'completed'
+      window.setTimeout(() => {
+        setClawReveal(null)
+        if (sessionCompleted) setClawSessionOver(true)
+      }, 1500)
+    } finally {
+      setClawBusy(false)
+      onClawGrabPending(false)
+    }
+  }
+
+  function handleClawExit() {
+    setPhase('menu')
+    setClawSessionId(null)
+    setClawSlots([])
+    setClawSessionOver(false)
+    setClawWonThisSession([])
+    setClawReveal(null)
   }
 
   function handleChannelClick(channel: ContentChannel) {
@@ -398,7 +550,7 @@ export default function ChildContentZonePopup({
   }
 
   function handleCloseOverlay() {
-    if (phase === 'watching' || phase === 'pickVideo') return
+    if (phase === 'watching' || phase === 'pickVideo' || phase === 'clawMachine') return
     if (phase === 'browse' && sessionId && remainingSecRef.current > 0) {
       void saveSessionProgress(remainingSecRef.current).finally(() => onClose())
       return
@@ -417,7 +569,7 @@ export default function ChildContentZonePopup({
       aria-modal="true"
       aria-label="보물상자 콘텐츠"
     >
-      {phase !== 'watching' && phase !== 'pickVideo' && phase !== 'timeup' ? (
+      {phase !== 'watching' && phase !== 'pickVideo' && phase !== 'timeup' && phase !== 'clawMachine' ? (
         <button
           type="button"
           className="absolute inset-0 bg-black/45"
@@ -749,6 +901,128 @@ export default function ChildContentZonePopup({
           >
             미션 하러 가기
           </button>
+        </div>
+      ) : null}
+
+      {/* ── 인형뽑기(클로우 머신) ── */}
+      {phase === 'clawMachine' ? (
+        <div className="relative z-[1] flex h-full w-full flex-col items-center justify-between bg-gradient-to-b from-indigo-950 via-indigo-900 to-indigo-950 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(1rem,env(safe-area-inset-top))]">
+          <div className="flex w-full flex-col items-center gap-2">
+            <div className="flex w-full items-center justify-between">
+              <button
+                type="button"
+                onClick={handleClawExit}
+                className="rounded-lg bg-white/10 px-2.5 py-1 text-[12px] font-bold text-white"
+                aria-label="메뉴로 돌아가기"
+              >
+                ← 메뉴
+              </button>
+              <h3 className="text-base font-black text-white">인형뽑기</h3>
+              <span className="w-[52px]" aria-hidden />
+            </div>
+            <div className="flex items-center gap-1.5" aria-label={`남은 시도 ${clawTriesLeft}번`}>
+              {Array.from({ length: 5 }).map((_, i) => (
+                <span
+                  key={i}
+                  className={`h-3 w-3 rounded-full ${i < clawTriesLeft ? 'bg-rose-400' : 'bg-white/20'}`}
+                  aria-hidden
+                />
+              ))}
+            </div>
+          </div>
+
+          <div className="relative flex w-full flex-1 items-center">
+            <div className="relative mx-auto w-full max-w-sm rounded-2xl border-4 border-white/20 bg-white/5 py-8 shadow-inner">
+              <div className="grid grid-cols-6 gap-1 px-2">
+                {clawSlots.map((slot, i) => (
+                  <div
+                    key={i}
+                    className="flex aspect-square items-center justify-center rounded-lg bg-white/10 text-2xl"
+                  >
+                    {slot ? CLAW_PRIZE_ICON[slot.prize.type] : ''}
+                  </div>
+                ))}
+              </div>
+              <div
+                className="pointer-events-none absolute top-0 -translate-x-1/2 text-2xl transition-[left] duration-150"
+                style={{ left: `${clawPosition}%` }}
+                aria-hidden
+              >
+                🪝
+              </div>
+            </div>
+          </div>
+
+          <div className="flex w-full max-w-sm items-center justify-center gap-4 pb-2">
+            <button
+              type="button"
+              onClick={() => nudgeClaw(-1)}
+              disabled={clawBusy || Boolean(clawReveal)}
+              className="flex h-12 w-12 items-center justify-center rounded-full bg-white/15 text-xl font-black text-white disabled:opacity-40"
+              aria-label="클로우 왼쪽으로"
+            >
+              ◀
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleClawGrab()}
+              disabled={clawBusy || Boolean(clawReveal) || clawTriesLeft <= 0}
+              className="flex h-16 w-16 items-center justify-center rounded-full bg-rose-500 text-sm font-black text-white shadow-lg disabled:opacity-40"
+              aria-label="뽑기"
+            >
+              뽑기
+            </button>
+            <button
+              type="button"
+              onClick={() => nudgeClaw(1)}
+              disabled={clawBusy || Boolean(clawReveal)}
+              className="flex h-12 w-12 items-center justify-center rounded-full bg-white/15 text-xl font-black text-white disabled:opacity-40"
+              aria-label="클로우 오른쪽으로"
+            >
+              ▶
+            </button>
+          </div>
+
+          {clawReveal ? (
+            <div className="absolute inset-0 z-[3] flex items-center justify-center bg-black/60">
+              <div className="flex flex-col items-center gap-2 rounded-3xl bg-white px-8 py-6 shadow-2xl">
+                {clawReveal.hit && clawReveal.prize ? (
+                  <>
+                    <span className="text-4xl">{CLAW_PRIZE_ICON[clawReveal.prize.type]}</span>
+                    <p className="text-center text-base font-black text-gray-900">
+                      {clawPrizeLabel(clawReveal.prize)}
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-center text-lg font-black text-gray-500">꽝!</p>
+                )}
+              </div>
+            </div>
+          ) : null}
+
+          {clawSessionOver ? (
+            <div className="absolute inset-0 z-[4] flex flex-col items-center justify-center gap-4 bg-black/80 p-6">
+              <p className="text-center text-lg font-black text-white">뽑기가 끝났어요!</p>
+              {clawWonThisSession.length > 0 ? (
+                <ul className="flex flex-col items-center gap-1">
+                  {clawWonThisSession.map((prize, i) => (
+                    <li key={i} className="text-sm font-bold text-white/90">
+                      {CLAW_PRIZE_ICON[prize.type]} {clawPrizeLabel(prize)}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-sm font-bold text-white/70">이번엔 못 뽑았어요, 다음에 또 해봐요!</p>
+              )}
+              <button
+                type="button"
+                onClick={handleClawExit}
+                className="mt-2 w-full max-w-xs rounded-2xl bg-amber-400 py-3.5 text-base font-black text-gray-900"
+              >
+                메뉴로 돌아가기
+              </button>
+            </div>
+          ) : null}
         </div>
       ) : null}
     </div>,
