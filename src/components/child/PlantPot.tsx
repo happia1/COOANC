@@ -6,7 +6,7 @@
  * 비개발자 설명:
  * - 바깥 화면에는 화분 그림만 보입니다. 탭하면 팝업이 열립니다.
  * - 팝업 가운데에 화분, 오른쪽에 물조리개가 있습니다.
- * - 물조리개: 물방울 연출과 함께 식물이 자랍니다(하트 1 소모).
+ * - 물조리개: 하트가 화분으로 포물선을 그리며 날아가는 연출과 함께 식물이 자랍니다(하트 1 소모).
  */
 
 import { useEffect, useRef, useState } from 'react'
@@ -48,6 +48,8 @@ export type PlantPotWaterActions = {
    * 7단계(완성)에서는 하트가 0이어도 서버가 화분만 씨앗으로 돌립니다 — 물조리개 잠금을 풉니다.
    */
   allowWaterWithoutHearts?: boolean
+  /** 단계 상승 축하 팝업이 떠 있는 동안 true — 물조리개가 튕기는 연출만 보여주고 물주기를 막습니다 */
+  locked?: boolean
 }
 
 export type PlantPotSeedSelect = {
@@ -206,22 +208,38 @@ function PlantShovelImage({
   )
 }
 
-/** 물조리개 탭 시 화분 위로 떨어지는 물방울 */
-function WaterDrop({ index }: { index: number }) {
-  const offsetX = (index - 1) * 10
+/** 물주기 성공 시 화분으로 포물선을 그리며 날아가는 하트 1개의 궤적 데이터 */
+type HeartBurst = {
+  id: number
+  startX: number
+  startY: number
+  dx: number
+  dy: number
+  arc: number
+}
+
+/** 물조리개 탭 시 화분으로 날아가는 하트 — 연속 탭이면 여러 개가 겹쳐 날아갑니다 */
+function HeartFly({ burst }: { burst: HeartBurst }) {
   return (
     <span
-      className="pointer-events-none absolute left-1/2 top-0 text-sky-400"
+      className="pointer-events-none absolute left-0 top-0"
       style={{
-        marginLeft: offsetX,
-        fontSize: 14,
-        lineHeight: 1,
-        animation: 'plantWaterDrop 620ms ease-in forwards',
-        animationDelay: `${index * 90}ms`,
+        left: burst.startX,
+        top: burst.startY,
+        animation: 'plantPotHeartArc 620ms ease-out forwards',
+        ['--dx' as string]: `${burst.dx}px`,
+        ['--dy' as string]: `${burst.dy}px`,
+        ['--arc' as string]: `${burst.arc}px`,
       }}
       aria-hidden
     >
-      💧
+      <SpriteImage
+        sheet={ICONS}
+        frame="heart"
+        width={18}
+        clipRotated={false}
+        className="h-[18px] w-[18px] object-contain"
+      />
     </span>
   )
 }
@@ -234,8 +252,9 @@ export default function PlantPot({ pot, seedSelect, waterActions }: Props) {
   const [statusPopupOpen, setStatusPopupOpen] = useState(false)
   const [inspectWiggle, setInspectWiggle] = useState(false)
   const [portalReady, setPortalReady] = useState(false)
-  /** 물조리개 탭 시 화분 위 물방울 연출 */
-  const [waterPourBurst, setWaterPourBurst] = useState(false)
+  /** 물조리개 탭 시 화분으로 날아가는 하트들 — 탭마다 하나씩 쌓였다 각자 사라집니다 */
+  const [heartBursts, setHeartBursts] = useState<HeartBurst[]>([])
+  const heartBurstIdRef = useRef(0)
   const arcWrapRef = useRef<HTMLDivElement>(null)
   const canVisualRef = useRef<HTMLDivElement>(null)
   const potVisualRef = useRef<HTMLDivElement>(null)
@@ -308,12 +327,37 @@ export default function PlantPot({ pot, seedSelect, waterActions }: Props) {
     window.setTimeout(() => setInspectWiggle(false), 420)
   }
 
-  /** 물조리개 — 물방울 연출 + 성장 API */
-  async function handleWaterInPopup(): Promise<WaterResult> {
+  /**
+   * 물조리개 — 탭 즉시 하트 1개가 화분으로 포물선을 그리며 날아가는 연출 + 성장 API.
+   * 서버 응답을 기다리지 않고 탭마다 바로 쏘아 올려, 연속 탭에서도 하트가 하나씩 연달아 날아갑니다.
+   */
+  function handleWaterInPopup(): Promise<WaterResult> {
     playToolClickSound()
-    setWaterPourBurst(true)
-    window.setTimeout(() => setWaterPourBurst(false), 720)
-    if (!waterActions) return 'ok'
+
+    const wrap = arcWrapRef.current
+    const canEl = canVisualRef.current
+    const potEl = potVisualRef.current
+    if (wrap && canEl && potEl) {
+      const ww = wrap.getBoundingClientRect()
+      const cw = canEl.getBoundingClientRect()
+      const pw = potEl.getBoundingClientRect()
+      /** 물조리개 입구 쪽(좌측)에서 출발 */
+      const startX = cw.left + cw.width * 0.28 - ww.left
+      const startY = cw.top + cw.height * 0.54 - ww.top
+      /** 화분 중앙으로 정확히 도착 */
+      const targetX = pw.left + pw.width * 0.5 - ww.left
+      const targetY = pw.top + pw.height * 0.5 - ww.top
+      const dx = targetX - startX
+      const dy = targetY - startY
+      const arc = Math.max(18, Math.abs(dx) * 0.24)
+      const id = ++heartBurstIdRef.current
+      setHeartBursts((prev) => [...prev, { id, startX, startY, dx, dy, arc }])
+      window.setTimeout(() => {
+        setHeartBursts((prev) => prev.filter((b) => b.id !== id))
+      }, 700)
+    }
+
+    if (!waterActions) return Promise.resolve('ok')
     return waterActions.water()
   }
 
@@ -375,13 +419,6 @@ export default function PlantPot({ pot, seedSelect, waterActions }: Props) {
                   className={popupPotImageClass}
                   sizes="112px"
                 />
-                {waterPourBurst ? (
-                  <div className="pointer-events-none absolute inset-x-0 top-2 flex justify-center">
-                    {[0, 1, 2].map((i) => (
-                      <WaterDrop key={i} index={i} />
-                    ))}
-                  </div>
-                ) : null}
               </div>
 
               {/* 물조리개 — 화분 오른쪽 */}
@@ -392,12 +429,18 @@ export default function PlantPot({ pot, seedSelect, waterActions }: Props) {
                 <WateringCanButton
                   hearts={waterActions.hearts}
                   disabled={false}
+                  locked={waterActions.locked}
                   allowWaterWithoutHearts={waterActions.allowWaterWithoutHearts}
                   onWater={handleWaterInPopup}
                   onNoHearts={waterActions.onNoHearts}
                   onGrowthCelebrate={waterActions.onGrowthCelebrate}
                 />
               </div>
+
+              {/* 물주기 성공 시 하트가 화분으로 포물선을 그리며 날아갑니다(연속 탭이면 여러 개 동시 표시) */}
+              {heartBursts.map((burst) => (
+                <HeartFly key={burst.id} burst={burst} />
+              ))}
             </div>
 
             <div className="mx-auto mt-2 w-[82%] px-1">
@@ -446,17 +489,21 @@ export default function PlantPot({ pot, seedSelect, waterActions }: Props) {
         )}
       </div>
       <style>{`
-        @keyframes plantWaterDrop {
+        @keyframes plantPotHeartArc {
           0% {
-            transform: translateY(0) scale(0.7);
-            opacity: 0;
+            transform: translate(0, 0) scale(0.95);
+            opacity: 1;
           }
-          15% {
+          55% {
+            transform: translate(
+              calc(var(--dx, 0px) * 0.55),
+              calc(var(--dy, 0px) * 0.55 - var(--arc, 24px))
+            ) scale(1.08);
             opacity: 1;
           }
           100% {
-            transform: translateY(52px) scale(1);
-            opacity: 0;
+            transform: translate(var(--dx, 0px), var(--dy, 0px)) scale(0.8);
+            opacity: 0.08;
           }
         }
       `}</style>

@@ -50,6 +50,8 @@ export type PotState = {
 export type WaterResult =
   | 'ok'
   | 'no_hearts'
+  /** 단계 상승 축하 팝업이 떠 있는 동안(잠금 중) 들어온 물주기 — 하트 소모 없음 */
+  | 'locked'
   | { type: 'grew'; newStage: PlantStage; harvest?: PlantHarvestCelebrate }
 
 export type BuySeedResult =
@@ -134,6 +136,19 @@ export function usePlantPot(
   onWaterPendingRef.current = options?.onWaterPending
   /** 큐에 쌓인 물주기 요청 수 — 0→1, 1→0 전이에서만 onWaterPending을 알립니다 */
   const pendingWaterCountRef = useRef(0)
+  /**
+   * 단계 상승(레벨업) 경계 잠금 — 낙관적 계산에서 levelUp이 확정되는 순간 true.
+   * 이후 들어오는 water() 호출은 즉시 'locked'를 돌려주고 하트를 건드리지 않습니다.
+   * `stageTransitionLockRef`는 water() 내부의 동기 가드용, `stageLocked`는 버튼 등 UI에 반응형으로 전달합니다.
+   */
+  const stageTransitionLockRef = useRef(false)
+  const [stageLocked, setStageLocked] = useState(false)
+  /**
+   * 화분 "생애주기" 세대 번호 — 7단계 완성(재심기 대기) 또는 새 씨앗 심기 성공 시 +1.
+   * 물주기 호출 시점의 세대를 캡처해 뒀다가, 큐에서 실제 서버 전송 직전 세대가 달라졌으면
+   * (그 사이 완성·재심기가 끼어든 것) 이미 낡은 요청이므로 전송하지 않고 버립니다.
+   */
+  const potGenerationRef = useRef(0)
 
   /** `syncStats`: true 면 상단 레벨 카드 `stats.hearts` 도 맞춥니다(물주기 성공 등). refresh 는 false 로 훅만 갱신합니다. */
   const syncHeartsFromDb = useCallback((value: unknown, syncStats = true) => {
@@ -426,6 +441,10 @@ export function usePlantPot(
 
   const water = useCallback(
     async (displayHearts?: number): Promise<WaterResult> => {
+      if (stageTransitionLockRef.current) {
+        return 'locked'
+      }
+
       const prevPot = pot
       if (!prevPot?.hasChosenSeed || needsPotSeedSelection(prevPot)) {
         return 'ok'
@@ -464,9 +483,29 @@ export function usePlantPot(
           heartsNeeded: getHeartsNeededForStage(prevPot.treeId, newStage),
           completed: isCompleted,
         })
+
+        /**
+         * 레벨업 경계 — 축하 팝업이 닫힐 때까지 이후 water() 호출을 즉시 'locked'로 막습니다.
+         * 완성(7단계)이면 세대도 올려 두어, 이 시점 이후 큐에 남을 수 있는 낡은 요청을
+         * 재심기 이후에는 버리도록 합니다(같은 tick에서 도는 이번 호출 자체는 아래에서
+         * generationAtCall 을 이 새 세대로 캡처하므로 영향받지 않습니다).
+         */
+        if (levelUp) {
+          stageTransitionLockRef.current = true
+          setStageLocked(true)
+        }
+        if (isCompleted) {
+          potGenerationRef.current += 1
+        }
       }
 
+      const generationAtCall = potGenerationRef.current
+
       const resultPromise = async (): Promise<WaterResult> => {
+        if (potGenerationRef.current !== generationAtCall) {
+          // 큐에 머무는 동안 화분이 재심기되어 더 이상 유효하지 않은 요청 — 그대로 버립니다.
+          return 'ok'
+        }
         pendingWaterCountRef.current += 1
         if (pendingWaterCountRef.current === 1) {
           onWaterPendingRef.current?.(true)
@@ -542,6 +581,11 @@ export function usePlantPot(
           if (json.grew === true && typeof json.newStage === 'number') {
             const tid = prevPot.treeId ?? DEFAULT_TREE
             const ns = clampPotStageForTree(tid, json.newStage)
+            if (ns === 7) {
+              // 완성 — 다음 생애주기(재심기)를 위해 큐·대기 카운터를 정리합니다.
+              waterQueueRef.current = Promise.resolve<WaterResult>('ok')
+              pendingWaterCountRef.current = 0
+            }
             return {
               type: 'grew',
               newStage: ns,
@@ -574,10 +618,20 @@ export function usePlantPot(
     [childId, hearts, pot, refresh, syncHeartsFromDb],
   )
 
+  /** 단계 상승 축하 팝업이 닫힐 때 호출 — 다시 연속 물주기를 허용합니다. */
+  const unlockStageTransition = useCallback(() => {
+    stageTransitionLockRef.current = false
+    setStageLocked(false)
+  }, [])
+
   /**
    * 씨앗 구매 — 크레딧 차감 + 화분·나무 종류 초기화 (`/api/child/plant-buy-seed`)
    */
   const buySeed = useCallback(async (treeId: PlantTreeId): Promise<BuySeedResult> => {
+    // 미처리 물주기 요청이 남아 있으면 먼저 흘려보낸 뒤 씨앗 심기를 진행합니다(서버 상태 경합 방지).
+    if (pendingWaterCountRef.current > 0) {
+      await waterQueueRef.current.catch(() => {})
+    }
     try {
       const res = await fetch('/api/child/plant-buy-seed', {
         method: 'POST',
@@ -642,6 +696,9 @@ export function usePlantPot(
         }
       }
 
+      // 새로운 화분 생애주기 시작 — 이전 세대에서 큐에 남아 있던 물주기 요청은 이제 모두 무효화됩니다.
+      potGenerationRef.current += 1
+
       const tid = resolveTreeId(json.treeId)
       const initialStage = getInitialStageAfterSeed(tid)
       markPlantChosenSeedInSession(childId)
@@ -671,6 +728,8 @@ export function usePlantPot(
       if (typeof json.hearts === 'number') {
         setHearts(readChildStatInt(json.hearts))
       }
+      // 씨앗 심기 완료 후 서버 값으로 화분 상태를 다시 맞춥니다.
+      void refresh()
 
       return { ok: true as const, newCredits, treeId: tid }
     } catch (e) {
@@ -721,6 +780,8 @@ export function usePlantPot(
     hearts,
     loading,
     water,
+    stageLocked,
+    unlockStageTransition,
     buySeed,
     resetPot,
     refresh,

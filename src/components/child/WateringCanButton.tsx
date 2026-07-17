@@ -18,6 +18,8 @@ import type { WaterResult } from '@/hooks/usePlantPot'
 type Props = {
   hearts: number
   disabled?: boolean
+  /** 단계 상승 축하 팝업이 떠 있는 동안 true — 물주기를 받지 않고 살짝 튕기는 연출만 보여줍니다 */
+  locked?: boolean
   onWater: () => Promise<WaterResult>
   onNoHearts: () => void
   allowWaterWithoutHearts?: boolean
@@ -25,17 +27,24 @@ type Props = {
 }
 
 const WateringCanButton = forwardRef<HTMLButtonElement, Props>(function WateringCanButton(
-  { hearts, disabled, onWater, onNoHearts, onGrowthCelebrate, allowWaterWithoutHearts = false },
+  { hearts, disabled, locked = false, onWater, onNoHearts, onGrowthCelebrate, allowWaterWithoutHearts = false },
   ref,
 ) {
   const [isPouring, setIsPouring] = useState(false)
   const [emptyShake, setEmptyShake] = useState(false)
+  const [lockedBounce, setLockedBounce] = useState(false)
 
   const canPour = hearts > 0 || allowWaterWithoutHearts
   const imageSrc = canPour ? WATERING_CAN_FULL_SRC : WATERING_CAN_EMPTY_SRC
 
   function handleClick() {
     if (disabled) return
+
+    if (locked) {
+      setLockedBounce(true)
+      window.setTimeout(() => setLockedBounce(false), 260)
+      return
+    }
 
     if (!canPour) {
       setEmptyShake(true)
@@ -48,6 +57,11 @@ const WateringCanButton = forwardRef<HTMLButtonElement, Props>(function Watering
     window.setTimeout(() => setIsPouring(false), 420)
 
     void onWater().then((result) => {
+      if (result === 'locked') {
+        setLockedBounce(true)
+        window.setTimeout(() => setLockedBounce(false), 260)
+        return
+      }
       if (result === 'no_hearts') {
         setEmptyShake(true)
         onNoHearts()
@@ -76,6 +90,11 @@ const WateringCanButton = forwardRef<HTMLButtonElement, Props>(function Watering
           80%  { transform: rotate(6deg) translateX(1px); }
           100% { transform: rotate(0deg) translateX(0); }
         }
+        @keyframes canLockedBounce {
+          0%   { transform: scale(1); }
+          40%  { transform: scale(0.88); }
+          100% { transform: scale(1); }
+        }
       `}</style>
       <button
         ref={ref}
@@ -84,11 +103,13 @@ const WateringCanButton = forwardRef<HTMLButtonElement, Props>(function Watering
         disabled={disabled}
         className="relative flex shrink-0 origin-bottom items-center justify-center overflow-visible border-0 bg-transparent p-0 transition-transform duration-150 ease-out active:scale-[0.96] disabled:opacity-50"
         style={{
-          animation: emptyShake
-            ? 'canEmptyShake 0.42s ease-in-out'
-            : isPouring
-              ? 'canPourTilt 0.42s ease-out'
-              : undefined,
+          animation: lockedBounce
+            ? 'canLockedBounce 0.26s ease-in-out'
+            : emptyShake
+              ? 'canEmptyShake 0.42s ease-in-out'
+              : isPouring
+                ? 'canPourTilt 0.42s ease-out'
+                : undefined,
         }}
         aria-label={canPour ? `물 주기 — 보유 하트 ${hearts}개` : '하트가 없어 물을 줄 수 없어요'}
       >

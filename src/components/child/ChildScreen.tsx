@@ -738,6 +738,8 @@ export default function ChildScreen({
     hearts: plantHearts,
     loading: plantLoading,
     water,
+    stageLocked: plantStageLocked,
+    unlockStageTransition,
     buySeed,
     bumpHeartsForMissionOptimistic,
     rollbackMissionHeartsOptimistic,
@@ -766,7 +768,8 @@ export default function ChildScreen({
   const dismissPlantCelebrate = useCallback(() => {
     setPlantCelebrateStage(null)
     setPlantHarvestCelebrate(null)
-  }, [])
+    unlockStageTransition()
+  }, [unlockStageTransition])
 
   /**
    * 레벨 카드·물조리개에 쓸 보유 하트.
@@ -2522,6 +2525,7 @@ export default function ChildScreen({
                           /** 물조리개 그림·탭 판정은 레벨 카드와 같은 `heartsForHomeUi` 기준 */
                           hearts: heartsForHomeUi,
                           allowWaterWithoutHearts: pot.stage === 7,
+                          locked: plantStageLocked,
                           water: () => water(heartsForHomeUi),
                           onNoHearts: () =>
                             setPlantHint('하트가 부족해요! 미션을 하면 하트를 받을 수 있어요.'),
