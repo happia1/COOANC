@@ -76,6 +76,7 @@ type Props = {
   /** @deprecated 팝업 내 좌·우 패널 좌표를 씁니다. 호출부 호환용 */
   levelCreditRef?: React.RefObject<HTMLDivElement | null>
   onPiggyUpdate: (patch: { credits: number; credits_piggy: number }) => void
+  onPiggyTransferPending?: (pending: boolean) => void
 }
 
 export default function ChildHomePiggyBank({
@@ -84,6 +85,7 @@ export default function ChildHomePiggyBank({
   childId,
   depositEnabled,
   onPiggyUpdate,
+  onPiggyTransferPending,
 }: Props) {
   const [sheetOpen, setSheetOpen] = useState(false)
   const [portalReady, setPortalReady] = useState(false)
@@ -98,6 +100,7 @@ export default function ChildHomePiggyBank({
   const optimisticCreditsRef = useRef(availableCredits)
   const optimisticPiggyRef = useRef(piggyCredits)
   const apiQueueRef = useRef(Promise.resolve())
+  const pendingTransferCountRef = useRef(0)
   const [piggySrc, setPiggySrc] = useState(piggyBankVisualUrlFromSavedCredits(piggyCredits))
 
   useEffect(() => {
@@ -159,7 +162,12 @@ export default function ChildHomePiggyBank({
 
   const syncTransferToServer = useCallback(
     async (kind: TransferKind) => {
-      const res = await fetch('/api/child/credits/transfer', {
+      pendingTransferCountRef.current += 1
+      if (pendingTransferCountRef.current === 1) {
+        onPiggyTransferPending?.(true)
+      }
+      try {
+        const res = await fetch('/api/child/credits/transfer', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -186,6 +194,12 @@ export default function ChildHomePiggyBank({
       optimisticCreditsRef.current = json.credits
       optimisticPiggyRef.current = json.credits_piggy
       onPiggyUpdate({ credits: json.credits, credits_piggy: json.credits_piggy })
+    } finally {
+      pendingTransferCountRef.current = Math.max(0, pendingTransferCountRef.current - 1)
+      if (pendingTransferCountRef.current === 0) {
+        onPiggyTransferPending?.(false)
+      }
+    }
     },
     [childId, onPiggyUpdate, rollbackOptimistic],
   )

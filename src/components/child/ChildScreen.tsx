@@ -912,6 +912,13 @@ export default function ChildScreen({
   const optimisticDailyMissionCompleteIdsRef = useRef<Set<string>>(new Set())
 
   /**
+   * 미션 완료·저금통 이체 등 credits/hearts 낙관적 업데이트가 진행 중인 요청 수.
+   * 0보다 크면 statsChannel Realtime UPDATE가 credits/credits_piggy/hearts/total_credits_earned를
+   * 덮어쓰지 않도록 막아, 낙관적 업데이트와 서버 이벤트가 경합해 숫자가 출렁이는 것을 막습니다.
+   */
+  const pendingStatsWritesRef = useRef(0)
+
+  /**
    * 뽀모도로·알람 팝업(ChildAlarmClockPopup) 열림 여부
    * 비개발자 설명: 상단 우측 타이머(유리 버튼)를 누르면 true 가 되고, 닫기로 false 가 됩니다.
    */
@@ -1217,8 +1224,16 @@ export default function ChildScreen({
           filter: `child_id=eq.${childId}`,
         },
         (payload) => {
+          const row = payload.new as Record<string, unknown>
+          if (pendingStatsWritesRef.current > 0) {
+            const { credits, credits_piggy, hearts, total_credits_earned, ...rest } = row
+            setStats((prev) =>
+              normalizeChildStatsCreditsSplit(mergeChildStatsPatch(prev, rest)),
+            )
+            return
+          }
           setStats((prev) =>
-            normalizeChildStatsCreditsSplit(mergeChildStatsPatch(prev, payload.new as Record<string, unknown>)),
+            normalizeChildStatsCreditsSplit(mergeChildStatsPatch(prev, row)),
           )
         },
       )
@@ -1502,6 +1517,7 @@ export default function ChildScreen({
         return next
       })
 
+      pendingStatsWritesRef.current += 1
       void (async () => {
         try {
           const res = await fetch('/api/daily-mission/complete', {
@@ -1575,6 +1591,8 @@ export default function ChildScreen({
             next.delete(dm.id)
             return next
           })
+        } finally {
+          pendingStatsWritesRef.current = Math.max(0, pendingStatsWritesRef.current - 1)
         }
       })()
     },
@@ -2208,6 +2226,10 @@ export default function ChildScreen({
     setStats((prev) => (prev ? mergeChildStatsPatch(prev, p) : prev))
   }, [])
 
+  const setPiggyTransferPending = useCallback((pending: boolean) => {
+    pendingStatsWritesRef.current = Math.max(0, pendingStatsWritesRef.current + (pending ? 1 : -1))
+  }, [])
+
   const availableCreditsForHome = readChildStatInt(stats?.credits)
 
   return (
@@ -2460,14 +2482,15 @@ export default function ChildScreen({
                   transformOrigin: 'center bottom',
                 }}
               >
-                <ChildHomePiggyBank
-                  availableCredits={availableCreditsForHome}
-                  piggyCredits={readChildStatInt(stats.credits_piggy)}
-                  childId={childId}
-                  depositEnabled={piggyDepositEnabled}
-                  levelCreditRef={creditBadgeRef}
-                  onPiggyUpdate={patchPiggyFromHome}
-                />
+                        <ChildHomePiggyBank
+                    availableCredits={availableCreditsForHome}
+                    piggyCredits={readChildStatInt(stats.credits_piggy)}
+                    childId={childId}
+                    depositEnabled={piggyDepositEnabled}
+                    levelCreditRef={creditBadgeRef}
+                    onPiggyUpdate={patchPiggyFromHome}
+                    onPiggyTransferPending={setPiggyTransferPending}
+                  />
               </div>
             </div>
           ) : null}
