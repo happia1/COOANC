@@ -21,7 +21,7 @@ export function prefetchChildScreenChunk(): void {
 export function prefetchChildScreenChunkWhenIdle(): void {
   if (typeof window === 'undefined') return
   const run = () => prefetchChildScreenChunk()
-  if ('requestIdleCallback' in window) {
+  if (typeof window.requestIdleCallback === 'function') {
     window.requestIdleCallback(run, { timeout: 4000 })
   } else {
     window.setTimeout(run, 800)
