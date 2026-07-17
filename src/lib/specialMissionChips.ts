@@ -136,12 +136,6 @@ export const SPECIAL_MISSION_CHIPS: SpecialMissionChipDef[] = [
     emoji: '',
     defaultPopupMessage: '손톱을 깔끔하게 다듬어요.',
   },
-  {
-    id: 'sp-clean-bed',
-    title: '이불 정리하기',
-    emoji: '',
-    defaultPopupMessage: '이불과 베개를 예쁘게 정리해요.',
-  },
 ]
 
 /** 스페셜 미션 시트에서 보여줄 카테고리 순서 */
@@ -154,7 +148,6 @@ export const SPECIAL_MISSION_CHIP_CATEGORIES: SpecialMissionChipCategoryDef[] = 
       'sp-laundry-basket',
       'sp-laundry-neat',
       'sp-laundry-tidy',
-      'sp-clean-bed',
       'sp-meal',
       'sp-finish-meal',
       'sp-after-meal-clear',
@@ -246,6 +239,11 @@ const RETIRED_SPECIAL_DISPLAY_TITLES = new Set<string>([
   '로션바르기',
   '로션 바르기',
   '로션(선크림)바르기',
+  /** 오전 일상으로 옮김 — 남은 스페셜 템플릿 숨김 */
+  '이불 정리하기',
+  '이불정리하기',
+  '이불개기',
+  '이불 개기',
 ])
 
 /** 현재 스페셜 칩 제목(정규화 후) — DB 정리·UI 숨김 기준 */

@@ -59,6 +59,13 @@ const SHOWER_PNG_CACHE_BUST = '1'
  */
 const COMB_HAIR_PNG_CACHE_BUST = '1'
 
+/**
+ * 오전 일상 「이불 정리하기」(`clean_bed.png`) — 검정 배경 제거 후 캐시 무효화용 버전입니다.
+ */
+const CLEAN_BED_PNG_CACHE_BUST = '3'
+
+const CLEAN_BED_ROUTINE_PNG = `${BASE}/special/clean_bed.png?v=${CLEAN_BED_PNG_CACHE_BUST}`
+
 /** 샤워·씻기 루틴 공통 — `목욕/샤워` 옛 제목은 별칭으로 여기와 같은 파일을 씁니다 */
 const SHOWER_ROUTINE_PNG = `${BASE}/p.m/shower.png?v=${SHOWER_PNG_CACHE_BUST}`
 
@@ -209,10 +216,10 @@ const PNG_BY_TITLE: Record<string, string> = {
   로션바르기: `${BASE}/special/lotion.png`,
   '로션 바르기': `${BASE}/special/lotion.png`,
   '로션(선크림)바르기': `${BASE}/special/lotion.png`,
-  '이불 정리하기': `${BASE}/special/clean_bed.png`,
-  이불정리하기: `${BASE}/special/clean_bed.png`,
-  이불개기: `${BASE}/special/clean_bed.png`,
-  '이불 개기': `${BASE}/special/clean_bed.png`,
+  '이불 정리하기': CLEAN_BED_ROUTINE_PNG,
+  이불정리하기: CLEAN_BED_ROUTINE_PNG,
+  이불개기: CLEAN_BED_ROUTINE_PNG,
+  '이불 개기': CLEAN_BED_ROUTINE_PNG,
   인사잘하기: `${BASE}/special/say_hello.png`,
   어른께인사하기: `${BASE}/special/bow_to_adult.png`,
   목욕하기: `${BASE}/special/bath.png`,

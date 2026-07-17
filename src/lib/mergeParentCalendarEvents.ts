@@ -3,6 +3,7 @@
  * 비개발자: 홈 「일정 브리핑」은 DB도 보는데, 캘린더 화면은 예전에 기기 저장만 보더라서
  * 같은 일정이 한쪽에만 보이는 어긋남이 생길 수 있어, 둘을 합칩니다.
  */
+import { getBrowserSessionUserId } from '@/lib/browserParentAuthCache'
 import { createClient } from '@/lib/supabase/client'
 import type { LocalCalendarEvent } from '@/types/database'
 import {
@@ -193,12 +194,11 @@ type CalRow = {
  */
 export async function fetchParentCalendarEventsFromServer(childId: string | null): Promise<LocalCalendarEvent[]> {
   const supabase = createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return []
+  /** 서버 `/user` 대신 로컬 세션 — Auth storage 락 경쟁을 줄입니다 */
+  const userId = await getBrowserSessionUserId(supabase)
+  if (!userId) return []
 
-  let linksQuery = supabase.from('family_links').select('id, child_id').eq('parent_id', user.id)
+  let linksQuery = supabase.from('family_links').select('id, child_id').eq('parent_id', userId)
   if (childId) {
     linksQuery = linksQuery.eq('child_id', childId)
   }

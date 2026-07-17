@@ -159,15 +159,35 @@
 }
 
 /**
- * 자녀 「오늘의 미션」 스페셜 카드 — 대각선 골드 베이스 + 얇은 하이라이트 띠가 비스듬히 지나가며 반짝이는 느낌.
- * (Tailwind만으로는 미세한 색 단계·애니메이션 제어가 불안정해 단일 클래스로 고정합니다.)
+ * 자녀·부모 스페셜 미션 카드 — 흰 중앙, 테두리·가장자리 노란 후광 펄스.
  */
-@keyframes child-mission-gold-shimmer-slide {
-  0% {
-    transform: translate3d(-145%, -35%, 0) rotate(24deg);
-  }
+@keyframes child-mission-special-glow-pulse {
+  0%,
   100% {
-    transform: translate3d(145%, 45%, 0) rotate(24deg);
+    box-shadow:
+      inset 0 0 0 1px rgba(254, 240, 138, 0.55),
+      inset 0 0 16px 4px rgba(253, 224, 71, 0.22),
+      inset 0 0 32px 8px rgba(250, 204, 21, 0.1),
+      0 0 14px 4px rgba(253, 224, 71, 0.38),
+      0 0 32px 10px rgba(250, 204, 21, 0.2);
+  }
+  50% {
+    box-shadow:
+      inset 0 0 0 2px rgba(250, 204, 21, 0.82),
+      inset 0 0 24px 7px rgba(253, 224, 71, 0.48),
+      inset 0 0 40px 12px rgba(250, 204, 21, 0.22),
+      0 0 22px 7px rgba(253, 224, 71, 0.62),
+      0 0 48px 16px rgba(250, 204, 21, 0.34);
+  }
+}
+
+@keyframes child-mission-special-edge-pulse {
+  0%,
+  100% {
+    opacity: 0.62;
+  }
+  50% {
+    opacity: 1;
   }
 }
 
@@ -175,51 +195,41 @@
   position: relative;
   overflow: hidden;
   isolation: isolate;
-  /* 좌상 크림 → 우하 진한 앰버까지 사선 그라데이션으로 금색 질감 */
-  background-color: #fbbf24;
-  background-image: linear-gradient(
-    128deg,
-    #fffbeb 0%,
-    #fef3c7 14%,
-    #fde68a 32%,
-    #fcd34d 52%,
-    #fbbf24 72%,
-    #f59e0b 88%,
-    #fde047 100%
-  );
-  border: 1px solid rgba(180, 83, 9, 0.62);
-  box-shadow:
-    inset 0 1px 1px rgba(255, 255, 255, 0.78),
-    0 0 0 2px rgba(251, 191, 36, 0.48);
+  background-color: #ffffff;
+  border: 1px solid rgba(250, 204, 21, 0.55);
+  animation: child-mission-special-glow-pulse 2.2s ease-in-out infinite;
 }
 
+/* 중앙은 흰색 유지, 가장자리만 노란 링 */
 .child-mission-card-gold::before {
   content: '';
   position: absolute;
   z-index: 0;
-  top: -50%;
-  left: -90%;
-  width: 70%;
-  height: 220%;
+  inset: 0;
   pointer-events: none;
-  background: linear-gradient(
-    106deg,
-    transparent 38%,
-    rgba(255, 255, 255, 0) 45%,
-    rgba(255, 255, 255, 0.95) 50%,
-    rgba(255, 249, 219, 1) 52%,
-    rgba(255, 255, 255, 0.82) 56%,
-    transparent 64%
+  background: radial-gradient(
+    ellipse 100% 100% at 50% 50%,
+    transparent 50%,
+    rgba(255, 255, 255, 0) 58%,
+    rgba(253, 224, 71, 0.18) 76%,
+    rgba(250, 204, 21, 0.5) 90%,
+    rgba(234, 179, 8, 0.62) 100%
   );
-  opacity: 0.88;
-  animation: child-mission-gold-shimmer-slide 2.9s ease-in-out infinite;
+  animation: child-mission-special-edge-pulse 2.2s ease-in-out infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .child-mission-card-gold {
+    animation: none;
+    box-shadow:
+      inset 0 0 0 1px rgba(254, 240, 138, 0.6),
+      inset 0 0 18px 5px rgba(253, 224, 71, 0.3),
+      0 0 18px 5px rgba(253, 224, 71, 0.4);
+  }
+
   .child-mission-card-gold::before {
     animation: none;
-    opacity: 0.32;
-    transform: translate3d(12%, 8%, 0) rotate(24deg);
+    opacity: 0.78;
   }
 }
 
@@ -229,17 +239,18 @@
   z-index: 1;
 }
 
-/** 스페셜 카드 하단 보상 줄 — 카드와 같은 방향의 연한 사선 골드 */
+/** 스페셜 카드 하단 보상 줄 — 흰 바탕에 노란 테두리 */
 .child-mission-card-gold-reward-pill {
+  background-color: rgba(255, 255, 255, 0.96);
   background-image: linear-gradient(
     118deg,
-    rgba(255, 251, 235, 0.98) 0%,
-    rgba(253, 230, 138, 0.94) 48%,
-    rgba(254, 243, 199, 0.96) 100%
+    rgba(255, 255, 255, 0.98) 0%,
+    rgba(255, 251, 235, 0.92) 48%,
+    rgba(254, 249, 195, 0.88) 100%
   );
   box-shadow:
-    inset 0 1px 1px rgba(255, 255, 255, 0.72),
-    0 0 0 1px rgba(217, 119, 6, 0.28);
+    inset 0 1px 1px rgba(255, 255, 255, 0.85),
+    0 0 0 1px rgba(250, 204, 21, 0.32);
 }
 
 /* 미션 탭: 잘 자요 / 아침 알람 바텀시트 슬라이드 */

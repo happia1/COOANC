@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { runSerializedBrowserAuthOp } from '@/lib/supabase/browserAuthQueue'
 
 /** 마지막으로 확인한 부모 user id — family_links 캐시 키 */
 let cachedUserId: string | null = null
@@ -25,13 +26,15 @@ function installAuthCacheInvalidator(supabase: SupabaseClient) {
  */
 export async function getBrowserSessionUserId(supabase: SupabaseClient): Promise<string | null> {
   installAuthCacheInvalidator(supabase)
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
-  const id = session?.user?.id ?? null
-  cachedUserId = id
-  if (!id) cachedParentChildIds = null
-  return id
+  return runSerializedBrowserAuthOp(async () => {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+    const id = session?.user?.id ?? null
+    cachedUserId = id
+    if (!id) cachedParentChildIds = null
+    return id
+  })
 }
 
 /**

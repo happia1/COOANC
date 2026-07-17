@@ -140,7 +140,7 @@ export function childHomeMissionRewardIconSizePx(viewportWidth: number): number 
  * 자녀 앱 「오늘의 미션」 카드 배경·테두리 (단일 스타일 출처).
  * - 오전: 은은한 분홍 (`rose` 계열 — 채도를 낮춘 핑크 느낌)
  * - 오후: 은은한 파랑 (`blue` 계열 — 하늘색보다 무난한 블루 틴트)
- * - 스페셜: `globals.css` 의 `.child-mission-card-gold`(대각선 골드 + 반짝임 애니메이션)
+ * - 스페셜: `globals.css` 의 `.child-mission-card-gold`(흰 중앙 + 테두리 노란 후광 펄스)
  * (`isAfternoonMission`·`isSpecialSectionMission` 과 함께 쓰며, 부모 앱 루틴 편집 UI에는 사용하지 않습니다.)
  */
 export const CHILD_HOME_MISSION_CARD_AM_BG_CLASSNAME =

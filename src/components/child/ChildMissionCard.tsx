@@ -195,7 +195,7 @@ export default function ChildMissionCard({ mission, onComplete, tapResetKey = 0 
   }
 
   /**
-   * 카드 배경 — 스페셜은 골드(`missionTodayLayoutSpec`), 일상은 오전 분홍 / 오후 파랑(`missionAmPm` 와 동일 기준).
+   * 카드 배경 — 스페셜은 흰 바탕+노란 후광(`missionTodayLayoutSpec`), 일상은 오전 분홍 / 오후 파랑.
    */
   const cardBg = special
     ? CHILD_HOME_MISSION_CARD_SPECIAL_BG_CLASSNAME

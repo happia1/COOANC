@@ -38,6 +38,7 @@ import SpriteImage from '@/components/common/SpriteImage'
 import { ICONS } from '@/constants/sprites'
 import RoutineAgentSchedulePanel from '@/components/parent/RoutineAgentSchedulePanel'
 import RoutineAgentFab from '@/components/parent/RoutineAgentFab'
+import { prefetchChildScreenChunkWhenIdle } from '@/lib/prefetchChildScreenChunk'
 
 /**
  * 서버에서 내려온 브리핑용 일정이 현재 선택 자녀에 맞는지 판별합니다.
@@ -358,6 +359,12 @@ export default function HomeTab({
       setSelectedChildId(childrenData[0].id)
     }
   }, [childrenData, selectedChildId, setSelectedChildId])
+
+  /** 부모 홈에 머무는 동안 자녀 앱 JS 청크를 미리 받아 둡니다 */
+  useEffect(() => {
+    if (!currentId) return
+    prefetchChildScreenChunkWhenIdle()
+  }, [currentId])
 
   useEffect(() => {
     if (!child) {

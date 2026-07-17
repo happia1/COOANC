@@ -547,7 +547,7 @@ function orderedMissionsForSlider(list: DailyMissionWithTemplate[]): DailyMissio
   const routineRows = list.filter((dm) => dm.missions && !isSpecialSectionMission(dm.missions))
   const specialRows = list.filter((dm) => dm.missions && isSpecialSectionMission(dm.missions))
 
-  /** 같은 키워드·중복 일일행이 있으면 가로 슬라이더에는 한 장만 남깁니다 */
+  /** 오전·오후 일상 루틴 먼저, 스페셜 미션은 맨 뒤 */
   const sortedRoutine = dedupeDailyRoutineMissionsByCanonicalKey(
     [...routineRows].sort((a, b) => {
       const sa = dmToSortable(a)

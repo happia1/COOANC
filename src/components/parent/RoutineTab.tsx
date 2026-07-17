@@ -693,7 +693,7 @@ export default function RoutineTab({
   const weekdayInactiveParts = useMemo(() => splitMissionsAmPm(weekdayInactive), [weekdayInactive])
   const weekendInactiveParts = useMemo(() => splitMissionsAmPm(weekendInactive), [weekendInactive])
 
-  const filteredSpecial = sortByTime(specialOnly.filter((m) => m.level_required <= childLevel))
+  const filteredSpecial = sortMissionsByRoutineFlow(specialOnly.filter((m) => m.level_required <= childLevel))
   const activeSpecial = filteredSpecial.filter((m) => m.is_active)
   const inactiveSpecial = filteredSpecial.filter((m) => !m.is_active)
   /** 활성 먼저·비활성 뒤 — 매일(daily) / 이벤트(event) 로 나눔 */
@@ -1172,9 +1172,9 @@ function SpecialMissionRow({
         }
       }}
       aria-label={`${m.title} 보상(크레딧·애정 하트) 수정`}
-      className={`${MISSION_CARD_DRAG_SURFACE_CLASS} flex min-h-[5.5rem] w-full flex-col items-center justify-center gap-1.5 rounded-xl bg-white px-1 py-1 text-center shadow-sm ring-1 ${
-        m.is_active ? 'ring-violet-100' : 'ring-gray-100 opacity-80'
-      } ${sortable ? (sortable.isDragging ? 'cursor-grabbing shadow-md ring-2 ring-violet-300/50' : 'cursor-grab active:cursor-grabbing') : ''}`}
+      className={`${MISSION_CARD_DRAG_SURFACE_CLASS} child-mission-card-gold flex min-h-[5.5rem] w-full flex-col items-center justify-center gap-1.5 rounded-xl px-1 py-1 text-center shadow-sm ${
+        m.is_active ? '' : 'opacity-80'
+      } ${sortable ? (sortable.isDragging ? 'cursor-grabbing shadow-md ring-2 ring-amber-300/50' : 'cursor-grab active:cursor-grabbing') : ''}`}
     >
       <span
         className="flex h-9 w-9 shrink-0 items-center justify-center text-sm font-black leading-none text-violet-800"

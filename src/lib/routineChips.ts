@@ -26,6 +26,7 @@ export type ChipDef = {
 
 export const AM_CHIPS: ChipDef[] = [
   { id: 'am-wake', title: '기상', emoji: '', type: 'fixed', apiBlock: 'morning' },
+  { id: 'am-bed', title: '이불 정리하기', emoji: '', type: 'recommended', apiBlock: 'morning' },
   { id: 'am-wash', title: '세수하기', emoji: '', type: 'recommended', apiBlock: 'morning' },
   { id: 'am-brush', title: '양치', emoji: '', type: 'recommended', apiBlock: 'morning' },
   { id: 'am-gargle', title: '가글하기', emoji: '', type: 'recommended', apiBlock: 'morning' },
@@ -43,21 +44,21 @@ export const AM_CHIPS: ChipDef[] = [
 ]
 
 export const PM_CHIPS: ChipDef[] = [
+  { id: 'pm-out', title: '야외놀이', emoji: '', type: 'optional', apiBlock: 'afternoon' },
   { id: 'pm-hands', title: '손씻기', emoji: '', type: 'recommended', apiBlock: 'afternoon' },
   /**
    * 오후·저녁을 한 줄(UI)로 묶되, 오전 「물마시기」와 이름이 겹치지 않게 구분합니다.
    * 예전 DB 에 오후 블록으로 「물마시기」만 적혀 있어도 `canonicalRoutineChipMatchTitle` 로 이 칩에 연결됩니다.
    */
   { id: 'pm-water', title: '저녁 물마시기', emoji: '', type: 'recommended', apiBlock: 'afternoon' },
-  { id: 'pm-out', title: '야외놀이', emoji: '', type: 'optional', apiBlock: 'afternoon' },
   { id: 'pm-in', title: '실내놀이', emoji: '', type: 'optional', apiBlock: 'afternoon' },
-  { id: 'pm-hw', title: '숙제·공부하기', emoji: '', type: 'optional', apiBlock: 'afternoon' },
+  { id: 'pm-tidy', title: '모두 제자리', emoji: '', type: 'recommended', apiBlock: 'evening' },
   /**
    * 저녁 루틴 식사 카드: 기존 `저녁식사`는 삭제하고, `저녁밥먹기`로 통일합니다.
    * 비개발자 설명: “같은 미션인데 이름이 달라서” 이미지/정렬/중복처리가 어긋나는 문제를 막기 위한 정리입니다.
    */
   { id: 'pm-dinner', title: '저녁밥먹기', emoji: '', type: 'recommended', apiBlock: 'evening' },
-  { id: 'pm-tidy', title: '모두 제자리', emoji: '', type: 'recommended', apiBlock: 'evening' },
+  { id: 'pm-hw', title: '숙제·공부하기', emoji: '', type: 'optional', apiBlock: 'afternoon' },
   /** 샤워만 따로 루틴에 넣을 때 — 썸네일 `p.m/shower.png` (`목욕/샤워` 옛 칩은 별칭으로 여기와 통합) */
   { id: 'pm-shower', title: '샤워하기', emoji: '', type: 'optional', apiBlock: 'evening' },
   { id: 'pm-brush', title: '잠자리 양치', emoji: '', type: 'recommended', apiBlock: 'bedtime' },
@@ -69,6 +70,15 @@ export const PM_CHIPS: ChipDef[] = [
 
 /** 기상 → 취침 순서(오전 칩 먼저, 이어서 오후~취침). DB 의 afternoon/evening/bedtime 은 한 줄 슬라이더에 함께 보입니다. */
 const ALL_ROUTINE_FLOW_CHIPS: ChipDef[] = [...AM_CHIPS, ...PM_CHIPS]
+
+/**
+ * 일상(오전·오후) 루틴 칩 정렬 순서 — 스페셜 미션은 포함하지 않습니다.
+ * 자녀 슬라이더에서는 일상 뒤에 스페셜을 따로 붙입니다.
+ */
+export const MISSION_DAY_FLOW_TITLES: readonly string[] = [
+  ...AM_CHIPS.map((c) => c.title),
+  ...PM_CHIPS.map((c) => c.title),
+]
 
 /** 미션 정렬용 최소 필드( DB Mission 과 호환 ) */
 export type RoutineFlowSortable = {
@@ -90,6 +100,10 @@ function minutesFromHHMMSafe(t: string | null | undefined): number {
  * 별칭 테이블에 있는 제목도 해당 칩의 순위를 받습니다.
  */
 export function routineMissionFlowRank(m: RoutineFlowSortable): number {
+  const flowKey = canonicalRoutineChipMatchTitle(m)
+  const flowIdx = MISSION_DAY_FLOW_TITLES.indexOf(flowKey)
+  if (flowIdx >= 0) return flowIdx
+
   const title = canonicalRoutineChipMatchTitle(m)
   const candidates = ALL_ROUTINE_FLOW_CHIPS.map((c, i) => ({ c, i })).filter((x) => x.c.title === title)
   if (candidates.length > 0) {

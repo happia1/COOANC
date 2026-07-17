@@ -11,10 +11,14 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { flushSync } from 'react-dom'
-import { useCallback, useState, type MouseEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useState, type MouseEvent, type ReactNode } from 'react'
 import { useChildEnterTransition } from '@/components/child/ChildEnterTransitionProvider'
 import { parentEnterChildUiHref, parentEnterChildUiJsonHref } from '@/lib/parentEnterChildUi'
 import { parseJsonFromResponse } from '@/lib/parseJsonResponse'
+import {
+  prefetchChildScreenChunk,
+  prefetchChildScreenChunkWhenIdle,
+} from '@/lib/prefetchChildScreenChunk'
 
 type Props = {
   childId: string | null | undefined
@@ -35,6 +39,11 @@ export default function ParentEnterChildUiLink({
   const { childEnterActive, beginChildEnter, endChildEnter } = useChildEnterTransition()
   const [entering, setEntering] = useState(false)
   const href = parentEnterChildUiHref(childId)
+
+  useEffect(() => {
+    if (!childId) return
+    prefetchChildScreenChunkWhenIdle()
+  }, [childId])
 
   const handleClick = useCallback(
     async (event: MouseEvent<HTMLAnchorElement>) => {
@@ -70,6 +79,7 @@ export default function ParentEnterChildUiLink({
       className={className}
       aria-label={ariaLabel}
       onClick={handleClick}
+      onPointerEnter={() => prefetchChildScreenChunk()}
       aria-busy={entering || childEnterActive}
     >
       {children}
