@@ -722,6 +722,10 @@ export default function ChildScreen({
     setStats((prev) => normalizeChildStatsCreditsSplit(mergeChildStatsPatch(prev, patch)))
   }, [])
 
+  const onWaterPending = useCallback((pending: boolean) => {
+    pendingStatsWritesRef.current = Math.max(0, pendingStatsWritesRef.current + (pending ? 1 : -1))
+  }, [])
+
   /** 화분(식물) — `child_stats`의 pot_* 컬럼과 동기화 */
   const {
     pot,
@@ -731,7 +735,7 @@ export default function ChildScreen({
     buySeed,
     bumpHeartsForMissionOptimistic,
     rollbackMissionHeartsOptimistic,
-  } = usePlantPot(childId, { onPlantStatsSynced })
+  } = usePlantPot(childId, { onPlantStatsSynced, onWaterPending })
   /** 완성 후 씨앗 고르기 모달 */
   const { refresh: refreshHarvestInventory } = usePlantHarvest(childId)
   /** 성장 단계 축하 팝업 — 도달한 단계 번호(null 이메 닫힘) */

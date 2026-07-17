@@ -111,6 +111,8 @@ export function usePlantPot(
      * 비개발자: 화분 쪽 숫자만 바뀌고 위 카드 하트는 그대로인 현상을 막습니다.
      */
     onPlantStatsSynced?: (patch: Record<string, unknown>) => void
+    /** 물주기 API 요청이 진행 중인 동안 true — ChildScreen의 pendingStatsWritesRef 카운터와 연결됩니다. */
+    onWaterPending?: (pending: boolean) => void
   },
 ) {
   /**
@@ -123,11 +125,15 @@ export function usePlantPot(
   const [pot, setPot] = useState<PotState | null>(null)
   const [hearts, setHearts] = useState(0)
   const [loading, setLoading] = useState(true)
-  /** 물주기 API 중복 호출 방지 — 연타·레이스로 하트가 여러 번 빠지는 것을 막습니다 */
-  const waterInFlightRef = useRef(false)
+  /** 물주기 API를 순차 처리하기 위한 큐 — 클릭은 로컬에서 바로 반영하고, 서버 요청은 순서대로 보냅니다. */
+  const waterQueueRef = useRef<Promise<WaterResult>>(Promise.resolve<WaterResult>('ok'))
   /** 부모가 넘긴 콜백은 매 렌더마다 바뀔 수 있어 ref 로 최신만 읽습니다(물주기 `water` 의존성 안정화). */
   const onPlantStatsSyncedRef = useRef(options?.onPlantStatsSynced)
   onPlantStatsSyncedRef.current = options?.onPlantStatsSynced
+  const onWaterPendingRef = useRef(options?.onWaterPending)
+  onWaterPendingRef.current = options?.onWaterPending
+  /** 큐에 쌓인 물주기 요청 수 — 0→1, 1→0 전이에서만 onWaterPending을 알립니다 */
+  const pendingWaterCountRef = useRef(0)
 
   /** `syncStats`: true 면 상단 레벨 카드 `stats.hearts` 도 맞춥니다(물주기 성공 등). refresh 는 false 로 훅만 갱신합니다. */
   const syncHeartsFromDb = useCallback((value: unknown, syncStats = true) => {
@@ -420,17 +426,12 @@ export function usePlantPot(
 
   const water = useCallback(
     async (displayHearts?: number): Promise<WaterResult> => {
-      if (waterInFlightRef.current) {
-        return 'ok'
-      }
-
       const prevPot = pot
       if (!prevPot?.hasChosenSeed || needsPotSeedSelection(prevPot)) {
         return 'ok'
       }
 
       const stage7Reset = prevPot.stage === 7
-      /** 물조리개 UI(`heartsForHomeUi`)와 같은 잔량 기준 — 훅·stats 불일치로 잘못 차감되는 것을 막습니다 */
       const prevHearts = Math.max(hearts, readChildStatInt(displayHearts))
 
       if (!stage7Reset && prevHearts <= 0) {
@@ -438,17 +439,14 @@ export function usePlantPot(
       }
 
       let optimisticApplied = false
+      const prevSnapshot = { hearts: prevHearts, pot: prevPot }
       const rollbackOptimistic = () => {
         if (!optimisticApplied) return
         optimisticApplied = false
-        setHearts(prevHearts)
-        setPot(prevPot)
+        setHearts(prevSnapshot.hearts)
+        setPot(prevSnapshot.pot)
       }
 
-      /**
-       * API 확인 전에는 화분 훅만 낙관적으로 갱신합니다.
-       * 상단 stats.hearts 는 서버 응답·refresh 후에만 맞춥니다(실패 시 유령 차감 방지).
-       */
       if (!stage7Reset && prevHearts > 0) {
         const needed = prevPot.heartsNeeded
         const newHeartsUsed = prevPot.heartsUsed + 1
@@ -468,93 +466,110 @@ export function usePlantPot(
         })
       }
 
-      waterInFlightRef.current = true
-      try {
-        const res = await fetch('/api/child/plant-water', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ childId }),
-          credentials: 'same-origin',
-        })
-        const json = (await res.json().catch(() => ({}))) as {
-          ok?: boolean
-          code?: string
-          grew?: boolean
-          newStage?: number
-          hearts?: number
-          pot_stage?: number
-          pot_hearts_used?: number
-          pot_completed?: boolean
-          reset?: boolean
-          harvest?: PlantHarvestCelebrate
+      const resultPromise = async (): Promise<WaterResult> => {
+        pendingWaterCountRef.current += 1
+        if (pendingWaterCountRef.current === 1) {
+          onWaterPendingRef.current?.(true)
         }
+        try {
+          const res = await fetch('/api/child/plant-water', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ childId }),
+            credentials: 'same-origin',
+          })
+          const json = (await res.json().catch(() => ({}))) as {
+            ok?: boolean
+            code?: string
+            grew?: boolean
+            newStage?: number
+            hearts?: number
+            pot_stage?: number
+            pot_hearts_used?: number
+            pot_completed?: boolean
+            reset?: boolean
+            harvest?: PlantHarvestCelebrate
+          }
 
-        if (res.status === 400 && json?.code === 'NO_HEARTS') {
+          if (res.status === 400 && json?.code === 'NO_HEARTS') {
+            rollbackOptimistic()
+            await refresh()
+            return 'no_hearts'
+          }
+          if (res.status === 400 && json?.code === 'NO_SEED_CHOSEN') {
+            rollbackOptimistic()
+            return 'ok'
+          }
+
+          if (!res.ok || json?.ok !== true) {
+            console.warn('[usePlantPot] plant-water API', res.status, json)
+            rollbackOptimistic()
+            await refresh()
+            return 'ok'
+          }
+
+          const hasConfirmedPotState =
+            typeof json.hearts === 'number' &&
+            typeof json.pot_stage === 'number' &&
+            typeof json.pot_hearts_used === 'number' &&
+            typeof json.pot_completed === 'boolean'
+
+          if (!hasConfirmedPotState) {
+            console.warn('[usePlantPot] plant-water incomplete payload', json)
+            rollbackOptimistic()
+            await refresh()
+            return 'ok'
+          }
+
+          optimisticApplied = false
+          onPlantStatsSyncedRef.current?.({
+            hearts: json.hearts,
+            pot_stage: json.pot_stage,
+            pot_hearts_used: json.pot_hearts_used,
+            pot_completed: json.pot_completed,
+          })
+          syncHeartsFromDb(json.hearts)
+          setPot((prev) =>
+            potStateFromWaterResponse(
+              prev?.treeId ?? DEFAULT_TREE,
+              json.pot_stage,
+              json.pot_hearts_used,
+              json.pot_completed,
+              prev?.hasChosenSeed ?? false,
+            ),
+          )
+
+          if (json.grew === true && typeof json.newStage === 'number') {
+            const tid = prevPot.treeId ?? DEFAULT_TREE
+            const ns = clampPotStageForTree(tid, json.newStage)
+            return {
+              type: 'grew',
+              newStage: ns,
+              harvest: json.harvest,
+            }
+          }
+          return 'ok'
+        } catch (e) {
+          console.warn('[usePlantPot] plant-water fetch', e)
           rollbackOptimistic()
           await refresh()
-          return 'no_hearts'
-        }
-        if (res.status === 400 && json?.code === 'NO_SEED_CHOSEN') {
-          rollbackOptimistic()
           return 'ok'
-        }
-
-        if (!res.ok || json?.ok !== true) {
-          console.warn('[usePlantPot] plant-water API', res.status, json)
-          rollbackOptimistic()
-          await refresh()
-          return 'ok'
-        }
-
-        const hasConfirmedPotState =
-          typeof json.hearts === 'number' &&
-          typeof json.pot_stage === 'number' &&
-          typeof json.pot_hearts_used === 'number' &&
-          typeof json.pot_completed === 'boolean'
-
-        if (!hasConfirmedPotState) {
-          console.warn('[usePlantPot] plant-water incomplete payload', json)
-          rollbackOptimistic()
-          await refresh()
-          return 'ok'
-        }
-
-        optimisticApplied = false
-        onPlantStatsSyncedRef.current?.({
-          hearts: json.hearts,
-          pot_stage: json.pot_stage,
-          pot_hearts_used: json.pot_hearts_used,
-          pot_completed: json.pot_completed,
-        })
-        syncHeartsFromDb(json.hearts)
-        setPot((prev) =>
-          potStateFromWaterResponse(
-            prev?.treeId ?? DEFAULT_TREE,
-            json.pot_stage,
-            json.pot_hearts_used,
-            json.pot_completed,
-            prev?.hasChosenSeed ?? false,
-          ),
-        )
-
-        if (json.grew === true && typeof json.newStage === 'number') {
-          const tid = prevPot.treeId ?? DEFAULT_TREE
-          const ns = clampPotStageForTree(tid, json.newStage)
-          return {
-            type: 'grew',
-            newStage: ns,
-            harvest: json.harvest,
+        } finally {
+          pendingWaterCountRef.current = Math.max(0, pendingWaterCountRef.current - 1)
+          if (pendingWaterCountRef.current === 0) {
+            onWaterPendingRef.current?.(false)
           }
         }
-        return 'ok'
-      } catch (e) {
-        console.warn('[usePlantPot] plant-water fetch', e)
-        rollbackOptimistic()
-        await refresh()
-        return 'ok'
-      } finally {
-        waterInFlightRef.current = false
       }
+
+      waterQueueRef.current = waterQueueRef.current
+        .then(resultPromise)
+        .catch((err) => {
+          console.warn('[usePlantPot] plant-water queue error', err)
+          return 'ok'
+        })
+
+      return waterQueueRef.current
     },
     [childId, hearts, pot, refresh, syncHeartsFromDb],
   )

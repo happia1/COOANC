@@ -8,7 +8,7 @@
  * - 탭하면 기울기 연출이 나오고, 부모(`PlantPot`)에서 물방울·성장 처리를 합니다.
  */
 
-import { forwardRef, useRef, useState } from 'react'
+import { forwardRef, useState } from 'react'
 import Image from 'next/image'
 import type { PlantStage } from '@/constants/plantTrees'
 import { WATERING_CAN_EMPTY_SRC, WATERING_CAN_FULL_SRC } from '@/constants/plantTrees'
@@ -30,13 +30,12 @@ const WateringCanButton = forwardRef<HTMLButtonElement, Props>(function Watering
 ) {
   const [isPouring, setIsPouring] = useState(false)
   const [emptyShake, setEmptyShake] = useState(false)
-  const inFlightRef = useRef(false)
 
   const canPour = hearts > 0 || allowWaterWithoutHearts
   const imageSrc = canPour ? WATERING_CAN_FULL_SRC : WATERING_CAN_EMPTY_SRC
 
   function handleClick() {
-    if (disabled || inFlightRef.current) return
+    if (disabled) return
 
     if (!canPour) {
       setEmptyShake(true)
@@ -47,23 +46,18 @@ const WateringCanButton = forwardRef<HTMLButtonElement, Props>(function Watering
 
     setIsPouring(true)
     window.setTimeout(() => setIsPouring(false), 420)
-    inFlightRef.current = true
 
-    void onWater()
-      .then((result) => {
-        if (result === 'no_hearts') {
-          setEmptyShake(true)
-          onNoHearts()
-          window.setTimeout(() => setEmptyShake(false), 420)
-          return
-        }
-        if (typeof result === 'object' && result.type === 'grew') {
-          onGrowthCelebrate?.(result.newStage, result.harvest)
-        }
-      })
-      .finally(() => {
-        inFlightRef.current = false
-      })
+    void onWater().then((result) => {
+      if (result === 'no_hearts') {
+        setEmptyShake(true)
+        onNoHearts()
+        window.setTimeout(() => setEmptyShake(false), 420)
+        return
+      }
+      if (typeof result === 'object' && result.type === 'grew') {
+        onGrowthCelebrate?.(result.newStage, result.harvest)
+      }
+    })
   }
 
   return (
