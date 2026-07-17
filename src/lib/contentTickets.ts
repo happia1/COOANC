@@ -6,20 +6,29 @@ function grantSupabaseClient(fallback: SupabaseClient): SupabaseClient {
   return createServiceRoleClient() ?? fallback
 }
 
-/** DB `store_items.name` · 구매 스냅샷과 일치 */
-export const VIDEO_VIEWING_PASS_ITEM_NAME = '영상 시청권 30분'
+/** DB `store_items.name` · 구매 스냅샷과 일치 — 영상·미니게임 공용 단일 티켓 */
+export const CHEST_TICKET_ITEM_NAME = '보물상자 이용권'
 
+/** @deprecated `CHEST_TICKET_ITEM_NAME` 사용 */
+export const CONTENT_TICKET_ITEM_NAME = CHEST_TICKET_ITEM_NAME
+
+/** @deprecated `CHEST_TICKET_ITEM_NAME` 사용 — 118 마이그레이션 이전 상품명 */
+export const VIDEO_VIEWING_PASS_ITEM_NAME = CHEST_TICKET_ITEM_NAME
+
+/** @deprecated 118 마이그레이션으로 `CHEST_TICKET_ITEM_NAME` 에 통합됨 — 레거시 인식용으로만 유지 */
 export const MINIGAME_PLAY_PASS_ITEM_NAME = '미니게임 이용권'
 
-/** @deprecated `VIDEO_VIEWING_PASS_ITEM_NAME` 사용 */
-export const CONTENT_TICKET_ITEM_NAME = VIDEO_VIEWING_PASS_ITEM_NAME
-
-const LEGACY_VIDEO_PASS_NAMES = ['콘텐츠 30분 이용권', '콘텐츠 이용권 30분'] as const
+/** 티켓 통합(118) 이전에 쓰이던 상품명들 — 과거 구매 내역·지급 로직이 계속 인식하도록 유지 */
+const LEGACY_CHEST_TICKET_NAMES = [
+  '콘텐츠 30분 이용권',
+  '콘텐츠 이용권 30분',
+  '영상 시청권 30분',
+  MINIGAME_PLAY_PASS_ITEM_NAME,
+] as const
 
 const QUANTITY_PURCHASABLE_NAMES = new Set<string>([
-  VIDEO_VIEWING_PASS_ITEM_NAME,
-  MINIGAME_PLAY_PASS_ITEM_NAME,
-  ...LEGACY_VIDEO_PASS_NAMES,
+  CHEST_TICKET_ITEM_NAME,
+  ...LEGACY_CHEST_TICKET_NAMES,
 ])
 
 /** 영상·미니게임 등 수량 구매 가능한 콘텐츠 마켓 상품 */
@@ -37,19 +46,15 @@ export function isContentTicketItemName(name: string | null | undefined): boolea
   return isQuantityPurchasableMarketItem(name)
 }
 
-function isVideoViewingPassName(name: string): boolean {
+function isChestTicketName(name: string): boolean {
   const trimmed = name.trim()
   return (
-    trimmed === VIDEO_VIEWING_PASS_ITEM_NAME ||
-    LEGACY_VIDEO_PASS_NAMES.includes(trimmed as (typeof LEGACY_VIDEO_PASS_NAMES)[number])
+    trimmed === CHEST_TICKET_ITEM_NAME ||
+    LEGACY_CHEST_TICKET_NAMES.includes(trimmed as (typeof LEGACY_CHEST_TICKET_NAMES)[number])
   )
 }
 
-function isMinigamePassName(name: string): boolean {
-  return name.trim() === MINIGAME_PLAY_PASS_ITEM_NAME
-}
-
-/** 마켓 구매 완료(부모 승인·배송) 시 콘텐츠·미니게임 이용권 지급 */
+/** 마켓 구매 완료(부모 승인·배송) 시 보물상자 이용권 지급 */
 export async function grantMarketContentRewardsIfApplicable(
   supabase: SupabaseClient,
   childId: string,
@@ -57,35 +62,20 @@ export async function grantMarketContentRewardsIfApplicable(
   quantity = 1,
 ): Promise<number | null> {
   if (!itemName) return null
+  if (!isChestTicketName(itemName)) return null
 
   const amount = Math.max(1, Math.floor(quantity))
   const grantClient = grantSupabaseClient(supabase)
 
-  if (isVideoViewingPassName(itemName)) {
-    const { data, error } = await grantClient.rpc('grant_content_ticket', {
-      p_child_id: childId,
-      p_amount: amount,
-    })
-    if (error) {
-      console.error('[contentTickets] video grant failed:', error.message)
-      return null
-    }
-    return typeof data === 'number' ? data : null
+  const { data, error } = await grantClient.rpc('grant_content_ticket', {
+    p_child_id: childId,
+    p_amount: amount,
+  })
+  if (error) {
+    console.error('[contentTickets] chest ticket grant failed:', error.message)
+    return null
   }
-
-  if (isMinigamePassName(itemName)) {
-    const { data, error } = await grantClient.rpc('grant_minigame_ticket', {
-      p_child_id: childId,
-      p_amount: amount,
-    })
-    if (error) {
-      console.error('[contentTickets] minigame grant failed:', error.message)
-      return null
-    }
-    return typeof data === 'number' ? data : null
-  }
-
-  return null
+  return typeof data === 'number' ? data : null
 }
 
 export type PurchaseRequestRewardGrantRow = {

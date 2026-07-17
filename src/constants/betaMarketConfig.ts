@@ -40,7 +40,7 @@ export const BETA_MARKET_CONFIG = {
   activeEvents: ['엄마 뽀뽀', '아빠 뽀뽀', '책 읽어주세요', '안아주세요'],
 
   /** 자녀앱에 노출할 콘텐츠 이용권 목록 (간식 다음 구역) */
-  activeContent: ['영상 시청권 30분', '미니게임 이용권'],
+  activeContent: ['보물상자 이용권'],
 
   /** 자녀앱에서 완전히 숨길 카테고리 — 장난감은 비활성 유지 + 목록에서 숨김 */
   hiddenCategoriesChild: ['toy'] as string[],
@@ -52,7 +52,7 @@ export const BETA_MARKET_CONFIG = {
    * 부모 메뉴 제어에서 「준비중」 오버레이 (자녀앱 노출은 `childContentMenu` 의 available 과 연동)
    * DB store_items.name 과 정확히 일치해야 합니다.
    */
-  parentPreparingItems: ['미니게임 이용권'] as const,
+  parentPreparingItems: [] as const,
 } as const
 
 export type BetaMarketConfig = typeof BETA_MARKET_CONFIG
