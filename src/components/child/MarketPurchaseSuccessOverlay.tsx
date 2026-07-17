@@ -47,8 +47,8 @@ export default function MarketPurchaseSuccessOverlay({
 
     cheerSoundStopRef.current?.()
     cheerSoundStopRef.current = playAudioWithTimedFadeOut(CHILD_AUDIO.marketPurchaseCheer, {
-      playMs: 800,
-      fadeMs: 500,
+      playMs: 1500,
+      fadeMs: 1200,
       volume: 0.9,
     })
 
