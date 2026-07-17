@@ -35,8 +35,8 @@ type Props = {
   onTicketBalancesChange: (videoQuantity: number, minigameQuantity: number) => void
 }
 
-/** menu · browse · confirm · pickVideo(영상 선택) · watching · timeup */
-type Phase = 'menu' | 'browse' | 'confirm' | 'pickVideo' | 'watching' | 'timeup'
+/** menu · browse · pickVideo(영상 선택) · watching · timeup */
+type Phase = 'menu' | 'browse' | 'pickVideo' | 'watching' | 'timeup'
 
 function readSessionRemainingSeconds(session: ContentSession): number {
   if (
@@ -316,15 +316,8 @@ export default function ChildContentZonePopup({
 
   function handleChannelClick(channel: ContentChannel) {
     setSelectedChannel(channel)
-    if (sessionId && remainingPlaySeconds > 0) {
-      void enterChannel(channel)
-      return
-    }
-    if (watchSecondsPool > 0 || totalAvailableSeconds > 0) {
-      setPhase('confirm')
-      return
-    }
-    setPhase('confirm')
+    if (busy) return
+    void enterChannel(channel)
   }
 
   async function enterChannel(channel: ContentChannel) {
@@ -372,11 +365,6 @@ export default function ChildContentZonePopup({
     }
   }
 
-  async function handleConfirmStartViewing() {
-    if (!selectedChannel || busy) return
-    await enterChannel(selectedChannel)
-  }
-
   function handlePickVideo(video: YouTubeListVideo) {
     setActiveVideoId(video.videoId)
     setIsVideoPlaying(false)
@@ -410,7 +398,7 @@ export default function ChildContentZonePopup({
     onClose()
   }
 
-  const showModal = phase === 'menu' || phase === 'browse' || phase === 'confirm'
+  const showModal = phase === 'menu' || phase === 'browse'
 
   if (!open || !portalReady) return null
 
@@ -615,58 +603,6 @@ export default function ChildContentZonePopup({
                   ))}
                 </div>
               )}
-            </div>
-          ) : null}
-
-          {/* ── 이용권 확인 ── */}
-          {phase === 'confirm' ? (
-            <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 py-8">
-              {sessionId && remainingPlaySeconds > 0 ? (
-                <>
-                  <ContentVideoWatchBalanceRow
-                    ticketQuantity={videoTicketQty}
-                    watchTimeLabel={formatWatchTimeClock(remainingPlaySeconds)}
-                  />
-                  <p className="text-center text-[12px] font-bold text-gray-500">
-                    이 시간으로 시청을 이어갈까요?
-                  </p>
-                </>
-              ) : (
-                <>
-                  <ContentVideoWatchBalanceRow
-                    ticketQuantity={videoTicketQty}
-                    watchTimeLabel={formatWatchTimeClock(displayWatchSeconds)}
-                  />
-                  <p className="text-center text-[11px] font-bold text-gray-400">
-                    시청권 1장 = 30분 · 뒤로가기해도 남은 시간은 유지돼요
-                  </p>
-                </>
-              )}
-              {selectedChannel ? (
-                <p className="text-center text-[12px] font-bold text-indigo-600">{selectedChannel.title}</p>
-              ) : null}
-              <div className="flex w-full gap-2">
-                <button
-                  type="button"
-                  onClick={() => setPhase('browse')}
-                  className="flex-1 rounded-xl bg-gray-100 py-3 text-sm font-bold text-gray-700"
-                >
-                  취소
-                </button>
-                <button
-                  type="button"
-                  disabled={
-                    busy ||
-                    (sessionId && remainingPlaySeconds > 0
-                      ? false
-                      : watchSecondsPool <= 0 && totalAvailableSeconds <= 0 && videoTicketQty < 1)
-                  }
-                  onClick={() => void handleConfirmStartViewing()}
-                  className="flex-1 rounded-xl bg-indigo-500 py-3 text-sm font-bold text-white disabled:opacity-50"
-                >
-                  확인
-                </button>
-              </div>
             </div>
           ) : null}
 
