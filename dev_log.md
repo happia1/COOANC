@@ -4,6 +4,21 @@
 
 ---
 
+## [2026-07-23] - 빠른 연속 입력 시 크레딧·하트 숫자 역행 수정
+- **Status:** 완료
+- **Files Modified:**
+  - `src/components/child/ChildHomePiggyBank.tsx`
+  - `src/hooks/usePlantPot.ts`
+- **Summary:**
+  - 저금통 연속 이체 중 중간 서버 응답과 Realtime 이벤트가 아직 대기 중인 입력을 덮어쓰지 않게 했습니다.
+  - 화분 물주기는 최신 하트·진행도를 즉시 이어받아 재렌더 전의 빠른 탭도 한 번씩 정확히 계산합니다.
+  - 물주기 큐의 마지막 응답만 서버 확정값으로 반영하고, 중간 성장 팝업은 서버 왕복을 기다리지 않고 성장 경계에서 즉시 표시합니다.
+- **Verification:**
+  - `tsc --noEmit` 통과
+  - `git diff --check` 통과
+
+---
+
 ## 🚀 Logging Protocol
 1. 모든 작업은 세션 단위로 기록한다.
 2. `Files Created/Modified`에는 정확한 경로를 기재한다.

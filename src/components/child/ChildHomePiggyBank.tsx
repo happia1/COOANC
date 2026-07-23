@@ -101,6 +101,7 @@ export default function ChildHomePiggyBank({
   const optimisticPiggyRef = useRef(piggyCredits)
   const apiQueueRef = useRef(Promise.resolve())
   const pendingTransferCountRef = useRef(0)
+  const lastConfirmedBalanceRef = useRef<{ credits: number; credits_piggy: number } | null>(null)
   const [piggySrc, setPiggySrc] = useState(piggyBankVisualUrlFromSavedCredits(piggyCredits))
 
   useEffect(() => {
@@ -108,6 +109,9 @@ export default function ChildHomePiggyBank({
   }, [])
 
   useEffect(() => {
+    // 빠르게 여러 번 누른 동안에는 부모로 전달된 낙관적 숫자가 다시 props로 들어옵니다.
+    // 이 값을 서버 확정값으로 오인해 진행 중인 입력 기준을 되돌리지 않습니다.
+    if (pendingTransferCountRef.current > 0) return
     optimisticCreditsRef.current = availableCredits
     optimisticPiggyRef.current = piggyCredits
   }, [availableCredits, piggyCredits])
@@ -162,10 +166,6 @@ export default function ChildHomePiggyBank({
 
   const syncTransferToServer = useCallback(
     async (kind: TransferKind) => {
-      pendingTransferCountRef.current += 1
-      if (pendingTransferCountRef.current === 1) {
-        onPiggyTransferPending?.(true)
-      }
       try {
         const res = await fetch('/api/child/credits/transfer', {
         method: 'POST',
@@ -191,12 +191,22 @@ export default function ChildHomePiggyBank({
         console.warn('[ChildHomePiggyBank] transfer failed', json.error ?? res.status)
         return
       }
-      optimisticCreditsRef.current = json.credits
-      optimisticPiggyRef.current = json.credits_piggy
-      onPiggyUpdate({ credits: json.credits, credits_piggy: json.credits_piggy })
+      // 앞선 요청의 응답은 뒤에 대기 중인 탭을 포함하지 않은 값입니다.
+      // 마지막 요청까지 끝났을 때만 서버 확정값을 화면에 반영합니다.
+      lastConfirmedBalanceRef.current = {
+        credits: json.credits,
+        credits_piggy: json.credits_piggy,
+      }
     } finally {
       pendingTransferCountRef.current = Math.max(0, pendingTransferCountRef.current - 1)
       if (pendingTransferCountRef.current === 0) {
+        const confirmed = lastConfirmedBalanceRef.current
+        if (confirmed) {
+          optimisticCreditsRef.current = confirmed.credits
+          optimisticPiggyRef.current = confirmed.credits_piggy
+          onPiggyUpdate(confirmed)
+          lastConfirmedBalanceRef.current = null
+        }
         onPiggyTransferPending?.(false)
       }
     }
@@ -206,13 +216,18 @@ export default function ChildHomePiggyBank({
 
   const enqueueTransfer = useCallback(
     (kind: TransferKind) => {
+      pendingTransferCountRef.current += 1
+      if (pendingTransferCountRef.current === 1) {
+        lastConfirmedBalanceRef.current = null
+        onPiggyTransferPending?.(true)
+      }
       apiQueueRef.current = apiQueueRef.current
         .then(() => syncTransferToServer(kind))
         .catch((err) => {
           console.warn('[ChildHomePiggyBank] transfer queue failed', err)
         })
     },
-    [syncTransferToServer],
+    [onPiggyTransferPending, syncTransferToServer],
   )
 
   const depositOne = useCallback(() => {

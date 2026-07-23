@@ -126,6 +126,9 @@ export function usePlantPot(
   const supabase = useMemo(() => createClient(), [])
   const [pot, setPot] = useState<PotState | null>(null)
   const [hearts, setHearts] = useState(0)
+  /** 빠른 연속 탭은 React 재렌더 전에도 들어오므로, 다음 탭이 즉시 최신 숫자를 읽도록 ref를 함께 유지합니다. */
+  const potRef = useRef<PotState | null>(null)
+  const heartsRef = useRef(0)
   const [loading, setLoading] = useState(true)
   /** 물주기 API를 순차 처리하기 위한 큐 — 클릭은 로컬에서 바로 반영하고, 서버 요청은 순서대로 보냅니다. */
   const waterQueueRef = useRef<Promise<WaterResult>>(Promise.resolve<WaterResult>('ok'))
@@ -136,6 +139,13 @@ export function usePlantPot(
   onWaterPendingRef.current = options?.onWaterPending
   /** 큐에 쌓인 물주기 요청 수 — 0→1, 1→0 전이에서만 onWaterPending을 알립니다 */
   const pendingWaterCountRef = useRef(0)
+  const lastConfirmedWaterRef = useRef<{
+    hearts: number
+    pot_stage: number
+    pot_hearts_used: number
+    pot_completed: boolean
+  } | null>(null)
+  const refreshAfterWaterQueueRef = useRef(false)
   /**
    * 단계 상승(레벨업) 경계 잠금 — 낙관적 계산에서 levelUp이 확정되는 순간 true.
    * 이후 들어오는 water() 호출은 즉시 'locked'를 돌려주고 하트를 건드리지 않습니다.
@@ -153,11 +163,20 @@ export function usePlantPot(
   /** `syncStats`: true 면 상단 레벨 카드 `stats.hearts` 도 맞춥니다(물주기 성공 등). refresh 는 false 로 훅만 갱신합니다. */
   const syncHeartsFromDb = useCallback((value: unknown, syncStats = true) => {
     const h = readChildStatInt(value)
+    heartsRef.current = h
     setHearts(h)
     if (syncStats) {
       onPlantStatsSyncedRef.current?.({ hearts: h })
     }
   }, [])
+
+  useEffect(() => {
+    heartsRef.current = hearts
+  }, [hearts])
+
+  useEffect(() => {
+    potRef.current = pot
+  }, [pot])
 
   /**
    * 브라우저에서 pot_* 정규화 UPDATE 가 실패했을 때, 같은 작업을 서버 세션으로 한 번 더 시도합니다.
@@ -389,8 +408,13 @@ export function usePlantPot(
         },
         (payload) => {
           const row = (payload.new ?? {}) as Record<string, unknown>
+          // 각 물주기 UPDATE 이벤트는 뒤에 대기 중인 탭을 아직 포함하지 않습니다.
+          // 큐가 끝난 뒤 마지막 API 응답으로 한 번만 확정해 숫자가 역행하지 않게 합니다.
+          if (pendingWaterCountRef.current > 0) return
           if (Object.prototype.hasOwnProperty.call(row, 'hearts')) {
-            setHearts(readChildStatInt(row.hearts))
+            const nextHearts = readChildStatInt(row.hearts)
+            heartsRef.current = nextHearts
+            setHearts(nextHearts)
           }
           /** pot 진행도도 함께 들어왔으면 같이 갱신 — 부모가 DB 에서 화분을 손봐도 자녀 화면 동기화 */
           const hasPotField =
@@ -420,7 +444,7 @@ export function usePlantPot(
                 completedRaw,
                 treeId,
               )
-              return {
+              const nextPot = {
                 ...prev,
                 treeId,
                 stage: normalized.stage,
@@ -428,6 +452,8 @@ export function usePlantPot(
                 heartsNeeded: getHeartsNeededForStage(treeId, normalized.stage),
                 completed: normalized.completed,
               }
+              potRef.current = nextPot
+              return nextPot
             })
           }
         },
@@ -445,27 +471,19 @@ export function usePlantPot(
         return 'locked'
       }
 
-      const prevPot = pot
+      const prevPot = potRef.current
       if (!prevPot?.hasChosenSeed || needsPotSeedSelection(prevPot)) {
         return 'ok'
       }
 
       const stage7Reset = prevPot.stage === 7
-      const prevHearts = Math.max(hearts, readChildStatInt(displayHearts))
+      const prevHearts = Math.max(heartsRef.current, readChildStatInt(displayHearts))
 
       if (!stage7Reset && prevHearts <= 0) {
         return 'no_hearts'
       }
 
-      let optimisticApplied = false
-      const prevSnapshot = { hearts: prevHearts, pot: prevPot }
-      const rollbackOptimistic = () => {
-        if (!optimisticApplied) return
-        optimisticApplied = false
-        setHearts(prevSnapshot.hearts)
-        setPot(prevSnapshot.pot)
-      }
-
+      let immediateGrowthResult: WaterResult | null = null
       if (!stage7Reset && prevHearts > 0) {
         const needed = prevPot.heartsNeeded
         const newHeartsUsed = prevPot.heartsUsed + 1
@@ -474,14 +492,22 @@ export function usePlantPot(
         const newHeartsUsedAfter = levelUp ? 0 : newHeartsUsed
         const isCompleted = newStage === 7
 
-        optimisticApplied = true
-        setHearts(prevHearts - 1)
-        setPot({
+        const optimisticPot = {
           ...prevPot,
           stage: newStage,
           heartsUsed: newHeartsUsedAfter,
           heartsNeeded: getHeartsNeededForStage(prevPot.treeId, newStage),
           completed: isCompleted,
+        }
+        heartsRef.current = prevHearts - 1
+        potRef.current = optimisticPot
+        setHearts(prevHearts - 1)
+        setPot(optimisticPot)
+        onPlantStatsSyncedRef.current?.({
+          hearts: prevHearts - 1,
+          pot_stage: newStage,
+          pot_hearts_used: newHeartsUsedAfter,
+          pot_completed: isCompleted,
         })
 
         /**
@@ -493,6 +519,11 @@ export function usePlantPot(
         if (levelUp) {
           stageTransitionLockRef.current = true
           setStageLocked(true)
+          // 중간 성장 팝업은 서버 왕복을 기다리지 않고 정확한 경계 탭에서 즉시 엽니다.
+          // 최종 수확 단계만 서버가 만드는 수확 결과가 필요해 응답을 기다립니다.
+          if (!isCompleted) {
+            immediateGrowthResult = { type: 'grew', newStage }
+          }
         }
         if (isCompleted) {
           potGenerationRef.current += 1
@@ -500,15 +531,23 @@ export function usePlantPot(
       }
 
       const generationAtCall = potGenerationRef.current
+      pendingWaterCountRef.current += 1
+      if (pendingWaterCountRef.current === 1) {
+        lastConfirmedWaterRef.current = null
+        refreshAfterWaterQueueRef.current = false
+        onWaterPendingRef.current?.(true)
+      }
 
       const resultPromise = async (): Promise<WaterResult> => {
         if (potGenerationRef.current !== generationAtCall) {
           // 큐에 머무는 동안 화분이 재심기되어 더 이상 유효하지 않은 요청 — 그대로 버립니다.
+          pendingWaterCountRef.current = Math.max(0, pendingWaterCountRef.current - 1)
+          if (pendingWaterCountRef.current === 0) {
+            lastConfirmedWaterRef.current = null
+            refreshAfterWaterQueueRef.current = false
+            onWaterPendingRef.current?.(false)
+          }
           return 'ok'
-        }
-        pendingWaterCountRef.current += 1
-        if (pendingWaterCountRef.current === 1) {
-          onWaterPendingRef.current?.(true)
         }
         try {
           const res = await fetch('/api/child/plant-water', {
@@ -531,19 +570,17 @@ export function usePlantPot(
           }
 
           if (res.status === 400 && json?.code === 'NO_HEARTS') {
-            rollbackOptimistic()
-            await refresh()
+            refreshAfterWaterQueueRef.current = true
             return 'no_hearts'
           }
           if (res.status === 400 && json?.code === 'NO_SEED_CHOSEN') {
-            rollbackOptimistic()
+            refreshAfterWaterQueueRef.current = true
             return 'ok'
           }
 
           if (!res.ok || json?.ok !== true) {
             console.warn('[usePlantPot] plant-water API', res.status, json)
-            rollbackOptimistic()
-            await refresh()
+            refreshAfterWaterQueueRef.current = true
             return 'ok'
           }
 
@@ -555,36 +592,23 @@ export function usePlantPot(
 
           if (!hasConfirmedPotState) {
             console.warn('[usePlantPot] plant-water incomplete payload', json)
-            rollbackOptimistic()
-            await refresh()
+            refreshAfterWaterQueueRef.current = true
             return 'ok'
           }
 
-          optimisticApplied = false
-          onPlantStatsSyncedRef.current?.({
+          lastConfirmedWaterRef.current = {
             hearts: json.hearts,
             pot_stage: json.pot_stage,
             pot_hearts_used: json.pot_hearts_used,
             pot_completed: json.pot_completed,
-          })
-          syncHeartsFromDb(json.hearts)
-          setPot((prev) =>
-            potStateFromWaterResponse(
-              prev?.treeId ?? DEFAULT_TREE,
-              json.pot_stage,
-              json.pot_hearts_used,
-              json.pot_completed,
-              prev?.hasChosenSeed ?? false,
-            ),
-          )
+          }
 
           if (json.grew === true && typeof json.newStage === 'number') {
             const tid = prevPot.treeId ?? DEFAULT_TREE
             const ns = clampPotStageForTree(tid, json.newStage)
             if (ns === 7) {
               // 완성 — 다음 생애주기(재심기)를 위해 큐·대기 카운터를 정리합니다.
-              waterQueueRef.current = Promise.resolve<WaterResult>('ok')
-              pendingWaterCountRef.current = 0
+              // 큐와 대기 수는 finally에서 요청별로 정리합니다.
             }
             return {
               type: 'grew',
@@ -595,12 +619,30 @@ export function usePlantPot(
           return 'ok'
         } catch (e) {
           console.warn('[usePlantPot] plant-water fetch', e)
-          rollbackOptimistic()
-          await refresh()
+          refreshAfterWaterQueueRef.current = true
           return 'ok'
         } finally {
           pendingWaterCountRef.current = Math.max(0, pendingWaterCountRef.current - 1)
           if (pendingWaterCountRef.current === 0) {
+            const confirmed = lastConfirmedWaterRef.current
+            if (refreshAfterWaterQueueRef.current) {
+              await refresh()
+            } else if (confirmed) {
+              const nextPot = potStateFromWaterResponse(
+                potRef.current?.treeId ?? DEFAULT_TREE,
+                confirmed.pot_stage,
+                confirmed.pot_hearts_used,
+                confirmed.pot_completed,
+                potRef.current?.hasChosenSeed ?? false,
+              )
+              heartsRef.current = confirmed.hearts
+              potRef.current = nextPot
+              setHearts(confirmed.hearts)
+              setPot(nextPot)
+              onPlantStatsSyncedRef.current?.(confirmed)
+            }
+            lastConfirmedWaterRef.current = null
+            refreshAfterWaterQueueRef.current = false
             onWaterPendingRef.current?.(false)
           }
         }
@@ -613,9 +655,9 @@ export function usePlantPot(
           return 'ok'
         })
 
-      return waterQueueRef.current
+      return immediateGrowthResult ?? waterQueueRef.current
     },
-    [childId, hearts, pot, refresh, syncHeartsFromDb],
+    [childId, refresh],
   )
 
   /** 단계 상승 축하 팝업이 닫힐 때 호출 — 다시 연속 물주기를 허용합니다. */
