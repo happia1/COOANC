@@ -850,27 +850,6 @@ export default function RoutineTab({
           모바일(grid-cols-1): 일상 미션 → 스페셜 미션 순(DOM 순서 = 화면 순서)
           md+(grid-cols-2): 좌=일상 미션, 우=스페셜 미션(sticky) — 캘린더는 홈 탭으로 이동
       ──────────────────────────────────────────────────────────────────────── */}
-      {/* 루틴 카드 조작 안내 — 최초 1회 공지 블록(X 로 닫으면 다시 안 뜸) */}
-      {!guideDismissed && (
-        <div className={`${PARENT_NEUTRAL_CARD_CLASSNAME} flex items-start gap-2 px-3 py-2.5`}>
-          <span className="mt-0.5 shrink-0 text-base leading-none" aria-hidden>💡</span>
-          <p className="min-w-0 flex-1 text-[12px] font-medium leading-relaxed text-gray-600">
-            카드를 <b className="font-bold text-gray-700">클릭</b>하면 보상을 수정하고,{' '}
-            <b className="font-bold text-gray-700">길게 눌러</b> 끌면 순서를 바꿀 수 있어요.
-          </p>
-          <button
-            type="button"
-            onClick={dismissGuide}
-            aria-label="안내 닫기"
-            className="shrink-0 rounded-md p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
-          >
-            <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden>
-              <path d="M6 6l12 12M18 6L6 18" strokeLinecap="round" />
-            </svg>
-          </button>
-        </div>
-      )}
-
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2 md:gap-6 md:items-start">
 
         {/* 좌 컬럼(md) / 상단(모바일): 프로필 바 + 미션 섹션들 */}
@@ -897,7 +876,28 @@ export default function RoutineTab({
             />
           )}
 
-          {/* 활성 미션 — 헤더 + 미션 수정하기 버튼 (안내문은 상단 공지 블록으로 1회만) */}
+          {/* 루틴 카드 조작 안내 — 캐릭터(프로필) 블록 아래 최초 1회 공지(X 로 닫으면 다시 안 뜸) */}
+          {!guideDismissed && (
+            <div className={`${PARENT_NEUTRAL_CARD_CLASSNAME} flex items-start gap-2 px-3 py-2.5`}>
+              <span className="mt-0.5 shrink-0 text-base leading-none" aria-hidden>💡</span>
+              <p className="min-w-0 flex-1 text-[12px] font-medium leading-relaxed text-gray-600">
+                카드를 <b className="font-bold text-gray-700">클릭</b>하면 보상을 수정하고,{' '}
+                <b className="font-bold text-gray-700">길게 눌러</b> 끌면 순서를 바꿀 수 있어요.
+              </p>
+              <button
+                type="button"
+                onClick={dismissGuide}
+                aria-label="안내 닫기"
+                className="shrink-0 rounded-md p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+              >
+                <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden>
+                  <path d="M6 6l12 12M18 6L6 18" strokeLinecap="round" />
+                </svg>
+              </button>
+            </div>
+          )}
+
+          {/* 활성 미션 — 헤더 + 미션 수정하기 버튼 (안내문은 위 공지 블록으로 1회만) */}
           <section>
             <div className="mb-1.5 flex items-center justify-between gap-2">
               <h2 className="shrink-0 text-sm font-bold text-gray-800">일상 미션</h2>
