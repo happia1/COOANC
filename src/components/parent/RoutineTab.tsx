@@ -755,7 +755,13 @@ export default function RoutineTab({
     setMissions((prev) => prev.map((x) => (x.id === updated.id ? updated : x)))
   }
 
-  async function handleSaveMissionRewards(missionId: string, credit: number, heart: number, exp: number) {
+  async function handleSaveMissionRewards(
+    missionId: string,
+    credit: number,
+    heart: number,
+    exp: number,
+    multiplier?: number,
+  ) {
     const res = await fetch('/api/mission/patch-rewards', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -765,8 +771,23 @@ export default function RoutineTab({
     if (!res.ok) {
       throw new Error(typeof json.error === 'string' ? json.error : '보상 저장에 실패했어요')
     }
-    const mission = json.mission as Mission | undefined
+    let mission = json.mission as Mission | undefined
     if (!mission) throw new Error('저장된 미션 정보를 읽지 못했어요')
+
+    /** 스페셜 미션은 보상 배율(1·2·3배)도 함께 저장합니다 — 별도 「보상 배율」버튼을 대체 */
+    if (typeof multiplier === 'number') {
+      const mres = await fetch('/api/mission/patch-reward-multiplier', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ missionId, reward_multiplier: multiplier }),
+      })
+      const mjson = await mres.json().catch(() => ({}))
+      if (!mres.ok) {
+        throw new Error(typeof mjson.error === 'string' ? mjson.error : '보상 배율 저장에 실패했어요')
+      }
+      if (mjson.mission) mission = mjson.mission as Mission
+    }
+
     mergeMission(mission)
     showToast('보상을 저장했어요')
   }
@@ -1199,22 +1220,7 @@ function SpecialMissionRow({
             {assigning ? '넣는 중…' : '일정 추가'}
           </button>
         ) : null}
-        {m.repeat_type !== 'event' && onOpenDailyBonusSettings ? (
-          <button
-            type="button"
-            disabled={!m.is_active}
-            onPointerDown={(e) => e.stopPropagation()}
-            onTouchStart={(e) => e.stopPropagation()}
-            onClick={(e) => {
-              e.stopPropagation()
-              onOpenDailyBonusSettings()
-            }}
-            aria-label="완료 보상 보너스 배율 설정"
-            className="w-full rounded-md border border-violet-200/80 bg-violet-50/60 py-0.5 text-[8px] font-bold leading-tight text-violet-900 disabled:opacity-40"
-          >
-            보상 배율
-          </button>
-        ) : null}
+        {/* 매일 스페셜의 「보상 배율」버튼은 제거 — 카드 클릭 시 뜨는 보상 수정 팝업 하단 배율 칩으로 통합 */}
       </div>
     </div>
   )
@@ -1269,12 +1275,14 @@ function MissionRewardEditModal({
 }: {
   mission: Mission | null
   onClose: () => void
-  onSave: (missionId: string, credit: number, heart: number, exp: number) => Promise<void>
+  onSave: (missionId: string, credit: number, heart: number, exp: number, multiplier?: number) => Promise<void>
 }) {
   const [portalReady, setPortalReady] = useState(false)
   const [credit, setCredit] = useState('0')
   const [heart, setHeart] = useState('0')
   const [exp, setExp] = useState('0')
+  /** 스페셜 미션 보상 배율(1·2·3배) — 카드 클릭 팝업 하단 칩으로 선택 */
+  const [multiplier, setMultiplier] = useState(1)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
 
@@ -1287,12 +1295,16 @@ function MissionRewardEditModal({
     setCredit(String(Math.max(0, mission.credit_reward)))
     setHeart(String(Math.max(0, mission.heart_reward)))
     setExp(String(Math.max(0, mission.exp_reward)))
+    const rm = Math.round(Number(mission.reward_multiplier ?? 1))
+    setMultiplier([1, 2, 3].includes(rm) ? rm : 1)
     setErr(null)
     setBusy(false)
   }, [mission])
 
   if (!mission || !portalReady) return null
 
+  /** 스페셜 미션에만 보상 배율 칩을 노출합니다(일상 미션은 배율 없음) */
+  const isSpecial = isSpecialSectionMission(mission)
   const parsedCredit = Math.max(0, Math.floor(Number(credit) || 0))
   const parsedHeart = Math.max(0, Math.floor(Number(heart) || 0))
   const parsedExp = Math.max(0, Math.floor(Number(exp) || 0))
@@ -1301,7 +1313,7 @@ function MissionRewardEditModal({
     setBusy(true)
     setErr(null)
     try {
-      await onSave(mission.id, parsedCredit, parsedHeart, parsedExp)
+      await onSave(mission.id, parsedCredit, parsedHeart, parsedExp, isSpecial ? multiplier : undefined)
       onClose()
     } catch (e) {
       setErr(e instanceof Error ? e.message : '저장에 실패했어요')
@@ -1352,6 +1364,35 @@ function MissionRewardEditModal({
             />
           </label>
         </div>
+
+        {isSpecial ? (
+          <div className="mt-3 border-t border-gray-100 pt-3">
+            <p className="text-[11px] font-bold text-gray-600">보상 배율</p>
+            <p className="mt-0.5 text-[10px] text-gray-400">
+              완료 시 크레딧·하트·EXP가 배율만큼 곱해져 지급돼요.
+            </p>
+            <div className="mt-2 grid grid-cols-3 gap-2">
+              {[1, 2, 3].map((mul) => {
+                const on = multiplier === mul
+                return (
+                  <button
+                    key={mul}
+                    type="button"
+                    onClick={() => setMultiplier(mul)}
+                    className={[
+                      'rounded-lg border py-2 text-sm font-black transition active:scale-95',
+                      on
+                        ? 'border-violet-500 bg-violet-500 text-white shadow-sm'
+                        : 'border-violet-200 bg-violet-50 text-violet-700',
+                    ].join(' ')}
+                  >
+                    {mul}배
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        ) : null}
 
         {err ? <p className="mt-2 text-center text-[11px] font-bold text-red-600">{err}</p> : null}
 

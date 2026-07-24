@@ -9,7 +9,35 @@
  * - 사진이 없는 기본 상품은 `items/shop/items/*.png` 를 씁니다(자녀 마켓과 같은 규칙).
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type CSSProperties,
+  type ReactNode,
+} from 'react'
+import {
+  DndContext,
+  KeyboardSensor,
+  MouseSensor,
+  TouchSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DraggableAttributes,
+} from '@dnd-kit/core'
+import {
+  SortableContext,
+  rectSortingStrategy,
+  sortableKeyboardCoordinates,
+  useSortable,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
+import { MISSION_CARD_DRAG_SURFACE_CLASS } from '@/components/parent/SortableHorizontalMissionStrip'
 import MarketItemImage from '@/components/common/MarketItemImage'
 import { marketFrameKeyForItemId } from '@/lib/marketItemFrame'
 import { resolveStoreItemImageUrl } from '@/constants/marketItemImages'
@@ -92,6 +120,32 @@ function VisibilityToggle({
   )
 }
 
+/** 타일 루트에 붙일 드래그·정렬 바인딩 — renderMenuItemTile 세 번째 인자 */
+type TileDragProps = {
+  setNodeRef: (element: HTMLElement | null) => void
+  style: CSSProperties
+  attributes: DraggableAttributes
+  listeners: ReturnType<typeof useSortable>['listeners']
+  isDragging: boolean
+}
+
+/** 한 구역(≥2개) 안에서 타일을 정렬 가능하게 감싸는 래퍼 */
+function SortableMenuTile({
+  id,
+  children,
+}: {
+  id: string
+  children: (drag: TileDragProps) => ReactNode
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id })
+  const style: CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 2 : undefined,
+  }
+  return children({ setNodeRef, style, attributes, listeners, isDragging })
+}
+
 export default function ParentMarketMenuControl({
   childId,
   storeItems,
@@ -152,12 +206,18 @@ export default function ParentMarketMenuControl({
   const addGalleryInputRef = useRef<HTMLInputElement>(null)
   const editCameraInputRef = useRef<HTMLInputElement>(null)
   const editGalleryInputRef = useRef<HTMLInputElement>(null)
-  const longPressTimerRef = useRef<number | null>(null)
 
-  /** 카드 정렬 모드(롱프레스 진입) */
-  const [reorderMode, setReorderMode] = useState(false)
-  /** 드래그 중인 카드 id + 섹션 */
-  const [dragging, setDragging] = useState<{ itemId: string; sectionKey: string } | null>(null)
+  /**
+   * 드래그 정렬 센서 — 미션 카드(SortableHorizontalMissionStrip)와 동일한 설정.
+   * - 마우스: 8px 이동하면 드래그 시작(짧은 클릭은 토글·연필 버튼 그대로 동작)
+   * - 터치: 250ms 길게 누르면 드래그 시작(짧은 탭·가로 스크롤은 그대로)
+   */
+  const sensors = useSensors(
+    useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  )
+
   /** 순서 저장 중 */
   const [orderSaving, setOrderSaving] = useState(false)
   const [orderSaveErr, setOrderSaveErr] = useState<string | null>(null)
@@ -195,16 +255,6 @@ export default function ParentMarketMenuControl({
       setAddImageFile(null)
     }
   }, [addOpen])
-
-  /** 롱프레스 타이머 정리 */
-  useEffect(
-    () => () => {
-      if (longPressTimerRef.current != null) {
-        window.clearTimeout(longPressTimerRef.current)
-      }
-    },
-    [],
-  )
 
   /**
    * 현재 자녀 마켓에 둘 상품만(전체 공개 + 이 부모-자녀 전용).
@@ -501,19 +551,11 @@ export default function ParentMarketMenuControl({
     [childId, onItemOrderSaved],
   )
 
-  function clearLongPressTimer() {
-    if (longPressTimerRef.current != null) {
-      window.clearTimeout(longPressTimerRef.current)
-      longPressTimerRef.current = null
-    }
-  }
-
-  function beginLongPressForReorder() {
-    if (reorderMode) return
-    clearLongPressTimer()
-    longPressTimerRef.current = window.setTimeout(() => {
-      setReorderMode(true)
-    }, 420)
+  /** dnd-kit 드래그 종료 → 해당 구역 안에서만 순서 재계산·저장 */
+  function handleSectionDragEnd(sectionKey: string, ev: DragEndEvent) {
+    const { active, over } = ev
+    if (!over || active.id === over.id) return
+    onDragReorder(sectionKey, String(active.id), String(over.id))
   }
 
   function onDragReorder(sectionKey: string, draggedId: string, targetId: string) {
@@ -537,7 +579,7 @@ export default function ParentMarketMenuControl({
     void saveItemOrder(orderedAll, nextOrderMap)
   }
 
-  function renderMenuItemTile(it: StoreItem, sectionKey: string) {
+  function renderMenuItemTile(it: StoreItem, sectionKey: string, drag: TileDragProps | null) {
     const hidden = hiddenItemIds.has(it.id)
     const visible = !hidden
     const spriteFrame = marketFrameKeyForItemId(it.id, it.name)
@@ -566,31 +608,16 @@ export default function ParentMarketMenuControl({
             ? true
             : !isBeta
 
-    const tileWiggleClass = reorderMode ? 'animate-[marketCardWiggle_0.26s_ease-in-out_infinite]' : ''
-
     return (
       <div
         key={it.id}
-        className={`relative flex min-w-0 snap-start flex-col items-center gap-0.5 rounded-xl px-0.5 py-0.5 ${tileWiggleClass} ${dragging?.itemId === it.id ? 'opacity-55' : ''}`}
-        draggable={reorderMode}
-        onPointerDown={() => beginLongPressForReorder()}
-        onPointerUp={clearLongPressTimer}
-        onPointerCancel={clearLongPressTimer}
-        onPointerLeave={clearLongPressTimer}
-        onDragStart={() => {
-          if (!reorderMode) return
-          setDragging({ itemId: it.id, sectionKey })
-        }}
-        onDragOver={(e) => {
-          if (!reorderMode || !dragging || dragging.sectionKey !== sectionKey) return
-          e.preventDefault()
-        }}
-        onDrop={(e) => {
-          if (!reorderMode || !dragging || dragging.sectionKey !== sectionKey) return
-          e.preventDefault()
-          onDragReorder(sectionKey, dragging.itemId, it.id)
-        }}
-        onDragEnd={() => setDragging(null)}
+        ref={drag?.setNodeRef}
+        style={drag?.style}
+        {...(drag?.attributes ?? {})}
+        {...(drag?.listeners ?? {})}
+        className={`relative flex min-w-0 snap-start flex-col items-center gap-0.5 rounded-xl px-0.5 py-0.5 ${
+          drag ? MISSION_CARD_DRAG_SURFACE_CLASS : ''
+        } ${drag?.isDragging ? 'opacity-55' : ''}`}
       >
         {/* 베타 미포함 상품: 흐리게 처리 */}
         <div className={isBlocked ? 'opacity-40 grayscale' : ''}>
@@ -617,10 +644,7 @@ export default function ParentMarketMenuControl({
           {/** 이 자녀 기준 실제 가격 + 탭하면 숫자를 바꿀 수 있음 */}
           <button
             type="button"
-            onClick={() => {
-              if (reorderMode) return
-              openItemEdit(it)
-            }}
+            onClick={() => openItemEdit(it)}
             title={hasOverride ? `기본 ${it.credit_price}크레딧 → 이 자녀만 ${price}` : '크레딧 바꾸기'}
             className="max-w-full truncate rounded-md px-0.5 text-[8px] font-black leading-tight text-brand-blue underline-offset-2 hover:underline"
           >
@@ -629,7 +653,6 @@ export default function ParentMarketMenuControl({
           </button>
           <VisibilityToggle
             on={visible}
-            disabled={reorderMode}
             ariaLabel={visible ? `${it.name} 마켓에서 숨기기` : `${it.name} 마켓에 표시하기`}
             onToggle={() => toggleHidden(it.id, visible)}
           />
@@ -640,7 +663,6 @@ export default function ParentMarketMenuControl({
           type="button"
           onClick={(e) => {
             e.stopPropagation()
-            if (reorderMode) return
             openItemEdit(it)
           }}
           className="absolute right-0 top-0 z-[1] flex h-4 w-4 items-center justify-center rounded-full bg-white/90 text-gray-300 shadow-sm ring-1 ring-gray-100 transition active:scale-95 hover:text-gray-400"
@@ -721,18 +743,6 @@ export default function ParentMarketMenuControl({
       <div className="mb-1 flex items-start justify-between gap-2">
         <h2 className="text-sm font-bold text-brand-text">메뉴 제어</h2>
         <div className="flex items-center gap-2">
-          {reorderMode ? (
-            <button
-              type="button"
-              onClick={() => {
-                setReorderMode(false)
-                setDragging(null)
-              }}
-              className="shrink-0 text-[11px] font-bold text-brand-blue underline-offset-2 hover:underline"
-            >
-              정렬 완료
-            </button>
-          ) : null}
           <button
             type="button"
             disabled={!childId}
@@ -749,20 +759,9 @@ export default function ParentMarketMenuControl({
       <p className="mb-3 text-[11px] leading-snug text-gray-400">
         자녀의 마켓에 올라가는 상품을 직접 관리할 수 있어요.
       </p>
-      <style>{`
-        @keyframes marketCardWiggle {
-          0% { transform: rotate(-1.4deg); }
-          50% { transform: rotate(1.4deg); }
-          100% { transform: rotate(-1.4deg); }
-        }
-      `}</style>
-      {reorderMode ? (
-        <p className="mb-2 rounded-xl bg-blue-50 px-3 py-2 text-[11px] font-bold text-blue-700 ring-1 ring-blue-100">
-          카드를 끌어서 순서를 바꿀 수 있어요. 다시 눌러 놓으면 저장됩니다.
-        </p>
-      ) : (
-        <p className="mb-2 text-[11px] font-bold text-gray-400">카드를 길게 누르면 드래그 정렬 모드가 켜져요.</p>
-      )}
+      <p className="mb-2 text-[11px] font-bold text-gray-400">
+        카드를 길게 누른 뒤(마우스는 살짝 끌어서) 옮기면 순서가 바뀌고 자동 저장돼요.
+      </p>
 
       {toggleSaveErr && (
         <p className="mb-2 rounded-xl bg-red-50 px-3 py-2 text-[11px] font-bold text-red-600 ring-1 ring-red-100" role="alert">
@@ -840,20 +839,50 @@ export default function ParentMarketMenuControl({
                  */}
                 {expanded ? (
                   <div className="-mx-1 snap-x snap-mandatory overflow-x-auto overflow-y-hidden pb-1 pt-1 [scrollbar-width:thin] [-ms-overflow-style:none] [&::-webkit-scrollbar]:h-1">
-                    {block.sectionKey === 'event' || block.sectionKey === 'content' || !useTwoRows ? (
-                      <div className="grid w-max grid-flow-col grid-rows-1 gap-x-1.5 gap-y-2.5 px-1 auto-cols-[minmax(3.25rem,3.5rem)] sm:auto-cols-[minmax(3.5rem,3.75rem)]">
-                        {block.items.map((it) => renderMenuItemTile(it, block.sectionKey))}
-                      </div>
-                    ) : (
-                      <div
-                        className="grid w-max grid-rows-2 gap-x-1.5 gap-y-2.5 px-1"
-                        style={{
-                          gridTemplateColumns: `repeat(${twoRowColumnCount}, minmax(3.25rem, 3.75rem))`,
-                        }}
-                      >
-                        {block.items.map((it) => renderMenuItemTile(it, block.sectionKey))}
-                      </div>
-                    )}
+                    {(() => {
+                      /** 2개 이상이면 그 구역 안에서만 드래그 정렬(터치·마우스). */
+                      const canSort = block.items.length > 1
+                      const oneRow =
+                        block.sectionKey === 'event' || block.sectionKey === 'content' || !useTwoRows
+                      const tiles = block.items.map((it) =>
+                        canSort ? (
+                          <SortableMenuTile key={it.id} id={it.id}>
+                            {(drag) => renderMenuItemTile(it, block.sectionKey, drag)}
+                          </SortableMenuTile>
+                        ) : (
+                          renderMenuItemTile(it, block.sectionKey, null)
+                        ),
+                      )
+                      const grid = oneRow ? (
+                        <div className="grid w-max grid-flow-col grid-rows-1 gap-x-1.5 gap-y-2.5 px-1 auto-cols-[minmax(3.25rem,3.5rem)] sm:auto-cols-[minmax(3.5rem,3.75rem)]">
+                          {tiles}
+                        </div>
+                      ) : (
+                        <div
+                          className="grid w-max grid-rows-2 gap-x-1.5 gap-y-2.5 px-1"
+                          style={{
+                            gridTemplateColumns: `repeat(${twoRowColumnCount}, minmax(3.25rem, 3.75rem))`,
+                          }}
+                        >
+                          {tiles}
+                        </div>
+                      )
+                      if (!canSort) return grid
+                      return (
+                        <DndContext
+                          sensors={sensors}
+                          collisionDetection={closestCenter}
+                          onDragEnd={(ev) => handleSectionDragEnd(block.sectionKey, ev)}
+                        >
+                          <SortableContext
+                            items={block.items.map((x) => x.id)}
+                            strategy={rectSortingStrategy}
+                          >
+                            {grid}
+                          </SortableContext>
+                        </DndContext>
+                      )
+                    })()}
                   </div>
                 ) : null}
               </div>
