@@ -29,12 +29,15 @@ export default function RoutineAgentFab({ disabled = false, unreadCount = 0, onC
   }, [])
 
   return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-[calc(60px+env(safe-area-inset-bottom,0px)+10px)] z-[55] flex justify-center md:bottom-6">
-      {/**
-       * 래퍼는 pointer-events-none 으로 두고, 실제 버튼에만 pointer-events-auto 를 둡니다.
-       * 비개발자 설명: 버튼 주변의 빈 영역이 화면 아래 다른 버튼 클릭을 막지 않게 합니다.
-       */}
-      <div className="pointer-events-none flex w-full max-w-md justify-end px-4 md:max-w-none md:px-8">
+    /**
+     * 화면 **오른쪽 하단**에 고정합니다. (기존에는 max-w-md 를 화면 중앙에 정렬하고
+     * 그 안에서 오른쪽에 붙여, 갤럭시 폴드처럼 넓은 화면에서 버튼이 화면 중앙 근처에
+     * 뜨는 문제가 있었습니다. 이제 뷰포트 오른쪽 가장자리에 직접 앵커합니다.)
+     * 래퍼는 pointer-events-none, 실제 버튼만 pointer-events-auto 로 두어 주변 빈 영역이
+     * 아래 다른 버튼 클릭을 막지 않게 합니다.
+     */
+    <div className="pointer-events-none fixed right-4 md:right-8 bottom-[calc(60px+env(safe-area-inset-bottom,0px)+10px)] z-[55] md:bottom-6">
+      <div className="pointer-events-none flex justify-end">
         <button
           type="button"
           disabled={disabled}

@@ -788,12 +788,12 @@ export default function ApprovalTab({
       )}
 
       {/* ── 2컬럼 그리드 ────────────────────────────────────────────────────────
-          모바일(grid-cols-1): 좌 컬럼 → 우 컬럼 순 스택
-          md+(grid-cols-2):   좌=프로필+구매요청(상단 링크로 최근내역 시트)+완료미션, 우=스티커+마켓제어
+          모바일(grid-cols-1): 칭찬스티커 → 오늘완료 → 구매요청 → 메뉴제어 순 스택(프로필 최상단)
+          md+(grid-cols-2):   좌=프로필+칭찬스티커+오늘완료, 우=구매요청+마켓 메뉴제어
       ──────────────────────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 gap-6 w-full items-start md:grid-cols-2">
 
-      {/* ── 좌 컬럼: 프로필 + 구매 요청(+최근구매내역 링크) + 오늘 완료 미션 ── */}
+      {/* ── 좌 컬럼: 프로필 + 칭찬 스티커 + 오늘 완료 미션 ── */}
       <div className="flex flex-col gap-5">
 
         {/* 통합 프로필 바 — RoutineTab과 동일 */}
@@ -817,15 +817,117 @@ export default function ApprovalTab({
           />
         )}
 
-        {/**
-         * 모바일 전용 배치:
-         * - 요청사항에 맞춰 프로필 블록 바로 아래에 칭찬 스티커 보상 패널을 둡니다.
-         * - 태블릿 가로(md 이상)는 기존 우측 컬럼 배치를 유지합니다.
-         */}
-        <div className="md:hidden">
-          <PraiseStickerPanel childId={currentId} childName={currentChild?.name ?? '자녀'} />
-        </div>
+        {/* 칭찬 스티커 보상 — 모바일·태블릿 공통, 좌 컬럼 상단(프로필 아래) */}
+        <PraiseStickerPanel childId={currentId} childName={currentChild?.name ?? '자녀'} />
 
+        {/* 오늘 완료 미션 — 버튼 → 하단 시트 (모바일·태블릿 공통) */}
+        <section>
+          <button
+            type="button"
+            onClick={() => {
+              setPurchaseHistorySheetOpen(false)
+              setRollbackSheetShowAll(false)
+              setRollbackSheetOpen(true)
+            }}
+            className="w-full rounded-2xl bg-white px-4 py-2.5 text-left shadow-sm ring-1 ring-gray-100 transition-all active:scale-[0.99]"
+          >
+            <div className="flex items-center gap-3">
+              <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <span className="text-sm font-black text-brand-text">오늘 완료 미션</span>
+                <span className="text-[11px] text-gray-400">탭하여 다시 하기 · 롤백</span>
+              </div>
+              <span className="shrink-0 rounded-full bg-brand-blue/10 px-2.5 py-1 text-xs font-black tabular-nums text-brand-blue">
+                {todayCompletedLogs.length}건
+              </span>
+              <span className="shrink-0 text-lg font-bold text-gray-300" aria-hidden>›</span>
+            </div>
+          </button>
+
+          {rollbackSheetOpen && (
+            <div className="fixed inset-0 z-[100] flex flex-col justify-end">
+              <button
+                type="button"
+                className="absolute inset-0 bg-black/45"
+                aria-label="닫기"
+                onClick={() => setRollbackSheetOpen(false)}
+              />
+              <div
+                className="relative z-[1] flex w-full max-h-[min(78dvh,560px)] flex-col rounded-t-3xl bg-white shadow-2xl"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="rollback-sheet-title"
+              >
+                <div className="flex justify-center pt-2 pb-1">
+                  <span className="h-1 w-10 rounded-full bg-gray-200" />
+                </div>
+                <div className="border-b border-gray-100 px-5 pb-3 pt-1">
+                  <h3 id="rollback-sheet-title" className="text-base font-black text-brand-text">
+                    오늘 완료 미션
+                  </h3>
+                </div>
+                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3">
+                  {todayCompletedLogs.length === 0 ? (
+                    <p className="py-8 text-center text-sm text-gray-400">오늘 완료한 미션이 없어요</p>
+                  ) : (
+                    <div className="flex flex-col gap-2">
+                      {visibleRollbackInSheet.map((log) => (
+                        <div
+                          key={log.id}
+                          className="flex items-center gap-3 rounded-xl bg-gray-50/90 px-3 py-2.5 ring-1 ring-gray-100"
+                        >
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-bold text-brand-text">{log.missions?.title ?? '미션'}</p>
+                            <p className="text-[10px] text-gray-400">
+                              {log.completed_at
+                                ? getSeoulDateFromIsoTimestamp(log.completed_at) ?? log.completed_at.slice(0, 10)
+                                : ''}
+                            </p>
+                          </div>
+                          <div className="shrink-0 text-right">
+                            <p className="text-[10px] font-bold tabular-nums text-brand-blue">+{log.credit_earned} 크레딧</p>
+                            <button
+                              type="button"
+                              onClick={() => void handleRequestRedoFromChild(log)}
+                              disabled={loading === log.id}
+                              className="text-[10px] font-bold text-orange-500 hover:underline disabled:opacity-50"
+                            >
+                              다시하기
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                {todayCompletedLogs.length > ROLLBACK_SHEET_INITIAL && !rollbackSheetShowAll && (
+                  <div className="border-t border-gray-100 px-4 py-2">
+                    <button
+                      type="button"
+                      onClick={() => setRollbackSheetShowAll(true)}
+                      className="w-full rounded-xl border border-gray-200 py-2.5 text-sm font-bold text-brand-text"
+                    >
+                      더보기 ({todayCompletedLogs.length - ROLLBACK_SHEET_INITIAL}개 더 있음)
+                    </button>
+                  </div>
+                )}
+                <div className="border-t border-gray-100 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+                  <button
+                    type="button"
+                    onClick={() => setRollbackSheetOpen(false)}
+                    className="w-full rounded-2xl bg-gray-100 py-3 text-sm font-bold text-gray-600"
+                  >
+                    닫기
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </section>
+
+      </div>{/* /좌 컬럼 */}
+
+      {/* ── 우 컬럼: 구매 요청 + 마켓 메뉴 제어 ── */}
+      <div className="flex flex-col gap-5">
         {/**
          * 구매 요청 섹션 + 최근 내역 바텀시트를 한 덩어리로 묶음
          * - 제목 행·보조 문구·우측 링크: 메뉴 제어 블록과 같은 타이포·간격(상품 추가하기와 대응)
@@ -1017,120 +1119,6 @@ export default function ApprovalTab({
               </div>
             </div>
           )}
-        </div>
-
-        {/* 오늘 완료 미션 — 버튼 → 하단 시트 (모바일·태블릿 공통) */}
-        <section>
-          <button
-            type="button"
-            onClick={() => {
-              setPurchaseHistorySheetOpen(false)
-              setRollbackSheetShowAll(false)
-              setRollbackSheetOpen(true)
-            }}
-            className="w-full rounded-2xl bg-white px-4 py-2.5 text-left shadow-sm ring-1 ring-gray-100 transition-all active:scale-[0.99]"
-          >
-            <div className="flex items-center gap-3">
-              <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <span className="text-sm font-black text-brand-text">오늘 완료 미션</span>
-                <span className="text-[11px] text-gray-400">탭하여 다시 하기 · 롤백</span>
-              </div>
-              <span className="shrink-0 rounded-full bg-brand-blue/10 px-2.5 py-1 text-xs font-black tabular-nums text-brand-blue">
-                {todayCompletedLogs.length}건
-              </span>
-              <span className="shrink-0 text-lg font-bold text-gray-300" aria-hidden>›</span>
-            </div>
-          </button>
-
-          {rollbackSheetOpen && (
-            <div className="fixed inset-0 z-[100] flex flex-col justify-end">
-              <button
-                type="button"
-                className="absolute inset-0 bg-black/45"
-                aria-label="닫기"
-                onClick={() => setRollbackSheetOpen(false)}
-              />
-              <div
-                className="relative z-[1] flex w-full max-h-[min(78dvh,560px)] flex-col rounded-t-3xl bg-white shadow-2xl"
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby="rollback-sheet-title"
-              >
-                <div className="flex justify-center pt-2 pb-1">
-                  <span className="h-1 w-10 rounded-full bg-gray-200" />
-                </div>
-                <div className="border-b border-gray-100 px-5 pb-3 pt-1">
-                  <h3 id="rollback-sheet-title" className="text-base font-black text-brand-text">
-                    오늘 완료 미션
-                  </h3>
-                </div>
-                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3">
-                  {todayCompletedLogs.length === 0 ? (
-                    <p className="py-8 text-center text-sm text-gray-400">오늘 완료한 미션이 없어요</p>
-                  ) : (
-                    <div className="flex flex-col gap-2">
-                      {visibleRollbackInSheet.map((log) => (
-                        <div
-                          key={log.id}
-                          className="flex items-center gap-3 rounded-xl bg-gray-50/90 px-3 py-2.5 ring-1 ring-gray-100"
-                        >
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-bold text-brand-text">{log.missions?.title ?? '미션'}</p>
-                            <p className="text-[10px] text-gray-400">
-                              {log.completed_at
-                                ? getSeoulDateFromIsoTimestamp(log.completed_at) ?? log.completed_at.slice(0, 10)
-                                : ''}
-                            </p>
-                          </div>
-                          <div className="shrink-0 text-right">
-                            <p className="text-[10px] font-bold tabular-nums text-brand-blue">+{log.credit_earned} 크레딧</p>
-                            <button
-                              type="button"
-                              onClick={() => void handleRequestRedoFromChild(log)}
-                              disabled={loading === log.id}
-                              className="text-[10px] font-bold text-orange-500 hover:underline disabled:opacity-50"
-                            >
-                              다시하기
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                {todayCompletedLogs.length > ROLLBACK_SHEET_INITIAL && !rollbackSheetShowAll && (
-                  <div className="border-t border-gray-100 px-4 py-2">
-                    <button
-                      type="button"
-                      onClick={() => setRollbackSheetShowAll(true)}
-                      className="w-full rounded-xl border border-gray-200 py-2.5 text-sm font-bold text-brand-text"
-                    >
-                      더보기 ({todayCompletedLogs.length - ROLLBACK_SHEET_INITIAL}개 더 있음)
-                    </button>
-                  </div>
-                )}
-                <div className="border-t border-gray-100 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-                  <button
-                    type="button"
-                    onClick={() => setRollbackSheetOpen(false)}
-                    className="w-full rounded-2xl bg-gray-100 py-3 text-sm font-bold text-gray-600"
-                  >
-                    닫기
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-        </section>
-
-      </div>{/* /좌 컬럼 */}
-
-      {/* ── 우 컬럼: 칭찬 스티커 + 마켓 제어 ── */}
-      <div className="flex flex-col gap-5">
-
-        {/* 태블릿 가로/데스크톱 전용: 기존 위치 유지 */}
-        <div className="hidden md:block">
-          <PraiseStickerPanel childId={currentId} childName={currentChild?.name ?? '자녀'} />
         </div>
 
         {/* `id`: 홈 경제 EQ 코칭 카드의 「자녀 보상 등록」링크가 이 구역으로 스크롤되게 함 */}
