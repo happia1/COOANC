@@ -2580,6 +2580,7 @@ export default function ChildScreen({
               >
                 <PlantPot
                   pot={pot}
+                  celebrationActive={plantCelebrateStage !== null}
                   seedSelect={{
                     currentCredits: creditsAvailable(stats ?? { credits: 0 }),
                     onSelect: buySeed,

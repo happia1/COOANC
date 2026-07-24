@@ -740,9 +740,9 @@ export default function ParentMarketMenuControl({
               setAddErr(null)
               setAddOpen(true)
             }}
-            className="shrink-0 text-[11px] font-bold text-gray-400 underline-offset-2 hover:text-gray-500 hover:underline disabled:opacity-30"
+            className="shrink-0 rounded-lg border border-[#4A90E2]/40 bg-[#4A90E2]/10 px-3 py-1.5 text-[11px] font-bold text-[#2563EB] shadow-sm transition active:scale-95 hover:bg-[#4A90E2]/15 disabled:opacity-30"
           >
-            상품 추가하기
+            ＋ 상품 추가하기
           </button>
         </div>
       </div>

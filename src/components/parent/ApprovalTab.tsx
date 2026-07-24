@@ -945,9 +945,9 @@ export default function ApprovalTab({
                   setPurchaseHistoryShowAll(false)
                   setPurchaseHistorySheetOpen(true)
                 }}
-                className="shrink-0 text-[11px] font-bold text-gray-400 underline-offset-2 hover:text-gray-500 hover:underline"
+                className="shrink-0 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-[11px] font-bold text-gray-600 shadow-sm transition active:scale-95 hover:bg-gray-50"
               >
-                최근구매내역
+                🧾 최근 구매내역
               </button>
             </div>
           </div>

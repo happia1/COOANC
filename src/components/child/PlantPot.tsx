@@ -64,6 +64,12 @@ type Props = {
   seedSelect?: PlantPotSeedSelect
   /** 있으면 팝업 안에서 물조리개로 물을 줍니다. */
   waterActions?: PlantPotWaterActions
+  /**
+   * 수확/성장 축하 팝업이 떠 있는 동안 true.
+   * 수확(7단계 완성) 순간 화분 상태 팝업이 씨앗 픽커로 바뀌어 축하보다 먼저 뜨는 것을 막고,
+   * 축하 팝업을 먼저 보여 준 뒤(확인) 홈의 모종삽을 눌렀을 때만 씨앗 픽커가 열리게 합니다.
+   */
+  celebrationActive?: boolean
 }
 
 /** 별 파티클 — 메인 화면 화분 버튼 레벨업 연출용 */
@@ -244,12 +250,18 @@ function HeartFly({ burst }: { burst: HeartBurst }) {
   )
 }
 
-export default function PlantPot({ pot, seedSelect, waterActions }: Props) {
+export default function PlantPot({ pot, seedSelect, waterActions, celebrationActive = false }: Props) {
   const prevStage = useRef(pot.stage)
   const skipInitialFx = useRef(true)
   const [levelUpBurst, setLevelUpBurst] = useState(false)
   const [showStars, setShowStars] = useState(false)
   const [statusPopupOpen, setStatusPopupOpen] = useState(false)
+  /**
+   * 팝업을 **열던 순간** 씨앗 선택이 필요했는지(=모종삽을 눌러 연 것인지)를 기억합니다.
+   * 물주기로 팝업이 열려 있는 동안 수확이 일어나 씨앗 선택 상태가 되어도, 이 값이 false 면
+   * 씨앗 픽커로 바뀌지 않습니다 → 축하 팝업이 먼저, 씨앗 픽커는 모종삽 재탭 시에만.
+   */
+  const [seedPickerArmed, setSeedPickerArmed] = useState(false)
   const [inspectWiggle, setInspectWiggle] = useState(false)
   const [portalReady, setPortalReady] = useState(false)
   /** 물조리개 탭 시 화분으로 날아가는 하트들 — 탭마다 하나씩 쌓였다 각자 사라집니다 */
@@ -285,9 +297,21 @@ export default function PlantPot({ pot, seedSelect, waterActions }: Props) {
 
   const needsSeedSelection = needsPotSeedSelection(pot)
   const awaitingFirstSeed = isPotAwaitingFirstSeed(pot)
-  /** 수확 후 재심기 등 — 홈에 사과 0단계 미리보기 */
+  /** 수확 후 재심기 등 — 팝업 안 미리보기용(사과 0단계). 홈은 모종삽으로 표시합니다. */
   const useAppleSeedPreview = needsSeedSelection && !awaitingFirstSeed
-  const showSeedPickerInPopup = Boolean(seedSelect) && needsSeedSelection
+  /**
+   * 씨앗 픽커는 (모종삽을 눌러 연 팝업) + (씨앗 선택 필요) + (축하 안 뜬 상태)일 때만.
+   * 물주기 중 수확이 일어나 morph 되는 경우(seedPickerArmed=false)는 배제됩니다.
+   */
+  const showSeedPickerInPopup =
+    Boolean(seedSelect) && needsSeedSelection && seedPickerArmed && !celebrationActive
+
+  /** 수확 축하가 뜨면 열려 있던 물주기 팝업을 닫아, 축하만 깔끔히 보이게 합니다. */
+  useEffect(() => {
+    if (celebrationActive && needsSeedSelection) {
+      setStatusPopupOpen(false)
+    }
+  }, [celebrationActive, needsSeedSelection])
   const seedPickerIntro =
     pot.hasChosenSeed && pot.stage === 7 && pot.completed
       ? '수확을 모두 완료했어요! 새로운 씨앗을 심어볼까요?'
@@ -322,6 +346,8 @@ export default function PlantPot({ pot, seedSelect, waterActions }: Props) {
   }
 
   function handleInspectPot() {
+    /** 여는 순간의 씨앗 선택 필요 여부를 고정 — 물주기 중 morph 로 씨앗 픽커가 뜨는 것을 막습니다 */
+    setSeedPickerArmed(needsSeedSelection)
     setInspectWiggle(true)
     setStatusPopupOpen(true)
     window.setTimeout(() => setInspectWiggle(false), 420)
@@ -585,7 +611,11 @@ export default function PlantPot({ pot, seedSelect, waterActions }: Props) {
           {showStars ? Array.from({ length: 8 }, (_, i) => <StarParticle key={i} index={i} />) : null}
 
           <div className="relative h-full w-full overflow-visible">
-            {awaitingFirstSeed ? (
+            {needsSeedSelection ? (
+              /**
+               * 씨앗을 골라야 하는 상태(첫 씨앗 or 수확 후 재심기)에는 홈에 **모종삽**을 표시합니다.
+               * 탭하면 씨앗 고르기 팝업이 열립니다. (수확 후 사과 미리보기 대신 모종삽으로 통일)
+               */
               <PlantShovelImage
                 visualStyle={shovelHomeVisual}
                 className={homePotImageClass}

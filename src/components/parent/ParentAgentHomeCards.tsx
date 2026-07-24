@@ -533,9 +533,9 @@ export default function ParentAgentHomeCards({
           <button
             type="button"
             onClick={onOpenCalendarEventSheet}
-            className="shrink-0 text-[10px] font-medium leading-tight text-[#4A90E2]"
+            className="shrink-0 rounded-lg border border-[#4A90E2]/40 bg-[#4A90E2]/10 px-2.5 py-1 text-[10px] font-bold leading-tight text-[#2563EB] shadow-sm transition active:scale-95 hover:bg-[#4A90E2]/15"
           >
-            일정 등록하기
+            ＋ 일정 등록하기
           </button>
         </div>
         {calendarUpcomingEvents.length === 0 ? (
