@@ -11,7 +11,6 @@ import { type AgentEqScores, type AgentLatestReportRow, parseAgentReportPayload 
 import type { ParentAgentErrorReason, UseParentAgentReportResult } from '@/hooks/useParentAgentReport'
 import { createClient } from '@/lib/supabase/client'
 import { PARENT_NEUTRAL_CARD_CLASSNAME } from '@/lib/parentNeutralBlockStyle'
-import Link from 'next/link'
 
 /** 에러 원인별로 사용자 문구를 분리해 보여 줍니다. */
 function getAgentErrorCopy(reason: ParentAgentErrorReason): { title: string; detail: string } {
@@ -88,6 +87,8 @@ type Props = {
   }[]
   /** 홈탭에서 공용 일정 등록 시트를 열 때 사용합니다. */
   onOpenCalendarEventSheet?: () => void
+  /** 다가오는 일정 항목을 누르면 해당 날짜의 캘린더 상세 팝업을 엽니다(페이지 이동 대신). */
+  onSelectUpcomingEvent?: (date: string) => void
   /** false 이면 「다가오는 일정」 블록을 숨깁니다(홈 좌측 열에만 둘 때). */
   showCalendarBriefing?: boolean
   /** false 이면 「AI 리포트」 블록을 숨깁니다(홈 우측 비활성 열에만 둘 때). */
@@ -500,6 +501,7 @@ export default function ParentAgentHomeCards({
   calendarNoticeText,
   calendarUpcomingEvents = [],
   onOpenCalendarEventSheet,
+  onSelectUpcomingEvent,
   showCalendarBriefing = true,
   showAiReport = true,
 }: Props) {
@@ -545,11 +547,12 @@ export default function ParentAgentHomeCards({
         ) : (
           <div>
             {calendarUpcomingEvents.map((event) => (
-              <Link
+              <button
                 key={event.id}
-                href={`/parent/home?calendarDate=${encodeURIComponent(event.date)}`}
-                className="mb-2 flex items-center gap-2 rounded-lg px-1 py-1 transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4A90E2] last:mb-0"
-                aria-label={`${event.dateLabel} ${event.title} 일정 보러가기`}
+                type="button"
+                onClick={() => onSelectUpcomingEvent?.(event.date)}
+                className="mb-2 flex w-full items-center gap-2 rounded-lg px-1 py-1 text-left transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4A90E2] last:mb-0"
+                aria-label={`${event.dateLabel} ${event.title} 일정 상세 보기`}
               >
                 <span className="rounded-full bg-gray-50 px-2 py-0.5 text-[10px] font-bold text-gray-500 ring-1 ring-gray-200">
                   {event.dateLabel}
@@ -560,7 +563,7 @@ export default function ParentAgentHomeCards({
                 <span className="ml-auto text-[10px] font-semibold text-gray-500">
                   {event.impactLabel}
                 </span>
-              </Link>
+              </button>
             ))}
           </div>
         )}

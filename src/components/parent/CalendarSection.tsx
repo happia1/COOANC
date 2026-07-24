@@ -112,14 +112,16 @@ type OverrideType = LocalCalendarEvent['routineOverride']
  */
 function routineOverrideLabel(override: LocalCalendarEvent['routineOverride']): string {
   if (override === 'none') return '루틴 없음'
-  if (override === 'weekend') return '주간 일정 적용'
-  return '주중 루틴 적용'
+  if (override === 'weekend') return '주말/휴일 루틴'
+  return '주중 루틴'
 }
 
 interface Props {
   childId: string | null
-  /** 홈 브리핑 링크로 들어왔을 때 자동으로 선택해 열 날짜(YYYY-MM-DD) */
+  /** 홈 브리핑/다가오는 일정에서 눌러 자동으로 열 날짜(YYYY-MM-DD) */
   focusDate?: string | null
+  /** 같은 날짜를 다시 눌러도 상세 팝업이 재오픈되도록 하는 논스(클릭마다 증가) */
+  focusNonce?: number
 }
 
 function dateKey(y: number, m: number, d: number): string {
@@ -165,7 +167,7 @@ type SheetState = {
   presetType?: LocalCalendarEvent['eventType']
 }
 
-export default function CalendarSection({ childId, focusDate = null }: Props) {
+export default function CalendarSection({ childId, focusDate = null, focusNonce }: Props) {
   const [year, setYear] = useState(() => {
     const s = getSeoulDateString()
     return Number(s.slice(0, 4))
@@ -254,7 +256,8 @@ export default function CalendarSection({ childId, focusDate = null }: Props) {
     // 대상 월/년으로 먼저 이동해야 해당 날짜를 달력에서 바로 열 수 있습니다.
     setYear(y)
     setMonth(m - 1)
-  }, [focusDate])
+    // focusNonce 를 deps 에 포함해, 같은 날짜를 다시 눌러도(팝업 닫은 뒤) 재오픈됩니다.
+  }, [focusDate, focusNonce])
 
   useEffect(() => {
     void refreshMergedEvents()
@@ -1002,7 +1005,7 @@ export function CalendarEventSheet({
                           override === v ? 'border-brand-blue bg-brand-blue/10 text-brand-blue' : 'border-gray-200 text-gray-400'
                         }`}
                       >
-                        {v === 'weekday' ? '주중 루틴 적용' : v === 'weekend' ? '주간 일정 적용' : '루틴 없음'}
+                        {v === 'weekday' ? '주중 루틴' : v === 'weekend' ? '주말/휴일 루틴' : '루틴 없음'}
                       </button>
                     ))}
                   </div>

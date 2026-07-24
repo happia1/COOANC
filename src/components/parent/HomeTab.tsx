@@ -137,6 +137,8 @@ export default function HomeTab({
   const searchParams = useSearchParams()
   /** 일정 브리핑 딥링크(`?calendarDate=YYYY-MM-DD`) — 캘린더가 홈으로 이동해 여기서 받습니다 */
   const calendarDateFromQuery = searchParams.get('calendarDate')
+  /** 다가오는 일정에서 누른 날짜 — 캘린더 상세 팝업을 열기 위한 focus(논스로 같은 날 재클릭도 재오픈) */
+  const [calendarFocus, setCalendarFocus] = useState<{ date: string; nonce: number } | null>(null)
   /**
    * `useRef(createClient())`는 **매 렌더마다** `createClient()`가 실행됩니다(JS는 인자를 먼저 계산).
    * Supabase 브라우저 클라이언트가 그때마다 초기화되면 경고·청크 로드 지연을 유발할 수 있어,
@@ -551,6 +553,7 @@ export default function HomeTab({
                   impactLabel: ev.routine_override === 'none' ? '루틴 없음' : '루틴 조정 필요',
                 }))}
                 onOpenCalendarEventSheet={() => setCalendarEventSheetOpen(true)}
+                onSelectUpcomingEvent={(date) => setCalendarFocus({ date, nonce: Date.now() })}
                 showCalendarBriefing
                 showAiReport={false}
               />
@@ -558,7 +561,11 @@ export default function HomeTab({
 
             {/* 우측: 캘린더 (루틴 탭에서 이동, md 에서 sticky) */}
             <div className="md:sticky md:top-4 md:self-start">
-              <CalendarSection childId={currentId ?? null} focusDate={calendarDateFromQuery} />
+              <CalendarSection
+                childId={currentId ?? null}
+                focusDate={calendarFocus?.date ?? calendarDateFromQuery}
+                focusNonce={calendarFocus?.nonce}
+              />
             </div>
           </div>
         </>
