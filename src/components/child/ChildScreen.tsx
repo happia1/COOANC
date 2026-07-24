@@ -273,10 +273,11 @@ function plantFeetAnchorsKeepRugGapPx(
   /**
    * 좁은 화면(<640px, SE·S8+·XR 등 폰)에서는 배율 계산을 쓰지 않고 **고정 위치**로 배치합니다.
    * - 기기·측정폭이 달라도 항상 동일하게 배치되어 겹침(오른쪽 장바구니 아이콘)·과밀을 막습니다.
-   * - 저금통 왼쪽 28%, 화분 오른쪽 72% (토끼 중심 50% 양옆). 더 벌리려면 24/76, 더 붙이려면 32/68.
+   * - 저금통 왼쪽 24%, 화분 오른쪽 76% (토끼 중심 50% 양옆). 더 벌리려면 22/78, 더 붙이려면 28/72.
+   *   (화분 76%↑ 는 오른쪽 장바구니 아이콘과 겹칠 수 있으니 주의)
    */
   if (containerWidthPx < 640) {
-    return { plantPct: 28, canPct: 72 }
+    return { plantPct: 24, canPct: 76 }
   }
   /** 중심에서 위 거리만큼 떨어진 픽셀 위치 → 현재 너비로 나눈 비율(0~1) */
   let plant = rugCenterX - gapPlantCenterPx / containerWidthPx
