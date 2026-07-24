@@ -17,6 +17,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { flushSync } from 'react-dom'
 import { useRouter } from 'next/navigation'
+import { useSwipeToDismiss } from '@/hooks/useSwipeToDismiss'
 import type { LocalCalendarEvent } from '@/types/database'
 import { getSeoulDateString } from '@/lib/koreaDate'
 import { COOANC_CALENDAR_EVENTS_STORAGE_KEY } from '@/lib/localStorageChildScope'
@@ -368,6 +369,53 @@ export default function CalendarSection({ childId, focusDate = null, focusNonce 
   )
 
   /**
+   * 이번 달 법정 공휴일을 합성 이벤트로 만든 목록(「이번 달 일정」목록·개수·범례용).
+   * 격자 도트는 아래 `dateEventMap`에서 따로 합성하므로 여기 값은 목록에만 씁니다.
+   */
+  const monthPublicHolidayEvents: LocalCalendarEvent[] = Object.keys(holidayNamesByDate)
+    .filter((dk) => {
+      const [yv, mv] = dk.split('-').map(Number)
+      return yv === year && mv - 1 === month
+    })
+    .map((dk) => ({
+      id: `__public_holiday__:${dk}`,
+      childId: null,
+      title: holidayNamesByDate[dk],
+      startDate: dk,
+      endDate: dk,
+      eventType: 'holiday' as const,
+      routineOverride: 'none' as const,
+    }))
+
+  /** 통합 라벨 정규화(event→special, other→etc) — 범례 칩 키와 맞춤 */
+  function legendCanonicalType(t: LocalCalendarEvent['eventType']): LocalCalendarEvent['eventType'] {
+    if (t === 'event') return 'special'
+    if (t === 'other') return 'etc'
+    return t
+  }
+
+  /**
+   * 이번 달에 실제로 존재하는 일정 유형만 범례 칩으로 노출(요청: 해당 달 키워드만).
+   * 공휴일은 법정 공휴일이 하나라도 있으면 포함. 현재 선택된 필터는 해제할 수 있게 항상 포함.
+   */
+  const presentEventTypes = new Set<LocalCalendarEvent['eventType']>()
+  for (const ev of monthEventsAll) presentEventTypes.add(legendCanonicalType(ev.eventType))
+  if (monthPublicHolidayEvents.length > 0) presentEventTypes.add('holiday')
+  if (legendFilter) presentEventTypes.add(legendCanonicalType(legendFilter))
+  const legendTypes = EVENT_TYPES_ORDER.filter((t) => presentEventTypes.has(t))
+
+  /**
+   * 「이번 달 일정」목록에 쓸 최종 배열 = 사용자·서버 일정 + 법정 공휴일(범례가 전체/공휴일일 때).
+   * 격자 도트(dateEventMap)와 달리 목록에는 공휴일도 함께 보여 줍니다(요청).
+   */
+  const monthScheduleList = [
+    ...monthEvents,
+    ...(legendFilter == null || legendFilter === 'holiday' ? monthPublicHolidayEvents : []),
+  ].sort((a, b) => a.startDate.localeCompare(b.startDate) || a.title.localeCompare(b.title))
+  /** 개수 배지·빈 상태 판단에 쓰는 이번 달 전체 건수(공휴일 포함) */
+  const monthTotalCount = monthEventsAll.length + monthPublicHolidayEvents.length
+
+  /**
    * 날짜 → 일정 배열(격자 도트·칸에 쓰는 맵) — `monthEvents` = 범례 반영본이라 칩을 바꾸면 점이 바뀜.
    * (날짜 **상세**는 이 맵이 아니라 `events`에서 그날 전체를 별도로 씀.)
    */
@@ -572,8 +620,8 @@ export default function CalendarSection({ childId, focusDate = null, focusNonce 
               type="button"
               onClick={() => handleDayClick(dk)}
               className={[
-                /* py-1.5: 숫자 줄·도트 슬롯을 포함해 모든 날짜 칸 높이를 통일하기 위한 여백 */
-                'relative flex flex-col items-center rounded-lg py-1.5 text-[11px] font-bold transition-all',
+                /* py-1.5 + min-h: 공휴일 이름이 있는 칸(한 줄 더 큼)까지 포함해 모든 주(마지막 주 포함) 높이를 동일하게 맞춤 */
+                'relative flex min-h-[3.25rem] flex-col items-center rounded-lg py-1.5 text-[11px] font-bold transition-all',
                 isToday ? 'ring-2 ring-brand-blue' : '',
                 'hover:bg-gray-50',
                 isSun ? 'text-red-500' : isSat ? 'text-blue-500' : 'text-gray-700',
@@ -609,13 +657,14 @@ export default function CalendarSection({ childId, focusDate = null, focusNonce 
         })}
       </div>
 
-      {/* 공휴일·방학 등 유형 칩(범례) — 캘린더 격자 아래로 이동 */}
+      {/* 공휴일·방학 등 유형 칩(범례) — 이번 달에 있는 유형만 표시. 캘린더 격자 아래로 이동 */}
+      {legendTypes.length > 0 ? (
       <div
         className="mb-3 flex snap-x snap-proximity touch-pan-x gap-2 overflow-x-auto overscroll-x-contain pb-0.5 [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
         role="list"
         aria-label="일정 유형 범례 — 칩을 누르면 달의 점과 아래 이번 달 일정 목록이 해당 유형으로 좁혀짐(날짜 상세는 항상 그날 전체)"
       >
-        {EVENT_TYPES_ORDER.map((type) => {
+        {legendTypes.map((type) => {
           const selected =
             legendFilter === type ||
             (type === 'special' && legendFilter === 'event') ||
@@ -645,6 +694,7 @@ export default function CalendarSection({ childId, focusDate = null, focusNonce 
           )
         })}
       </div>
+      ) : null}
 
       {/*
         이번 달 일정: 0건이어도 이 블록은 항상 보임.
@@ -668,8 +718,8 @@ export default function CalendarSection({ childId, focusDate = null, focusNonce 
         <div className="flex min-h-9 items-center justify-between gap-2">
           <p className="text-[11px] font-bold text-gray-400">
             이번 달 일정
-            {monthEventsAll.length > 0 ? (
-              <span className="ml-1 font-black text-gray-500">({monthEventsAll.length})</span>
+            {monthTotalCount > 0 ? (
+              <span className="ml-1 font-black text-gray-500">({monthTotalCount})</span>
             ) : null}
           </p>
           <span
@@ -693,16 +743,18 @@ export default function CalendarSection({ childId, focusDate = null, focusNonce 
         </div>
         {monthScheduleOpen ? (
           <div className="mt-2 flex flex-col gap-2">
-            {monthEvents.length === 0 ? (
+            {monthScheduleList.length === 0 ? (
               <p className="rounded-xl border border-dashed border-gray-200 bg-gray-50/80 px-3 py-3 text-center text-[10px] font-bold text-gray-400">
-                {monthEventsAll.length === 0
+                {monthTotalCount === 0
                   ? '이번 달 등록된 일정이 없어요'
                   : legendFilter
                     ? `${EVENT_TYPE_LABELS[legendFilter]} 일정은 이번 달에 없어요. 위 칩을 다시 누르면 전체를 볼 수 있어요`
                     : '이번 달 등록된 일정이 없어요'}
               </p>
             ) : (
-              monthEvents.map((ev) => (
+              monthScheduleList.map((ev) => {
+                const isPublicHoliday = ev.id.startsWith('__public_holiday__:')
+                return (
                 <button
                   key={ev.id}
                   type="button"
@@ -715,14 +767,24 @@ export default function CalendarSection({ childId, focusDate = null, focusNonce 
                   <div className="min-w-0">
                     <p className={`truncate text-xs font-bold ${EVENT_COLORS[ev.eventType].text}`}>{ev.title}</p>
                     <p className="text-[10px] text-gray-500">
-                      {ev.startDate} ~ {ev.endDate}
-                      &nbsp;·&nbsp;
-                      {routineOverrideLabel(ev.routineOverride)}
+                      {isPublicHoliday ? (
+                        <>
+                          {ev.startDate}
+                          &nbsp;·&nbsp;법정공휴일
+                        </>
+                      ) : (
+                        <>
+                          {ev.startDate} ~ {ev.endDate}
+                          &nbsp;·&nbsp;
+                          {routineOverrideLabel(ev.routineOverride)}
+                        </>
+                      )}
                     </p>
                   </div>
                   <span className="shrink-0 text-[10px] font-bold text-gray-400">상세</span>
                 </button>
-              ))
+                )
+              })
             )}
           </div>
         ) : null}
@@ -842,6 +904,7 @@ export function CalendarEventSheet({
    */
   const [savedDone, setSavedDone] = useState(false)
   const [panelOpen, setPanelOpen] = useState(false)
+  const swipe = useSwipeToDismiss(onClose)
 
   useEffect(() => {
     const t = window.setTimeout(() => setPanelOpen(true), 10)
@@ -878,10 +941,15 @@ export function CalendarEventSheet({
             ? 'translate-y-0 md:translate-y-0 md:translate-x-0'
             : 'translate-y-full md:translate-y-0 md:translate-x-full',
         ].join(' ')}
+        style={swipe.dragStyle}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex h-full flex-col">
-          <div className="shrink-0 border-b border-gray-100 px-5 py-4">
+          <div
+            className="shrink-0 cursor-grab touch-none border-b border-gray-100 px-5 pb-4 pt-2 active:cursor-grabbing"
+            {...swipe.handleProps}
+          >
+            <div className="mx-auto mb-2 h-1.5 w-10 rounded-full bg-gray-300" aria-hidden />
             <p id="event-sheet-title" className="text-base font-black text-brand-text">
               {existing ? '일정 편집' : '일정 추가'}
             </p>
@@ -1059,6 +1127,7 @@ function EmptyDayBottomSheet({
   onAddSchedule: (dk: string) => void
 }) {
   const [panelOpen, setPanelOpen] = useState(false)
+  const swipe = useSwipeToDismiss(onClose)
 
   useEffect(() => {
     const t = window.setTimeout(() => setPanelOpen(true), 10)
@@ -1077,9 +1146,14 @@ function EmptyDayBottomSheet({
             ? 'translate-y-0 md:translate-y-0 md:translate-x-0'
             : 'translate-y-full md:translate-y-0 md:translate-x-full',
         ].join(' ')}
+        style={swipe.dragStyle}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="shrink-0 border-b border-gray-100 px-5 py-4">
+        <div
+          className="shrink-0 cursor-grab touch-none border-b border-gray-100 px-5 pb-4 pt-2 active:cursor-grabbing"
+          {...swipe.handleProps}
+        >
+          <div className="mx-auto mb-2 h-1.5 w-10 rounded-full bg-gray-300" aria-hidden />
           <p className="text-base font-black text-brand-text">일정 안내</p>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto p-5 pb-2 pt-4">
@@ -1123,6 +1197,7 @@ function EventDetailBottomSheet({
   onDelete: (id: string) => void
 }) {
   const [panelOpen, setPanelOpen] = useState(false)
+  const swipe = useSwipeToDismiss(onClose)
 
   useEffect(() => {
     const t = window.setTimeout(() => setPanelOpen(true), 10)
@@ -1141,9 +1216,14 @@ function EventDetailBottomSheet({
             ? 'translate-y-0 md:translate-y-0 md:translate-x-0'
             : 'translate-y-full md:translate-y-0 md:translate-x-full',
         ].join(' ')}
+        style={swipe.dragStyle}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="shrink-0 border-b border-gray-100 px-5 py-4">
+        <div
+          className="shrink-0 cursor-grab touch-none border-b border-gray-100 px-5 pb-4 pt-2 active:cursor-grabbing"
+          {...swipe.handleProps}
+        >
+          <div className="mx-auto mb-2 h-1.5 w-10 rounded-full bg-gray-300" aria-hidden />
           <p className="text-base font-black text-brand-text">일정 상세</p>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto p-5 pb-2 pt-4">

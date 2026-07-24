@@ -551,7 +551,8 @@ export default function HomeTab({
                   date: ev.start_date,
                   dateLabel: formatEventDate(ev.start_date),
                   title: ev.title?.trim() || getCategoryLabel(ev),
-                  impactLabel: ev.routine_override === 'none' ? '루틴 없음' : '루틴 조정 필요',
+                  /** 「루틴 조정 필요」 문구 대신 일정 유형 키워드(공휴일·방학·여행·기념일 등) 표시 */
+                  impactLabel: getCategoryLabel(ev),
                 }))}
                 onOpenCalendarEventSheet={() => setCalendarEventSheetOpen(true)}
                 onSelectUpcomingEvent={(date) => setCalendarFocus({ date, nonce: Date.now() })}
