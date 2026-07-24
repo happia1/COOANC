@@ -171,6 +171,32 @@ export async function createParentCalendarEvent(event: LocalCalendarEvent): Prom
 }
 
 /**
+ * 캘린더 일정 편집 서버 반영(기기 간 동기화) — DB UUID 행만 서버 업데이트합니다.
+ * 로컬 전용(임시 id) 일정은 서버에 없으므로 localStorage 만 유지(호출 측에서 처리).
+ */
+export async function updateParentCalendarEvent(event: LocalCalendarEvent): Promise<boolean> {
+  if (typeof window === 'undefined') return false
+  if (!looksLikeDbUuid(event.id)) return false
+  try {
+    const res = await fetch('/api/calendar-event/update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        eventId: event.id,
+        title: event.title,
+        startDate: event.startDate,
+        endDate: event.endDate,
+        eventType: event.eventType,
+        routineOverride: event.routineOverride,
+      }),
+    })
+    return res.ok
+  } catch {
+    return false
+  }
+}
+
+/**
  * 같은 제목·시작일(localStorage 중복 삽입 등)이 여러 줄일 때 한 줄로 줄입니다.
  * - 둘 중 id 가 DB UUID 형태면 그쪽을 우선
  * - 둘 다 UUID 거나 둘 다 아니면 **나중에 나온 항목**을 유지(최근 저장 우선)
