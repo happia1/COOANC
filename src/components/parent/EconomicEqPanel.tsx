@@ -399,45 +399,36 @@ export default function EconomicEqPanel({
 
 // ─── 홈 상단 3단 진행도 블록 ─────────────────────────────────────────────────
 
-/** 오늘의 진행도 — 원형 도넛(중앙 %) */
-function TodayProgressDonut({ percent, gradientId }: { percent: number; gradientId: string }) {
-  const r = 34
-  const c = 2 * Math.PI * r
-  const clamped = Math.max(0, Math.min(100, Math.round(percent)))
+/** 반원 게이지 + 중앙 % — 오늘의 진행도·주간 루틴 완주율 공통(둘 다 파란색) */
+function ParentHomeHalfGauge({
+  label,
+  value,
+  sub,
+  gradientId,
+}: {
+  label: string
+  value: number
+  sub: string
+  gradientId: string
+}) {
+  const clamped = Math.max(0, Math.min(100, Math.round(value)))
   return (
-    <div className="relative h-[88px] w-[88px]">
-      <svg viewBox="0 0 84 84" className="h-full w-full -rotate-90">
-        <defs>
-          <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="#93C5FD" />
-            <stop offset="100%" stopColor="#2563EB" />
-          </linearGradient>
-        </defs>
-        <circle cx="42" cy="42" r={r} fill="none" stroke="#F3F4F6" strokeWidth="9" />
-        {clamped > 0 && (
-          <circle
-            cx="42"
-            cy="42"
-            r={r}
-            fill="none"
-            stroke={`url(#${gradientId})`}
-            strokeWidth="9"
-            strokeLinecap="round"
-            strokeDasharray={`${(clamped / 100) * c} ${c}`}
-            className="transition-all duration-700"
-          />
-        )}
-      </svg>
-      <div className="absolute inset-0 flex items-center justify-center">
-        <span className="text-lg font-black tabular-nums text-[#2563EB]">{clamped}%</span>
+    <div className="flex flex-col items-center justify-center">
+      <span className="mb-0.5 text-center text-[10px] font-bold text-gray-600">{label}</span>
+      <div className="flex w-full flex-col items-center">
+        <DelayHalfGauge value={clamped} gradientId={gradientId} startColor="#93C5FD" endColor="#2563EB" />
+        <div className="-mt-5 flex flex-col items-center">
+          <span className="text-base font-black leading-none tabular-nums text-[#2563EB]">{clamped}%</span>
+          <span className="mt-0.5 text-[9px] text-gray-400">{sub}</span>
+        </div>
       </div>
     </div>
   )
 }
 
 /**
- * 부모 홈 상단 통합 블록 — 한 카드 안에 3단:
- * ① 오늘의 진행도(원형 도넛, 중앙 %) ② 주간 루틴 완료율(막대, 축소) ③ 루틴 완주율(반원 게이지)
+ * 부모 홈 상단 통합 블록 — 한 카드 안에 3단(모두 파란색 톤 통일):
+ * ① 오늘의 진행도(반원 게이지) ② 주간 루틴 완료율(막대) ③ 주간 루틴 완주율(반원 게이지)
  */
 export function ParentHomeProgressBlock({
   missionRate,
@@ -462,18 +453,19 @@ export function ParentHomeProgressBlock({
   return (
     <div className={`${PARENT_NEUTRAL_CARD_CLASSNAME} px-3 py-3`}>
       <div className="flex items-stretch gap-2.5">
-        {/* ① 오늘의 진행도 — 도넛 */}
-        <div className="flex flex-[3] flex-col items-center justify-center gap-1">
-          <p className="text-center text-[10px] font-bold text-gray-600">오늘의 진행도</p>
-          <TodayProgressDonut percent={missionRate} gradientId={`today-${gradId}`} />
-          <span className="text-[9px] tabular-nums text-gray-400">
-            {todayCompleted}/{totalMissions} 완료
-          </span>
+        {/* ① 오늘의 진행도 — 반원 게이지 (오늘 완료/전체) */}
+        <div className="flex flex-[3] items-center justify-center">
+          <ParentHomeHalfGauge
+            label="오늘의 진행도"
+            value={missionRate}
+            sub={`${todayCompleted}/${totalMissions} 완료`}
+            gradientId={`today-${gradId}`}
+          />
         </div>
 
         <div className="w-px self-stretch bg-gray-200/80" />
 
-        {/* ② 주간 루틴 완료율 — 막대 (축소) */}
+        {/* ② 주간 루틴 완료율 — 막대 */}
         <div className="flex flex-[4] flex-col justify-center gap-1.5 min-w-0">
           <p className="text-center text-[10px] font-bold text-gray-600">주간 루틴 완료율</p>
           <WeekdayRoutineBars days={weeklyRoutine} />
@@ -481,23 +473,14 @@ export function ParentHomeProgressBlock({
 
         <div className="w-px self-stretch bg-gray-200/80" />
 
-        {/* ③ 루틴 완주율 — 반원 게이지 */}
-        <div className="flex flex-[3] flex-col items-center justify-center">
-          <span className="mb-0.5 text-[10px] font-bold text-gray-600">루틴 완주율</span>
-          <div className="flex w-full flex-col items-center">
-            <DelayHalfGauge
-              value={weeklyCompletionRate}
-              gradientId={`routine3-${gradId}`}
-              startColor="#6EE7B7"
-              endColor="#059669"
-            />
-            <div className="-mt-5 flex flex-col items-center">
-              <span className="text-base font-black leading-none tabular-nums text-emerald-600">
-                {weeklyCompletionRate}%
-              </span>
-              <span className="mt-0.5 text-[9px] text-gray-400">이번 주 평균</span>
-            </div>
-          </div>
+        {/* ③ 주간 루틴 완주율 — 반원 게이지 (이번 주 평균) */}
+        <div className="flex flex-[3] items-center justify-center">
+          <ParentHomeHalfGauge
+            label="주간 루틴 완주율"
+            value={weeklyCompletionRate}
+            sub="이번 주 평균"
+            gradientId={`routine3-${gradId}`}
+          />
         </div>
       </div>
     </div>

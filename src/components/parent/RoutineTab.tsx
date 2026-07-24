@@ -841,10 +841,15 @@ export default function RoutineTab({
             />
           )}
 
-          {/* 활성 미션 — 헤더와 연필(키워드 시트) 동일 행 */}
+          {/* 활성 미션 — 헤더 + 안내문(제목 옆) + 미션 수정하기 버튼 */}
           <section>
             <div className="mb-1.5 flex items-center justify-between gap-2">
-              <h2 className="text-sm font-bold text-gray-800">일상 미션</h2>
+              <div className="flex min-w-0 items-baseline gap-1.5">
+                <h2 className="shrink-0 text-sm font-bold text-gray-800">일상 미션</h2>
+                <span className={`min-w-0 truncate ${ROUTINE_DESC_TEXT_CLASS}`}>
+                  카드를 클릭하여 보상을 수정하고, 길게 눌러 순서를 변경할 수 있어요.
+                </span>
+              </div>
               <button
                 type="button"
                 aria-label="키워드로 일상 미션 추가·편집"
@@ -852,12 +857,9 @@ export default function RoutineTab({
                 onClick={() => setKeywordSheetOpen(true)}
                 className="shrink-0 rounded-lg bg-[#4A90E2] px-3 py-1.5 text-[11px] font-bold text-white shadow-sm transition active:scale-95 disabled:opacity-30"
               >
-                ✏️ 미션 수정하기
+                미션 수정하기
               </button>
             </div>
-            <p className={`mb-1.5 px-0.5 ${ROUTINE_DESC_TEXT_CLASS}`}>
-              카드를 길게 눌러 끌면 순서를 바꿀 수 있어요
-            </p>
 
             {activeRoutine.length === 0 ? (
               <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50/80 px-4 py-6 text-center">
@@ -977,7 +979,12 @@ export default function RoutineTab({
           {/* 스페셜: 매일 반복하지 않는 미션 */}
           <section id="parent-routine-special-missions" className="mt-2 md:mt-0">
             <div className="mb-1.5 flex items-center justify-between gap-2">
-              <h2 className="text-sm font-bold text-gray-800">스페셜 미션</h2>
+              <div className="flex min-w-0 items-baseline gap-1.5">
+                <h2 className="shrink-0 text-sm font-bold text-gray-800">스페셜 미션</h2>
+                <span className={`min-w-0 truncate ${ROUTINE_DESC_TEXT_CLASS}`}>
+                  카드를 클릭하여 보상을 수정하고, 길게 눌러 순서를 변경할 수 있어요.
+                </span>
+              </div>
               <button
                 type="button"
                 aria-label="스페셜 미션 추가·편집"
@@ -985,12 +992,9 @@ export default function RoutineTab({
                 onClick={() => setSpecialSheetOpen(true)}
                 className="shrink-0 rounded-lg bg-[#4A90E2] px-3 py-1.5 text-[11px] font-bold text-white shadow-sm transition active:scale-95 disabled:opacity-30"
               >
-                ✏️ 미션 수정하기
+                미션 수정하기
               </button>
             </div>
-            <p className={`mb-1.5 px-0.5 ${ROUTINE_DESC_TEXT_CLASS}`}>
-              카드를 길게 눌러 끌면 순서를 바꿀 수 있어요
-            </p>
             {activeSpecial.length === 0 && inactiveSpecial.length === 0 ? (
               <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50/80 px-4 py-6 text-center">
                 <button
@@ -1160,7 +1164,8 @@ function SpecialMissionRow({
         }
       }}
       aria-label={`${m.title} 보상(크레딧·애정 하트) 수정`}
-      className={`${MISSION_CARD_DRAG_SURFACE_CLASS} child-mission-card-gold flex min-h-[5.5rem] w-full flex-col items-center justify-center gap-1.5 rounded-xl px-1 py-1 text-center shadow-sm ${
+      /* 부모 앱에서는 노란 반짝임(child-mission-card-gold) 대신 차분한 흰 카드 — 반짝임은 자녀 앱에서만 */
+      className={`${MISSION_CARD_DRAG_SURFACE_CLASS} flex min-h-[5.5rem] w-full flex-col items-center justify-center gap-1.5 rounded-xl border border-amber-200/70 bg-white px-1 py-1 text-center shadow-sm ${
         m.is_active ? '' : 'opacity-80'
       } ${sortable ? (sortable.isDragging ? 'cursor-grabbing shadow-md ring-2 ring-amber-300/50' : 'cursor-grab active:cursor-grabbing') : ''}`}
     >
