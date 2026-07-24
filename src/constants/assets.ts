@@ -152,16 +152,16 @@ export const ASSETS = {
     /**
      * 자녀 홈 기본 배경(레거시 호환 키) — 실제 PNG 는 `childHomeBackgroundSecondScreen` 와 동일 파일을 가리킵니다.
      */
-    childHomeBackground01: assetImg('layouts', 'backgrounds', 'kidsroom.png'),
+    childHomeBackground01: assetImg('layouts', 'backgrounds', 'tablet_kidsroom_background_portrait2.png'),
     /**
      * 자녀 앱 홈 탭 풀블리드 배경입니다.
-     * - 키즈룸 일러스트, 세로(portrait) (`kidsroom.png`).
+     * - 키즈룸 일러스트, 세로(portrait) (`tablet_kidsroom_background_portrait2.png`).
      * - 미션·로딩 등 다른 화면의 `sharedAppBackground` 와는 별도 파일이라 교체 시 홈만 바뀝니다.
      */
     childHomeBackgroundSecondScreen: assetImg(
       'layouts',
       'backgrounds',
-      'kidsroom.png',
+      'tablet_kidsroom_background_portrait2.png',
     ),
     /**
      * 공용 로딩(`loading.tsx`), 루트(`/`) 리다이렉트 등 — 미션 탭은 전면 배경 이미지를 쓰지 않습니다.
@@ -180,7 +180,7 @@ export const ASSETS = {
  * - 그림을 바꿨는데도 홈 배경이 안 바뀌면 이 숫자만 1 올리면, 주소가 `...png?v=2` 처럼 달라져서 새 파일을 받아옵니다.
  * - `HomeTab` 배경 `<img>` 에만 붙입니다.
  */
-export const CHILD_HOME_BACKGROUND_CACHE_BUST = '3'
+export const CHILD_HOME_BACKGROUND_CACHE_BUST = '4'
 
 export type AssetsCategory = keyof typeof ASSETS
 
