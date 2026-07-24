@@ -56,12 +56,12 @@ export default function ParentAppChrome({ pendingApprovalCount, children }: Prop
         <ParentSettingsDeepLink onOpenSettings={openSettings} />
       </Suspense>
       <ParentTopBar pendingApprovalCount={pendingApprovalCount} onOpenSettings={openSettings} />
-      {/* 모바일: flex-col(하단 독바 fixed) / md+: flex-row(좌측 사이드 독바 + 본문) */}
-      <div className="flex flex-1 flex-col overflow-hidden md:flex-row">
+      {/* 모바일·태블릿 세로: flex-col(하단 독바 fixed) / 태블릿 가로+데스크톱: flex-row(좌측 사이드 독바 + 본문) */}
+      <div className="flex flex-1 flex-col overflow-hidden md:landscape:flex-row">
         <ParentNavBar />
         <main
           id={PARENT_TABS_MAIN_SCROLL_EL_ID}
-          className="w-full flex-1 overflow-y-auto pb-16 md:pb-0"
+          className="w-full flex-1 overflow-y-auto pb-16 md:landscape:pb-0"
         >
           {children}
         </main>

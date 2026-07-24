@@ -36,7 +36,7 @@ export default function RoutineAgentFab({ disabled = false, unreadCount = 0, onC
      * 래퍼는 pointer-events-none, 실제 버튼만 pointer-events-auto 로 두어 주변 빈 영역이
      * 아래 다른 버튼 클릭을 막지 않게 합니다.
      */
-    <div className="pointer-events-none fixed right-4 md:right-8 bottom-[calc(60px+env(safe-area-inset-bottom,0px)+10px)] z-[55] md:bottom-6">
+    <div className="pointer-events-none fixed right-4 md:right-8 bottom-[calc(60px+env(safe-area-inset-bottom,0px)+10px)] z-[55] md:landscape:bottom-6">
       <div className="pointer-events-none flex justify-end">
         <button
           type="button"

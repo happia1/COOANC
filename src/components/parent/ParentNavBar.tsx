@@ -21,12 +21,12 @@ export default function ParentNavBar() {
     <nav className="
       fixed bottom-0 left-0 right-0 z-40 flex flex-row
       border-t border-gray-100 bg-white shadow-lg
-      md:relative md:bottom-auto md:left-auto md:right-auto
-      md:flex-col md:w-20 md:h-full
-      md:border-t-0 md:border-r md:border-gray-100 md:shadow-none
+      md:landscape:relative md:landscape:bottom-auto md:landscape:left-auto md:landscape:right-auto
+      md:landscape:flex-col md:landscape:w-20 md:landscape:h-full
+      md:landscape:border-t-0 md:landscape:border-r md:landscape:border-gray-100 md:landscape:shadow-none
     ">
-      {/* 모바일: 가로 h-[60px] / md+: 세로 전체 높이 */}
-      <div className="flex h-[60px] w-full items-stretch md:h-full md:w-auto md:flex-col md:items-stretch">
+      {/* 모바일·태블릿 세로: 하단 가로 독바 / 태블릿 가로+데스크톱: 좌측 세로 독바 */}
+      <div className="flex h-[60px] w-full items-stretch md:landscape:h-full md:landscape:w-auto md:landscape:flex-col md:landscape:items-stretch">
         {TABS.map(({ href, label, icon }) => {
           const isActive = pathname === href || pathname.startsWith(href + '/')
           /** 선택 탭은 진한 네이비, 나머지는 연한 회색 */
@@ -36,13 +36,13 @@ export default function ParentNavBar() {
               key={href}
               href={href}
               prefetch={false}
-              className="relative flex flex-1 flex-col items-center justify-center gap-0.5 transition-colors md:h-16 md:flex-none"
+              className="relative flex flex-1 flex-col items-center justify-center gap-0.5 transition-colors md:landscape:h-16 md:landscape:flex-none"
             >
               {/* 모바일: 상단 수평 바 / md+: 우측 수직 바 */}
               {isActive && (
                 <span className="
                   absolute top-0 left-1/2 h-1 w-6 -translate-x-1/2 rounded-b-full bg-slate-700
-                  md:top-1/2 md:right-0 md:left-auto md:h-6 md:w-1 md:translate-x-0 md:-translate-y-1/2 md:rounded-l-full
+                  md:landscape:top-1/2 md:landscape:right-0 md:landscape:left-auto md:landscape:h-6 md:landscape:w-1 md:landscape:translate-x-0 md:landscape:-translate-y-1/2 md:landscape:rounded-l-full
                 " />
               )}
               <DockTabIcon id={icon} className={`h-6 w-6 shrink-0 ${tone}`} />

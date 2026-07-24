@@ -829,7 +829,7 @@ export default function ApprovalTab({
               setRollbackSheetShowAll(false)
               setRollbackSheetOpen(true)
             }}
-            className="w-full rounded-2xl bg-white px-4 py-2.5 text-left shadow-sm ring-1 ring-gray-100 transition-all active:scale-[0.99]"
+            className="w-full rounded-2xl bg-white px-4 py-2.5 text-left shadow-sm transition-all active:scale-[0.99]"
           >
             <div className="flex items-center gap-3">
               <div className="flex min-w-0 flex-1 flex-col gap-0.5">
@@ -969,7 +969,7 @@ export default function ApprovalTab({
                 return (
                   <div
                     key={req.id}
-                    className="rounded-2xl bg-white px-3 py-2.5 shadow-sm ring-1 ring-gray-100"
+                    className="rounded-2xl bg-white px-3 py-2.5 shadow-sm"
                   >
                     <div className="flex flex-row items-start gap-2 sm:gap-3">
                       <div className="flex min-w-0 flex-1 gap-2 sm:gap-3">
