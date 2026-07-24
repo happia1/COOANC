@@ -15,6 +15,7 @@ import {
   readRoutineHasSchoolFromStorage,
   writeRoutineAlarmPrefs,
   serializeRoutineAlarmStorage,
+  restoreRoutineAlarmStorage,
   type RoutineAlarmPrefsLoaded,
   type RoutineCustomAlarmStored,
 } from '@/lib/routineAlarmLocalPrefs'
@@ -195,7 +196,11 @@ export default function RoutineAlarmSettingsSheet({ open, onClose }: Props) {
     }
   }, [open])
 
-  /** 선택된 자녀가 있으면 서버에 저장된 등원·잘 준비 알람을 우선 표시 */
+  /**
+   * 선택된 자녀가 있으면 **DB(서버) 값을 소스로** 시트를 채웁니다(기기 간 동기화의 단일 기준).
+   * - routine_alarm_prefs 번들: 기상·잘시간·하원 포함 전체를 localStorage 로 복원 후 시트 상태 반영
+   * - 등원·잘 준비: 전용 컬럼을 우선 적용
+   */
   useEffect(() => {
     if (!open || !selectedChildId) return
     let cancelled = false
@@ -204,11 +209,33 @@ export default function RoutineAlarmSettingsSheet({ open, onClose }: Props) {
       const { data, error } = await supabase
         .from('child_stats')
         .select(
-          'school_time, school_time_enabled, school_time_weekday, school_time_weekend, sleep_ready_time, sleep_ready_time_enabled, sleep_ready_time_weekday, sleep_ready_time_weekend',
+          'routine_alarm_prefs, school_time, school_time_enabled, school_time_weekday, school_time_weekend, sleep_ready_time, sleep_ready_time_enabled, sleep_ready_time_weekday, sleep_ready_time_weekend',
         )
         .eq('child_id', selectedChildId)
         .maybeSingle()
       if (cancelled || error || !data) return
+      /** DB 알람 번들을 localStorage 로 복원 후, 시트 전체 상태(기상·잘시간·하원 등)를 그 값으로 채움 */
+      const bundle = (data as { routine_alarm_prefs?: Record<string, unknown> | null }).routine_alarm_prefs
+      if (bundle && typeof bundle === 'object') {
+        restoreRoutineAlarmStorage(bundle)
+        setHasSchool(readRoutineHasSchoolFromStorage())
+        const p = readRoutineAlarmPrefs()
+        setWakeTime(p.wakeTime)
+        setSleepTime(p.sleepTime)
+        setReturnHomeTime(p.returnHomeTime)
+        setNotifyWake(p.notifyWake)
+        setNotifyReturn(p.notifyReturn)
+        setNotifySleep(p.notifySleep)
+        setWakeOnWeekend(p.wakeOnWeekend)
+        setReturnOnWeekend(p.returnOnWeekend)
+        setSleepOnWeekend(p.sleepOnWeekend)
+        setSoundWake(p.soundWake)
+        setSoundReturn(p.soundReturn)
+        setSoundSleep(p.soundSleep)
+        setSoundSchool(p.soundSchool)
+        setSoundSleepReady(p.soundSleepReady)
+        setCustomAlarms(p.customAlarms.map((c) => ({ ...c })))
+      }
       const norm = (raw: unknown) => {
         if (typeof raw !== 'string' || !/^\d{1,2}:\d{2}$/.test(raw)) return null
         const [hh, mm] = raw.split(':')
