@@ -793,7 +793,8 @@ export default function RoutineTab({
   }
 
   return (
-    <div className="w-full px-4 md:px-6 lg:px-8 py-4 flex flex-col gap-3 md:gap-6">
+    /* pb-28: 우하단 플로팅(루틴 도우미) 버튼 높이만큼 하단 여백 — 마지막 내용이 버튼에 가리지 않게 */
+    <div className="w-full px-4 md:px-6 lg:px-8 py-4 pb-28 flex flex-col gap-3 md:gap-6">
       {toast && (
         <div
           className={`fixed top-6 left-1/2 -translate-x-1/2 z-[60] font-bold text-sm shadow-lg ${

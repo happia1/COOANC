@@ -180,8 +180,8 @@ export default function CalendarSection({ childId, focusDate = null }: Props) {
   const [detailEvents, setDetailEvents] = useState<LocalCalendarEvent[] | null>(null)
   /** 일정이 없는 날을 눌렀을 때만 값이 있음(빈 날 시트 표시) */
   const [emptyDayKey, setEmptyDayKey] = useState<string | null>(null)
-  /** 이번 달 일정 — 기본 펼침(접기 가능) */
-  const [monthScheduleOpen, setMonthScheduleOpen] = useState(true)
+  /** 이번 달 일정 — 기본 접힘(탭하면 펼침) */
+  const [monthScheduleOpen, setMonthScheduleOpen] = useState(false)
   /** 캘린더 뷰 — 홈 기본은 주간(주 단위), 토글로 월간 전환 */
   const [viewMode, setViewMode] = useState<'week' | 'month'>('week')
   /**
@@ -515,79 +515,41 @@ export default function CalendarSection({ childId, focusDate = null }: Props) {
 
   return (
     <section className="w-full">
-      {/* 스페셜 미션과 동일: 섹션 제목은 카드 밖, 액션(+ )는 같은 줄 오른쪽 끝 */}
+      {/* 제목 옆 주간/월간 토글 · 오른쪽 끝 「일정 등록하기」(다가오는 일정 버튼과 동일 스타일, + 대체) */}
       <div className="mb-1.5 flex items-center justify-between gap-2">
-        <h2 className="text-sm font-bold text-gray-800">캘린더</h2>
+        <div className="flex items-center gap-2">
+          <h2 className="text-sm font-bold text-gray-800">캘린더</h2>
+          <div className="inline-flex overflow-hidden rounded-lg border border-gray-200 text-[11px] font-bold">
+            <button
+              type="button"
+              onClick={() => setViewMode('week')}
+              aria-pressed={viewMode === 'week'}
+              className={`px-2.5 py-0.5 transition-colors ${viewMode === 'week' ? 'bg-[#4A90E2] text-white' : 'bg-white text-gray-500'}`}
+            >
+              주간
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('month')}
+              aria-pressed={viewMode === 'month'}
+              className={`px-2.5 py-0.5 transition-colors ${viewMode === 'month' ? 'bg-[#4A90E2] text-white' : 'bg-white text-gray-500'}`}
+            >
+              월간
+            </button>
+          </div>
+        </div>
         <button
           type="button"
           onClick={openAddSheet}
-          className="shrink-0 px-1 text-2xl font-light leading-none text-[#4A90E2] transition-opacity active:opacity-60"
-          aria-label="일정 추가"
+          className="shrink-0 rounded-lg border border-[#4A90E2]/40 bg-[#4A90E2]/10 px-3 py-1.5 text-[11px] font-bold text-[#2563EB] shadow-sm transition active:scale-95 hover:bg-[#4A90E2]/15"
+          aria-label="일정 등록하기"
         >
-          +
+          ＋ 일정 등록하기
         </button>
       </div>
 
       {/* pb-4: 이번 달 일정 아래·카드 하단 여백을 최소로(요청에 따라 pb-10 → 더 축소). FAB과 겹치면 pb-6 등으로만 살짝 늘리면 됨 */}
       <div className="w-full rounded-2xl bg-white px-4 pt-4 pb-4 shadow-sm">
-      {/* 범례: 한 줄 가로 스크롤 — 스크롤바 UI는 숨김(웹킷·파이어폭스·구형 Edge) */}
-      <div
-        className="mb-3 flex snap-x snap-proximity touch-pan-x gap-2 overflow-x-auto overscroll-x-contain pb-0.5 [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
-        role="list"
-        aria-label="일정 유형 범례 — 칩을 누르면 달의 점과 아래 이번 달 일정 목록이 해당 유형으로 좁혀짐(날짜 상세는 항상 그날 전체)"
-      >
-        {EVENT_TYPES_ORDER.map((type) => {
-          const selected =
-            legendFilter === type ||
-            (type === 'special' && legendFilter === 'event') ||
-            (type === 'etc' && legendFilter === 'other')
-          const chip = selected ? EVENT_LEGEND_CHIP_SELECTED[type] : EVENT_COLORS[type]
-          return (
-            <button
-              key={type}
-              type="button"
-              role="listitem"
-              aria-pressed={selected}
-              aria-label={
-                selected
-                  ? `${EVENT_TYPE_LABELS[type]} 필터 해제, 달과 목록을 전체 유형으로`
-                  : `${EVENT_TYPE_LABELS[type]}만 달 점·이번 달 일정에 표시`
-              }
-              onClick={() => toggleLegendFilter(type)}
-              className={[
-                'inline-flex shrink-0 snap-start items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-bold transition-colors duration-150 active:opacity-90',
-                chip.bg,
-                chip.text,
-              ].join(' ')}
-            >
-              <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${chip.dot}`} aria-hidden />
-              {EVENT_TYPE_LABELS[type]}
-            </button>
-          )
-        })}
-      </div>
-
-      {/* 주간/월간 뷰 토글 */}
-      <div className="mb-2 flex justify-end">
-        <div className="inline-flex overflow-hidden rounded-lg border border-gray-200 text-[11px] font-bold">
-          <button
-            type="button"
-            onClick={() => setViewMode('week')}
-            aria-pressed={viewMode === 'week'}
-            className={`px-3 py-1 transition-colors ${viewMode === 'week' ? 'bg-[#4A90E2] text-white' : 'bg-white text-gray-500'}`}
-          >
-            주간
-          </button>
-          <button
-            type="button"
-            onClick={() => setViewMode('month')}
-            aria-pressed={viewMode === 'month'}
-            className={`px-3 py-1 transition-colors ${viewMode === 'month' ? 'bg-[#4A90E2] text-white' : 'bg-white text-gray-500'}`}
-          >
-            월간
-          </button>
-        </div>
-      </div>
 
       <div className="mb-3 flex items-center justify-between">
         <button
@@ -674,6 +636,43 @@ export default function CalendarSection({ childId, focusDate = null }: Props) {
                   />
                 ))}
               </div>
+            </button>
+          )
+        })}
+      </div>
+
+      {/* 공휴일·방학 등 유형 칩(범례) — 캘린더 격자 아래로 이동 */}
+      <div
+        className="mb-3 flex snap-x snap-proximity touch-pan-x gap-2 overflow-x-auto overscroll-x-contain pb-0.5 [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+        role="list"
+        aria-label="일정 유형 범례 — 칩을 누르면 달의 점과 아래 이번 달 일정 목록이 해당 유형으로 좁혀짐(날짜 상세는 항상 그날 전체)"
+      >
+        {EVENT_TYPES_ORDER.map((type) => {
+          const selected =
+            legendFilter === type ||
+            (type === 'special' && legendFilter === 'event') ||
+            (type === 'etc' && legendFilter === 'other')
+          const chip = selected ? EVENT_LEGEND_CHIP_SELECTED[type] : EVENT_COLORS[type]
+          return (
+            <button
+              key={type}
+              type="button"
+              role="listitem"
+              aria-pressed={selected}
+              aria-label={
+                selected
+                  ? `${EVENT_TYPE_LABELS[type]} 필터 해제, 달과 목록을 전체 유형으로`
+                  : `${EVENT_TYPE_LABELS[type]}만 달 점·이번 달 일정에 표시`
+              }
+              onClick={() => toggleLegendFilter(type)}
+              className={[
+                'inline-flex shrink-0 snap-start items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-bold transition-colors duration-150 active:opacity-90',
+                chip.bg,
+                chip.text,
+              ].join(' ')}
+            >
+              <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${chip.dot}`} aria-hidden />
+              {EVENT_TYPE_LABELS[type]}
             </button>
           )
         })}

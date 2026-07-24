@@ -495,7 +495,8 @@ export default function HomeTab({
   const siblingNav = useChildSiblingAvatarNav(tabs)
 
   return (
-    <div className="w-full px-4 md:px-6 lg:px-8 py-4 flex flex-col gap-4 md:gap-6">
+    /* pb-28: 우하단 플로팅(루틴 도우미) 버튼 높이만큼 하단 여백 — 마지막 내용이 버튼에 가리지 않게 */
+    <div className="w-full px-4 md:px-6 lg:px-8 py-4 pb-28 flex flex-col gap-4 md:gap-6">
       {!child ? (
         <div className="flex flex-col items-center justify-center py-20 gap-4">
           <div className="text-center">
