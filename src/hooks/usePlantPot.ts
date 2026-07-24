@@ -484,6 +484,12 @@ export function usePlantPot(
       }
 
       let immediateGrowthResult: WaterResult | null = null
+      /**
+       * 완성(7단계) 경계에서 잠금을 걸고 서버 응답을 기다리는 상태.
+       * 서버가 'grew' 를 확정하지 못하면(실패·불완전 응답·미성장) 축하 팝업이 열리지 않아
+       * 잠금 해제 경로가 사라지므로, 그런 종료 지점마다 직접 잠금을 풀어야 합니다.
+       */
+      let lockedAwaitingServerCelebration = false
       if (!stage7Reset && prevHearts > 0) {
         const needed = prevPot.heartsNeeded
         const newHeartsUsed = prevPot.heartsUsed + 1
@@ -492,12 +498,17 @@ export function usePlantPot(
         const newHeartsUsedAfter = levelUp ? 0 : newHeartsUsed
         const isCompleted = newStage === 7
 
+        /**
+         * `completed` 는 낙관적으로 켜지 않습니다 — 서버 확정('grew'·7단계 응답) 전에 켜면
+         * `needsPotSeedSelection` 이 true 가 되어 씨앗 심기 팝업이 잘못 뜨고,
+         * 서버가 실패하면 팝업만 남는 오동작이 됩니다. 확정값은 finally 의 confirmed 반영이 처리합니다.
+         */
         const optimisticPot = {
           ...prevPot,
           stage: newStage,
           heartsUsed: newHeartsUsedAfter,
           heartsNeeded: getHeartsNeededForStage(prevPot.treeId, newStage),
-          completed: isCompleted,
+          completed: false,
         }
         heartsRef.current = prevHearts - 1
         potRef.current = optimisticPot
@@ -507,14 +518,13 @@ export function usePlantPot(
           hearts: prevHearts - 1,
           pot_stage: newStage,
           pot_hearts_used: newHeartsUsedAfter,
-          pot_completed: isCompleted,
+          pot_completed: false,
         })
 
         /**
          * 레벨업 경계 — 축하 팝업이 닫힐 때까지 이후 water() 호출을 즉시 'locked'로 막습니다.
-         * 완성(7단계)이면 세대도 올려 두어, 이 시점 이후 큐에 남을 수 있는 낡은 요청을
-         * 재심기 이후에는 버리도록 합니다(같은 tick에서 도는 이번 호출 자체는 아래에서
-         * generationAtCall 을 이 새 세대로 캡처하므로 영향받지 않습니다).
+         * 세대(potGeneration) 증가는 서버가 완성을 확정한 뒤(성공 'grew' 7단계 응답)에만 합니다 —
+         * 낙관적으로 올리면 서버 실패 시 큐의 정상 물주기 요청까지 잘못 폐기됩니다.
          */
         if (levelUp) {
           stageTransitionLockRef.current = true
@@ -523,14 +533,20 @@ export function usePlantPot(
           // 최종 수확 단계만 서버가 만드는 수확 결과가 필요해 응답을 기다립니다.
           if (!isCompleted) {
             immediateGrowthResult = { type: 'grew', newStage }
+          } else {
+            lockedAwaitingServerCelebration = true
           }
-        }
-        if (isCompleted) {
-          potGenerationRef.current += 1
         }
       }
 
       const generationAtCall = potGenerationRef.current
+      /** 완성 경계 잠금을 축하 팝업 없이 끝내는 종료 지점에서 호출 — 물주기 영구 잠김 방지 */
+      const releaseLockIfAwaitingCelebration = () => {
+        if (!lockedAwaitingServerCelebration) return
+        lockedAwaitingServerCelebration = false
+        stageTransitionLockRef.current = false
+        setStageLocked(false)
+      }
       pendingWaterCountRef.current += 1
       if (pendingWaterCountRef.current === 1) {
         lastConfirmedWaterRef.current = null
@@ -547,6 +563,7 @@ export function usePlantPot(
             refreshAfterWaterQueueRef.current = false
             onWaterPendingRef.current?.(false)
           }
+          releaseLockIfAwaitingCelebration()
           return 'ok'
         }
         try {
@@ -571,16 +588,19 @@ export function usePlantPot(
 
           if (res.status === 400 && json?.code === 'NO_HEARTS') {
             refreshAfterWaterQueueRef.current = true
+            releaseLockIfAwaitingCelebration()
             return 'no_hearts'
           }
           if (res.status === 400 && json?.code === 'NO_SEED_CHOSEN') {
             refreshAfterWaterQueueRef.current = true
+            releaseLockIfAwaitingCelebration()
             return 'ok'
           }
 
           if (!res.ok || json?.ok !== true) {
             console.warn('[usePlantPot] plant-water API', res.status, json)
             refreshAfterWaterQueueRef.current = true
+            releaseLockIfAwaitingCelebration()
             return 'ok'
           }
 
@@ -593,6 +613,7 @@ export function usePlantPot(
           if (!hasConfirmedPotState) {
             console.warn('[usePlantPot] plant-water incomplete payload', json)
             refreshAfterWaterQueueRef.current = true
+            releaseLockIfAwaitingCelebration()
             return 'ok'
           }
 
@@ -607,8 +628,11 @@ export function usePlantPot(
             const tid = prevPot.treeId ?? DEFAULT_TREE
             const ns = clampPotStageForTree(tid, json.newStage)
             if (ns === 7) {
-              // 완성 — 다음 생애주기(재심기)를 위해 큐·대기 카운터를 정리합니다.
-              // 큐와 대기 수는 finally에서 요청별로 정리합니다.
+              /**
+               * 완성 확정 — 이 시점에 세대를 올려, 큐에 남은 낡은 물주기 요청을 폐기합니다.
+               * (낙관적으로 미리 올리면 서버 실패 시 정상 요청까지 잘못 버려짐)
+               */
+              potGenerationRef.current += 1
             }
             return {
               type: 'grew',
@@ -616,10 +640,13 @@ export function usePlantPot(
               harvest: json.harvest,
             }
           }
+          /** 성장 없음(경계 오판 등) — 완성 대기 잠금이 있었다면 팝업이 안 열리므로 풀어 줍니다 */
+          releaseLockIfAwaitingCelebration()
           return 'ok'
         } catch (e) {
           console.warn('[usePlantPot] plant-water fetch', e)
           refreshAfterWaterQueueRef.current = true
+          releaseLockIfAwaitingCelebration()
           return 'ok'
         } finally {
           pendingWaterCountRef.current = Math.max(0, pendingWaterCountRef.current - 1)

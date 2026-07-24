@@ -186,33 +186,7 @@ export async function POST(req: NextRequest) {
 
   if (!stats) return NextResponse.json({ error: '스탯 정보를 찾을 수 없어요' }, { status: 404 })
 
-  let newExp = stats.exp + expEarned
-  let newLevel = stats.current_level
-  let newExpToNext = stats.exp_to_next_level
-
-  /**
-   * 레벨업은 1회 if 가 아니라 while 로 처리합니다.
-   * 비개발자: 보상을 크게 받아 경험치가 여러 칸을 넘겨도, 한 번에 정확히 여러 레벨이 오릅니다.
-   */
-  while (newExpToNext > 0 && newExp >= newExpToNext) {
-    newExp -= newExpToNext
-    newLevel += 1
-    newExpToNext = Math.max(1, Math.round(newExpToNext * 1.5))
-  }
-
-  const yesterday = addSeoulCalendarDays(completionDay, -1)
-  let newStreak = stats.streak_days
-  if (stats.last_mission_date !== completionDay) {
-    newStreak = stats.last_mission_date === yesterday ? newStreak + 1 : 1
-  }
-
-  /** 보상 크레딧은 레벨 블록 가용(`credits`)에 더합니다. 저금통은 그대로 둡니다. */
-  const keepPiggy = readChildStatInt(stats.credits_piggy)
-  const baseCredits = readChildStatInt(stats.credits)
-  const baseHearts = readChildStatInt(stats.hearts)
-  const baseTotalCreditsEarned = readChildStatInt(stats.total_credits_earned)
-
-  // ── 배 이동: 오늘 완료율 90% 이상 + 오늘 첫 달성 시 boat_step 증가 ──
+  // ── 배 이동 판정: 오늘 완료율 90% 이상 (실제 이동·하루 1회 게이트는 RPC가 행 잠금 안에서 처리) ──
   /** `daily_missions` 배정 열은 `date` 입니다(`assigned_date` 는 mission_logs 전용). */
   const { data: todayMissions } = await supabase
     .from('daily_missions')
@@ -223,53 +197,129 @@ export async function POST(req: NextRequest) {
   const totalToday = todayMissions?.length ?? 0
   const completedToday = (todayMissions?.filter((m) => m.is_completed).length ?? 0) + 1 // +1 낙관적
   const heartsFullToday = totalToday > 0 && completedToday / totalToday >= 0.9
-  const lastHeartsFullDate = (stats as Record<string, unknown>).last_hearts_full_date as string | null | undefined
-  const boatShouldAdvance = heartsFullToday && lastHeartsFullDate !== completionDay
 
-  const NAV_STEPS_PER_SECTION = 5
-  const NAV_SECTION_COUNT = 4
-  const currentBoatSection = ((stats as Record<string, unknown>).boat_section as number | undefined) ?? 0
-  const currentBoatStep = ((stats as Record<string, unknown>).boat_step as number | undefined) ?? 0
+  /**
+   * 보상 반영은 121 RPC(complete_mission_reward)로 원자화합니다.
+   * 행 잠금(FOR UPDATE) 안에서 증가·레벨업·스트릭·배 이동을 계산해,
+   * 카드 연타(동시 요청) 시 같은 잔액을 읽고 서로 덮어쓰던 보상 유실(Lost Update)을 막습니다.
+   */
+  type AppliedReward = {
+    credits: number
+    hearts: number
+    exp: number
+    current_level: number
+    exp_to_next_level: number
+    streak_days: number
+    total_credits_earned: number
+    boat_advanced: boolean
+  }
+  let applied: AppliedReward | null = null
 
-  let newBoatSection = currentBoatSection
-  let newBoatStep = currentBoatStep
-  if (boatShouldAdvance) {
-    newBoatStep = currentBoatStep + 1
-    if (newBoatStep >= NAV_STEPS_PER_SECTION && newBoatSection < NAV_SECTION_COUNT - 1) {
-      newBoatSection = currentBoatSection + 1
-      newBoatStep = 0
-    } else if (newBoatStep >= NAV_STEPS_PER_SECTION) {
-      newBoatStep = NAV_STEPS_PER_SECTION - 1 // 마지막 섹션 마지막 칸에서 고정
+  const { data: rpcData, error: rpcErr } = await supabase.rpc('complete_mission_reward', {
+    p_child_id: childId,
+    p_credit: creditEarned,
+    p_heart: heartEarned,
+    p_exp: expEarned,
+    p_completion_day: completionDay,
+    p_advance_boat: heartsFullToday,
+  })
+
+  if (!rpcErr && rpcData && typeof rpcData === 'object') {
+    const r = rpcData as Record<string, unknown>
+    applied = {
+      credits: readChildStatInt(r.credits),
+      hearts: readChildStatInt(r.hearts),
+      exp: readChildStatInt(r.exp),
+      current_level: readChildStatInt(r.current_level),
+      exp_to_next_level: readChildStatInt(r.exp_to_next_level),
+      streak_days: readChildStatInt(r.streak_days),
+      total_credits_earned: readChildStatInt(r.total_credits_earned),
+      boat_advanced: r.boat_advanced === true,
     }
+  } else if (rpcErr) {
+    console.error('[daily-mission/complete] complete_mission_reward RPC 실패 — 레거시 경로 폴백', rpcErr.message)
   }
 
-  const { error: statsUpdateErr } = await supabase
-    .from('child_stats')
-    .update({
+  if (!applied) {
+    // ── 폴백 (121 마이그레이션 미적용 DB): 기존 read-modify-write — 동시 요청 시 보상 유실 가능
+    let newExp = stats.exp + expEarned
+    let newLevel = stats.current_level
+    let newExpToNext = stats.exp_to_next_level
+    while (newExpToNext > 0 && newExp >= newExpToNext) {
+      newExp -= newExpToNext
+      newLevel += 1
+      newExpToNext = Math.max(1, Math.round(newExpToNext * 1.5))
+    }
+
+    const yesterday = addSeoulCalendarDays(completionDay, -1)
+    let newStreak = stats.streak_days
+    if (stats.last_mission_date !== completionDay) {
+      newStreak = stats.last_mission_date === yesterday ? newStreak + 1 : 1
+    }
+
+    const keepPiggy = readChildStatInt(stats.credits_piggy)
+    const baseCredits = readChildStatInt(stats.credits)
+    const baseHearts = readChildStatInt(stats.hearts)
+    const baseTotalCreditsEarned = readChildStatInt(stats.total_credits_earned)
+    const lastHeartsFullDate = (stats as Record<string, unknown>).last_hearts_full_date as string | null | undefined
+    const boatShouldAdvance = heartsFullToday && lastHeartsFullDate !== completionDay
+
+    const NAV_STEPS_PER_SECTION = 5
+    const NAV_SECTION_COUNT = 4
+    const currentBoatSection = ((stats as Record<string, unknown>).boat_section as number | undefined) ?? 0
+    const currentBoatStep = ((stats as Record<string, unknown>).boat_step as number | undefined) ?? 0
+
+    let newBoatSection = currentBoatSection
+    let newBoatStep = currentBoatStep
+    if (boatShouldAdvance) {
+      newBoatStep = currentBoatStep + 1
+      if (newBoatStep >= NAV_STEPS_PER_SECTION && newBoatSection < NAV_SECTION_COUNT - 1) {
+        newBoatSection = currentBoatSection + 1
+        newBoatStep = 0
+      } else if (newBoatStep >= NAV_STEPS_PER_SECTION) {
+        newBoatStep = NAV_STEPS_PER_SECTION - 1 // 마지막 섹션 마지막 칸에서 고정
+      }
+    }
+
+    const { error: statsUpdateErr } = await supabase
+      .from('child_stats')
+      .update({
+        credits: baseCredits + creditEarned,
+        credits_wallet: 0,
+        credits_piggy: keepPiggy,
+        hearts: baseHearts + heartEarned,
+        total_credits_earned: baseTotalCreditsEarned + creditEarned,
+        exp: newExp,
+        current_level: newLevel,
+        exp_to_next_level: newExpToNext,
+        streak_days: newStreak,
+        longest_streak: Math.max(stats.longest_streak, newStreak),
+        last_mission_date: completionDay,
+        promotion_pending: false,
+        promotion_eligible_at: null,
+        ...(boatShouldAdvance && {
+          boat_section: newBoatSection,
+          boat_step: newBoatStep,
+          last_hearts_full_date: completionDay,
+        }),
+        updated_at: completedAt,
+      })
+      .eq('child_id', childId)
+    if (statsUpdateErr) {
+      console.error('[daily-mission/complete] child_stats update failed', statsUpdateErr.message)
+      return NextResponse.json({ error: '보상 저장에 실패했어요' }, { status: 500 })
+    }
+
+    applied = {
       credits: baseCredits + creditEarned,
-      credits_wallet: 0,
-      credits_piggy: keepPiggy,
       hearts: baseHearts + heartEarned,
-      total_credits_earned: baseTotalCreditsEarned + creditEarned,
       exp: newExp,
       current_level: newLevel,
       exp_to_next_level: newExpToNext,
       streak_days: newStreak,
-      longest_streak: Math.max(stats.longest_streak, newStreak),
-      last_mission_date: completionDay,
-      promotion_pending: false,
-      promotion_eligible_at: null,
-      ...(boatShouldAdvance && {
-        boat_section: newBoatSection,
-        boat_step: newBoatStep,
-        last_hearts_full_date: completionDay,
-      }),
-      updated_at: completedAt,
-    })
-    .eq('child_id', childId)
-  if (statsUpdateErr) {
-    console.error('[daily-mission/complete] child_stats update failed', statsUpdateErr.message)
-    return NextResponse.json({ error: '보상 저장에 실패했어요' }, { status: 500 })
+      total_credits_earned: baseTotalCreditsEarned + creditEarned,
+      boat_advanced: boatShouldAdvance,
+    }
   }
 
   // ── 게임 트리거: 첫 미션 완료 ──
@@ -382,24 +432,20 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const newCredits = baseCredits + creditEarned
-  const newHearts = baseHearts + heartEarned
-  const newTotalEarned = baseTotalCreditsEarned + creditEarned
-
   return NextResponse.json({
     creditReward: creditEarned,
     heartReward: heartEarned,
     expReward: expEarned,
     rewardMultiplier,
-    newLevel,
-    newExp,
-    newExpToNext,
-    newStreak,
-    /** 클라이언트가 child_stats 를 서버와 동일하게 즉시 반영할 수 있게 함 */
-    newCredits,
-    newHearts,
-    totalCreditsEarned: newTotalEarned,
-    boatAdvanced: boatShouldAdvance,
+    newLevel: applied.current_level,
+    newExp: applied.exp,
+    newExpToNext: applied.exp_to_next_level,
+    newStreak: applied.streak_days,
+    /** 클라이언트가 child_stats 를 서버와 동일하게 즉시 반영할 수 있게 함 (RPC 확정값) */
+    newCredits: applied.credits,
+    newHearts: applied.hearts,
+    totalCreditsEarned: applied.total_credits_earned,
+    boatAdvanced: applied.boat_advanced,
     itemUnlocked: triggerResult.fired && triggerResult.unlockedItemIndex !== null
       ? { index: triggerResult.unlockedItemIndex, triggerKey: 'FIRST_MISSION' }
       : null,

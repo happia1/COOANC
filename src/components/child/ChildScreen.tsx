@@ -1596,7 +1596,22 @@ export default function ChildScreen({
             /* 응답이 JSON이 아니면 stats 동기화 생략 */
           }
           if (res.ok) {
-            setStats((prev) => tryApplyCompletePayload(prev, json) ?? prev)
+            setStats((prev) => {
+              const next = tryApplyCompletePayload(prev, json)
+              if (!next || !prev) return next ?? prev
+              /**
+               * 연타로 완료 응답 여러 개가 순서 뒤바뀌어 도착할 수 있습니다.
+               * total_credits_earned 는 단조 증가하므로, 더 낮은(옛) 응답이
+               * 최신 값을 덮어써 크레딧이 되돌아가 보이는 것을 막습니다.
+               */
+              if (
+                readChildStatInt(next.total_credits_earned) <
+                readChildStatInt(prev.total_credits_earned)
+              ) {
+                return prev
+              }
+              return next
+            })
             if (typeof performance !== 'undefined') lastLocalStatsBumpAtRef.current = performance.now()
             if (
               json &&
