@@ -11,26 +11,25 @@
  *   50보다 **작으면** **왼쪽**으로 illust(방·러그)가 살짝 밀어 보이게(크롭) 맞출 때 씁니다.
  *   바꾸면 `rugCenterX` 를 같이 맞춥니다.
  *
- * 이미지 원본: 858 × 968px (tablet_kidsroom_background_portrait.png)
+ * 이미지 원본: 418 × 537px (kidsroom.png)
  */
 export const BACKGROUND_ANCHORS = {
   kids_background: {
     /**
      * 러그 좌우 중심 X 비율(캐릭터 `left%`).
-     * 배경 `imageObjectPositionX` 조정에 맞춰 함께 사용합니다.
-     * 42%·0.495 기준에서 가로 2%p 오른쪽(→44)에 맞춤.
+     * kidsroom.png 는 러그가 가로 중앙(≈50%)에 있어 0.50.
      */
-    rugCenterX: 0.501,
+    rugCenterX: 0.50,
     /**
-     * 풀블리드 배경 `object-position` x(%)—50=중앙, 44=42에서 반대(오른쪽)으로 2%p.
+     * 풀블리드 배경 `object-position` x(%)—50=중앙. 러그가 중앙이라 50.
      */
-    imageObjectPositionX: 44,
-    /** 러그 상하 중심 Y 비율 */
-    rugCenterY: 0.470,
-    /** 캐릭터 발이 닿는 Y 비율 */
-    characterFootY: 0.530,
-    /** 배경 높이의 몇 배로 캐릭터를 그릴지 (기존 0.187의 1.5배) */
-    characterScale: 0.28,
+    imageObjectPositionX: 50,
+    /** 러그 상하 중심 Y 비율 (kidsroom.png 는 러그가 세로 약간 아래 ≈0.54) */
+    rugCenterY: 0.54,
+    /** 캐릭터 발이 닿는 Y 비율 (러그 앞·중앙) */
+    characterFootY: 0.56,
+    /** 배경 높이의 몇 배로 캐릭터를 그릴지 */
+    characterScale: 0.30,
     /**
      * 화분 UI 가로 앵커(0~1) — 캐릭터 **왼발** 쪽(화면에서 발 왼쪽).
      * 비개발자: 발 높이 근처에 두고 `translate(-50%, …)` 로 가운데를 발 옆에 맞춥니다.

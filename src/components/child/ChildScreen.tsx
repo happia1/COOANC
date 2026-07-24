@@ -270,20 +270,20 @@ function plantFeetAnchorsKeepRugGapPx(
     (rugCenterX - plantPotBesideLeftFootX) * referenceWidthPx * spreadMultiplier
   const gapCanCenterPx =
     (wateringCanBesideRightFootX - rugCenterX) * referenceWidthPx * spreadMultiplier
+  /**
+   * 좁은 화면(<640px, SE·S8+·XR 등 폰)에서는 배율 계산을 쓰지 않고 **고정 위치**로 배치합니다.
+   * - 기기·측정폭이 달라도 항상 동일하게 배치되어 겹침(오른쪽 장바구니 아이콘)·과밀을 막습니다.
+   * - 저금통 왼쪽 28%, 화분 오른쪽 72% (토끼 중심 50% 양옆). 더 벌리려면 24/76, 더 붙이려면 32/68.
+   */
+  if (containerWidthPx < 640) {
+    return { plantPct: 28, canPct: 72 }
+  }
   /** 중심에서 위 거리만큼 떨어진 픽셀 위치 → 현재 너비로 나눈 비율(0~1) */
   let plant = rugCenterX - gapPlantCenterPx / containerWidthPx
   let can = rugCenterX + gapCanCenterPx / containerWidthPx
-  /**
-   * 좁은 화면(<640px)에서는 저금통(왼쪽)·화분(오른쪽)의 가로 위치를 안쪽으로 강하게 제한합니다.
-   * - 화분이 오른쪽 아이콘 열(장바구니 등)을 가리지 않도록 오른쪽 한계선을 0.70으로 고정
-   * - 저금통도 대칭으로 왼쪽 한계선을 0.30으로 고정 → 토끼와의 간격이 확실히 좁아짐
-   * (배율이 어떻든 이 한계선을 넘지 않으므로 기기별 겹침·과도한 벌어짐을 막습니다)
-   */
-  const isNarrow = containerWidthPx > 0 && containerWidthPx < 640
-  const plantLeftMin = isNarrow ? 0.30 : 0.06
-  const canRightMax = isNarrow ? 0.70 : 0.94
-  plant = Math.max(plantLeftMin, Math.min(0.49, plant))
-  can = Math.min(canRightMax, Math.max(0.51, can))
+  /** 매우 좁은 기기에서만 화면 밖으로 나가지 않게 자름(이때는 간격이 기준보다 좁아질 수 있음) */
+  plant = Math.max(0.06, Math.min(0.49, plant))
+  can = Math.min(0.94, Math.max(0.51, can))
   return { plantPct: plant * 100, canPct: can * 100 }
 }
 
