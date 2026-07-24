@@ -221,18 +221,19 @@ const HAMSTER_CHARACTER_UI_SCALE_MAX = 1.1
 /** 햄스터 캐릭터 하한 — 요청 반영: 최소 2/3배 */
 const HAMSTER_CHARACTER_UI_SCALE_MIN = 2 / 3
 
-/** 화분·물조리개(발 옆) — 모바일에서 최대 1.5배까지 확대 */
-const PLANT_FEET_UI_SCALE_MAX = 1.5
+/** 화분·물조리개(발 옆) 크기 배율 상한 — 400px→820px 구간에서 1.0→이 값으로 커집니다(≤400px 는 1.0 고정, 모바일 크기 불변). iPad Air(820) 이상에서 저금통/화분을 키우려 상향. */
+const PLANT_FEET_UI_SCALE_MAX = 1.7
 
 /**
  * 발 옆 화분·물조리개의 **표시 크기**와 **토끼와의 가로 간격(px)** 을 맞출 때 쓰는 기준 가로(px).
  * 비개발자: 가로 885일 때 화분·물조리개 크기(배율)와, 토끼 발치 기준 가로 간격을 그대로 유지합니다.
  */
 const PLANT_FEET_LAYOUT_REFERENCE_W = 885
-/** 데스크톱/태블릿에서 화분·물조리개를 토끼 기준으로 벌리는 배율(1=기존, 1.35=35% 더 멀게) */
-const PLANT_FEET_GAP_SPREAD_MULTIPLIER = 1.35
+/** 데스크톱/태블릿(≥640px, iPad Air 820 포함)에서 화분·물조리개를 토끼 기준으로 벌리는 배율(1=기존). iPad Air 에서 토끼와 저금통/화분 간격을 넓히려 상향. */
+const PLANT_FEET_GAP_SPREAD_MULTIPLIER = 1.45
 /** 아주 좁은 화면(<640px)에서 발 옆 간격 배율 — 낮출수록 토끼 양옆으로 더 붙습니다. 640px 이상은 데스크톱 배율을 씁니다(예: 760px 창에서 저금통·화분이 넓게). */
-const PLANT_FEET_GAP_SPREAD_MULTIPLIER_MOBILE = 1.07
+/** SE(375)·S8+(360) 등 좁은 폰: 저금통·화분을 토끼 쪽으로 더 붙여 화면 가장자리(장바구니 아이콘 등) 겹침을 줄입니다. (1.0=기준앵커, 낮출수록 토끼에 더 붙음) */
+const PLANT_FEET_GAP_SPREAD_MULTIPLIER_MOBILE = 0.6
 /** 초소형 모바일(<=300px)에서 화분·물조리개 간격 배율 */
 const PLANT_FEET_GAP_SPREAD_MULTIPLIER_TINY_MOBILE = 1.02
 
@@ -272,9 +273,17 @@ function plantFeetAnchorsKeepRugGapPx(
   /** 중심에서 위 거리만큼 떨어진 픽셀 위치 → 현재 너비로 나눈 비율(0~1) */
   let plant = rugCenterX - gapPlantCenterPx / containerWidthPx
   let can = rugCenterX + gapCanCenterPx / containerWidthPx
-  /** 매우 좁은 기기에서만 화면 밖으로 나가지 않게 자름(이때는 간격이 기준보다 좁아질 수 있음) */
-  plant = Math.max(0.06, Math.min(0.49, plant))
-  can = Math.min(0.94, Math.max(0.51, can))
+  /**
+   * 좁은 화면(<640px)에서는 저금통(왼쪽)·화분(오른쪽)의 가로 위치를 안쪽으로 강하게 제한합니다.
+   * - 화분이 오른쪽 아이콘 열(장바구니 등)을 가리지 않도록 오른쪽 한계선을 0.70으로 고정
+   * - 저금통도 대칭으로 왼쪽 한계선을 0.30으로 고정 → 토끼와의 간격이 확실히 좁아짐
+   * (배율이 어떻든 이 한계선을 넘지 않으므로 기기별 겹침·과도한 벌어짐을 막습니다)
+   */
+  const isNarrow = containerWidthPx > 0 && containerWidthPx < 640
+  const plantLeftMin = isNarrow ? 0.30 : 0.06
+  const canRightMax = isNarrow ? 0.70 : 0.94
+  plant = Math.max(plantLeftMin, Math.min(0.49, plant))
+  can = Math.min(canRightMax, Math.max(0.51, can))
   return { plantPct: plant * 100, canPct: can * 100 }
 }
 
