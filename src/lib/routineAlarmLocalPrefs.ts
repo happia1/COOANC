@@ -231,3 +231,33 @@ export function writeRoutineAlarmPrefs(p: RoutineAlarmPrefsLoaded): void {
   }
   localStorage.setItem('cooanc_alarm_prefs', JSON.stringify(payload))
 }
+
+/**
+ * 기기 간 동기화용 — 알람 관련 localStorage 키 전체를 한 번들(JSON)로 묶고/되돌립니다.
+ * child_stats.routine_alarm_prefs 에 이 번들을 저장해, 다른 기기의 자녀 앱이 그대로 복원합니다.
+ */
+const ALARM_STORAGE_KEYS = [
+  'cooanc_alarm_prefs',
+  'cooanc_notify_wake',
+  'cooanc_notify_return',
+  'cooanc_notify_sleep',
+  ROUTINE_HAS_SCHOOL_KEY,
+] as const
+
+export function serializeRoutineAlarmStorage(): Record<string, string> {
+  if (typeof window === 'undefined') return {}
+  const out: Record<string, string> = {}
+  for (const k of ALARM_STORAGE_KEYS) {
+    const v = localStorage.getItem(k)
+    if (v != null) out[k] = v
+  }
+  return out
+}
+
+export function restoreRoutineAlarmStorage(bundle: Record<string, unknown> | null | undefined): void {
+  if (typeof window === 'undefined' || !bundle || typeof bundle !== 'object') return
+  for (const k of ALARM_STORAGE_KEYS) {
+    const v = (bundle as Record<string, unknown>)[k]
+    if (typeof v === 'string') localStorage.setItem(k, v)
+  }
+}

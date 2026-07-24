@@ -14,6 +14,7 @@ import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { useAlarmSoundPreview } from '@/hooks/useAlarmSoundPreview'
 import {
   writeRoutineAlarmPrefs,
+  serializeRoutineAlarmStorage,
   type RoutineCustomAlarmStored,
 } from '@/lib/routineAlarmLocalPrefs'
 import { createClient } from '@/lib/supabase/client'
@@ -711,6 +712,14 @@ export default function RoutineOnboarding({ onComplete, linkedChildId }: Props) 
           .eq('child_id', linkedChildId)
         if (statsErr) {
           console.warn('[onboarding routine] 등원·잘 준비 알람 child_stats 저장 실패:', statsErr.message)
+        }
+        /** 알람 전체 번들 미러링(기기 간 동기화) — 별도 update 로 123 미적용 DB 에서도 위 저장 보호 */
+        const { error: bundleErr } = await supabase
+          .from('child_stats')
+          .update({ routine_alarm_prefs: serializeRoutineAlarmStorage() })
+          .eq('child_id', linkedChildId)
+        if (bundleErr) {
+          console.warn('[onboarding routine] 알람 번들 동기화 실패(123 마이그레이션 필요?):', bundleErr.message)
         }
       }
       onComplete()

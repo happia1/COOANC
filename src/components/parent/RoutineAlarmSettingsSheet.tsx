@@ -14,6 +14,7 @@ import {
   readRoutineAlarmPrefs,
   readRoutineHasSchoolFromStorage,
   writeRoutineAlarmPrefs,
+  serializeRoutineAlarmStorage,
   type RoutineAlarmPrefsLoaded,
   type RoutineCustomAlarmStored,
 } from '@/lib/routineAlarmLocalPrefs'
@@ -352,6 +353,17 @@ export default function RoutineAlarmSettingsSheet({ open, onClose }: Props) {
         .eq('child_id', selectedChildId)
       if (error) {
         console.warn('[routine alarm] 등원·잘 준비 알람 저장 실패:', error.message)
+      }
+      /**
+       * 기상·잘시간·하원 포함 알람 전체를 번들로 미러링 → 다른 기기의 자녀 앱과 동기화.
+       * 별도 update 로 분리해, 123 마이그레이션 미적용 DB(컬럼 없음)에서도 위 저장이 깨지지 않게 합니다.
+       */
+      const { error: bundleErr } = await supabase
+        .from('child_stats')
+        .update({ routine_alarm_prefs: serializeRoutineAlarmStorage() })
+        .eq('child_id', selectedChildId)
+      if (bundleErr) {
+        console.warn('[routine alarm] 알람 번들 동기화 실패(123 마이그레이션 필요?):', bundleErr.message)
       }
     }
     onClose()

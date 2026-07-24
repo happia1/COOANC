@@ -114,7 +114,7 @@ import {
   isAllowedChildProfileAvatarUrl,
   publicUrlForChildProfileAvatar,
 } from '@/lib/childProfileAvatar'
-import { readRoutineAlarmPrefs } from '@/lib/routineAlarmLocalPrefs'
+import { readRoutineAlarmPrefs, restoreRoutineAlarmStorage } from '@/lib/routineAlarmLocalPrefs'
 import { resolveRoutineAlarmSoundUrl } from '@/lib/routineAlarmSounds'
 import { installChildRoutineAudioUnlockOnFirstGesture } from '@/lib/childAudio'
 import {
@@ -708,6 +708,17 @@ export default function ChildScreen({
   const [stats, setStats] = useState<ChildStats | null>(() =>
     initialStats ? normalizeChildStatsCreditsSplit(initialStats) : null,
   )
+
+  /**
+   * 부모가 저장한 루틴 알람(기상·잘시간·하원 등) 번들을 DB(child_stats.routine_alarm_prefs)에서
+   * localStorage 로 복원합니다. 자녀 알람 컴포넌트들이 localStorage 를 읽기 **전에** 렌더 중 1회 실행해,
+   * 다른 기기에서 설정한 알람이 이 기기 자녀 앱에도 그대로 반영되게 합니다.
+   */
+  const alarmRestoredRef = useRef(false)
+  if (!alarmRestoredRef.current && typeof window !== 'undefined') {
+    alarmRestoredRef.current = true
+    restoreRoutineAlarmStorage(initialStats?.routine_alarm_prefs ?? null)
+  }
 
   /** 다이어리 배경 PNG — 홈 진입 시 미리 확인(없으면 팝업에서 404 대기 없음) */
   useEffect(() => {

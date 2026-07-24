@@ -72,6 +72,8 @@ export type ChildStats = {
   sleep_ready_time_enabled?: boolean
   sleep_ready_time_weekday?: boolean
   sleep_ready_time_weekend?: boolean
+  /** 루틴 알람 localStorage 번들(기기 간 동기화용) — 자녀 앱이 로드 시 localStorage 로 복원 */
+  routine_alarm_prefs?: Record<string, unknown> | null
   /** 등원 알림 HH:MM */
   school_time?: string | null
   school_time_enabled?: boolean
