@@ -219,14 +219,17 @@ export default function RoutineKeywordBuilderSheet({
         <div className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-gray-200" aria-hidden />
       )}
       {!(embedded && embeddedPanelWizard) ? (
-        <div className="border-b border-gray-100 px-4 pb-2 pt-3">
+        <div className="border-b border-gray-100 px-4 pb-2.5 pt-3">
           <p id="kw-sheet-title" className="text-center text-sm font-black text-gray-900">
-            키워드로 루틴 추가
+            미션 수정하기
+          </p>
+          <p className="mt-1 text-center text-[11px] font-normal leading-snug text-gray-400">
+            키워드를 클릭해서 루틴을 활성화 또는 비활성화할 수 있습니다.
           </p>
         </div>
       ) : (
         <div className="sr-only" id="kw-sheet-title">
-          키워드로 루틴 추가
+          미션 수정하기
         </div>
       )}
 

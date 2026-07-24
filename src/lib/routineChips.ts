@@ -420,8 +420,17 @@ async function createMissionsFromIds(
     ...PM_CHIPS.filter((c) => pmIds.includes(c.id)),
   ]
 
-  for (const chip of ordered) {
-    const time = scheduledTimeForChip(chip, {
+  /**
+   * 생성할 미션 payload 를 먼저 전부 만든 뒤 **병렬로** 요청합니다.
+   * (기존: 칩마다 순차 await — 15~30개면 매우 느리고, 중간 실패 시 wipe 후 루틴이 통째로 비는 문제)
+   * 표시 순서는 자녀/부모 화면에서 block·시각 기준으로 다시 정렬하므로 생성 순서는 무관합니다.
+   */
+  const payloads: Record<string, unknown>[] = ordered.map((chip) => ({
+    title: chip.title,
+    description: missionDescriptionForChip(chip, pmIds, ctx.soundWake, ctx.soundReturn, ctx.soundSleep, hasSchoolForAnchor),
+    icon_emoji: routineMissionIconEmojiForCreate(chip.title),
+    block: chip.apiBlock,
+    scheduled_time: scheduledTimeForChip(chip, {
       selPmIds: pmIds,
       wake: ctx.wakeTime,
       sleep: ctx.sleepTime,
@@ -430,71 +439,56 @@ async function createMissionsFromIds(
       notifyWake: ctx.notifyWake,
       notifyReturn: ctx.notifyReturn,
       notifySleep: ctx.notifySleep,
-    })
-    const description = missionDescriptionForChip(
-      chip,
-      pmIds,
-      ctx.soundWake,
-      ctx.soundReturn,
-      ctx.soundSleep,
-      hasSchoolForAnchor,
-    )
-    const res = await fetchApi('/api/mission/create', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        title: chip.title,
-        description,
-        icon_emoji: routineMissionIconEmojiForCreate(chip.title),
-        block: chip.apiBlock,
-        scheduled_time: time,
-        credit_reward: 10,
-        exp_reward: 10,
-        /** DB 기본(1)과 맞춤 — 0이면 자녀 미션 카드·부모 `하트`와 어긋나 보임 */
-        heart_reward: 1,
-        difficulty: 'easy',
-        repeat_type: repeatType,
-        level_required: 0,
-        linked_child_id: linkedChildId,
-      }),
-    })
-    if (!res.ok) {
-      const j = await res.json().catch(() => ({}))
-      throw new Error(typeof j.error === 'string' ? j.error : '미션 생성 실패')
-    }
-  }
+    }),
+    credit_reward: 10,
+    exp_reward: 10,
+    /** DB 기본(1)과 맞춤 — 0이면 자녀 미션 카드·부모 `하트`와 어긋나 보임 */
+    heart_reward: 1,
+    difficulty: 'easy',
+    repeat_type: repeatType,
+    level_required: 0,
+    linked_child_id: linkedChildId,
+  }))
 
   if (repeatType === 'daily' && customs.length > 0) {
     const sortedCustom = [...customs].sort(
       (a, b) => minutesFromHHMM(a.time) - minutesFromHHMM(b.time) || a.id.localeCompare(b.id),
     )
     for (const a of sortedCustom) {
-      const t = a.notify && /^\d{2}:\d{2}$/.test(a.time) ? a.time : null
-      const block = blockFromTimeHHMM(a.time)
-      const description = alarmDescription(a.soundFile)
-      const res = await fetchApi('/api/mission/create', {
+      payloads.push({
+        title: a.label.trim(),
+        description: alarmDescription(a.soundFile),
+        icon_emoji: '·',
+        block: blockFromTimeHHMM(a.time),
+        scheduled_time: a.notify && /^\d{2}:\d{2}$/.test(a.time) ? a.time : null,
+        credit_reward: 10,
+        exp_reward: 10,
+        heart_reward: 1,
+        difficulty: 'easy',
+        repeat_type: 'daily',
+        level_required: 0,
+        linked_child_id: linkedChildId,
+      })
+    }
+  }
+
+  const results = await Promise.allSettled(
+    payloads.map((body) =>
+      fetchApi('/api/mission/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: a.label.trim(),
-          description,
-          icon_emoji: '·',
-          block,
-          scheduled_time: t,
-          credit_reward: 10,
-          exp_reward: 10,
-          heart_reward: 1,
-          difficulty: 'easy',
-          repeat_type: 'daily',
-          level_required: 0,
-          linked_child_id: linkedChildId,
-        }),
-      })
-      if (!res.ok) {
-        const j = await res.json().catch(() => ({}))
-        throw new Error(typeof j.error === 'string' ? j.error : '미션 생성 실패')
-      }
-    }
+        body: JSON.stringify(body),
+      }).then(async (res) => {
+        if (!res.ok) {
+          const j = (await res.json().catch(() => ({}))) as { error?: string }
+          throw new Error(typeof j.error === 'string' ? j.error : '미션 생성 실패')
+        }
+      }),
+    ),
+  )
+  const failed = results.filter((r) => r.status === 'rejected').length
+  if (failed > 0) {
+    throw new Error(`미션 ${failed}개 생성에 실패했어요. 다시 시도해 주세요.`)
   }
 }
 
