@@ -1,68 +1,30 @@
 -- ============================================================
--- 120_missions_active_unique_guard.sql
--- 미션 템플릿 중복 방지 (daily_missions 안전 재연결 포함)
+-- 120: (철회) 미션 템플릿 DB 레벨 dedup 되돌리기
 --
--- 문제: 온보딩·루틴 재설정을 반복하면 /api/mission/create 가
---   같은 제목의 활성 템플릿을 계속 INSERT → "기상" 12개 등 대량 중복.
---   중복 템플릿마다 daily_missions 행이 생성되어 하루 미션이 부풀어남.
+-- 배경: 이 앱은 표시 시점에 중복 미션을 자동으로 합칩니다.
+--   · 부모: dedupeLinkedRoutineMissionsByCanonicalKey (RoutineTab)
+--   · 자녀: dedupeDailyRoutineMissionsByCanonicalKey (ChildScreen)
+--   키 = (정규화 제목, block, repeat_type). 따라서 DB 에 중복 템플릿이 있어도
+--   화면에는 1개로 보이도록 설계돼 있습니다.
 --
--- 주의: 단순히 중복 템플릿을 비활성화하면, 오늘 이미 배정된 daily_missions 가
---   비활성 템플릿을 참조하게 되어 자녀 화면 풀 필터에서 사라질 수 있음.
---   → 비활성화 "전에" daily_missions 를 canonical(최신) 템플릿으로 재연결한다.
+--   앞선 120 버전은 중복 템플릿을 is_active=false 로 비활성화하고 활성 유니크
+--   인덱스를 걸었는데, 이는 표시-dedup 설계와 충돌했습니다:
+--     · 그룹이 (활성1 + 비활성N) 혼합이 되며 표시-dedup 이 비활성 쪽을 대표로 골라
+--       부모 「일상 미션」이 비고 「비활성 미션」 섹션이 생김
+--     · 활성 유니크 인덱스가 같은 제목의 평일(daily)/주말(weekly) 공존을 막아
+--       키워드로 일상 미션 추가가 실패함
+--
+-- 결론: DB dedup 을 철회하고 표시-dedup 에 위임한다. (idempotent — 재실행 안전)
 -- ============================================================
 
--- 1) 오늘 이후 daily_missions 를 canonical(그룹 내 최신) 템플릿으로 재연결
-WITH grp AS (
-  SELECT id, title,
-         coalesce(block, '')                       AS blk,
-         coalesce(linked_child_id::text, 'global')  AS scope,
-         row_number() OVER (
-           PARTITION BY title, coalesce(block, ''), coalesce(linked_child_id::text, 'global')
-           ORDER BY created_at DESC
-         ) AS rn
-  FROM public.missions
-  WHERE is_active = true
-),
-canon AS (SELECT title, blk, scope, id AS canon_id FROM grp WHERE rn = 1),
-dups AS (
-  SELECT g.id AS dup_id, c.canon_id
-  FROM grp g
-  JOIN canon c ON c.title = g.title AND c.blk = g.blk AND c.scope = g.scope
-  WHERE g.rn > 1
-)
-UPDATE public.daily_missions dm
-SET mission_template_id = d.canon_id
-FROM dups d
-WHERE dm.mission_template_id = d.dup_id
-  AND dm.date >= CURRENT_DATE
-  AND NOT EXISTS (   -- 같은 자녀·날짜에 canonical 행이 이미 있으면 재연결 생략(유니크 충돌 방지)
-    SELECT 1 FROM public.daily_missions d2
-    WHERE d2.child_id = dm.child_id
-      AND d2.date = dm.date
-      AND d2.mission_template_id = d.canon_id
-  );
+-- 1) 활성 유니크 인덱스 제거 (미션 추가 실패 원인 제거)
+DROP INDEX IF EXISTS public.missions_active_title_block_scope_key;
 
--- 2) canonical 이 아닌 중복 활성 템플릿 비활성화 (완료 이력 보존 위해 삭제 대신 비활성화)
-WITH grp AS (
-  SELECT id, row_number() OVER (
-           PARTITION BY title, coalesce(block, ''), coalesce(linked_child_id::text, 'global')
-           ORDER BY created_at DESC
-         ) AS rn
-  FROM public.missions
-  WHERE is_active = true
-)
-UPDATE public.missions SET is_active = false
-WHERE id IN (SELECT id FROM grp WHERE rn > 1);
-
--- 3) 활성 템플릿 유니크 인덱스: 같은 (제목, 블록, 자녀범위)의 활성 행은 1개만 허용
-CREATE UNIQUE INDEX IF NOT EXISTS missions_active_title_block_scope_key
-  ON public.missions (title, coalesce(block, ''), coalesce(linked_child_id::text, 'global'))
-  WHERE is_active = true;
-
--- 4) 재연결 못 한(=이미 canonical 행이 있어 중복인) 비활성-참조 미완료 행 정리
-DELETE FROM public.daily_missions dm
-USING public.missions m
-WHERE dm.mission_template_id = m.id
-  AND m.is_active = false
-  AND dm.date >= CURRENT_DATE
-  AND dm.is_completed = false;
+-- 2) 앞선 dedup 이 비활성화한 루틴(일상) 템플릿 재활성화
+--    스페셜(event·special)은 제외 — 일상 루틴 템플릿만 복원.
+--    표시-dedup 이 중복을 알아서 합치므로 활성 중복이 있어도 화면엔 1개로 보임.
+UPDATE public.missions
+SET is_active = true
+WHERE is_active = false
+  AND repeat_type <> 'event'
+  AND difficulty <> 'special';
