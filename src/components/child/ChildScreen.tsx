@@ -1273,8 +1273,22 @@ export default function ChildScreen({
         },
         (payload) => {
           const row = payload.new as Record<string, unknown>
-          if (pendingStatsWritesRef.current > 0) {
+          /**
+           * 미션 완료 처리 중(pending>0) 또는 완료 직후 짧은 창 동안에는 돈 관련 필드를 무시합니다.
+           * 이유: `mission_logs` 기록이 먼저 커밋되며 `trg_mission_logs_recalc_eq` 가 child_stats 를
+           * (아직 크레딧 증가 전 = 옛 값으로) UPDATE → 이 Realtime 이벤트가 fetch 종료 뒤 늦게 도착하면
+           * 방금 올린 크레딧이 잠깐 내려갔다(딥) 올라오는 현상이 생깁니다. 로컬 값(낙관적·서버응답)이 정답.
+           */
+          const withinLocalStatsGuard =
+            pendingStatsWritesRef.current > 0 ||
+            (typeof performance !== 'undefined' &&
+              performance.now() - lastLocalStatsBumpAtRef.current < STALE_STATS_GUARD_MS)
+          if (withinLocalStatsGuard) {
             const { credits, credits_piggy, hearts, total_credits_earned, ...rest } = row
+            void credits
+            void credits_piggy
+            void hearts
+            void total_credits_earned
             setStats((prev) =>
               normalizeChildStatsCreditsSplit(mergeChildStatsPatch(prev, rest)),
             )
