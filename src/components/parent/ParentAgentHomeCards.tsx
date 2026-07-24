@@ -532,13 +532,7 @@ export default function ParentAgentHomeCards({
       <section className={`w-full ${PARENT_NEUTRAL_CARD_CLASSNAME} px-3 py-3`}>
         <div className="mb-2 flex items-center justify-between gap-2">
           <p className="text-sm font-bold text-gray-700">다가오는 일정</p>
-          <button
-            type="button"
-            onClick={onOpenCalendarEventSheet}
-            className="shrink-0 rounded-lg border border-[#4A90E2]/40 bg-[#4A90E2]/10 px-2.5 py-1 text-[10px] font-bold leading-tight text-[#2563EB] shadow-sm transition active:scale-95 hover:bg-[#4A90E2]/15"
-          >
-            ＋ 일정 등록하기
-          </button>
+          {/* 일정 등록은 아래 캘린더의 「일정 등록하기」버튼으로 통일(중복 제거) */}
         </div>
         {calendarUpcomingEvents.length === 0 ? (
           <p className="whitespace-pre-line text-center text-[12px] font-normal leading-relaxed text-gray-500">
