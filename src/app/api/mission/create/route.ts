@@ -110,6 +110,31 @@ export async function POST(req: NextRequest) {
   const service = createServiceRoleClient()
   const db = service ?? supabase
 
+  /**
+   * 중복 방지: 같은 (제목, 블록, 자녀범위)의 활성 미션이 이미 있으면
+   * 새로 만들지 않고 기존 행을 반환합니다.
+   * 온보딩·루틴 재설정을 반복 실행해도 템플릿이 쌓이지 않게 하는 멱등 처리이며,
+   * DB의 부분 유니크 인덱스(120 마이그레이션)와 같은 기준입니다.
+   */
+  const findExistingActive = async () => {
+    let q = db
+      .from('missions')
+      .select('*')
+      .eq('title', basePayload.title)
+      .eq('is_active', true)
+    q = parsedBlock === null ? q.is('block', null) : q.eq('block', parsedBlock)
+    q = parsedLinkedChildId === null
+      ? q.is('linked_child_id', null)
+      : q.eq('linked_child_id', parsedLinkedChildId)
+    const { data } = await q.order('created_at', { ascending: false }).limit(1)
+    return data?.[0] ?? null
+  }
+
+  const existingMission = await findExistingActive()
+  if (existingMission) {
+    return NextResponse.json({ mission: existingMission, reused: true }, { status: 200 })
+  }
+
   // DB 마이그레이션 단계별 호환: 없는 컬럼(42703·PGRST204 등)이면 더 짧은 payload 로 재시도
   type InsertRow = Record<string, unknown>
   const attempts: InsertRow[] = []
@@ -132,6 +157,14 @@ export async function POST(req: NextRequest) {
   let result = await db.from('missions').insert(attempts[0]).select().single()
   for (let a = 1; a < attempts.length && isMissingColumnOrSchemaCacheError(result.error); a++) {
     result = await db.from('missions').insert(attempts[a]).select().single()
+  }
+
+  /** 동시 요청이 유니크 인덱스(23505)에 걸린 경우 — 먼저 생성된 행을 그대로 반환 */
+  if (result.error?.code === '23505') {
+    const racedMission = await findExistingActive()
+    if (racedMission) {
+      return NextResponse.json({ mission: racedMission, reused: true }, { status: 200 })
+    }
   }
 
   if (result.error) {
