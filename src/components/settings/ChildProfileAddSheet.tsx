@@ -15,6 +15,7 @@ import { birthDateInputBounds, getAgeFromBirthDateIso } from '@/lib/ageFromBirth
 import { parseJsonFromResponse } from '@/lib/parseJsonResponse'
 import { ChildProfileAvatarPicker } from '@/components/common/ChildProfileAvatarPicker'
 import { CHILD_PROFILE_AVATAR_OPTIONS_ONBOARDING_ROW } from '@/lib/childProfileAvatar'
+import { useSwipeToDismiss } from '@/hooks/useSwipeToDismiss'
 
 /** 루틴 온보딩은 무겁므로 시트가 열릴 때만 클라이언트에서 불러 옵니다 */
 const RoutineOnboarding = dynamic(() => import('@/components/onboarding/RoutineOnboarding'), {
@@ -83,6 +84,8 @@ export default function ChildProfileAddSheet({ open, onClose, onRegistered }: Ch
     if (createdChildId) onRegistered?.()
     onClose()
   }, [createdChildId, onRegistered, onClose])
+
+  const swipe = useSwipeToDismiss(handleBackdropClose)
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault()
@@ -165,10 +168,11 @@ export default function ChildProfileAddSheet({ open, onClose, onRegistered }: Ch
           className={`pointer-events-auto flex max-h-[min(94dvh,100vh)] w-full max-w-none flex-col overflow-hidden rounded-t-3xl bg-white shadow-2xl transition-transform duration-300 ease-out ${
             sheetEntered ? 'translate-y-0' : 'translate-y-full'
           }`}
+          style={swipe.dragStyle}
         >
           <div className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-gray-200" aria-hidden />
 
-          <div className="shrink-0 border-b border-gray-100 px-5 pb-3 pt-2">
+          <div className="shrink-0 touch-none border-b border-gray-100 px-5 pb-3 pt-2" {...swipe.handleProps}>
             <h2 id={titleId} className="text-center text-sm font-black text-gray-900">
               {phase === 'form' ? '자녀 프로필 추가' : '초기 루틴 설정'}
             </h2>

@@ -10,6 +10,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import type { PurchaseRequest, StoreItem } from '@/types/database'
+import { useSwipeToDismiss } from '@/hooks/useSwipeToDismiss'
 import StoreItemThumbnail from '@/components/common/StoreItemThumbnail'
 import { marketFrameKeyForItemId, type MarketItemFrameKey } from '@/lib/marketItemFrame'
 import {
@@ -108,6 +109,7 @@ function RequestRow({
 export default function MarketRequestsBottomSheet({ open, onClose, requests, marketItems }: Props) {
   const [deliveredOpen, setDeliveredOpen] = useState(false)
   const [activeShowAll, setActiveShowAll] = useState(false)
+  const swipe = useSwipeToDismiss(onClose)
 
   /** 시트를 다시 열면 배송 완료 구역은 기본(접힘)으로 돌아갑니다 */
   useEffect(() => {
@@ -142,11 +144,11 @@ export default function MarketRequestsBottomSheet({ open, onClose, requests, mar
         onClick={onClose}
       />
       <div
-        className="relative z-10 max-h-[min(78vh,520px)] w-full overflow-hidden rounded-t-3xl bg-[#FFF8F0] shadow-[0_-8px_32px_rgba(0,0,0,0.18)]"
-        style={{ animation: 'mission-sheet-slide-up 0.32s ease-out forwards' }}
+        className="relative z-10 max-h-[min(78vh,520px)] w-full overflow-hidden rounded-t-3xl bg-[#FFF8F0] shadow-[0_-8px_32px_rgba(0,0,0,0.18)] transition-transform duration-300 ease-out"
+        style={{ animation: 'mission-sheet-slide-up 0.32s ease-out', ...swipe.dragStyle }}
       >
         <div className="mx-auto mt-2 h-1.5 w-10 shrink-0 rounded-full bg-gray-300/90" aria-hidden />
-        <div className="flex items-center justify-between border-b border-black/[0.06] px-5 pb-3 pt-2">
+        <div className="flex touch-none items-center justify-between border-b border-black/[0.06] px-5 pb-3 pt-2" {...swipe.handleProps}>
           <h2 className="text-base font-black text-brand-text">내 요청 현황</h2>
           <button
             type="button"

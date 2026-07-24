@@ -9,6 +9,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useState } from 'react'
 import { useAlarmSoundPreview } from '@/hooks/useAlarmSoundPreview'
+import { useSwipeToDismiss } from '@/hooks/useSwipeToDismiss'
 import { createPortal } from 'react-dom'
 import {
   readRoutineAlarmPrefs,
@@ -113,6 +114,7 @@ export default function RoutineAlarmSettingsSheet({ open, onClose }: Props) {
   const [sheetEntered, setSheetEntered] = useState(false)
   /** 알람 소리 시트에서만 쓰는 미리듣기(한 번에 하나) — 닫을 때·메인 닫힘 시 반드시 정지 */
   const { play: previewPlay, stop: stopPreview, playingId: previewPlayingId } = useAlarmSoundPreview()
+  const swipe = useSwipeToDismiss(onClose)
 
   useEffect(() => {
     if (!open) stopPreview()
@@ -411,9 +413,10 @@ export default function RoutineAlarmSettingsSheet({ open, onClose }: Props) {
               ? 'translate-y-0 md:landscape:translate-y-0 md:landscape:translate-x-0'
               : 'translate-y-full md:landscape:translate-y-0 md:landscape:translate-x-full'
           }`}
+          style={swipe.dragStyle}
         >
           <div className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-gray-200 md:landscape:hidden" aria-hidden />
-          <div className="border-b border-gray-100 px-4 pb-2 pt-3">
+          <div className="touch-none border-b border-gray-100 px-4 pb-2 pt-3" {...swipe.handleProps}>
             <p id="routine-alarm-sheet-title" className="text-center text-sm font-black text-gray-900">
               루틴 알람
             </p>

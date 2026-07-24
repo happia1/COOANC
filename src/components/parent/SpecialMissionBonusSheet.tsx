@@ -10,6 +10,7 @@
 import { useEffect, useLayoutEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { Mission } from '@/types/database'
+import { useSwipeToDismiss } from '@/hooks/useSwipeToDismiss'
 import { displaySpecialMissionTitle } from '@/lib/specialMissionChips'
 import { normalizeRewardMultiplier, type RewardMultiplier } from '@/lib/missionRewardMultiplier'
 
@@ -32,6 +33,7 @@ export default function SpecialMissionBonusSheet({ mission, onClose, onSaved, sh
   const [sheetEntered, setSheetEntered] = useState(false)
   const [pick, setPick] = useState<RewardMultiplier>(1)
   const [saving, setSaving] = useState(false)
+  const swipe = useSwipeToDismiss(onClose)
 
   useLayoutEffect(() => {
     setPortalReady(true)
@@ -85,9 +87,10 @@ export default function SpecialMissionBonusSheet({ mission, onClose, onSaved, sh
           className={`pointer-events-auto flex max-h-[min(88dvh,100vh-1rem)] w-full max-w-none flex-col rounded-t-2xl bg-white shadow-2xl transition-transform duration-300 ease-out ${
             sheetEntered ? 'translate-y-0' : 'translate-y-full'
           }`}
+          style={swipe.dragStyle}
         >
           <div className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-gray-200" aria-hidden />
-          <div className="shrink-0 border-b border-gray-100 px-4 py-3">
+          <div className="shrink-0 touch-none border-b border-gray-100 px-4 py-3" {...swipe.handleProps}>
             <h2 id="bonus-sheet-title" className="text-center text-sm font-black text-gray-900">
               보너스 보상
             </h2>

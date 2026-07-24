@@ -9,6 +9,7 @@
 import { useEffect, useLayoutEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
+import { useSwipeToDismiss } from '@/hooks/useSwipeToDismiss'
 import ParentNoticeSlides from '@/components/parent/ParentNoticeSlides'
 
 type RapidTapAlert = {
@@ -44,6 +45,7 @@ export default function ParentBellBoardSheet({
 }: Props) {
   const [portalReady, setPortalReady] = useState(false)
   const [sheetEntered, setSheetEntered] = useState(false)
+  const swipe = useSwipeToDismiss(onClose)
 
   useLayoutEffect(() => {
     setPortalReady(true)
@@ -77,10 +79,11 @@ export default function ParentBellBoardSheet({
               ? 'translate-y-0 md:landscape:translate-y-0 md:landscape:translate-x-0'
               : 'translate-y-full md:landscape:translate-y-0 md:landscape:translate-x-full'
           }`}
+          style={swipe.dragStyle}
         >
           {/* 가로 모드에서는 Mac/태블릿에서 흔한 하단 시트 손잡이 막대는 숨깁니다 */}
           <div className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-gray-200 md:landscape:hidden" aria-hidden />
-          <div className="border-b border-gray-100 px-4 pb-2 pt-3">
+          <div className="touch-none border-b border-gray-100 px-4 pb-2 pt-3" {...swipe.handleProps}>
             <p id="parent-bell-board-title" className="text-center text-sm font-black text-gray-900">
               알림 · 공지
             </p>

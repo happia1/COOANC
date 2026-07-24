@@ -9,6 +9,7 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import type { StoreItem } from '@/types/database'
+import { useSwipeToDismiss } from '@/hooks/useSwipeToDismiss'
 import SpriteImage from '@/components/common/SpriteImage'
 import StoreItemThumbnail from '@/components/common/StoreItemThumbnail'
 import { ICONS } from '@/constants/sprites'
@@ -54,6 +55,7 @@ export default function MarketWishlistBottomSheet({
   onRemoveItem,
   onChangeQty,
 }: Props) {
+  const swipe = useSwipeToDismiss(onClose)
   if (!open) return null
   /** 지갑 - 장바구니 합계: +면 충분, -면 부족 */
   const balanceDiff = currentCredits - wishlistTotalCredits
@@ -64,14 +66,14 @@ export default function MarketWishlistBottomSheet({
       {/* 반투명 배경 탭 시 시트를 닫습니다 */}
       <button type="button" className="absolute inset-0 bg-black/40" aria-label="닫기" onClick={onClose} />
       <div
-        className="relative z-10 mb-[calc(60px+env(safe-area-inset-bottom,0px)+10px)] max-h-[min(80vh,560px)] w-full overflow-hidden rounded-t-3xl bg-[#FFF8F0] shadow-[0_-8px_32px_rgba(0,0,0,0.18)]"
-        style={{ animation: 'mission-sheet-slide-up 0.32s ease-out forwards' }}
+        className="relative z-10 mb-[calc(60px+env(safe-area-inset-bottom,0px)+10px)] max-h-[min(80vh,560px)] w-full overflow-hidden rounded-t-3xl bg-[#FFF8F0] shadow-[0_-8px_32px_rgba(0,0,0,0.18)] transition-transform duration-300 ease-out"
+        style={{ animation: 'mission-sheet-slide-up 0.32s ease-out', ...swipe.dragStyle }}
         role="dialog"
         aria-modal="true"
         aria-labelledby="market-wishlist-sheet-title"
       >
         <div className="mx-auto mt-2 h-1.5 w-10 shrink-0 rounded-full bg-gray-300/90" aria-hidden />
-        <div className="flex items-center justify-between border-b border-black/[0.06] px-5 pb-3 pt-2">
+        <div className="flex touch-none items-center justify-between border-b border-black/[0.06] px-5 pb-3 pt-2" {...swipe.handleProps}>
           <h2 id="market-wishlist-sheet-title" className="text-base font-black text-brand-text">
             장바구니
           </h2>

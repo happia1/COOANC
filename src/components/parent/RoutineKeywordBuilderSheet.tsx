@@ -8,6 +8,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useSwipeToDismiss } from '@/hooks/useSwipeToDismiss'
 import type { Mission } from '@/types/database'
 import {
   AM_CHIPS,
@@ -63,6 +64,8 @@ export default function RoutineKeywordBuilderSheet({
   suppressCloseAfterSuccess = false,
 }: Props) {
   const router = useRouter()
+  /** 하단 시트(비임베드)에서만 스와이프로 닫기 — 임베드(패널) 모드는 그대로 둡니다 */
+  const swipe = useSwipeToDismiss(onClose)
   const [weekdayAm, setWeekdayAm] = useState<string[]>([])
   const [weekdayPm, setWeekdayPm] = useState<string[]>([])
   const [holidayAm, setHolidayAm] = useState<string[]>([])
@@ -211,6 +214,7 @@ export default function RoutineKeywordBuilderSheet({
       className={`relative flex min-h-0 flex-col overflow-hidden bg-white shadow-2xl ${
         embedded ? 'h-full max-h-full rounded-xl border border-gray-100' : 'max-h-[88vh] w-full rounded-t-2xl'
       }`}
+      style={embedded ? undefined : swipe.dragStyle}
     >
       {/* 하단 시트일 때만 손잡이 — 패널 임베드는 상단 여백만 최소로 둡니다 */}
       {embedded && embeddedPanelWizard ? (
@@ -219,7 +223,10 @@ export default function RoutineKeywordBuilderSheet({
         <div className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-gray-200" aria-hidden />
       )}
       {!(embedded && embeddedPanelWizard) ? (
-        <div className="border-b border-gray-100 px-4 pb-2.5 pt-3">
+        <div
+          className={`border-b border-gray-100 px-4 pb-2.5 pt-3 ${embedded ? '' : 'touch-none'}`}
+          {...(embedded ? {} : swipe.handleProps)}
+        >
           <p id="kw-sheet-title" className="text-center text-sm font-black text-gray-900">
             미션 수정하기
           </p>

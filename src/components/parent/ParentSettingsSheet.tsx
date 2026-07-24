@@ -9,6 +9,7 @@
 import { useEffect, useLayoutEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import ParentSettingsPanelContent from '@/components/parent/ParentSettingsPanelContent'
+import { useSwipeToDismiss } from '@/hooks/useSwipeToDismiss'
 
 type Props = {
   open: boolean
@@ -18,6 +19,7 @@ type Props = {
 export default function ParentSettingsSheet({ open, onClose }: Props) {
   const [portalReady, setPortalReady] = useState(false)
   const [sheetEntered, setSheetEntered] = useState(false)
+  const swipe = useSwipeToDismiss(onClose)
 
   useLayoutEffect(() => {
     setPortalReady(true)
@@ -51,10 +53,11 @@ export default function ParentSettingsSheet({ open, onClose }: Props) {
               ? 'translate-y-0 md:translate-y-0 md:translate-x-0'
               : 'translate-y-full md:translate-y-0 md:translate-x-full'
           }`}
+          style={swipe.dragStyle}
         >
           {/** 모바일만 손잡이 막대 — 태블릿·PC 우측 패널에서는 숨김 */}
           <div className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-gray-300/80 md:hidden" aria-hidden />
-          <div className="shrink-0 border-b border-gray-200/80 px-4 pb-2 pt-3 md:pt-4">
+          <div className="shrink-0 touch-none border-b border-gray-200/80 px-4 pb-2 pt-3 md:pt-4" {...swipe.handleProps}>
             <p id="parent-settings-sheet-title" className="text-center text-sm font-black text-gray-900">
               설정
             </p>
