@@ -159,6 +159,13 @@ function rollbackOptimisticMissionMoneyRewards(
   } as ChildStats)
 }
 
+/**
+ * 미션 완료로 상단 숫자(크레딧·하트)를 올린 뒤 이 시간(ms) 동안은,
+ * 아직 커밋 전 값을 담은 느린 `/home` 재조회(서버 프롭)가 stats 를 덮어써서
+ * 크레딧이 되돌아가 보이는 롤백을 막습니다.
+ */
+const STALE_STATS_GUARD_MS = 6000
+
 /** 화분 단계 상승(물주기로 stage+1) 시 재생할 효과음 */
 const PLANT_STAGE_UP_SOUND_SRC =
   '/assets/audio/missions/get_badge-christmas-reveal-tones-2988.wav' as const
@@ -221,18 +228,19 @@ const HAMSTER_CHARACTER_UI_SCALE_MAX = 1.1
 /** 햄스터 캐릭터 하한 — 요청 반영: 최소 2/3배 */
 const HAMSTER_CHARACTER_UI_SCALE_MIN = 2 / 3
 
-/** 화분·물조리개(발 옆) — 모바일에서 최대 1.5배까지 확대 */
-const PLANT_FEET_UI_SCALE_MAX = 1.5
+/** 화분·물조리개(발 옆) 크기 배율 상한 — 400px→820px 구간에서 1.0→이 값으로 커집니다(≤400px 는 1.0 고정, 모바일 크기 불변). iPad Air(820) 이상에서 저금통/화분을 키우려 상향. */
+const PLANT_FEET_UI_SCALE_MAX = 1.7
 
 /**
  * 발 옆 화분·물조리개의 **표시 크기**와 **토끼와의 가로 간격(px)** 을 맞출 때 쓰는 기준 가로(px).
  * 비개발자: 가로 885일 때 화분·물조리개 크기(배율)와, 토끼 발치 기준 가로 간격을 그대로 유지합니다.
  */
 const PLANT_FEET_LAYOUT_REFERENCE_W = 885
-/** 데스크톱/태블릿에서 화분·물조리개를 토끼 기준으로 벌리는 배율(1=기존, 1.35=35% 더 멀게) */
-const PLANT_FEET_GAP_SPREAD_MULTIPLIER = 1.35
+/** 데스크톱/태블릿(≥640px, iPad Air 820 포함)에서 화분·물조리개를 토끼 기준으로 벌리는 배율(1=기존). iPad Air 에서 토끼와 저금통/화분 간격을 넓히려 상향. */
+const PLANT_FEET_GAP_SPREAD_MULTIPLIER = 1.45
 /** 아주 좁은 화면(<640px)에서 발 옆 간격 배율 — 낮출수록 토끼 양옆으로 더 붙습니다. 640px 이상은 데스크톱 배율을 씁니다(예: 760px 창에서 저금통·화분이 넓게). */
-const PLANT_FEET_GAP_SPREAD_MULTIPLIER_MOBILE = 1.07
+/** SE(375)·S8+(360) 등 좁은 폰: 저금통·화분을 토끼 쪽으로 더 붙여 화면 가장자리(장바구니 아이콘 등) 겹침을 줄입니다. (1.0=기준앵커, 낮출수록 토끼에 더 붙음) */
+const PLANT_FEET_GAP_SPREAD_MULTIPLIER_MOBILE = 0.6
 /** 초소형 모바일(<=300px)에서 화분·물조리개 간격 배율 */
 const PLANT_FEET_GAP_SPREAD_MULTIPLIER_TINY_MOBILE = 1.02
 
@@ -269,6 +277,15 @@ function plantFeetAnchorsKeepRugGapPx(
     (rugCenterX - plantPotBesideLeftFootX) * referenceWidthPx * spreadMultiplier
   const gapCanCenterPx =
     (wateringCanBesideRightFootX - rugCenterX) * referenceWidthPx * spreadMultiplier
+  /**
+   * 좁은 화면(<640px, SE·S8+·XR 등 폰)에서는 배율 계산을 쓰지 않고 **고정 위치**로 배치합니다.
+   * - 기기·측정폭이 달라도 항상 동일하게 배치되어 겹침(오른쪽 장바구니 아이콘)·과밀을 막습니다.
+   * - 저금통 왼쪽 24%, 화분 오른쪽 76% (토끼 중심 50% 양옆). 더 벌리려면 22/78, 더 붙이려면 28/72.
+   *   (화분 76%↑ 는 오른쪽 장바구니 아이콘과 겹칠 수 있으니 주의)
+   */
+  if (containerWidthPx < 640) {
+    return { plantPct: 24, canPct: 76 }
+  }
   /** 중심에서 위 거리만큼 떨어진 픽셀 위치 → 현재 너비로 나눈 비율(0~1) */
   let plant = rugCenterX - gapPlantCenterPx / containerWidthPx
   let can = rugCenterX + gapCanCenterPx / containerWidthPx
@@ -788,7 +805,23 @@ export default function ChildScreen({
   }, [plantHint])
 
   useEffect(() => {
-    setStats(initialStats ? normalizeChildStatsCreditsSplit(initialStats) : null)
+    const next = initialStats ? normalizeChildStatsCreditsSplit(initialStats) : null
+    setStats((prev) => {
+      if (!next) return null
+      if (!prev) return next
+      /**
+       * 미션 완료 직후 느린 `/home` 재조회가 아직 커밋 전 옛 값을 내려주면 방금 올린 크레딧이
+       * 되돌아가 보입니다(롤백). 쓰기 진행 중이거나 최근 갱신 직후에는 서버 프롭으로 덮어쓰지 않습니다.
+       */
+      if (pendingStatsWritesRef.current > 0) return prev
+      if (
+        typeof performance !== 'undefined' &&
+        performance.now() - lastLocalStatsBumpAtRef.current < STALE_STATS_GUARD_MS
+      ) {
+        return prev
+      }
+      return next
+    })
   }, [initialStats])
 
   /** 총 크레딧 (지갑+저금통+돈바구니 합산) */
@@ -930,6 +963,8 @@ export default function ChildScreen({
    * 덮어쓰지 않도록 막아, 낙관적 업데이트와 서버 이벤트가 경합해 숫자가 출렁이는 것을 막습니다.
    */
   const pendingStatsWritesRef = useRef(0)
+  /** 미션 완료로 stats 를 올린 마지막 시각(performance.now, 단조 시계). 직후엔 스테일 서버 프롭으로 덮어쓰지 않음. */
+  const lastLocalStatsBumpAtRef = useRef(0)
 
   /**
    * 뽀모도로·알람 팝업(ChildAlarmClockPopup) 열림 여부
@@ -1238,8 +1273,22 @@ export default function ChildScreen({
         },
         (payload) => {
           const row = payload.new as Record<string, unknown>
-          if (pendingStatsWritesRef.current > 0) {
+          /**
+           * 미션 완료 처리 중(pending>0) 또는 완료 직후 짧은 창 동안에는 돈 관련 필드를 무시합니다.
+           * 이유: `mission_logs` 기록이 먼저 커밋되며 `trg_mission_logs_recalc_eq` 가 child_stats 를
+           * (아직 크레딧 증가 전 = 옛 값으로) UPDATE → 이 Realtime 이벤트가 fetch 종료 뒤 늦게 도착하면
+           * 방금 올린 크레딧이 잠깐 내려갔다(딥) 올라오는 현상이 생깁니다. 로컬 값(낙관적·서버응답)이 정답.
+           */
+          const withinLocalStatsGuard =
+            pendingStatsWritesRef.current > 0 ||
+            (typeof performance !== 'undefined' &&
+              performance.now() - lastLocalStatsBumpAtRef.current < STALE_STATS_GUARD_MS)
+          if (withinLocalStatsGuard) {
             const { credits, credits_piggy, hearts, total_credits_earned, ...rest } = row
+            void credits
+            void credits_piggy
+            void hearts
+            void total_credits_earned
             setStats((prev) =>
               normalizeChildStatsCreditsSplit(mergeChildStatsPatch(prev, rest)),
             )
@@ -1421,6 +1470,7 @@ export default function ChildScreen({
        * 비개발자: "보상 숫자는 탭하자마자 올라가고, 저장이 안 되면 다시 내려가요."
        */
       setStats((prev) => (prev ? applyOptimisticMissionMoneyRewards(prev, creditReward, heartReward) : prev))
+      if (typeof performance !== 'undefined') lastLocalStatsBumpAtRef.current = performance.now()
       /** 화분 훅 숫자도 같이 올려 `heartsForHomeUi` 가 plantHearts 만 볼 때 생기던 지연을 없앱니다 */
       bumpHeartsForMissionOptimistic(heartReward)
       /**
@@ -1547,6 +1597,7 @@ export default function ChildScreen({
           }
           if (res.ok) {
             setStats((prev) => tryApplyCompletePayload(prev, json) ?? prev)
+            if (typeof performance !== 'undefined') lastLocalStatsBumpAtRef.current = performance.now()
             if (
               json &&
               typeof json === 'object' &&
