@@ -22,7 +22,6 @@ import { usePathname, useSearchParams } from 'next/navigation'
 import { CompactChildProfileCard } from '@/components/parent/CompactChildProfileCard'
 import { useParentStore } from '@/store/parentStore'
 import { useChildSiblingAvatarNav, type ChildTab } from '@/components/parent/ChildProfileNav'
-import CalendarSection from '@/components/parent/CalendarSection'
 import RoutineKeywordBuilderSheet from '@/components/parent/RoutineKeywordBuilderSheet'
 import SpecialMissionAddSheet from '@/components/parent/SpecialMissionAddSheet'
 import SpecialMissionBonusSheet from '@/components/parent/SpecialMissionBonusSheet'
@@ -578,18 +577,18 @@ export default function RoutineTab({
   /** 카드 클릭 시 열리는 보상(크레딧·애정 하트·EXP) 편집 팝업 대상 미션 */
   const [rewardEditMission, setRewardEditMission] = useState<Mission | null>(null)
 
-  /** 오전/오후 접기 — 기본 접힘 */
-  const [openWeekdayAm, setOpenWeekdayAm] = useState(false)
-  const [openWeekdayPm, setOpenWeekdayPm] = useState(false)
-  const [openWeekendAm, setOpenWeekendAm] = useState(false)
-  const [openWeekendPm, setOpenWeekendPm] = useState(false)
-  const [openWeekdayInactiveAm, setOpenWeekdayInactiveAm] = useState(false)
-  const [openWeekdayInactivePm, setOpenWeekdayInactivePm] = useState(false)
-  const [openWeekendInactiveAm, setOpenWeekendInactiveAm] = useState(false)
-  const [openWeekendInactivePm, setOpenWeekendInactivePm] = useState(false)
-  /** 스페셜: 매일 포함 / 오늘만 넣기 — 일상 오전·오후와 같이 기본 접힘 */
-  const [openSpecialDaily, setOpenSpecialDaily] = useState(false)
-  const [openSpecialEvent, setOpenSpecialEvent] = useState(false)
+  /** 오전/오후 접기 — 캘린더가 홈으로 이동해 공간이 생겨 기본 펼침(원하면 토글로 닫기) */
+  const [openWeekdayAm, setOpenWeekdayAm] = useState(true)
+  const [openWeekdayPm, setOpenWeekdayPm] = useState(true)
+  const [openWeekendAm, setOpenWeekendAm] = useState(true)
+  const [openWeekendPm, setOpenWeekendPm] = useState(true)
+  const [openWeekdayInactiveAm, setOpenWeekdayInactiveAm] = useState(true)
+  const [openWeekdayInactivePm, setOpenWeekdayInactivePm] = useState(true)
+  const [openWeekendInactiveAm, setOpenWeekendInactiveAm] = useState(true)
+  const [openWeekendInactivePm, setOpenWeekendInactivePm] = useState(true)
+  /** 스페셜: 매일 포함 / 오늘만 넣기 — 일상과 같이 기본 펼침 */
+  const [openSpecialDaily, setOpenSpecialDaily] = useState(true)
+  const [openSpecialEvent, setOpenSpecialEvent] = useState(true)
 
   useEffect(() => {
     if (children.length === 0) {
@@ -603,8 +602,6 @@ export default function RoutineTab({
   }, [children, selectedChildId, setSelectedChildId])
 
   const currentId = selectedChildId ?? children[0]?.id ?? null
-  /** 홈 일정 브리핑에서 넘어온 `calendarDate(YYYY-MM-DD)`를 캘린더 섹션으로 전달합니다. */
-  const calendarDateFromQuery = searchParams.get('calendarDate')
   const currentChild = children.find((c) => c.id === currentId) ?? children[0]
   const childLevel = currentChild?.level ?? 0
   const familyLinkId = currentId ? familyLinkByChild[currentId] ?? null : null
@@ -815,8 +812,8 @@ export default function RoutineTab({
       />
 
       {/* ── 2컬럼 그리드 ────────────────────────────────────────────────────────
-          모바일(grid-cols-1): 미션 → 캘린더 순(DOM 순서 = 화면 순서)
-          md+(grid-cols-2): 좌=미션, 우=CalendarSection(sticky)
+          모바일(grid-cols-1): 일상 미션 → 스페셜 미션 순(DOM 순서 = 화면 순서)
+          md+(grid-cols-2): 좌=일상 미션, 우=스페셜 미션(sticky) — 캘린더는 홈 탭으로 이동
       ──────────────────────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2 md:gap-6 md:items-start">
 
@@ -853,11 +850,14 @@ export default function RoutineTab({
                 aria-label="키워드로 일상 미션 추가·편집"
                 disabled={!currentId}
                 onClick={() => setKeywordSheetOpen(true)}
-                className="shrink-0 rounded-md p-0.5 text-gray-500 transition-opacity hover:text-gray-600 active:opacity-60 disabled:opacity-30"
+                className="shrink-0 rounded-lg bg-[#4A90E2] px-3 py-1.5 text-[11px] font-bold text-white shadow-sm transition active:scale-95 disabled:opacity-30"
               >
-                <PencilIcon className="h-3.5 w-3.5" />
+                ✏️ 미션 수정하기
               </button>
             </div>
+            <p className={`mb-1.5 px-0.5 ${ROUTINE_DESC_TEXT_CLASS}`}>
+              카드를 길게 눌러 끌면 순서를 바꿀 수 있어요
+            </p>
 
             {activeRoutine.length === 0 ? (
               <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50/80 px-4 py-6 text-center">
@@ -970,8 +970,12 @@ export default function RoutineTab({
             </section>
           )}
 
+        </div>{/* /좌 컬럼: 일상 미션 */}
+
+        {/* 우 컬럼(md) / 하단(모바일): 스페셜 미션 — 태블릿에서 좌 일상 / 우 스페셜 2열 */}
+        <div className="md:sticky md:top-4">
           {/* 스페셜: 매일 반복하지 않는 미션 */}
-          <section id="parent-routine-special-missions" className="mt-2">
+          <section id="parent-routine-special-missions" className="mt-2 md:mt-0">
             <div className="mb-1.5 flex items-center justify-between gap-2">
               <h2 className="text-sm font-bold text-gray-800">스페셜 미션</h2>
               <button
@@ -979,11 +983,14 @@ export default function RoutineTab({
                 aria-label="스페셜 미션 추가·편집"
                 disabled={!currentId}
                 onClick={() => setSpecialSheetOpen(true)}
-                className="shrink-0 rounded-md p-0.5 text-gray-500 transition-opacity hover:text-gray-600 active:opacity-60 disabled:opacity-30"
+                className="shrink-0 rounded-lg bg-[#4A90E2] px-3 py-1.5 text-[11px] font-bold text-white shadow-sm transition active:scale-95 disabled:opacity-30"
               >
-                <PencilIcon className="h-3.5 w-3.5" />
+                ✏️ 미션 수정하기
               </button>
             </div>
+            <p className={`mb-1.5 px-0.5 ${ROUTINE_DESC_TEXT_CLASS}`}>
+              카드를 길게 눌러 끌면 순서를 바꿀 수 있어요
+            </p>
             {activeSpecial.length === 0 && inactiveSpecial.length === 0 ? (
               <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50/80 px-4 py-6 text-center">
                 <button
@@ -1029,13 +1036,7 @@ export default function RoutineTab({
               />
             )}
           </section>
-
-        </div>{/* /좌 컬럼 */}
-
-        {/* 우 컬럼(md) / 하단(모바일): CalendarSection — sticky on md */}
-        <div className="md:sticky md:top-4">
-          <CalendarSection childId={currentId ?? null} focusDate={calendarDateFromQuery} />
-        </div>
+        </div>{/* /우 컬럼: 스페셜 미션 */}
 
       </div>{/* /2컬럼 그리드 */}
 
@@ -1086,19 +1087,6 @@ export default function RoutineTab({
         onSave={handleSaveMissionRewards}
       />
     </div>
-  )
-}
-
-/** 섹션 헤더 — 키워드·스페셜 시트 열기용 연필 아이콘 */
-function PencilIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-      <path
-        d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
   )
 }
 

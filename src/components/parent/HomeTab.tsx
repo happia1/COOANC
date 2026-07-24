@@ -12,7 +12,8 @@
  * - 「일정 브리핑」: 서울 기준 오늘부터 6일 후까지(7일) 구간에 들어오는 `calendar_events` + `public_holidays`(노동절·어린이날 등) + 기기 localStorage 일정을 합칩니다.
  */
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import {
@@ -25,10 +26,10 @@ import { COOANC_CALENDAR_EVENTS_STORAGE_KEY } from '@/lib/localStorageChildScope
 import { COOANC_CALENDAR_STORAGE_UPDATE_EVENT } from '@/lib/syncAgentEventToLocalCalendar'
 import { useParentStore } from '@/store/parentStore'
 import { useChildSiblingAvatarNav, type ChildTab } from '@/components/parent/ChildProfileNav'
-import EconomicEqPanel from '@/components/parent/EconomicEqPanel'
+import { ParentHomeProgressBlock } from '@/components/parent/EconomicEqPanel'
 import { PARENT_NEUTRAL_CARD_CLASSNAME } from '@/lib/parentNeutralBlockStyle'
 import ParentAgentHomeCards from '@/components/parent/ParentAgentHomeCards'
-import { CalendarEventSheet } from '@/components/parent/CalendarSection'
+import CalendarSection, { CalendarEventSheet } from '@/components/parent/CalendarSection'
 import { CompactChildProfileCard } from '@/components/parent/CompactChildProfileCard'
 import { useParentAgentReport } from '@/hooks/useParentAgentReport'
 import { buildPlaceholderCoachingGuide, buildPlaceholderEqDataFeedback } from '@/lib/childEqAiPlaceholders'
@@ -109,29 +110,6 @@ export type ChildSummary = {
   weeklyRoutine: WeeklyRoutineDay[]
 }
 
-/**
- * AI 리포트·경제 EQ 지수 — 베타 홈에서 비활성(정식 론칭 때 해제)
- */
-function ParentHomeAiEqComingSoon({ children }: { children: ReactNode }) {
-  return (
-    <div className="relative min-h-[10rem]" aria-disabled="true">
-      <div className="space-y-4 opacity-45 grayscale pointer-events-none select-none">
-        {children}
-      </div>
-      <div className="absolute inset-0 z-10 flex items-center justify-center rounded-2xl bg-gray-900/25 px-4 py-10">
-        <div className="max-w-xs rounded-2xl bg-white px-5 py-4 text-center shadow-lg ring-1 ring-gray-200/90">
-          <p className="text-sm font-black text-gray-800">🔒 준비 중</p>
-          <p className="mt-2 text-xs font-semibold leading-relaxed text-gray-600">
-            AI 리포트와 우리아이 경제 EQ 지수는
-            <br />
-            정식 론칭 버전에서 소개할 예정이에요
-          </p>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 type Props = {
   childrenData: ChildSummary[]
   upcomingEvents: {
@@ -156,6 +134,9 @@ export default function HomeTab({
   familyLinkByChild = {},
 }: Props) {
   const { selectedChildId, setSelectedChildId } = useParentStore()
+  const searchParams = useSearchParams()
+  /** 일정 브리핑 딥링크(`?calendarDate=YYYY-MM-DD`) — 캘린더가 홈으로 이동해 여기서 받습니다 */
+  const calendarDateFromQuery = searchParams.get('calendarDate')
   /**
    * `useRef(createClient())`는 **매 렌더마다** `createClient()`가 실행됩니다(JS는 인자를 먼저 계산).
    * Supabase 브라우저 클라이언트가 그때마다 초기화되면 경고·청크 로드 지연을 유발할 수 있어,
@@ -549,26 +530,13 @@ export default function HomeTab({
                 }}
               />
 
-              <div className={`${PARENT_NEUTRAL_CARD_CLASSNAME} space-y-2 px-3 py-3`}>
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-sm font-bold text-gray-700">오늘의 진행도</p>
-                  <span className="text-sm font-black tabular-nums text-[#4A90E2]">
-                    {missionRate}%
-                    <span className="ml-1 text-[10px] font-normal text-gray-400">
-                      ({child.todayCompleted}/{child.totalMissions})
-                    </span>
-                  </span>
-                </div>
-                <div className="h-2 overflow-hidden rounded-full bg-gray-100">
-                  <div
-                    className="h-full rounded-full bg-gradient-to-r from-[#93C5FD] to-[#2563EB] transition-all"
-                    style={{ width: `${missionRate}%` }}
-                  />
-                </div>
-                {missionRate === 100 && child.totalMissions > 0 && (
-                  <p className="text-right text-[10px] font-bold text-[#2563EB]">오늘 미션 모두 완료!</p>
-                )}
-              </div>
+              {/* 한 블록 3단: 오늘의 진행도(도넛) · 주간 루틴 완료율 · 루틴 완주율 */}
+              <ParentHomeProgressBlock
+                missionRate={missionRate}
+                todayCompleted={child.todayCompleted}
+                totalMissions={child.totalMissions}
+                weeklyRoutine={weeklyRoutine}
+              />
 
               <ParentAgentHomeCards
                 agent={effectiveAgentReport}
@@ -585,56 +553,12 @@ export default function HomeTab({
                 showCalendarBriefing
                 showAiReport={false}
               />
-
-              <EconomicEqPanel
-                stats={{
-                  eq_routine_rate: s?.eq_routine_rate ?? 0,
-                  eq_delay_score: s?.eq_delay_score ?? 0,
-                  eq_save_ratio: s?.eq_save_ratio ?? 0,
-                  streak_days: s?.streak_days ?? 0,
-                  credits: s?.credits ?? 0,
-                  credits_wallet: s?.credits_wallet ?? 0,
-                  credits_piggy: s?.credits_piggy ?? 0,
-                  current_level: s?.current_level ?? 0,
-                }}
-                weeklyRoutine={weeklyRoutine}
-                childName={child.name}
-                agentChildId={child.id}
-                agentRow={effectiveAgentReport.row}
-                agentLoading={effectiveAgentReport.loading}
-                showWeeklyRoutine
-                showEqSummary={false}
-              />
             </div>
 
-            {/* 우측(비활성): AI 리포트 · 우리아이 경제 EQ 지수 */}
-            <ParentHomeAiEqComingSoon>
-              <ParentAgentHomeCards
-                agent={effectiveAgentReport}
-                daysWithData={selectedDaysWithData}
-                showCalendarBriefing={false}
-                showAiReport
-              />
-              <EconomicEqPanel
-                stats={{
-                  eq_routine_rate: s?.eq_routine_rate ?? 0,
-                  eq_delay_score: s?.eq_delay_score ?? 0,
-                  eq_save_ratio: s?.eq_save_ratio ?? 0,
-                  streak_days: s?.streak_days ?? 0,
-                  credits: s?.credits ?? 0,
-                  credits_wallet: s?.credits_wallet ?? 0,
-                  credits_piggy: s?.credits_piggy ?? 0,
-                  current_level: s?.current_level ?? 0,
-                }}
-                weeklyRoutine={weeklyRoutine}
-                childName={child.name}
-                agentChildId={child.id}
-                agentRow={effectiveAgentReport.row}
-                agentLoading={effectiveAgentReport.loading}
-                showWeeklyRoutine={false}
-                showEqSummary
-              />
-            </ParentHomeAiEqComingSoon>
+            {/* 우측: 캘린더 (루틴 탭에서 이동, md 에서 sticky) */}
+            <div className="md:sticky md:top-4 md:self-start">
+              <CalendarSection childId={currentId ?? null} focusDate={calendarDateFromQuery} />
+            </div>
           </div>
         </>
       )}

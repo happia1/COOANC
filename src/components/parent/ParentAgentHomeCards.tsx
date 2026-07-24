@@ -547,7 +547,7 @@ export default function ParentAgentHomeCards({
             {calendarUpcomingEvents.map((event) => (
               <Link
                 key={event.id}
-                href={`/parent/routine?calendarDate=${encodeURIComponent(event.date)}`}
+                href={`/parent/home?calendarDate=${encodeURIComponent(event.date)}`}
                 className="mb-2 flex items-center gap-2 rounded-lg px-1 py-1 transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4A90E2] last:mb-0"
                 aria-label={`${event.dateLabel} ${event.title} 일정 보러가기`}
               >
