@@ -182,6 +182,8 @@ export default function CalendarSection({ childId, focusDate = null }: Props) {
   const [emptyDayKey, setEmptyDayKey] = useState<string | null>(null)
   /** 이번 달 일정 — 기본 펼침(접기 가능) */
   const [monthScheduleOpen, setMonthScheduleOpen] = useState(true)
+  /** 캘린더 뷰 — 홈 기본은 주간(주 단위), 토글로 월간 전환 */
+  const [viewMode, setViewMode] = useState<'week' | 'month'>('week')
   /**
    * 상단 범례(유형 칩): null 이면 전체, 값이면 **격자·이번 달 일정 목록**만 해당 유형으로 쌓기.
    * 날짜 **상세 시트**는 `events`에서 그날 전체를 따로 뽑아 범례를 적용하지 않음.
@@ -404,8 +406,24 @@ export default function CalendarSection({ childId, focusDate = null }: Props) {
 
   const firstDay = new Date(year, month, 1).getDay()
   const daysCount = new Date(year, month + 1, 0).getDate()
-  const cells: (number | null)[] = [...Array(firstDay).fill(null), ...Array.from({ length: daysCount }, (_, i) => i + 1)]
-  while (cells.length % 7 !== 0) cells.push(null)
+  const monthCells: (number | null)[] = [...Array(firstDay).fill(null), ...Array.from({ length: daysCount }, (_, i) => i + 1)]
+  while (monthCells.length % 7 !== 0) monthCells.push(null)
+
+  /**
+   * 주간/월간 뷰 — 홈 캘린더는 기본 주간. 주간은 「오늘」이 든 주(없으면 첫 주)만 한 줄로 보여 줍니다.
+   * 이벤트 맵은 현재 월 기준이라, 주가 달을 걸치는 가장자리 날은 이번 달 칸만 일정을 표시합니다.
+   */
+  const todayDayInMonth =
+    todayStr.slice(0, 7) === `${year}-${String(month + 1).padStart(2, '0')}`
+      ? Number(todayStr.slice(8, 10))
+      : null
+  const weekRowStart = (() => {
+    if (todayDayInMonth == null) return 0
+    const idx = monthCells.findIndex((d) => d === todayDayInMonth)
+    return idx < 0 ? 0 : Math.floor(idx / 7) * 7
+  })()
+  const cells: (number | null)[] =
+    viewMode === 'week' ? monthCells.slice(weekRowStart, weekRowStart + 7) : monthCells
 
   /**
    * 날짜 상세에 쓰는 "사용자+서버" 일정(법정 공휴일 합성 행은 제외).
@@ -547,6 +565,28 @@ export default function CalendarSection({ childId, focusDate = null }: Props) {
             </button>
           )
         })}
+      </div>
+
+      {/* 주간/월간 뷰 토글 */}
+      <div className="mb-2 flex justify-end">
+        <div className="inline-flex overflow-hidden rounded-lg border border-gray-200 text-[11px] font-bold">
+          <button
+            type="button"
+            onClick={() => setViewMode('week')}
+            aria-pressed={viewMode === 'week'}
+            className={`px-3 py-1 transition-colors ${viewMode === 'week' ? 'bg-[#4A90E2] text-white' : 'bg-white text-gray-500'}`}
+          >
+            주간
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode('month')}
+            aria-pressed={viewMode === 'month'}
+            className={`px-3 py-1 transition-colors ${viewMode === 'month' ? 'bg-[#4A90E2] text-white' : 'bg-white text-gray-500'}`}
+          >
+            월간
+          </button>
+        </div>
       </div>
 
       <div className="mb-3 flex items-center justify-between">
