@@ -24,6 +24,7 @@ import {
 import { buildWeeklyRoutineDays, type WeeklyRoutineDay } from '@/lib/childWeeklyRoutine'
 import { COOANC_CALENDAR_EVENTS_STORAGE_KEY } from '@/lib/localStorageChildScope'
 import { COOANC_CALENDAR_STORAGE_UPDATE_EVENT } from '@/lib/syncAgentEventToLocalCalendar'
+import { createParentCalendarEvent } from '@/lib/mergeParentCalendarEvents'
 import { useParentStore } from '@/store/parentStore'
 import { useChildSiblingAvatarNav, type ChildTab } from '@/components/parent/ChildProfileNav'
 import { ParentHomeProgressBlock } from '@/components/parent/EconomicEqPanel'
@@ -601,14 +602,29 @@ export default function HomeTab({
           initialEndDate={getSeoulDateString()}
           childId={child.id}
           onSave={(ev) => {
-            try {
-              const raw = localStorage.getItem(COOANC_CALENDAR_EVENTS_STORAGE_KEY)
-              const prev = raw ? (JSON.parse(raw) as unknown[]) : []
-              const safePrev = Array.isArray(prev) ? prev : []
-              localStorage.setItem(COOANC_CALENDAR_EVENTS_STORAGE_KEY, JSON.stringify([...safePrev, ev]))
-            } catch {
-              // 홈탭에서 저장 실패해도 앱이 멈추지 않게 방어합니다.
+            /** 로컬 저장(오프라인 캐시) — 서버 동기화 성공 시 아래에서 id 를 서버 UUID 로 교체 */
+            const writeLocal = (event: typeof ev) => {
+              try {
+                const raw = localStorage.getItem(COOANC_CALENDAR_EVENTS_STORAGE_KEY)
+                const prev = raw ? (JSON.parse(raw) as unknown[]) : []
+                const safePrev = (Array.isArray(prev) ? prev : []).filter(
+                  (e) => !(e && typeof e === 'object' && (e as { id?: string }).id === event.id),
+                )
+                localStorage.setItem(
+                  COOANC_CALENDAR_EVENTS_STORAGE_KEY,
+                  JSON.stringify([...safePrev, event]),
+                )
+                window.dispatchEvent(new Event(COOANC_CALENDAR_STORAGE_UPDATE_EVENT))
+              } catch {
+                // 저장 실패해도 앱이 멈추지 않게 방어합니다.
+              }
             }
+            writeLocal(ev)
+            /** 서버에도 저장해 다른 기기와 동기화 */
+            void (async () => {
+              const serverId = await createParentCalendarEvent(ev)
+              if (serverId && serverId !== ev.id) writeLocal({ ...ev, id: serverId })
+            })()
           }}
           onClose={() => setCalendarEventSheetOpen(false)}
         />

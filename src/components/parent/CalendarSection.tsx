@@ -24,6 +24,7 @@ import { COOANC_CALENDAR_STORAGE_UPDATE_EVENT } from '@/lib/syncAgentEventToLoca
 import { createClient } from '@/lib/supabase/client'
 import {
   dedupeMergedCalendarEventsByTitleAndStart,
+  createParentCalendarEvent,
   deleteParentCalendarEvent,
   fetchParentCalendarEventsFromServer,
   filterOutDeletedCalendarEvents,
@@ -774,9 +775,19 @@ export default function CalendarSection({ childId, focusDate = null, focusNonce 
           childId={childId}
           hideRoutineLink
           onSave={(ev) => {
+            const isNew = !sheet.existing
             saveEvents((prev) =>
-              sheet.existing ? prev.map((e) => (e.id === ev.id ? ev : e)) : [...prev, ev],
+              isNew ? [...prev, ev] : prev.map((e) => (e.id === ev.id ? ev : e)),
             )
+            /** 새 일정은 서버에도 저장해 다른 기기와 동기화하고, 로컬 임시 id 를 서버 UUID 로 교체 */
+            if (isNew) {
+              void (async () => {
+                const serverId = await createParentCalendarEvent(ev)
+                if (serverId && serverId !== ev.id) {
+                  saveEvents((prev) => prev.map((e) => (e.id === ev.id ? { ...e, id: serverId } : e)))
+                }
+              })()
+            }
           }}
           onDelete={
             sheet.existing

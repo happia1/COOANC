@@ -143,6 +143,34 @@ export async function deleteParentCalendarEvent(eventId: string): Promise<void> 
 }
 
 /**
+ * 캘린더 일정 서버 저장(기기 간 동기화) — 성공 시 서버 UUID 를 반환합니다.
+ * childId 가 없는(가족 공통) 일정은 서버 스키마상 family_link 귀속이 안 되므로 localStorage 만 유지(null 반환).
+ */
+export async function createParentCalendarEvent(event: LocalCalendarEvent): Promise<string | null> {
+  if (typeof window === 'undefined') return null
+  if (!event.childId) return null
+  try {
+    const res = await fetch('/api/calendar-event/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        childId: event.childId,
+        title: event.title,
+        startDate: event.startDate,
+        endDate: event.endDate,
+        eventType: event.eventType,
+        routineOverride: event.routineOverride,
+      }),
+    })
+    if (!res.ok) return null
+    const json = (await res.json().catch(() => ({}))) as { id?: string }
+    return typeof json.id === 'string' ? json.id : null
+  } catch {
+    return null
+  }
+}
+
+/**
  * 같은 제목·시작일(localStorage 중복 삽입 등)이 여러 줄일 때 한 줄로 줄입니다.
  * - 둘 중 id 가 DB UUID 형태면 그쪽을 우선
  * - 둘 다 UUID 거나 둘 다 아니면 **나중에 나온 항목**을 유지(최근 저장 우선)
