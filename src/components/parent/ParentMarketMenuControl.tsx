@@ -218,6 +218,15 @@ export default function ParentMarketMenuControl({
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   )
 
+  /**
+   * @dnd-kit hydration mismatch 방지 — 마운트 후에만 드래그(DndContext)를 켭니다.
+   * (SSR 에서 dnd-kit 의 aria-describedby id 를 렌더하지 않아 서버/클라 번호 어긋남 제거)
+   */
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
   /** 순서 저장 중 */
   const [orderSaving, setOrderSaving] = useState(false)
   const [orderSaveErr, setOrderSaveErr] = useState<string | null>(null)
@@ -840,8 +849,8 @@ export default function ParentMarketMenuControl({
                 {expanded ? (
                   <div className="-mx-1 snap-x snap-mandatory overflow-x-auto overflow-y-hidden pb-1 pt-1 [scrollbar-width:thin] [-ms-overflow-style:none] [&::-webkit-scrollbar]:h-1">
                     {(() => {
-                      /** 2개 이상이면 그 구역 안에서만 드래그 정렬(터치·마우스). */
-                      const canSort = block.items.length > 1
+                      /** 2개 이상이면 그 구역 안에서만 드래그 정렬(터치·마우스). 마운트 후에만(SSR hydration 방지) */
+                      const canSort = block.items.length > 1 && mounted
                       const oneRow =
                         block.sectionKey === 'event' || block.sectionKey === 'content' || !useTwoRows
                       const tiles = block.items.map((it) =>

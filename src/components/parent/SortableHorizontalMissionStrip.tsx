@@ -107,6 +107,15 @@ export default function SortableHorizontalMissionStrip({
   const router = useRouter()
   const [items, setItems] = useState<Mission[]>(missions)
   const suppressNextClickRef = useRef(false)
+  /**
+   * @dnd-kit 은 `aria-describedby="DndDescribedBy-N"` id 를 전역 카운터로 만들어,
+   * 서버 렌더와 클라이언트 렌더의 번호가 어긋나면 hydration mismatch 가 납니다
+   * (특히 DndContext 가 여러 개일 때). 마운트 후에만 드래그 UI 를 켜서 SSR 에는 dnd-kit 을 렌더하지 않습니다.
+   */
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   useEffect(() => {
     setItems(missions)
@@ -122,7 +131,7 @@ export default function SortableHorizontalMissionStrip({
 
   const ids = items.map((m) => m.id)
 
-  if (!childId || items.length === 0) {
+  if (!childId || items.length === 0 || !mounted) {
     if (items.length === 0) {
       return <p className="px-3 py-3 text-center text-[10px] font-normal leading-snug text-gray-400">{emptyHint}</p>
     }

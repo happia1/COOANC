@@ -504,11 +504,11 @@ export default function CalendarSection({ childId, focusDate = null, focusNonce 
       {/* 제목 · 오른쪽 끝 「일정 등록하기」(+ 대체) */}
       <div className="mb-1.5 flex items-center justify-between gap-2">
         <h2 className="text-sm font-bold text-gray-800">캘린더</h2>
-        {/* 루틴 탭 「미션 수정하기」와 동일한 솔리드 파란색 버튼 스타일 */}
+        {/* 아웃라인(연한 파랑) 스타일 — 루틴 「미션 수정하기」도 이 스타일로 통일 */}
         <button
           type="button"
           onClick={openAddSheet}
-          className="shrink-0 rounded-lg bg-[#4A90E2] px-3 py-1.5 text-[11px] font-bold text-white shadow-sm transition active:scale-95 disabled:opacity-30"
+          className="shrink-0 rounded-lg border border-[#4A90E2]/40 bg-[#4A90E2]/10 px-3 py-1.5 text-[11px] font-bold text-[#2563EB] shadow-sm transition active:scale-95 hover:bg-[#4A90E2]/15 disabled:opacity-30"
           aria-label="일정 등록하기"
         >
           일정 등록하기

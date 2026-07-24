@@ -877,7 +877,7 @@ export default function RoutineTab({
                 aria-label="키워드로 일상 미션 추가·편집"
                 disabled={!currentId}
                 onClick={() => setKeywordSheetOpen(true)}
-                className="shrink-0 rounded-lg bg-[#4A90E2] px-3 py-1.5 text-[11px] font-bold text-white shadow-sm transition active:scale-95 disabled:opacity-30"
+                className="shrink-0 rounded-lg border border-[#4A90E2]/40 bg-[#4A90E2]/10 px-3 py-1.5 text-[11px] font-bold text-[#2563EB] shadow-sm transition active:scale-95 hover:bg-[#4A90E2]/15 disabled:opacity-30"
               >
                 미션 수정하기
               </button>
@@ -1012,7 +1012,7 @@ export default function RoutineTab({
                 aria-label="스페셜 미션 추가·편집"
                 disabled={!currentId}
                 onClick={() => setSpecialSheetOpen(true)}
-                className="shrink-0 rounded-lg bg-[#4A90E2] px-3 py-1.5 text-[11px] font-bold text-white shadow-sm transition active:scale-95 disabled:opacity-30"
+                className="shrink-0 rounded-lg border border-[#4A90E2]/40 bg-[#4A90E2]/10 px-3 py-1.5 text-[11px] font-bold text-[#2563EB] shadow-sm transition active:scale-95 hover:bg-[#4A90E2]/15 disabled:opacity-30"
               >
                 미션 수정하기
               </button>
