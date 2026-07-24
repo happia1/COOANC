@@ -159,6 +159,13 @@ function rollbackOptimisticMissionMoneyRewards(
   } as ChildStats)
 }
 
+/**
+ * 미션 완료로 상단 숫자(크레딧·하트)를 올린 뒤 이 시간(ms) 동안은,
+ * 아직 커밋 전 값을 담은 느린 `/home` 재조회(서버 프롭)가 stats 를 덮어써서
+ * 크레딧이 되돌아가 보이는 롤백을 막습니다.
+ */
+const STALE_STATS_GUARD_MS = 6000
+
 /** 화분 단계 상승(물주기로 stage+1) 시 재생할 효과음 */
 const PLANT_STAGE_UP_SOUND_SRC =
   '/assets/audio/missions/get_badge-christmas-reveal-tones-2988.wav' as const
@@ -798,7 +805,23 @@ export default function ChildScreen({
   }, [plantHint])
 
   useEffect(() => {
-    setStats(initialStats ? normalizeChildStatsCreditsSplit(initialStats) : null)
+    const next = initialStats ? normalizeChildStatsCreditsSplit(initialStats) : null
+    setStats((prev) => {
+      if (!next) return null
+      if (!prev) return next
+      /**
+       * 미션 완료 직후 느린 `/home` 재조회가 아직 커밋 전 옛 값을 내려주면 방금 올린 크레딧이
+       * 되돌아가 보입니다(롤백). 쓰기 진행 중이거나 최근 갱신 직후에는 서버 프롭으로 덮어쓰지 않습니다.
+       */
+      if (pendingStatsWritesRef.current > 0) return prev
+      if (
+        typeof performance !== 'undefined' &&
+        performance.now() - lastLocalStatsBumpAtRef.current < STALE_STATS_GUARD_MS
+      ) {
+        return prev
+      }
+      return next
+    })
   }, [initialStats])
 
   /** 총 크레딧 (지갑+저금통+돈바구니 합산) */
@@ -940,6 +963,8 @@ export default function ChildScreen({
    * 덮어쓰지 않도록 막아, 낙관적 업데이트와 서버 이벤트가 경합해 숫자가 출렁이는 것을 막습니다.
    */
   const pendingStatsWritesRef = useRef(0)
+  /** 미션 완료로 stats 를 올린 마지막 시각(performance.now, 단조 시계). 직후엔 스테일 서버 프롭으로 덮어쓰지 않음. */
+  const lastLocalStatsBumpAtRef = useRef(0)
 
   /**
    * 뽀모도로·알람 팝업(ChildAlarmClockPopup) 열림 여부
@@ -1431,6 +1456,7 @@ export default function ChildScreen({
        * 비개발자: "보상 숫자는 탭하자마자 올라가고, 저장이 안 되면 다시 내려가요."
        */
       setStats((prev) => (prev ? applyOptimisticMissionMoneyRewards(prev, creditReward, heartReward) : prev))
+      if (typeof performance !== 'undefined') lastLocalStatsBumpAtRef.current = performance.now()
       /** 화분 훅 숫자도 같이 올려 `heartsForHomeUi` 가 plantHearts 만 볼 때 생기던 지연을 없앱니다 */
       bumpHeartsForMissionOptimistic(heartReward)
       /**
@@ -1557,6 +1583,7 @@ export default function ChildScreen({
           }
           if (res.ok) {
             setStats((prev) => tryApplyCompletePayload(prev, json) ?? prev)
+            if (typeof performance !== 'undefined') lastLocalStatsBumpAtRef.current = performance.now()
             if (
               json &&
               typeof json === 'object' &&
