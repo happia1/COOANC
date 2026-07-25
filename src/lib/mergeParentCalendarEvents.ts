@@ -6,10 +6,7 @@
 import { getBrowserSessionUserId } from '@/lib/browserParentAuthCache'
 import { createClient } from '@/lib/supabase/client'
 import type { LocalCalendarEvent } from '@/types/database'
-import {
-  addDeletedCalendarEventId,
-  readDeletedCalendarEventIds,
-} from '@/lib/localStorageChildScope'
+import { readDeletedCalendarEventIds } from '@/lib/localStorageChildScope'
 
 /** `calendar_events.event_type` 과 동일 허용값 — DB 스키마와 맞춤 */
 const EVENT_TYPES: LocalCalendarEvent['eventType'][] = [
@@ -54,6 +51,8 @@ export function calendarEventRowToLocal(
     routine_override: string | null
     family_link_id?: string
     child_id?: string | null
+    /** 126 미적용 DB 에서는 아예 없음(undefined) — 「서버가 모름」과 「빈 설명」을 구분 */
+    description?: string | null
   },
   childIdByFamilyLink?: Map<string, string>,
 ): LocalCalendarEvent {
@@ -71,12 +70,17 @@ export function calendarEventRowToLocal(
     endDate: ed,
     eventType: coerceEventType(row.event_type),
     routineOverride: coerceRoutineOverride(row.routine_override),
+    /**
+     * description 칼럼이 없는 DB(126 미적용)에서는 undefined 로 남겨,
+     * 병합 단계에서 「서버가 모르는 값」과 「사용자가 지운 값('')」을 구분합니다.
+     */
+    ...(row.description === undefined ? {} : { description: row.description ?? '' }),
   }
 }
 
 /**
  * 서버에서 가져온 일정 + 기기 localStorage 일정을 합칩니다.
- * - 같은 `id`면 **localStorage 쪽을 우선**(이 기기에서 방금 수정한 내용 유지)
+ * - 같은 `id`면 **서버(DB)를 기준**으로 사용 — 다른 기기의 수정이 반영됩니다
  * - id가 서버에만 있으면 서버 행 사용
  * - id가 로컬에만 있으면 로컬 행 유지
  */
@@ -95,9 +99,19 @@ export function mergeServerAndLocalCalendar(
   const localById = new Map(localScoped.map((e) => [e.id, e]))
   const merged = new Map<string, LocalCalendarEvent>()
 
+  /**
+   * DB 가 기준입니다. 예전에는 로컬 사본을 우선(`l ?? s`)했기 때문에,
+   * 다른 기기에서 수정한 내용이 이 기기의 오래된 사본에 계속 덮여 보이지 않았습니다.
+   * 이제 서버 값을 그대로 쓰되, 서버가 아직 모르는 필드(설명 칼럼 미적용 DB)만 로컬로 보완합니다.
+   */
   for (const s of server) {
     const l = localById.get(s.id)
-    merged.set(s.id, l ?? s)
+    if (l && s.description === undefined && l.description !== undefined) {
+      /** 126 마이그레이션 전이라 서버가 설명을 못 주는 경우에만 로컬 설명을 유지 */
+      merged.set(s.id, { ...s, description: l.description })
+    } else {
+      merged.set(s.id, s)
+    }
   }
   for (const l of localScoped) {
     if (!merged.has(l.id)) merged.set(l.id, l)
@@ -124,21 +138,26 @@ export function filterOutDeletedCalendarEvents(events: LocalCalendarEvent[]): Lo
  * 캘린더 일정 삭제 — localStorage 반영은 호출 쪽에서 하고,
  * DB UUID 행은 API로 서버에서도 지우며 tombstone id 를 남깁니다.
  */
-export async function deleteParentCalendarEvent(eventId: string): Promise<void> {
-  if (typeof window === 'undefined' || !eventId || eventId.startsWith('__public_holiday__')) return
+export async function deleteParentCalendarEvent(eventId: string): Promise<boolean> {
+  if (typeof window === 'undefined' || !eventId || eventId.startsWith('__public_holiday__')) return false
 
-  addDeletedCalendarEventId(eventId)
+  /** 서버에 올라간 적 없는 기기 전용 일정 — 로컬에서 지우면 끝 */
+  if (!looksLikeDbUuid(eventId)) return true
 
-  if (!looksLikeDbUuid(eventId)) return
-
+  /**
+   * DB 가 기준이므로 **서버 삭제가 확인된 뒤에만** 화면에서 지웁니다.
+   * 예전에는 결과를 기다리지 않고 기기별 삭제표시로 감췄기 때문에,
+   * 서버 삭제가 실패해도 그 기기에서만 사라진 것처럼 보여 기기 간 값이 어긋났습니다.
+   */
   try {
-    await fetch('/api/calendar-event/delete', {
+    const res = await fetch('/api/calendar-event/delete', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ eventId }),
     })
+    return res.ok
   } catch {
-    /* tombstone 으로 UI 는 유지 */
+    return false
   }
 }
 
@@ -167,6 +186,7 @@ export async function createParentCalendarEvent(
         endDate: event.endDate,
         eventType: event.eventType,
         routineOverride: event.routineOverride,
+        description: event.description ?? '',
       }),
     })
     if (!res.ok) {
@@ -202,6 +222,7 @@ export async function updateParentCalendarEvent(event: LocalCalendarEvent): Prom
         endDate: event.endDate,
         eventType: event.eventType,
         routineOverride: event.routineOverride,
+        description: event.description ?? '',
       }),
     })
     return res.ok
@@ -411,10 +432,17 @@ export async function fetchParentCalendarEventsFromServerScoped(
   /** 연결된 자녀가 없으면 서버에 일정도 없음 — 조회 자체는 성공입니다 */
   if (familyLinkIds.length === 0) return { ok: true, events: [], scopedChildIds }
 
-  const res = await supabase
-    .from('calendar_events')
-    .select('id, title, start_date, end_date, event_type, routine_override, family_link_id')
-    .in('family_link_id', familyLinkIds)
+  /**
+   * description 은 126 마이그레이션에서 추가됩니다.
+   * 아직 적용되지 않은 DB 에서는 이 칼럼을 요청하면 select 전체가 실패하므로,
+   * 실패 시 설명 없이 한 번 더 조회해 캘린더가 통째로 비지 않게 합니다.
+   */
+  const COLS_WITH_DESC = 'id, title, start_date, end_date, event_type, routine_override, family_link_id, description'
+  const COLS_BASE = 'id, title, start_date, end_date, event_type, routine_override, family_link_id'
+  let res = await supabase.from('calendar_events').select(COLS_WITH_DESC).in('family_link_id', familyLinkIds)
+  if (res.error) {
+    res = await supabase.from('calendar_events').select(COLS_BASE).in('family_link_id', familyLinkIds)
+  }
   if (res.error || !res.data) return { ...empty, scopedChildIds }
 
   const childIdByFamilyLink = new Map<string, string>(

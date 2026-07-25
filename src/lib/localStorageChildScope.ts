@@ -53,6 +53,19 @@ export function readDeletedCalendarEventIds(): Set<string> {
   }
 }
 
+/**
+ * 예전 방식의 삭제표시(tombstone)를 정리합니다. 서버 조회에 성공했을 때만 호출하세요.
+ *
+ * 배경: 삭제표시는 기기별 localStorage 라 다른 기기로 전파되지 않고, 한번 쌓이면 영원히 남습니다.
+ * 그래서 "서버에는 있는데 이 기기에서만 안 보이는" 영구 불일치가 생겼습니다.
+ * 이제 삭제는 서버 응답을 확인한 뒤에만 반영하므로(= DB 가 기준) 이 표시는 필요 없습니다.
+ */
+export function clearLegacyDeletedCalendarEventIds(): void {
+  if (typeof window === 'undefined') return
+  if (!window.localStorage.getItem(CALENDAR_DELETED_IDS_KEY)) return
+  window.localStorage.removeItem(CALENDAR_DELETED_IDS_KEY)
+}
+
 export function addDeletedCalendarEventId(eventId: string): void {
   if (typeof window === 'undefined' || !eventId.trim() || eventId.startsWith('__public_holiday__')) return
   const set = readDeletedCalendarEventIds()

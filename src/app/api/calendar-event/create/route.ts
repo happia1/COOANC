@@ -57,6 +57,8 @@ export async function POST(req: NextRequest) {
 
   const eventType = DB_EVENT_TYPES.has(eventTypeRaw) ? eventTypeRaw : 'etc'
   const routineOverride = DB_OVERRIDES.has(routineOverrideRaw) ? routineOverrideRaw : 'none'
+  /** 빈 문자열 = 설명 없음(126 적용 DB 에서만 저장됨) */
+  const description = String(body.description ?? '').slice(0, 2000)
 
   // 이 부모–자녀의 family_link 확인(권한 검증). 서버 행은 family_link_id 로 귀속됩니다.
   const { data: link } = await supabase
@@ -73,18 +75,32 @@ export async function POST(req: NextRequest) {
   const service = createServiceRoleClient()
   const db = service ?? supabase
 
-  const { data: inserted, error: insErr } = await db
+  const base = {
+    family_link_id: link.id,
+    event_type: eventType,
+    title,
+    start_date: startDate,
+    end_date: endDate,
+    routine_override: routineOverride,
+  }
+  /**
+   * description 은 126 마이그레이션에서 추가됩니다.
+   * 미적용 DB 에서 insert 전체가 실패하지 않도록, 실패 시 설명 없이 재시도합니다.
+   */
+  let { data: inserted, error: insErr } = await db
     .from('calendar_events')
-    .insert({
-      family_link_id: link.id,
-      event_type: eventType,
-      title,
-      start_date: startDate,
-      end_date: endDate,
-      routine_override: routineOverride,
-    })
+    .insert({ ...base, description })
     .select('id')
     .single()
+  if (insErr) {
+    const retry = await db.from('calendar_events').insert(base).select('id').single()
+    if (!retry.error && retry.data) {
+      console.warn('[calendar-event/create] description 칼럼 없음 — 126 마이그레이션 필요')
+      return NextResponse.json({ id: retry.data.id }, { status: 201 })
+    }
+    insErr = retry.error
+    inserted = retry.data
+  }
 
   if (insErr || !inserted) {
     console.error('[calendar-event/create]', insErr?.message)

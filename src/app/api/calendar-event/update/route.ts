@@ -57,6 +57,8 @@ export async function POST(req: NextRequest) {
 
   const eventType = DB_EVENT_TYPES.has(eventTypeRaw) ? eventTypeRaw : 'etc'
   const routineOverride = DB_OVERRIDES.has(routineOverrideRaw) ? routineOverrideRaw : 'none'
+  /** 빈 문자열 = 사용자가 설명을 지운 상태(다른 기기에도 그대로 반영) */
+  const description = String(body.description ?? '').slice(0, 2000)
 
   // 대상 일정 + family_link 확인(권한)
   const { data: event } = await supabase
@@ -89,16 +91,30 @@ export async function POST(req: NextRequest) {
   const service = createServiceRoleClient()
   const db = service ?? supabase
 
-  const { error: upErr } = await db
+  const base = {
+    title,
+    start_date: startDate,
+    end_date: endDate,
+    event_type: eventType,
+    routine_override: routineOverride,
+  }
+  /**
+   * description 은 126 마이그레이션에서 추가됩니다.
+   * 아직 적용되지 않은 DB 에서는 이 필드를 보내면 전체 update 가 실패하므로,
+   * 실패 시 설명 없이 재시도해 제목·날짜 수정은 정상 저장되게 합니다.
+   */
+  let { error: upErr } = await db
     .from('calendar_events')
-    .update({
-      title,
-      start_date: startDate,
-      end_date: endDate,
-      event_type: eventType,
-      routine_override: routineOverride,
-    })
+    .update({ ...base, description })
     .eq('id', eventId)
+  if (upErr) {
+    const retry = await db.from('calendar_events').update(base).eq('id', eventId)
+    if (!retry.error) {
+      console.warn('[calendar-event/update] description 칼럼 없음 — 126 마이그레이션 필요')
+      return NextResponse.json({ ok: true, descriptionSkipped: true }, { status: 200 })
+    }
+    upErr = retry.error
+  }
 
   if (upErr) {
     console.error('[calendar-event/update]', upErr.message)

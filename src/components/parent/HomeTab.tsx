@@ -604,12 +604,17 @@ export default function HomeTab({
           childId={child.id}
           onSave={(ev) => {
             /** 로컬 저장(오프라인 캐시) — 서버 동기화 성공 시 아래에서 id 를 서버 UUID 로 교체 */
-            const writeLocal = (event: typeof ev) => {
+            const writeLocal = (event: typeof ev, replacesId?: string) => {
               try {
                 const raw = localStorage.getItem(COOANC_CALENDAR_EVENTS_STORAGE_KEY)
                 const prev = raw ? (JSON.parse(raw) as unknown[]) : []
+                /**
+                 * 새 id 뿐 아니라 **교체 대상(임시 id)** 도 함께 지웁니다.
+                 * 예전에는 임시 id 행이 남아 같은 일정이 두 벌로 저장됐습니다.
+                 */
+                const drop = new Set([event.id, ...(replacesId ? [replacesId] : [])])
                 const safePrev = (Array.isArray(prev) ? prev : []).filter(
-                  (e) => !(e && typeof e === 'object' && (e as { id?: string }).id === event.id),
+                  (e) => !(e && typeof e === 'object' && drop.has(String((e as { id?: string }).id))),
                 )
                 localStorage.setItem(
                   COOANC_CALENDAR_EVENTS_STORAGE_KEY,
@@ -624,7 +629,7 @@ export default function HomeTab({
             /** 서버에도 저장해 다른 기기와 동기화 */
             void (async () => {
               const serverId = await createParentCalendarEvent(ev)
-              if (serverId && serverId !== ev.id) writeLocal({ ...ev, id: serverId })
+              if (serverId && serverId !== ev.id) writeLocal({ ...ev, id: serverId }, ev.id)
             })()
           }}
           onClose={() => setCalendarEventSheetOpen(false)}

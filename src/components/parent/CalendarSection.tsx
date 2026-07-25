@@ -20,7 +20,10 @@ import { useRouter } from 'next/navigation'
 import { useSwipeToDismiss } from '@/hooks/useSwipeToDismiss'
 import type { LocalCalendarEvent } from '@/types/database'
 import { getSeoulDateString } from '@/lib/koreaDate'
-import { COOANC_CALENDAR_EVENTS_STORAGE_KEY } from '@/lib/localStorageChildScope'
+import {
+  COOANC_CALENDAR_EVENTS_STORAGE_KEY,
+  clearLegacyDeletedCalendarEventIds,
+} from '@/lib/localStorageChildScope'
 import { COOANC_CALENDAR_STORAGE_UPDATE_EVENT } from '@/lib/syncAgentEventToLocalCalendar'
 import { createClient } from '@/lib/supabase/client'
 import {
@@ -233,6 +236,12 @@ export default function CalendarSection({ childId, focusDate = null, focusNonce 
        * 반드시 backfill 보다 **먼저** 해야 합니다. 순서가 바뀌면 backfill 이
        * 「서버에 없는 로컬 일정」으로 보고 삭제된 일정을 서버에 다시 올려 부활시킵니다.
        */
+      /**
+       * 예전 방식의 기기별 삭제표시를 정리합니다.
+       * 이제 삭제는 서버 응답을 확인한 뒤에만 반영하므로(= DB 가 기준) 이 표시는 필요 없고,
+       * 남겨 두면 「서버에는 있는데 이 기기에서만 안 보이는」 영구 불일치가 됩니다.
+       */
+      if (fetched.ok) clearLegacyDeletedCalendarEventIds()
       const pruned = pruneLocalEventsDeletedOnServer(local, fetched)
       if (pruned.prunedIds.length > 0) {
         local = pruned.kept
@@ -323,11 +332,24 @@ export default function CalendarSection({ childId, focusDate = null, focusNonce 
     const onStorage = () => {
       void refreshMergedEvents()
     }
+    /**
+     * 다른 기기(모바일·패드·노트북)에서 추가·수정·삭제한 내용을 보기 위해
+     * 화면으로 돌아올 때마다 DB 를 다시 읽습니다.
+     * 이게 없으면 앱을 열어 둔 기기는 새로고침 전까지 예전 값을 계속 보여 줍니다.
+     */
+    const onFocus = () => {
+      if (document.visibilityState === 'hidden') return
+      void refreshMergedEvents()
+    }
     window.addEventListener(COOANC_CALENDAR_STORAGE_UPDATE_EVENT, onStorage)
     window.addEventListener('storage', onStorage)
+    window.addEventListener('focus', onFocus)
+    document.addEventListener('visibilitychange', onFocus)
     return () => {
       window.removeEventListener(COOANC_CALENDAR_STORAGE_UPDATE_EVENT, onStorage)
       window.removeEventListener('storage', onStorage)
+      window.removeEventListener('focus', onFocus)
+      document.removeEventListener('visibilitychange', onFocus)
     }
   }, [refreshMergedEvents])
 
@@ -377,11 +399,20 @@ export default function CalendarSection({ childId, focusDate = null, focusNonce 
     [],
   )
 
+  /**
+   * 삭제는 **서버 성공을 확인한 뒤에만** 화면·기기에서 지웁니다(DB 가 기준).
+   * 실패하면 지우지 않고 이유를 알려, 다른 기기와 값이 어긋나는 상태를 만들지 않습니다.
+   */
   const removeEventById = useCallback(
-    (id: string) => {
-      if (id.startsWith('__public_holiday__')) return
-      void deleteParentCalendarEvent(id)
+    async (id: string): Promise<boolean> => {
+      if (id.startsWith('__public_holiday__')) return false
+      const ok = await deleteParentCalendarEvent(id)
+      if (!ok) {
+        setBackfillNotice('일정을 서버에서 삭제하지 못했어요. 인터넷 연결을 확인한 뒤 다시 시도해 주세요.')
+        return false
+      }
       saveEvents((prev) => prev.filter((e) => e.id !== id))
+      return true
     },
     [saveEvents],
   )
@@ -887,7 +918,7 @@ export default function CalendarSection({ childId, focusDate = null, focusNonce 
           onDelete={
             sheet.existing
               ? (id) => {
-                  removeEventById(id)
+                  void removeEventById(id)
                   closeSheet()
                 }
               : undefined
@@ -909,11 +940,14 @@ export default function CalendarSection({ childId, focusDate = null, focusNonce 
             setSheet({ startDate: ev.startDate, endDate: ev.endDate, existing: ev })
           }}
           onDelete={(id) => {
-            removeEventById(id)
-            setDetailEvents((prev) => {
-              if (!prev) return null
-              const next = prev.filter((e) => e.id !== id)
-              return next.length > 0 ? next : null
+            /** 서버 삭제 성공을 확인한 뒤에만 상세 목록에서도 내립니다(DB 가 기준) */
+            void removeEventById(id).then((ok) => {
+              if (ok === false) return
+              setDetailEvents((prev) => {
+                if (!prev) return null
+                const next = prev.filter((e) => e.id !== id)
+                return next.length > 0 ? next : null
+              })
             })
           }}
         />
