@@ -208,16 +208,35 @@ export default function RoutineAlarmSettingsSheet({ open, onClose }: Props) {
     let cancelled = false
     ;(async () => {
       const supabase = createClient()
-      const { data, error } = await supabase
-        .from('child_stats')
-        .select(
-          'routine_alarm_prefs, school_time, school_time_enabled, school_time_weekday, school_time_weekend, sleep_ready_time, sleep_ready_time_enabled, sleep_ready_time_weekday, sleep_ready_time_weekend',
+      /**
+       * 번들 컬럼은 **별도 쿼리**로 읽습니다.
+       * 한 select 에 묶으면 routine_alarm_prefs 가 PostgREST 스키마 캐시에 없을 때
+       * (124 마이그레이션 미적용 등) 쿼리 전체가 실패해 등원·잘 준비 동기화까지 같이 멈춥니다.
+       */
+      const [{ data, error }, bundleRes] = await Promise.all([
+        supabase
+          .from('child_stats')
+          .select(
+            'school_time, school_time_enabled, school_time_weekday, school_time_weekend, sleep_ready_time, sleep_ready_time_enabled, sleep_ready_time_weekday, sleep_ready_time_weekend',
+          )
+          .eq('child_id', selectedChildId)
+          .maybeSingle(),
+        supabase
+          .from('child_stats')
+          .select('routine_alarm_prefs')
+          .eq('child_id', selectedChildId)
+          .maybeSingle(),
+      ])
+      if (cancelled) return
+      if (bundleRes.error) {
+        console.warn(
+          '[routine alarm] 알람 번들 읽기 실패 — 124 마이그레이션(스키마 캐시 갱신) 필요:',
+          bundleRes.error.message,
         )
-        .eq('child_id', selectedChildId)
-        .maybeSingle()
-      if (cancelled || error || !data) return
+      }
       /** DB 알람 번들을 localStorage 로 복원 후, 시트 전체 상태(기상·잘시간·하원 등)를 그 값으로 채움 */
-      const bundle = (data as { routine_alarm_prefs?: Record<string, unknown> | null }).routine_alarm_prefs
+      const bundle = (bundleRes.data as { routine_alarm_prefs?: Record<string, unknown> | null } | null)
+        ?.routine_alarm_prefs
       if (bundle && typeof bundle === 'object') {
         restoreRoutineAlarmStorage(bundle)
         setHasSchool(readRoutineHasSchoolFromStorage())
@@ -238,6 +257,8 @@ export default function RoutineAlarmSettingsSheet({ open, onClose }: Props) {
         setSoundSleepReady(p.soundSleepReady)
         setCustomAlarms(p.customAlarms.map((c) => ({ ...c })))
       }
+      /** 전용 컬럼 쿼리가 실패해도 위 번들 복원은 이미 반영됨 */
+      if (error || !data) return
       const norm = (raw: unknown) => {
         if (typeof raw !== 'string' || !/^\d{1,2}:\d{2}$/.test(raw)) return null
         const [hh, mm] = raw.split(':')
@@ -385,14 +406,23 @@ export default function RoutineAlarmSettingsSheet({ open, onClose }: Props) {
       }
       /**
        * 기상·잘시간·하원 포함 알람 전체를 번들로 미러링 → 다른 기기의 자녀 앱과 동기화.
-       * 별도 update 로 분리해, 123 마이그레이션 미적용 DB(컬럼 없음)에서도 위 저장이 깨지지 않게 합니다.
+       * 별도 update 로 분리해, 컬럼이 없는 DB 에서도 위 저장이 깨지지 않게 합니다.
        */
       const { error: bundleErr } = await supabase
         .from('child_stats')
         .update({ routine_alarm_prefs: serializeRoutineAlarmStorage() })
         .eq('child_id', selectedChildId)
       if (bundleErr) {
-        console.warn('[routine alarm] 알람 번들 동기화 실패(123 마이그레이션 필요?):', bundleErr.message)
+        /**
+         * 조용히 실패하면 기기마다 알람이 달라지는데도 아무도 모릅니다(이번 증상의 원인).
+         * 저장 자체(이 기기)는 됐지만 동기화만 실패했음을 눈에 보이게 알립니다.
+         */
+        console.warn('[routine alarm] 알람 번들 동기화 실패(124 마이그레이션 필요?):', bundleErr.message)
+        window.alert(
+          '알람은 이 기기에 저장됐지만, 다른 기기와 동기화하지 못했어요.\n' +
+            '(Supabase 에서 124 마이그레이션을 실행해 주세요)\n\n' +
+            `상세: ${bundleErr.message}`,
+        )
       }
     }
     onClose()
