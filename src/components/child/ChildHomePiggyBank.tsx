@@ -13,15 +13,7 @@ import { createPortal } from 'react-dom'
 import { piggyBankVisualFrameIndexFromSavedCredits, piggyBankVisualUrlFromSavedCredits } from '@/lib/piggyBankHomeStage'
 import { PIGGY_BANK_UNLOCK_MIN_LEVEL } from '@/constants/childAgeConfig'
 import { CHILD_CREDIT_COIN_PNG_SRC, formatChildCreditsDisplay } from '@/lib/childCreditDisplay'
-import {
-  claimPiggyBonus,
-  formatPiggyBonusRate,
-  PIGGY_BONUS_HOLD_DAYS,
-  PIGGY_BONUS_MIN_BALANCE,
-  piggyBonusAmountFor,
-  piggyBonusDaysPerCoin,
-  piggyBonusRateFor,
-} from '@/lib/piggyBankBonus'
+import { claimPiggyBonus } from '@/lib/piggyBankBonus'
 
 export const CHILD_PIGGY_DEPOSIT_SOUND_SRC =
   `/assets/audio/effects/${encodeURIComponent('ElevenLabs_귀여운_동전_떨어지는_소리_효과.mp3')}` as const
@@ -373,14 +365,6 @@ export default function ChildHomePiggyBank({
     if (showHint) markPiggyTransferHintSeen(childId)
   }, [childId, depositEnabled])
 
-  /**
-   * 안내 문구용 — 지금 저금액의 이자율과 「코인 1개까지 며칠」.
-   * 요율이 1.5% 처럼 소수라서 반올림하지 않고 그대로 표기합니다.
-   */
-  const bonusRate = piggyBonusRateFor(piggyCredits)
-  const bonusPerPeriod = piggyBonusAmountFor(piggyCredits)
-  const bonusDaysPerCoin = piggyBonusDaysPerCoin(piggyCredits)
-
   const canDeposit = depositEnabled && availableCredits >= 1
   const canWithdraw = depositEnabled && piggyCredits >= 1
 
@@ -422,16 +406,20 @@ export default function ChildHomePiggyBank({
         />
         <div className="relative z-[1] flex w-full max-w-sm flex-col rounded-3xl border border-amber-100 bg-gradient-to-b from-amber-50 to-white p-5 shadow-xl">
           <h2 className="text-center text-lg font-black text-amber-900">저금하기</h2>
-          <p className="mb-4 mt-2 text-center text-xs font-semibold text-amber-900/90">
-            {`저금통에 ${PIGGY_BONUS_MIN_BALANCE}개 넘게 모으면 ${PIGGY_BONUS_HOLD_DAYS}일마다 보너스 크레딧이 생겨요!`}
-            <span className="mt-0.5 block text-[11px] font-bold text-amber-800/80">
-              {bonusRate <= 0
-                ? '많이 모을수록 보너스도 커져요'
-                : bonusPerPeriod >= 1
-                  ? `지금은 ${PIGGY_BONUS_HOLD_DAYS}일마다 ${formatPiggyBonusRate(bonusRate)}(코인 ${Math.floor(bonusPerPeriod)}개) — 많이 모을수록 더 빨라져요`
-                  : `지금은 ${formatPiggyBonusRate(bonusRate)}씩 쌓여서 ${bonusDaysPerCoin}일마다 코인 1개 — 많이 모을수록 더 빨라져요`}
-            </span>
-          </p>
+          {/**
+            * 자녀(미취학 포함)용 문구 — 규칙을 설명하지 않습니다.
+            * 「모았더니 선물이 왔다」는 기분만 짧게 전달하고, 나머지는 반짝이는 코인이 알려 줍니다.
+            */}
+          {bonusCount > 0 ? (
+            <p className="mb-4 mt-2 text-center text-base font-black text-amber-700">
+              선물이 왔어요!
+              <span className="mt-0.5 block text-xs font-bold text-amber-800/80">콕 눌러 보세요</span>
+            </p>
+          ) : (
+            <p className="mb-4 mt-2 text-center text-xs font-semibold text-amber-900/90">
+              모으면 선물이 와요!
+            </p>
+          )}
           <div className="grid grid-cols-2 gap-3">
             <button
               type="button"
@@ -519,7 +507,7 @@ export default function ChildHomePiggyBank({
                     onClick={(e) => claimOneBonus(e.currentTarget.getBoundingClientRect())}
                     className="pointer-events-auto relative h-[22px] w-[22px] shrink-0 border-0 bg-transparent p-0 transition active:scale-90"
                     style={{ animation: `piggyBonusSparkle 1.4s ease-in-out ${(i % 5) * 0.18}s infinite` }}
-                    aria-label="보너스 크레딧 받기"
+                    aria-label="선물 받기"
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
@@ -543,11 +531,6 @@ export default function ChildHomePiggyBank({
             </div>
           </div>
 
-          {bonusCount > 0 ? (
-            <p className="mt-3 text-center text-xs font-black text-amber-700">
-              {`반짝이는 코인 ${bonusCount}개를 눌러서 받아 가세요!`}
-            </p>
-          ) : null}
 
           {transferHintVisible && depositEnabled ? (
             <p className="mt-3 text-center text-xs font-black text-gray-600">
