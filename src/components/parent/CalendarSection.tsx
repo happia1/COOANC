@@ -30,6 +30,8 @@ import {
   updateParentCalendarEvent,
   deleteParentCalendarEvent,
   fetchParentCalendarEventsFromServer,
+  fetchParentCalendarEventsFromServerScoped,
+  pruneLocalEventsDeletedOnServer,
   filterOutDeletedCalendarEvents,
   mergeServerAndLocalCalendar,
 } from '@/lib/mergeParentCalendarEvents'
@@ -224,9 +226,24 @@ export default function CalendarSection({ childId, focusDate = null, focusNonce 
       } catch {
         local = []
       }
-      server = await fetchParentCalendarEventsFromServer(childId)
+      const fetched = await fetchParentCalendarEventsFromServerScoped(childId)
+      server = fetched.events
       /**
-       * 서버 저장이 도입되기 전에 이 기기에만 저장된 예전 일정(예: 여름 돌봄)을 한 번 올려
+       * ① 다른 기기에서 삭제된 일정을 이 기기에서도 제거합니다.
+       * 반드시 backfill 보다 **먼저** 해야 합니다. 순서가 바뀌면 backfill 이
+       * 「서버에 없는 로컬 일정」으로 보고 삭제된 일정을 서버에 다시 올려 부활시킵니다.
+       */
+      const pruned = pruneLocalEventsDeletedOnServer(local, fetched)
+      if (pruned.prunedIds.length > 0) {
+        local = pruned.kept
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(local))
+        } catch {
+          /* 저장 실패해도 이번 렌더는 아래 병합 결과로 맞습니다 */
+        }
+      }
+      /**
+       * ② 서버 저장이 도입되기 전에 이 기기에만 저장된 예전 일정(예: 여름 돌봄)을 한 번 올려
        * 모든 기기가 같은 DB 를 보도록 정리합니다. 이미 올린 일정은 다시 올리지 않습니다.
        */
       const backfill = await backfillLocalOnlyCalendarEvents(local, server, childId)
@@ -244,10 +261,13 @@ export default function CalendarSection({ childId, focusDate = null, focusNonce 
         setBackfillNotice(`이 기기에만 있던 예전 일정 ${backfill.uploaded}건을 모든 기기와 동기화했어요.`)
       }
       if (backfill.idMap.size > 0) {
-        /** 로컬 임시 id 를 서버 UUID 로 교체해 이후 편집·삭제도 서버에 반영되게 합니다 */
+        /**
+         * 로컬 임시 id 를 서버 UUID 로 교체해 이후 편집·삭제도 서버에 반영되게 합니다.
+         * childId 도 같이 채워야, 나중에 다른 기기에서 지웠을 때 이 기기에서도 삭제 판단(prune)이 됩니다.
+         */
         local = local.map((e) => {
           const newId = backfill.idMap.get(e.id)
-          return newId ? { ...e, id: newId } : e
+          return newId ? { ...e, id: newId, childId: e.childId ?? childId } : e
         })
         try {
           localStorage.setItem(STORAGE_KEY, JSON.stringify(local))

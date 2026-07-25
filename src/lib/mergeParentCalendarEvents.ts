@@ -375,28 +375,92 @@ type CalRow = {
  * 흐름: 현재 부모 uid 로 `family_links.id` 목록을 구한 뒤 `calendar_events` 를 `family_link_id IN (…)` 로만 조회합니다.
  * 자녀 필터가 필요하면(`childId` 지정) 해당 자녀의 `family_link_id` 행만 조회합니다.
  */
-export async function fetchParentCalendarEventsFromServer(childId: string | null): Promise<LocalCalendarEvent[]> {
+/**
+ * 서버 조회 결과 + "조회가 실제로 성공했는지" + "이 조회가 커버한 자녀 범위".
+ *
+ * 비개발자 설명: 빈 목록이 「일정이 없음」인지 「조회 실패」인지 구분하지 못하면,
+ * 네트워크 오류 한 번에 기기의 일정을 전부 지워 버릴 수 있습니다. 그래서 구분해 둡니다.
+ */
+export interface ServerCalendarFetch {
+  /** true 여야만 「서버에 없음 = 다른 기기에서 삭제됨」으로 판단할 수 있습니다 */
+  ok: boolean
+  events: LocalCalendarEvent[]
+  /** 이번 조회가 담당한 자녀 id 들 — 이 범위 밖 일정은 삭제 판단을 하지 않습니다 */
+  scopedChildIds: Set<string>
+}
+
+export async function fetchParentCalendarEventsFromServerScoped(
+  childId: string | null,
+): Promise<ServerCalendarFetch> {
+  const empty: ServerCalendarFetch = { ok: false, events: [], scopedChildIds: new Set() }
   const supabase = createClient()
   /** 서버 `/user` 대신 로컬 세션 — Auth storage 락 경쟁을 줄입니다 */
   const userId = await getBrowserSessionUserId(supabase)
-  if (!userId) return []
+  if (!userId) return empty
 
   let linksQuery = supabase.from('family_links').select('id, child_id').eq('parent_id', userId)
   if (childId) {
     linksQuery = linksQuery.eq('child_id', childId)
   }
-  const { data: allLinks } = await linksQuery
+  const { data: allLinks, error: linkErr } = await linksQuery
+  if (linkErr) return empty
   const familyLinkIds = (allLinks ?? []).map((r) => r.id).filter(Boolean)
-  if (familyLinkIds.length === 0) return []
+  const scopedChildIds = new Set<string>(
+    (allLinks ?? []).map((row: { id: string; child_id: string }) => row.child_id).filter(Boolean),
+  )
+  /** 연결된 자녀가 없으면 서버에 일정도 없음 — 조회 자체는 성공입니다 */
+  if (familyLinkIds.length === 0) return { ok: true, events: [], scopedChildIds }
 
   const res = await supabase
     .from('calendar_events')
     .select('id, title, start_date, end_date, event_type, routine_override, family_link_id')
     .in('family_link_id', familyLinkIds)
-  if (res.error || !res.data) return []
+  if (res.error || !res.data) return { ...empty, scopedChildIds }
 
   const childIdByFamilyLink = new Map<string, string>(
     (allLinks ?? []).map((row: { id: string; child_id: string }) => [row.id, row.child_id] as const),
   )
-  return (res.data as CalRow[]).map((row) => calendarEventRowToLocal(row, childIdByFamilyLink))
+  return {
+    ok: true,
+    events: (res.data as CalRow[]).map((row) => calendarEventRowToLocal(row, childIdByFamilyLink)),
+    scopedChildIds,
+  }
+}
+
+export async function fetchParentCalendarEventsFromServer(childId: string | null): Promise<LocalCalendarEvent[]> {
+  const { events } = await fetchParentCalendarEventsFromServerScoped(childId)
+  return events
+}
+
+/**
+ * 다른 기기에서 삭제된 일정을 이 기기의 localStorage 에서도 지웁니다.
+ *
+ * 배경: 병합은 「서버 ∪ 로컬」이라, 노트북에서 지워도 모바일 localStorage 에 남은 사본이
+ * 계속 되살아났습니다. 게다가 backfill 이 그 사본을 「서버에 없는 일정」으로 보고
+ * 다시 업로드해 노트북에서도 부활시킬 수 있었습니다.
+ *
+ * 안전 장치(오삭제 방지):
+ * - `ok === false`(조회 실패)면 아무것도 지우지 않습니다.
+ * - DB UUID 를 가진 일정만 대상 — 아직 업로드된 적 없는 로컬 전용 일정은 보존합니다.
+ * - 이번 조회가 담당한 자녀(`scopedChildIds`) 의 일정만 대상 —
+ *   다른 자녀의 여행 일정 등 조회 범위 밖은 판단하지 않습니다.
+ */
+export function pruneLocalEventsDeletedOnServer(
+  local: LocalCalendarEvent[],
+  fetched: ServerCalendarFetch,
+): { kept: LocalCalendarEvent[]; prunedIds: string[] } {
+  if (!fetched.ok) return { kept: local, prunedIds: [] }
+
+  const serverIds = new Set(fetched.events.map((e) => e.id))
+  const prunedIds: string[] = []
+  const kept = local.filter((ev) => {
+    if (!ev?.id || ev.id.startsWith('__public_holiday__')) return true
+    if (!looksLikeDbUuid(ev.id)) return true
+    if (serverIds.has(ev.id)) return true
+    /** 조회 범위 밖(다른 자녀·자녀 미지정)이면 삭제 여부를 알 수 없으므로 보존 */
+    if (!ev.childId || !fetched.scopedChildIds.has(ev.childId)) return true
+    prunedIds.push(ev.id)
+    return false
+  })
+  return { kept, prunedIds }
 }
