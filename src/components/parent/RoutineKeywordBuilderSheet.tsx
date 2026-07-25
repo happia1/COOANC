@@ -476,7 +476,7 @@ export default function RoutineKeywordBuilderSheet({
             onClick={() => void submit()}
             className="flex-1 rounded-xl bg-[#4A90E2] py-2.5 text-xs font-bold text-white disabled:opacity-50"
           >
-            {submitting ? '만드는 중…' : '이 자녀 루틴에 추가'}
+            {submitting ? '저장 중…' : '수정 완료'}
           </button>
         </div>
       )}
