@@ -206,6 +206,8 @@ export default function CalendarSection({ childId, focusDate = null, focusNonce 
    * 아직 `events`가 `[]`인 레이스가 있어, 병합이 반영된 뒤에만 자동 열기 하기 위한 신호로 씁니다.
    */
   const [calendarDataRevision, setCalendarDataRevision] = useState(0)
+  /** 예전(기기 전용) 일정 서버 정리 결과 안내 — 성공/실패 모두 눈에 보이게 */
+  const [backfillNotice, setBackfillNotice] = useState<string | null>(null)
 
   /**
    * localStorage + 서버 `calendar_events` 를 합쳐 `events` 를 맞춥니다.
@@ -227,11 +229,24 @@ export default function CalendarSection({ childId, focusDate = null, focusNonce 
        * 서버 저장이 도입되기 전에 이 기기에만 저장된 예전 일정(예: 여름 돌봄)을 한 번 올려
        * 모든 기기가 같은 DB 를 보도록 정리합니다. 이미 올린 일정은 다시 올리지 않습니다.
        */
-      const backfilled = await backfillLocalOnlyCalendarEvents(local, server, childId)
-      if (backfilled.size > 0) {
+      const backfill = await backfillLocalOnlyCalendarEvents(local, server, childId)
+      if (backfill.failures.length > 0) {
+        /**
+         * 조용히 실패하면 "동기화가 안 된다"는 것만 보이고 원인을 알 수 없습니다.
+         * 실패 사유를 그대로 보여 줘 바로 원인을 잡을 수 있게 합니다.
+         */
+        console.warn('[calendar backfill] 실패:', backfill.failures)
+        setBackfillNotice(
+          `예전 일정 ${backfill.failures.length}건을 다른 기기와 동기화하지 못했어요.\n` +
+            backfill.failures.map((f) => `· ${f.title}: ${f.reason}`).join('\n'),
+        )
+      } else if (backfill.uploaded > 0) {
+        setBackfillNotice(`이 기기에만 있던 예전 일정 ${backfill.uploaded}건을 모든 기기와 동기화했어요.`)
+      }
+      if (backfill.idMap.size > 0) {
         /** 로컬 임시 id 를 서버 UUID 로 교체해 이후 편집·삭제도 서버에 반영되게 합니다 */
         local = local.map((e) => {
-          const newId = backfilled.get(e.id)
+          const newId = backfill.idMap.get(e.id)
           return newId ? { ...e, id: newId } : e
         })
         try {
@@ -582,6 +597,18 @@ export default function CalendarSection({ childId, focusDate = null, focusNonce 
           일정 등록하기
         </button>
       </div>
+
+      {/* 예전 일정 동기화 결과 안내(1회성) — 눌러서 닫음 */}
+      {backfillNotice && (
+        <button
+          type="button"
+          onClick={() => setBackfillNotice(null)}
+          className="mb-1.5 w-full whitespace-pre-wrap rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-left text-[11px] font-bold leading-relaxed text-amber-800"
+        >
+          {backfillNotice}
+          <span className="mt-1 block text-[10px] font-medium text-amber-600">눌러서 닫기</span>
+        </button>
+      )}
 
       {/* pb-4: 이번 달 일정 아래·카드 하단 여백을 최소로(요청에 따라 pb-10 → 더 축소). FAB과 겹치면 pb-6 등으로만 살짝 늘리면 됨 */}
       <div className="w-full rounded-2xl bg-white px-4 pt-4 pb-4 shadow-sm">

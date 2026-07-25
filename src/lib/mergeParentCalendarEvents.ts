@@ -146,9 +146,16 @@ export async function deleteParentCalendarEvent(eventId: string): Promise<void> 
  * 캘린더 일정 서버 저장(기기 간 동기화) — 성공 시 서버 UUID 를 반환합니다.
  * childId 가 없는(가족 공통) 일정은 서버 스키마상 family_link 귀속이 안 되므로 localStorage 만 유지(null 반환).
  */
-export async function createParentCalendarEvent(event: LocalCalendarEvent): Promise<string | null> {
+export async function createParentCalendarEvent(
+  event: LocalCalendarEvent,
+  /** 실패 이유를 알려 주는 콜백(예전 일정 backfill 진단용) — 없으면 조용히 무시 */
+  onError?: (reason: string) => void,
+): Promise<string | null> {
   if (typeof window === 'undefined') return null
-  if (!event.childId) return null
+  if (!event.childId) {
+    onError?.('자녀 정보가 없어요(childId 없음)')
+    return null
+  }
   try {
     const res = await fetch('/api/calendar-event/create', {
       method: 'POST',
@@ -162,10 +169,17 @@ export async function createParentCalendarEvent(event: LocalCalendarEvent): Prom
         routineOverride: event.routineOverride,
       }),
     })
-    if (!res.ok) return null
+    if (!res.ok) {
+      const j = (await res.json().catch(() => ({}))) as { error?: string }
+      onError?.(`${res.status} ${j.error ?? '서버 저장 실패'}`)
+      return null
+    }
     const json = (await res.json().catch(() => ({}))) as { id?: string }
-    return typeof json.id === 'string' ? json.id : null
-  } catch {
+    if (typeof json.id === 'string') return json.id
+    onError?.('서버가 일정 id 를 돌려주지 않았어요')
+    return null
+  } catch (e) {
+    onError?.(e instanceof Error ? e.message : '네트워크 오류')
     return null
   }
 }
@@ -269,15 +283,30 @@ function calendarDedupeKey(title: string, startDate: string): string {
  *  2) 서버에 같은 제목·시작일이 있으면 건너뜀(다른 기기가 먼저 올린 경우)
  *  3) 한 번 올린 id 는 localStorage 에 기록해 다시 올리지 않음
  *
- * @returns 로컬 임시 id → 서버 UUID 매핑(호출 쪽에서 localStorage 의 id 를 교체하는 데 씁니다)
+ * @returns idMap(로컬 임시 id → 서버 UUID) + 진단 정보(시도/성공/실패 사유)
  */
+export interface CalendarBackfillResult {
+  /** 로컬 임시 id → 서버 UUID (호출 쪽에서 localStorage 의 id 를 교체하는 데 씁니다) */
+  idMap: Map<string, string>
+  /** 업로드를 시도한 건수 */
+  attempted: number
+  /** 실제로 서버에 올라간 건수 */
+  uploaded: number
+  /** 실패한 일정 제목 + 사유 (조용한 실패를 막기 위한 진단용) */
+  failures: { title: string; reason: string }[]
+}
+
 export async function backfillLocalOnlyCalendarEvents(
   local: LocalCalendarEvent[],
   server: LocalCalendarEvent[],
   selectedChildId: string | null,
-): Promise<Map<string, string>> {
+): Promise<CalendarBackfillResult> {
   const idMap = new Map<string, string>()
-  if (typeof window === 'undefined' || local.length === 0) return idMap
+  const failures: { title: string; reason: string }[] = []
+  let attempted = 0
+  if (typeof window === 'undefined' || local.length === 0) {
+    return { idMap, attempted, uploaded: idMap.size, failures }
+  }
 
   const serverIds = new Set(server.map((e) => e.id))
   const serverKeys = new Set(server.map((e) => calendarDedupeKey(e.title, e.startDate)))
@@ -301,20 +330,30 @@ export async function backfillLocalOnlyCalendarEvents(
      * 자녀 지정이 없던 예전 일정은 현재 보고 있는 자녀로 붙여 올립니다(같은 가족이라 브리핑·캘린더 모두 정상 표시).
      */
     const childId = ev.childId ?? selectedChildId
-    if (!childId) continue
+    if (!childId) {
+      failures.push({ title: ev.title, reason: '자녀를 고를 수 없어요(자녀 선택 후 다시 열어주세요)' })
+      continue
+    }
 
-    const newId = await createParentCalendarEvent({ ...ev, childId })
+    attempted += 1
+    let reason = '알 수 없는 오류'
+    const newId = await createParentCalendarEvent({ ...ev, childId }, (r) => {
+      reason = r
+    })
     if (newId) {
       idMap.set(ev.id, newId)
       done.add(ev.id)
       done.add(newId)
       doneChanged = true
       serverKeys.add(calendarDedupeKey(ev.title, ev.startDate))
+    } else {
+      /** 실패한 건 done 에 넣지 않아 다음 번에 다시 시도합니다 */
+      failures.push({ title: ev.title, reason })
     }
   }
 
   if (doneChanged) writeBackfilledIds(done)
-  return idMap
+  return { idMap, attempted, uploaded: idMap.size, failures }
 }
 
 type CalRow = {
