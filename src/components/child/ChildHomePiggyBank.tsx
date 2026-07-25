@@ -13,6 +13,12 @@ import { createPortal } from 'react-dom'
 import { piggyBankVisualFrameIndexFromSavedCredits, piggyBankVisualUrlFromSavedCredits } from '@/lib/piggyBankHomeStage'
 import { PIGGY_BANK_UNLOCK_MIN_LEVEL } from '@/constants/childAgeConfig'
 import { CHILD_CREDIT_COIN_PNG_SRC, formatChildCreditsDisplay } from '@/lib/childCreditDisplay'
+import {
+  claimPiggyBonus,
+  PIGGY_BONUS_HOLD_DAYS,
+  PIGGY_BONUS_MIN_BALANCE,
+  piggyBonusRateFor,
+} from '@/lib/piggyBankBonus'
 
 export const CHILD_PIGGY_DEPOSIT_SOUND_SRC =
   `/assets/audio/effects/${encodeURIComponent('ElevenLabs_귀여운_동전_떨어지는_소리_효과.mp3')}` as const
@@ -40,6 +46,9 @@ function playPiggyStageUpSound() {
     /* noop */
   }
 }
+
+/** 저금통 위에 한 번에 그릴 코인 최대 개수 — 넘으면 「+n」으로 줄여 보여 줍니다 */
+const MAX_BONUS_COINS_SHOWN = 12
 
 /** 저금통 입구(동전이 들어가는 지점) — 저금통 그림 기준 세로 % */
 const PIGGY_SLOT_Y_RATIO = 0.42
@@ -76,6 +85,10 @@ type Props = {
   levelCreditRef?: React.RefObject<HTMLDivElement | null>
   onPiggyUpdate: (patch: { credits: number; credits_piggy: number }) => void
   onPiggyTransferPending?: (pending: boolean) => void
+  /** 아직 받아 가지 않은 이자 개수 — 저금통 위에 이 수만큼 반짝이는 코인이 뜹니다 */
+  bonusPending?: number
+  /** 코인을 눌러 1개 받았을 때: 남은 개수와 늘어난 크레딧을 부모에게 알립니다 */
+  onBonusClaimed?: (next: { pending: number; credits: number }) => void
 }
 
 export default function ChildHomePiggyBank({
@@ -85,6 +98,8 @@ export default function ChildHomePiggyBank({
   depositEnabled,
   onPiggyUpdate,
   onPiggyTransferPending,
+  bonusPending = 0,
+  onBonusClaimed,
 }: Props) {
   const [sheetOpen, setSheetOpen] = useState(false)
   const [portalReady, setPortalReady] = useState(false)
@@ -102,6 +117,11 @@ export default function ChildHomePiggyBank({
   const pendingTransferCountRef = useRef(0)
   const lastConfirmedBalanceRef = useRef<{ credits: number; credits_piggy: number } | null>(null)
   const [piggySrc, setPiggySrc] = useState(piggyBankVisualUrlFromSavedCredits(piggyCredits))
+  /** 저금통 위에 떠 있는(아직 안 받은) 보너스 코인 개수 — 낙관적으로 먼저 줄입니다 */
+  const [bonusCount, setBonusCount] = useState(bonusPending)
+  const bonusOptimisticRef = useRef(bonusPending)
+  const bonusQueueRef = useRef(Promise.resolve())
+  const pendingClaimCountRef = useRef(0)
 
   useEffect(() => {
     setPortalReady(true)
@@ -118,6 +138,22 @@ export default function ChildHomePiggyBank({
   useEffect(() => {
     setPiggySrc(piggyBankVisualUrlFromSavedCredits(piggyCredits))
   }, [piggyCredits])
+
+  useEffect(() => {
+    // 연타 중에는 낙관적으로 줄여 둔 개수를 서버 왕복 값으로 되돌리지 않습니다.
+    if (pendingClaimCountRef.current > 0) return
+    bonusOptimisticRef.current = bonusPending
+    setBonusCount(bonusPending)
+  }, [bonusPending])
+
+  /** 임의의 좌표에서 크레딧 동전 그림까지 코인을 날립니다 */
+  const spawnFlyCoinAt = useCallback((fromX: number, fromY: number, toX: number, toY: number) => {
+    const id = ++flyIdRef.current
+    setFlyCoins((prev) => [...prev, { id, fromX, fromY, toX, toY }])
+    window.setTimeout(() => {
+      setFlyCoins((prev) => prev.filter((c) => c.id !== id))
+    }, 580)
+  }, [])
 
   const spawnFlyCoin = useCallback((kind: TransferKind) => {
     const piggyEl = piggyTargetRef.current
@@ -139,12 +175,8 @@ export default function ChildHomePiggyBank({
     const toX = kind === 'credits_to_piggy' ? piggyCenterX : creditsCoinCenterX
     const toY = kind === 'credits_to_piggy' ? piggySlotY : creditsCoinCenterY
 
-    const id = ++flyIdRef.current
-    setFlyCoins((prev) => [...prev, { id, fromX, fromY, toX, toY }])
-    window.setTimeout(() => {
-      setFlyCoins((prev) => prev.filter((c) => c.id !== id))
-    }, 580)
-  }, [])
+    spawnFlyCoinAt(fromX, fromY, toX, toY)
+  }, [spawnFlyCoinAt])
 
   const rollbackOptimistic = useCallback(
     (kind: TransferKind) => {
@@ -270,6 +302,63 @@ export default function ChildHomePiggyBank({
     enqueueTransfer('piggy_to_credits')
   }, [depositEnabled, onPiggyUpdate, spawnFlyCoin, enqueueTransfer])
 
+  /**
+   * 반짝이는 보너스 코인 1개를 눌러서 받습니다.
+   * 누른 코인 자리에서 왼쪽 크레딧 동전으로 날아가며 사라지고, 크레딧이 1 늘어납니다.
+   */
+  const claimOneBonus = useCallback(
+    (originRect: DOMRect) => {
+      if (bonusOptimisticRef.current < 1) return
+
+      const nextPending = bonusOptimisticRef.current - 1
+      bonusOptimisticRef.current = nextPending
+      setBonusCount(nextPending)
+
+      const nextCredits = optimisticCreditsRef.current + 1
+      optimisticCreditsRef.current = nextCredits
+      onPiggyUpdate({ credits: nextCredits, credits_piggy: optimisticPiggyRef.current })
+
+      const creditsCoinEl = creditsCoinRef.current
+      const creditsEl = creditsPanelRef.current
+      const target = creditsCoinEl?.getBoundingClientRect() ?? creditsEl?.getBoundingClientRect()
+      if (target) {
+        spawnFlyCoinAt(
+          originRect.left + originRect.width / 2,
+          originRect.top + originRect.height / 2,
+          target.left + target.width / 2,
+          target.top + target.height / 2,
+        )
+      }
+      playDepositSound()
+      setCreditsBounceKey((k) => k + 1)
+
+      pendingClaimCountRef.current += 1
+      bonusQueueRef.current = bonusQueueRef.current
+        .then(async () => {
+          const res = await claimPiggyBonus(childId, 1)
+          if (!res || res.claimed < 1) {
+            // 서버가 거절(이미 다 받음 등) — 화면을 되돌립니다.
+            bonusOptimisticRef.current += 1
+            setBonusCount(bonusOptimisticRef.current)
+            optimisticCreditsRef.current = Math.max(0, optimisticCreditsRef.current - 1)
+            onPiggyUpdate({
+              credits: optimisticCreditsRef.current,
+              credits_piggy: optimisticPiggyRef.current,
+            })
+            return
+          }
+          onBonusClaimed?.({ pending: res.pending, credits: res.credits })
+        })
+        .catch((err) => {
+          console.warn('[ChildHomePiggyBank] 보너스 받기 실패', err)
+        })
+        .finally(() => {
+          pendingClaimCountRef.current = Math.max(0, pendingClaimCountRef.current - 1)
+        })
+    },
+    [childId, onBonusClaimed, onPiggyUpdate, spawnFlyCoinAt],
+  )
+
   const openSheet = useCallback(() => {
     setSheetOpen(true)
     if (!depositEnabled) {
@@ -280,6 +369,9 @@ export default function ChildHomePiggyBank({
     setTransferHintVisible(showHint)
     if (showHint) markPiggyTransferHintSeen(childId)
   }, [childId, depositEnabled])
+
+  /** 지금 저금액에 적용되는 이자율(%) — 안내 문구용 */
+  const bonusRatePercent = Math.round(piggyBonusRateFor(piggyCredits) * 100)
 
   const canDeposit = depositEnabled && availableCredits >= 1
   const canWithdraw = depositEnabled && piggyCredits >= 1
@@ -323,7 +415,12 @@ export default function ChildHomePiggyBank({
         <div className="relative z-[1] flex w-full max-w-sm flex-col rounded-3xl border border-amber-100 bg-gradient-to-b from-amber-50 to-white p-5 shadow-xl">
           <h2 className="text-center text-lg font-black text-amber-900">저금하기</h2>
           <p className="mb-4 mt-2 text-center text-xs font-semibold text-amber-900/90">
-            저금을 하면 일주일에 1번 보너스 크레딧이 생겨요!
+            {`저금통에 ${PIGGY_BONUS_MIN_BALANCE}개 넘게 모으면 ${PIGGY_BONUS_HOLD_DAYS}일마다 보너스 크레딧이 생겨요!`}
+            <span className="mt-0.5 block text-[11px] font-bold text-amber-800/80">
+              {bonusRatePercent > 0
+                ? `지금은 ${bonusRatePercent}%씩 받아요 — 많이 모을수록 더 많이 받아요`
+                : '많이 모을수록 보너스도 커져요'}
+            </span>
           </p>
           <div className="grid grid-cols-2 gap-3">
             <button
@@ -361,11 +458,12 @@ export default function ChildHomePiggyBank({
               </div>
             </button>
 
+            <div className="relative">
             <button
               type="button"
               onClick={depositOne}
               disabled={!canDeposit}
-              className="flex min-h-[11.5rem] flex-col items-center rounded-2xl border-2 border-amber-100/90 bg-white/90 px-2 py-3 shadow-sm transition active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-45"
+              className="flex min-h-[11.5rem] w-full flex-col items-center rounded-2xl border-2 border-amber-100/90 bg-white/90 px-2 py-3 shadow-sm transition active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-45"
               aria-label={depositEnabled ? '저금통에 크레딧 넣기' : `저금통 — 레벨 ${PIGGY_BANK_UNLOCK_MIN_LEVEL}부터`}
             >
               <p className="text-center text-[11px] font-bold leading-tight text-amber-800/75">
@@ -397,7 +495,49 @@ export default function ChildHomePiggyBank({
                 </span>
               </div>
             </button>
+
+            {/**
+              * 저금통 머리 위 보너스 코인 — 받을 이자 1개당 코인 1개가 반짝입니다.
+              * 하나 누를 때마다 크레딧으로 날아가며 사라집니다(10개면 열 번 눌러야 다 받아요).
+              */}
+            {bonusCount > 0 ? (
+              <div className="pointer-events-none absolute inset-x-0 -top-3 z-[2] flex flex-wrap items-center justify-center gap-[3px] px-1">
+                {Array.from({ length: Math.min(bonusCount, MAX_BONUS_COINS_SHOWN) }).map((_, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={(e) => claimOneBonus(e.currentTarget.getBoundingClientRect())}
+                    className="pointer-events-auto relative h-[22px] w-[22px] shrink-0 border-0 bg-transparent p-0 transition active:scale-90"
+                    style={{ animation: `piggyBonusSparkle 1.4s ease-in-out ${(i % 5) * 0.18}s infinite` }}
+                    aria-label="보너스 크레딧 받기"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={CHILD_CREDIT_COIN_PNG_SRC}
+                      alt=""
+                      width={22}
+                      height={22}
+                      className="h-[22px] w-[22px] object-contain"
+                      style={{ filter: 'drop-shadow(0 0 4px rgba(255,214,80,0.95))' }}
+                      draggable={false}
+                    />
+                  </button>
+                ))}
+                {bonusCount > MAX_BONUS_COINS_SHOWN ? (
+                  <span className="ml-0.5 shrink-0 text-[11px] font-black text-amber-700">
+                    {`+${bonusCount - MAX_BONUS_COINS_SHOWN}`}
+                  </span>
+                ) : null}
+              </div>
+            ) : null}
+            </div>
           </div>
+
+          {bonusCount > 0 ? (
+            <p className="mt-3 text-center text-xs font-black text-amber-700">
+              {`반짝이는 코인 ${bonusCount}개를 눌러서 받아 가세요!`}
+            </p>
+          ) : null}
 
           {transferHintVisible && depositEnabled ? (
             <p className="mt-3 text-center text-xs font-black text-gray-600">
@@ -456,8 +596,26 @@ export default function ChildHomePiggyBank({
             draggable={false}
             onError={() => setPiggySrc('/assets/img/items/rewards/piggybank/piggy_bank1.png')}
           />
+          {/* 받을 보너스가 있으면 저금통 위에 반짝이는 코인 뱃지를 띄워 알려 줍니다 */}
+          {bonusCount > 0 ? (
+            <span
+              className="pointer-events-none absolute -right-1 -top-2 flex items-center gap-[1px] rounded-full bg-amber-400/95 px-1 py-[1px] text-[9px] font-black leading-none text-amber-950 shadow"
+              style={{ animation: 'piggyBonusSparkle 1.4s ease-in-out infinite' }}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={CHILD_CREDIT_COIN_PNG_SRC} alt="" width={10} height={10} className="h-[10px] w-[10px]" />
+              {bonusCount}
+            </span>
+          ) : null}
         </div>
       </button>
+      {/* 접힌 버튼의 뱃지도 반짝이도록 — 팝업이 닫혀 있어도 필요한 keyframe */}
+      <style>{`
+        @keyframes piggyBonusSparkle {
+          0%, 100% { transform: translateY(0) scale(1); filter: brightness(1); }
+          50% { transform: translateY(-3px) scale(1.14); filter: brightness(1.45); }
+        }
+      `}</style>
       {portalReady && flyLayer ? createPortal(flyLayer, document.body) : null}
       {portalReady && popup ? createPortal(popup, document.body) : null}
     </>

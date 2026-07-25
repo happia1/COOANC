@@ -710,8 +710,10 @@ export default function ChildScreen({
     initialStats ? normalizeChildStatsCreditsSplit(initialStats) : null,
   )
 
-  /** 저금통 이자를 방금 받았을 때 보여 줄 금액(없으면 null) */
-  const [piggyBonusToast, setPiggyBonusToast] = useState<number | null>(null)
+  /** 아직 받아 가지 않은 저금통 이자 — 저금통 위에 이 수만큼 반짝이는 코인이 뜹니다 */
+  const [piggyBonusPending, setPiggyBonusPending] = useState<number>(() =>
+    readChildStatInt(initialStats?.piggy_bonus_pending),
+  )
 
   /**
    * 부모가 저장한 루틴 알람(기상·잘시간·하원 등) 번들을 DB(child_stats.routine_alarm_prefs)에서
@@ -756,20 +758,18 @@ export default function ChildScreen({
   }, [])
 
   /**
-   * 저금통 보너스(이자) 정산 — 앱을 열 때 한 번 서버에 요청합니다.
+   * 저금통 이자 정산 — 앱을 열 때 한 번 서버에 요청합니다.
    *
-   * 비개발자: 저금통에 10크레딧 이상을 7일 두면 잔액의 10%를 자동으로 넣어 줍니다.
-   * 지급 여부·금액은 모두 서버가 판단하므로(중복 지급 방지) 여기서는 결과만 화면에 반영합니다.
+   * 비개발자: 저금통에 10크레딧 이상을 3일 두면 이자가 붙습니다(저금액이 많을수록 이자율↑).
+   * 이자는 바로 들어오지 않고 「받을 보너스」에 쌓이며, 저금통 위에 뜬 반짝이는 코인을
+   * 아이가 1개씩 눌러야 크레딧이 됩니다. 지급 판단은 모두 서버가 합니다(중복 지급 방지).
    */
   useEffect(() => {
     if (!childId) return
     let cancelled = false
     void settlePiggyBonus(childId).then((res) => {
-      if (cancelled || !res || res.paid <= 0) return
-      setStats((prev) =>
-        normalizeChildStatsCreditsSplit(mergeChildStatsPatch(prev, { credits_piggy: res.creditsPiggy })),
-      )
-      setPiggyBonusToast(res.paid)
+      if (cancelled || !res) return
+      setPiggyBonusPending(res.pending)
     })
     return () => {
       cancelled = true
@@ -2338,19 +2338,6 @@ export default function ChildScreen({
 
   return (
     <>
-      {/* 저금통 이자 지급 안내 — 눌러서 닫음 */}
-      {piggyBonusToast !== null && piggyBonusToast > 0 && (
-        <button
-          type="button"
-          onClick={() => setPiggyBonusToast(null)}
-          className="fixed left-1/2 top-4 z-[200] -translate-x-1/2 rounded-2xl bg-amber-400 px-5 py-3 text-center text-sm font-black text-amber-950 shadow-xl active:scale-95"
-        >
-          🐷 저금통 이자 +{piggyBonusToast} 크레딧을 받았어요!
-          <span className="mt-0.5 block text-[11px] font-bold text-amber-900/80">
-            모아 둘수록 더 많이 받아요
-          </span>
-        </button>
-      )}
       {/**
        * 전체 화면 컨테이너 — fixed inset-0 로 ChildNavBar(z-50), 레이아웃 나가기 버튼(z-50) 위에 올립니다.
        * 비개발자 설명: 이 화면이 기존 탭 바를 완전히 가리고 단일 화면으로 동작합니다.
@@ -2603,6 +2590,13 @@ export default function ChildScreen({
                     levelCreditRef={creditBadgeRef}
                     onPiggyUpdate={patchPiggyFromHome}
                     onPiggyTransferPending={setPiggyTransferPending}
+                    bonusPending={piggyBonusPending}
+                    onBonusClaimed={({ pending, credits }) => {
+                      setPiggyBonusPending(pending)
+                      setStats((prev) =>
+                        normalizeChildStatsCreditsSplit(mergeChildStatsPatch(prev, { credits })),
+                      )
+                    }}
                   />
               </div>
             </div>

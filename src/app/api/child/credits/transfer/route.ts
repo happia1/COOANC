@@ -131,29 +131,32 @@ export async function POST(req: NextRequest) {
       : { fired: false, unlockedItemIndex: null }
 
   /**
-   * 저금통 보너스 기간을 서버에서 갱신합니다.
+   * 저금통 이자 기간을 서버에서 갱신합니다.
    * - 10크레딧 이상이 되면 기간 시작, 10 미만으로 내려가면 리셋
-   * - 7일이 지났으면 이 자리에서 바로 지급
+   * - 3일이 지났으면 이자를 「받을 보너스」(piggy_bonus_pending)에 쌓습니다.
+   *   저금통 잔액은 건드리지 않습니다 — 자녀가 코인을 눌러서 받아 가야 크레딧이 됩니다.
    * 실패해도(마이그레이션 미적용 등) 옮기기 자체는 이미 저장되었으므로 무시합니다.
    */
   let bonusPaid = 0
-  let piggyAfterBonus = nextPiggy
+  let bonusPending = 0
   const { data: settled, error: settleErr } = await supabase.rpc('settle_piggy_bonus', {
     p_child_id: childId,
   })
   if (settleErr) {
-    console.warn('[credits/transfer] 저금통 보너스 정산 실패(127 마이그레이션 필요?):', settleErr.message)
+    console.warn('[credits/transfer] 저금통 이자 정산 실패(128 마이그레이션 필요?):', settleErr.message)
   } else if (settled && typeof settled === 'object') {
-    const s = settled as { paid?: number; credits_piggy?: number }
+    const s = settled as { paid?: number; pending?: number }
     bonusPaid = Number(s.paid ?? 0)
-    piggyAfterBonus = Number(s.credits_piggy ?? nextPiggy)
+    bonusPending = Number(s.pending ?? 0)
   }
 
   return NextResponse.json({
     credits: nextCredits,
-    credits_piggy: piggyAfterBonus,
-    /** 이번 옮기기 직후 지급된 저금통 보너스(0이면 없음) */
+    credits_piggy: nextPiggy,
+    /** 이번 옮기기 직후 새로 붙은 이자(0이면 없음) */
     piggy_bonus_paid: bonusPaid,
+    /** 아직 받아 가지 않고 쌓여 있는 이자 = 저금통 위에 뜰 코인 개수 */
+    piggy_bonus_pending: bonusPending,
     itemUnlocked:
       triggerResult.fired && triggerResult.unlockedItemIndex !== null
         ? { index: triggerResult.unlockedItemIndex, triggerKey: 'FIRST_SAVE' }
