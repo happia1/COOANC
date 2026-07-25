@@ -24,6 +24,7 @@ import { COOANC_CALENDAR_EVENTS_STORAGE_KEY } from '@/lib/localStorageChildScope
 import { COOANC_CALENDAR_STORAGE_UPDATE_EVENT } from '@/lib/syncAgentEventToLocalCalendar'
 import { createClient } from '@/lib/supabase/client'
 import {
+  backfillLocalOnlyCalendarEvents,
   dedupeMergedCalendarEventsByTitleAndStart,
   createParentCalendarEvent,
   updateParentCalendarEvent,
@@ -222,6 +223,24 @@ export default function CalendarSection({ childId, focusDate = null, focusNonce 
         local = []
       }
       server = await fetchParentCalendarEventsFromServer(childId)
+      /**
+       * 서버 저장이 도입되기 전에 이 기기에만 저장된 예전 일정(예: 여름 돌봄)을 한 번 올려
+       * 모든 기기가 같은 DB 를 보도록 정리합니다. 이미 올린 일정은 다시 올리지 않습니다.
+       */
+      const backfilled = await backfillLocalOnlyCalendarEvents(local, server, childId)
+      if (backfilled.size > 0) {
+        /** 로컬 임시 id 를 서버 UUID 로 교체해 이후 편집·삭제도 서버에 반영되게 합니다 */
+        local = local.map((e) => {
+          const newId = backfilled.get(e.id)
+          return newId ? { ...e, id: newId } : e
+        })
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(local))
+        } catch {
+          /* 저장 실패해도 아래 서버 재조회 결과로 화면은 맞습니다 */
+        }
+        server = await fetchParentCalendarEventsFromServer(childId)
+      }
       merged = dedupeMergedCalendarEventsByTitleAndStart(
         filterOutDeletedCalendarEvents(mergeServerAndLocalCalendar(server, local, childId)),
       )

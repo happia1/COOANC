@@ -227,6 +227,96 @@ export function dedupeMergedCalendarEventsByTitleAndStart(events: LocalCalendarE
   return keyOrder.map((k) => byKey.get(k)!)
 }
 
+/**
+ * 이미 서버로 올린(또는 올릴 필요가 없다고 판단한) 로컬 일정 id 모음 — 중복 업로드 방지용.
+ * 기기마다 따로 기록됩니다(어차피 업로드 대상도 그 기기의 localStorage 일정이라 기기별이면 충분).
+ */
+const CALENDAR_BACKFILL_DONE_KEY = 'cooanc_calendar_backfilled_ids_v1'
+
+function readBackfilledIds(): Set<string> {
+  try {
+    const raw = localStorage.getItem(CALENDAR_BACKFILL_DONE_KEY)
+    if (!raw) return new Set()
+    const arr = JSON.parse(raw) as unknown
+    return new Set(Array.isArray(arr) ? arr.filter((v): v is string => typeof v === 'string') : [])
+  } catch {
+    return new Set()
+  }
+}
+
+function writeBackfilledIds(ids: Set<string>): void {
+  try {
+    localStorage.setItem(CALENDAR_BACKFILL_DONE_KEY, JSON.stringify([...ids]))
+  } catch {
+    /* 저장 실패해도 중복은 아래 제목·시작일 대조로 한 번 더 걸러집니다 */
+  }
+}
+
+/** 중복 판정 키 — 제목(공백·대소문자 무시) + 시작일 */
+function calendarDedupeKey(title: string, startDate: string): string {
+  return `${title.trim().toLowerCase()} ${String(startDate).slice(0, 10)}`
+}
+
+/**
+ * **기기에만 남아 있던 예전 일정을 서버로 올립니다(1회성 정리).**
+ *
+ * 비개발자 설명: 캘린더가 서버 저장을 시작하기 전에 등록한 일정(예: 여름 돌봄)은
+ * 등록한 기기의 브라우저에만 있어서 다른 기기에서는 보이지 않았습니다.
+ * 이 함수가 그런 일정을 찾아 서버에 한 번 올려 주면, 그 뒤로는 모든 기기에서 같이 보입니다.
+ *
+ * 중복 방지 3중 장치:
+ *  1) 서버에 같은 id 가 이미 있으면 건너뜀
+ *  2) 서버에 같은 제목·시작일이 있으면 건너뜀(다른 기기가 먼저 올린 경우)
+ *  3) 한 번 올린 id 는 localStorage 에 기록해 다시 올리지 않음
+ *
+ * @returns 로컬 임시 id → 서버 UUID 매핑(호출 쪽에서 localStorage 의 id 를 교체하는 데 씁니다)
+ */
+export async function backfillLocalOnlyCalendarEvents(
+  local: LocalCalendarEvent[],
+  server: LocalCalendarEvent[],
+  selectedChildId: string | null,
+): Promise<Map<string, string>> {
+  const idMap = new Map<string, string>()
+  if (typeof window === 'undefined' || local.length === 0) return idMap
+
+  const serverIds = new Set(server.map((e) => e.id))
+  const serverKeys = new Set(server.map((e) => calendarDedupeKey(e.title, e.startDate)))
+  const deleted = readDeletedCalendarEventIds()
+  const done = readBackfilledIds()
+  let doneChanged = false
+
+  for (const ev of local) {
+    if (!ev?.id || ev.id.startsWith('__public_holiday__')) continue
+    if (deleted.has(ev.id)) continue
+    if (done.has(ev.id)) continue
+    if (serverIds.has(ev.id)) continue
+    if (serverKeys.has(calendarDedupeKey(ev.title, ev.startDate))) {
+      /** 다른 기기가 이미 올린 같은 일정 — 다시 안 보게 표시만 하고 넘어갑니다 */
+      done.add(ev.id)
+      doneChanged = true
+      continue
+    }
+    /**
+     * 서버는 자녀(family_link) 귀속이 필요합니다.
+     * 자녀 지정이 없던 예전 일정은 현재 보고 있는 자녀로 붙여 올립니다(같은 가족이라 브리핑·캘린더 모두 정상 표시).
+     */
+    const childId = ev.childId ?? selectedChildId
+    if (!childId) continue
+
+    const newId = await createParentCalendarEvent({ ...ev, childId })
+    if (newId) {
+      idMap.set(ev.id, newId)
+      done.add(ev.id)
+      done.add(newId)
+      doneChanged = true
+      serverKeys.add(calendarDedupeKey(ev.title, ev.startDate))
+    }
+  }
+
+  if (doneChanged) writeBackfilledIds(done)
+  return idMap
+}
+
 type CalRow = {
   id: string
   title: string
