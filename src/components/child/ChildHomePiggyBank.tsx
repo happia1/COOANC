@@ -11,7 +11,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { piggyBankVisualFrameIndexFromSavedCredits, piggyBankVisualUrlFromSavedCredits } from '@/lib/piggyBankHomeStage'
-import { markPiggyBonusPeriodStarted } from '@/lib/piggyBankBonus'
 import { PIGGY_BANK_UNLOCK_MIN_LEVEL } from '@/constants/childAgeConfig'
 import { CHILD_CREDIT_COIN_PNG_SRC, formatChildCreditsDisplay } from '@/lib/childCreditDisplay'
 
@@ -243,7 +242,6 @@ export default function ChildHomePiggyBank({
     spawnFlyCoin('credits_to_piggy')
     setTransferHintVisible(false)
     markPiggyTransferHintSeen(childId)
-    markPiggyBonusPeriodStarted(childId)
 
     const prevFrame = piggyBankVisualFrameIndexFromSavedCredits(prevPiggy)
     const nextFrame = piggyBankVisualFrameIndexFromSavedCredits(nextPiggy)

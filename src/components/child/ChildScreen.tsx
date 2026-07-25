@@ -126,6 +126,7 @@ import {
   getMsUntilNextSeoulMidnight,
 } from '@/lib/koreaDate'
 import { isAfternoonMission } from '@/lib/missionAmPm'
+import { settlePiggyBonus } from '@/lib/piggyBankBonus'
 import {
   isBedtimeMissionBlockedBeforeSleepReadyWindow,
   isSeoulTimeBeforeNoon,
@@ -709,6 +710,9 @@ export default function ChildScreen({
     initialStats ? normalizeChildStatsCreditsSplit(initialStats) : null,
   )
 
+  /** 저금통 이자를 방금 받았을 때 보여 줄 금액(없으면 null) */
+  const [piggyBonusToast, setPiggyBonusToast] = useState<number | null>(null)
+
   /**
    * 부모가 저장한 루틴 알람(기상·잘시간·하원 등) 번들을 DB(child_stats.routine_alarm_prefs)에서
    * localStorage 로 복원합니다. 자녀 알람 컴포넌트들이 localStorage 를 읽기 **전에** 렌더 중 1회 실행해,
@@ -750,6 +754,27 @@ export default function ChildScreen({
   const onWaterPending = useCallback((pending: boolean) => {
     pendingStatsWritesRef.current = Math.max(0, pendingStatsWritesRef.current + (pending ? 1 : -1))
   }, [])
+
+  /**
+   * 저금통 보너스(이자) 정산 — 앱을 열 때 한 번 서버에 요청합니다.
+   *
+   * 비개발자: 저금통에 10크레딧 이상을 7일 두면 잔액의 10%를 자동으로 넣어 줍니다.
+   * 지급 여부·금액은 모두 서버가 판단하므로(중복 지급 방지) 여기서는 결과만 화면에 반영합니다.
+   */
+  useEffect(() => {
+    if (!childId) return
+    let cancelled = false
+    void settlePiggyBonus(childId).then((res) => {
+      if (cancelled || !res || res.paid <= 0) return
+      setStats((prev) =>
+        normalizeChildStatsCreditsSplit(mergeChildStatsPatch(prev, { credits_piggy: res.creditsPiggy })),
+      )
+      setPiggyBonusToast(res.paid)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [childId])
 
   /** 인형뽑기 그랩 API가 저장한 하트·크레딧을 레벨 카드 `stats` 에도 바로 반영합니다. */
   const onClawStatsSynced = useCallback((patch: Record<string, unknown>) => {
@@ -2313,6 +2338,19 @@ export default function ChildScreen({
 
   return (
     <>
+      {/* 저금통 이자 지급 안내 — 눌러서 닫음 */}
+      {piggyBonusToast !== null && piggyBonusToast > 0 && (
+        <button
+          type="button"
+          onClick={() => setPiggyBonusToast(null)}
+          className="fixed left-1/2 top-4 z-[200] -translate-x-1/2 rounded-2xl bg-amber-400 px-5 py-3 text-center text-sm font-black text-amber-950 shadow-xl active:scale-95"
+        >
+          🐷 저금통 이자 +{piggyBonusToast} 크레딧을 받았어요!
+          <span className="mt-0.5 block text-[11px] font-bold text-amber-900/80">
+            모아 둘수록 더 많이 받아요
+          </span>
+        </button>
+      )}
       {/**
        * 전체 화면 컨테이너 — fixed inset-0 로 ChildNavBar(z-50), 레이아웃 나가기 버튼(z-50) 위에 올립니다.
        * 비개발자 설명: 이 화면이 기존 탭 바를 완전히 가리고 단일 화면으로 동작합니다.

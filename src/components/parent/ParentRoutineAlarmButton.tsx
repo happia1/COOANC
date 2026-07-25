@@ -51,9 +51,15 @@ export default function ParentRoutineAlarmButton({ initialPendingApprovalCount }
     mission_count: number
   }[]>([])
 
-  /** 클라이언트에서만: 예전에 확인해 둔 id 를 불러옵니다 */
+  /** 확인해 둔 id 를 DB 에서 불러옵니다(기기 간 동일) */
   useEffect(() => {
-    setAcknowledgedIds(readAcknowledgedPurchaseRequestIds())
+    let cancelled = false
+    void readAcknowledgedPurchaseRequestIds().then((ids) => {
+      if (!cancelled) setAcknowledgedIds(ids)
+    })
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   /**
@@ -104,11 +110,8 @@ export default function ParentRoutineAlarmButton({ initialPendingApprovalCount }
     } else {
       const ids = (purchaseRes.data ?? []).map((r: { id: string }) => r.id)
       setPendingRequestIds(ids)
-      setAcknowledgedIds((prev) => {
-        const pruned = pruneAcknowledgedToCurrentPending(prev, ids)
-        if (pruned.size !== prev.size) writeAcknowledgedPurchaseRequestIds(pruned)
-        return pruned
-      })
+      /** 처리된 요청은 DB 의 cascade 가 정리하므로 여기서는 화면 표시만 좁힙니다 */
+      setAcknowledgedIds((prev) => pruneAcknowledgedToCurrentPending(prev, ids))
     }
     if (rapidRes.error) {
       console.warn('[parent bell hub] rapid_tap_alerts:', rapidRes.error.message)
@@ -166,15 +169,10 @@ export default function ParentRoutineAlarmButton({ initialPendingApprovalCount }
 
   /** 승인 탭으로 가기 직전: 현재 보이던 대기 건을 모두 「확인」처리 */
   const acknowledgePurchaseNotifications = useCallback(() => {
-    setAcknowledgedIds((prev) => {
-      const next = new Set(prev)
-      for (const id of pendingRequestIds) {
-        if (!prev.has(id)) next.add(id)
-      }
-      const pruned = pruneAcknowledgedToCurrentPending(next, pendingRequestIds)
-      writeAcknowledgedPurchaseRequestIds(pruned)
-      return pruned
-    })
+    const pruned = pruneAcknowledgedToCurrentPending(new Set(pendingRequestIds), pendingRequestIds)
+    setAcknowledgedIds(pruned)
+    /** DB 에 저장해 다른 기기(폰·태블릿)에서도 뱃지가 함께 사라지게 합니다 */
+    void writeAcknowledgedPurchaseRequestIds(pruned)
   }, [pendingRequestIds])
 
   return (

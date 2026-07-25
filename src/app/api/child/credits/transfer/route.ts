@@ -130,9 +130,30 @@ export async function POST(req: NextRequest) {
       ? await fireGameTrigger(supabase, childId, 'FIRST_SAVE')
       : { fired: false, unlockedItemIndex: null }
 
+  /**
+   * 저금통 보너스 기간을 서버에서 갱신합니다.
+   * - 10크레딧 이상이 되면 기간 시작, 10 미만으로 내려가면 리셋
+   * - 7일이 지났으면 이 자리에서 바로 지급
+   * 실패해도(마이그레이션 미적용 등) 옮기기 자체는 이미 저장되었으므로 무시합니다.
+   */
+  let bonusPaid = 0
+  let piggyAfterBonus = nextPiggy
+  const { data: settled, error: settleErr } = await supabase.rpc('settle_piggy_bonus', {
+    p_child_id: childId,
+  })
+  if (settleErr) {
+    console.warn('[credits/transfer] 저금통 보너스 정산 실패(127 마이그레이션 필요?):', settleErr.message)
+  } else if (settled && typeof settled === 'object') {
+    const s = settled as { paid?: number; credits_piggy?: number }
+    bonusPaid = Number(s.paid ?? 0)
+    piggyAfterBonus = Number(s.credits_piggy ?? nextPiggy)
+  }
+
   return NextResponse.json({
     credits: nextCredits,
-    credits_piggy: nextPiggy,
+    credits_piggy: piggyAfterBonus,
+    /** 이번 옮기기 직후 지급된 저금통 보너스(0이면 없음) */
+    piggy_bonus_paid: bonusPaid,
     itemUnlocked:
       triggerResult.fired && triggerResult.unlockedItemIndex !== null
         ? { index: triggerResult.unlockedItemIndex, triggerKey: 'FIRST_SAVE' }

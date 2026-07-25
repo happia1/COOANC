@@ -1,37 +1,72 @@
 /**
- * 부모 상단 알림·공지 시트에서 「구매 승인 대기」를 확인했을 때의 상태를 브라우저에만 둡니다.
- * - 요청 UUID 를 저장해 두었다가, 아직 대기 중인 건은 시트·뱃지에서 숨깁니다.
- * - 승인·반려 등으로 DB 에서 빠진 id 는 저장소에서도 정리해 두어 용량이 불필요하게 커지지 않게 합니다.
+ * 부모 상단 알림 시트에서 「구매 승인 대기」를 확인한 상태 — **DB 기준**입니다.
+ *
+ * 비개발자 설명:
+ * - 예전에는 확인 표시를 그 기기(브라우저)에만 저장해서, 노트북에서 알림을 확인해도
+ *   폰·태블릿에는 뱃지가 그대로 남아 기기마다 알림 개수가 달랐습니다.
+ * - 이제 `parent_purchase_request_acks` 테이블에 저장해 모든 기기가 같은 상태를 봅니다.
+ * - 승인·반려로 요청이 사라지면 DB 의 외래키(on delete cascade)가 알아서 정리합니다.
  */
 
-const STORAGE_KEY = 'cooanc_parent_bell_ack_purchase_request_ids'
+import { createClient } from '@/lib/supabase/client'
 
-/** localStorage 에서 확인 완료한 purchase_requests.id 목록을 읽습니다 */
-export function readAcknowledgedPurchaseRequestIds(): Set<string> {
+/** 이 부모가 확인 완료한 purchase_requests.id 목록을 DB 에서 읽습니다 */
+export async function readAcknowledgedPurchaseRequestIds(): Promise<Set<string>> {
   if (typeof window === 'undefined') return new Set()
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    const arr = raw ? JSON.parse(raw) : []
-    if (!Array.isArray(arr)) return new Set()
-    return new Set(arr.filter((x): x is string => typeof x === 'string' && x.length > 0))
+    const supabase = createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) return new Set()
+
+    const { data, error } = await supabase
+      .from('parent_purchase_request_acks')
+      .select('purchase_request_id')
+      .eq('parent_id', user.id)
+    if (error || !data) return new Set()
+
+    return new Set(
+      (data as { purchase_request_id: string }[])
+        .map((r) => r.purchase_request_id)
+        .filter((id): id is string => typeof id === 'string' && id.length > 0),
+    )
   } catch {
     return new Set()
   }
 }
 
-/** 확인한 id 들을 저장합니다(기존 항목과 합칩니다) */
-export function writeAcknowledgedPurchaseRequestIds(ids: Set<string>): void {
-  if (typeof window === 'undefined') return
+/**
+ * 확인한 id 들을 DB 에 기록합니다(이미 있으면 무시).
+ * 다른 기기에서도 곧바로 확인 완료 상태가 됩니다.
+ */
+export async function writeAcknowledgedPurchaseRequestIds(ids: Set<string>): Promise<void> {
+  if (typeof window === 'undefined' || ids.size === 0) return
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify([...ids]))
+    const supabase = createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) return
+
+    const rows = [...ids].map((purchase_request_id) => ({
+      parent_id: user.id,
+      purchase_request_id,
+    }))
+    const { error } = await supabase
+      .from('parent_purchase_request_acks')
+      .upsert(rows, { onConflict: 'parent_id,purchase_request_id', ignoreDuplicates: true })
+    if (error) {
+      console.warn('[parentBellPurchaseAck] 확인 상태 저장 실패(127 마이그레이션 필요?):', error.message)
+    }
   } catch {
-    /* 저장 실패 시 UI 만 맞고 다음에 다시 시도 */
+    /* 저장 실패 시 이번 화면만 맞고 다음에 다시 시도 */
   }
 }
 
 /**
  * DB 에서 여전히 대기(pending·parent_buying)인 id 만 남깁니다.
- * - 처리되어 목록에서 사라진 id 는 저장소에서도 지웁니다.
+ * 화면 표시용 계산이며, 저장소 정리는 DB 의 cascade 가 담당합니다.
  */
 export function pruneAcknowledgedToCurrentPending(
   acknowledged: Set<string>,

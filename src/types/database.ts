@@ -38,6 +38,10 @@ export type ChildStats = {
   credits_wallet?: number
   /** 「저금통」에 넣어 둔 크레딧 */
   credits_piggy?: number
+  /** 저금통 보너스(이자) 기간 시작 시각 — 최소 저금액(10) 미만이면 null (127) */
+  piggy_bonus_since?: string | null
+  /** 마지막 저금통 보너스 지급 시각 — 다음 지급은 7일 뒤 (127) */
+  piggy_bonus_last_paid_at?: string | null
   hearts: number
   total_credits_earned: number
   current_level: number         // 0~99
