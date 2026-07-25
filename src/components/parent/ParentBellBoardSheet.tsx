@@ -11,6 +11,7 @@ import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { useSwipeToDismiss } from '@/hooks/useSwipeToDismiss'
 import ParentNoticeSlides from '@/components/parent/ParentNoticeSlides'
+import ParentChildLevelGuideNoticeList from '@/components/parent/ParentChildLevelGuideNoticeList'
 
 type RapidTapAlert = {
   id: string
@@ -32,6 +33,8 @@ type Props = {
   rapidTapAlerts?: RapidTapAlert[]
   /** 연속 탭 알림 확인 처리 콜백 */
   onAcknowledgeRapidTapAlerts?: () => void
+  /** 자녀별 이름·레벨 — 「자녀 레벨 안내」 구역에 씁니다(홈에서 X 로 닫아도 여기선 계속 보임) */
+  childLevels?: { childId: string; name: string; level: number }[]
 }
 
 export default function ParentBellBoardSheet({
@@ -42,6 +45,7 @@ export default function ParentBellBoardSheet({
   onAcknowledgePurchaseNotifications,
   rapidTapAlerts = [],
   onAcknowledgeRapidTapAlerts,
+  childLevels = [],
 }: Props) {
   const [portalReady, setPortalReady] = useState(false)
   const [sheetEntered, setSheetEntered] = useState(false)
@@ -157,6 +161,9 @@ export default function ParentBellBoardSheet({
                 </ul>
               </div>
             ) : null}
+
+            {/* 자녀 레벨 안내 — 홈에서 닫아도 여기서는 언제든 다시 볼 수 있습니다 */}
+            <ParentChildLevelGuideNoticeList items={childLevels} />
 
             <ParentNoticeSlides active={open} onClose={onClose} focusNoticeId={focusNoticeId} />
           </div>

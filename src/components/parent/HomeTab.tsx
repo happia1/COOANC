@@ -30,6 +30,7 @@ import { useChildSiblingAvatarNav, type ChildTab } from '@/components/parent/Chi
 import { ParentHomeProgressBlock } from '@/components/parent/EconomicEqPanel'
 import { PARENT_NEUTRAL_CARD_CLASSNAME } from '@/lib/parentNeutralBlockStyle'
 import ParentAgentHomeCards from '@/components/parent/ParentAgentHomeCards'
+import ParentChildLevelGuideCard from '@/components/parent/ParentChildLevelGuideCard'
 import CalendarSection, { CalendarEventSheet } from '@/components/parent/CalendarSection'
 import { CompactChildProfileCard } from '@/components/parent/CompactChildProfileCard'
 import { useParentAgentReport } from '@/hooks/useParentAgentReport'
@@ -540,6 +541,16 @@ export default function HomeTab({
                 todayCompleted={child.todayCompleted}
                 totalMissions={child.totalMissions}
                 weeklyRoutine={weeklyRoutine}
+              />
+
+              {/**
+                * 자녀 레벨 안내 — 「다가오는 일정」 바로 위.
+                * X 로 닫으면 홈에서만 사라지고, 상단 알림창에서는 계속 볼 수 있습니다.
+                */}
+              <ParentChildLevelGuideCard
+                childId={child.id}
+                childName={child.name}
+                level={s?.current_level ?? 0}
               />
 
               <ParentAgentHomeCards

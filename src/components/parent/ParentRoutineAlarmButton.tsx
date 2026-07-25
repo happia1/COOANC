@@ -39,6 +39,8 @@ export default function ParentRoutineAlarmButton({ initialPendingApprovalCount }
   const [acknowledgedIds, setAcknowledgedIds] = useState<Set<string>>(() => new Set())
   /** 첫 번째 대기 목록 fetch 가 끝났는지 — 뱃지를 서버 숫자와 맞출 때 사용 */
   const [fetchDone, setFetchDone] = useState(false)
+  /** 알림창 「자녀 레벨 안내」용 — 연결된 자녀의 이름·레벨 */
+  const [childLevels, setChildLevels] = useState<{ childId: string; name: string; level: number }[]>([])
 
   /**
    * 최근 10분 이내에 미확인된 연속 탭 알림 목록.
@@ -90,7 +92,7 @@ export default function ParentRoutineAlarmButton({ initialPendingApprovalCount }
       return
     }
     const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString()
-    const [purchaseRes, rapidRes] = await Promise.all([
+    const [purchaseRes, rapidRes, statsRes, profileRes] = await Promise.all([
       supabase
         .from('purchase_requests')
         .select('id')
@@ -104,6 +106,9 @@ export default function ParentRoutineAlarmButton({ initialPendingApprovalCount }
         .gte('detected_at', tenMinutesAgo)
         .order('detected_at', { ascending: false })
         .limit(5),
+      // 알림창에서 「자녀 레벨 안내」를 보여 주기 위한 레벨·이름
+      supabase.from('child_stats').select('child_id, current_level').in('child_id', childIds),
+      supabase.from('profiles').select('id, name').in('id', childIds),
     ])
     if (purchaseRes.error) {
       console.warn('[parent bell hub] pending rows:', purchaseRes.error.message)
@@ -118,6 +123,26 @@ export default function ParentRoutineAlarmButton({ initialPendingApprovalCount }
     } else {
       setRapidTapAlerts(
         (rapidRes.data ?? []) as { id: string; child_id: string; detected_at: string; mission_count: number }[],
+      )
+    }
+    if (statsRes.error || profileRes.error) {
+      console.warn(
+        '[parent bell hub] child levels:',
+        statsRes.error?.message ?? profileRes.error?.message,
+      )
+    } else {
+      const nameById = new Map(
+        ((profileRes.data ?? []) as { id: string; name: string | null }[]).map((p) => [
+          p.id,
+          p.name ?? '아이',
+        ]),
+      )
+      setChildLevels(
+        ((statsRes.data ?? []) as { child_id: string; current_level: number | null }[]).map((r) => ({
+          childId: r.child_id,
+          name: nameById.get(r.child_id) ?? '아이',
+          level: Number(r.current_level ?? 0),
+        })),
       )
     }
     setFetchDone(true)
@@ -223,6 +248,7 @@ export default function ParentRoutineAlarmButton({ initialPendingApprovalCount }
         unreadPendingCount={unreadPendingCount}
         onAcknowledgePurchaseNotifications={acknowledgePurchaseNotifications}
         rapidTapAlerts={rapidTapAlerts}
+        childLevels={childLevels}
         onAcknowledgeRapidTapAlerts={acknowledgeRapidTapAlerts}
       />
 
