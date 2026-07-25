@@ -44,6 +44,8 @@ export type ChildStats = {
   piggy_bonus_last_paid_at?: string | null
   /** 아직 받아 가지 않은 이자 — 저금통 위 반짝이는 코인 개수 (128) */
   piggy_bonus_pending?: number
+  /** 코인 1개가 되지 못하고 이월된 이자 소수점, 0 이상 1 미만 (129) */
+  piggy_bonus_fraction?: number
   hearts: number
   total_credits_earned: number
   current_level: number         // 0~99

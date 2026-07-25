@@ -3,14 +3,15 @@
  *
  * 비개발자 설명:
  * - 저금통에 10크레딧 이상을 두면 **3일마다** 이자가 붙습니다.
- * - 이자율은 저금액이 많을수록 올라갑니다(10개↑ 10% / 50개↑ 15% / 100개↑ 20% / 200개↑ 25%).
- *   소수점은 버려서 항상 정수 크레딧으로만 지급됩니다.
+ * - 이자율은 저금액이 많을수록 올라갑니다(10개↑ 1% / 50개↑ 1.5% / 100개↑ 2% / 200개↑ 2.5%).
+ * - 이자가 1개에 못 미치면 소수점을 버리지 않고 **다음 회차로 이월**합니다.
+ *   (10개 저금 → 3일마다 0.1개씩 쌓여 30일째에 코인 1개) 지급은 항상 정수 크레딧입니다.
  * - 10크레딧 아래로 내려가면 기간이 처음부터 다시 시작됩니다(조금 빼는 건 괜찮습니다).
  * - 이자는 자동으로 들어오지 않고 **「받을 보너스」에 쌓입니다.** 저금통 위에 반짝이는
  *   크레딧 코인이 개수만큼 뜨고, 자녀가 1개씩 눌러서 크레딧으로 받아 갑니다.
  * - 계산·지급은 모두 서버가 하므로 폰·태블릿·노트북이 항상 같은 값을 봅니다.
  *
- * 숫자를 바꾸려면 `supabase/migrations/128_piggy_bonus_tiers_and_claim.sql` 의
+ * 숫자를 바꾸려면 `supabase/migrations/129_piggy_bonus_low_rates_with_carry.sql` 의
  * `piggy_bonus_rate_for` 함수·`c_hold_days` 상수와 아래 값을 같이 맞춰 주세요.
  */
 
@@ -25,10 +26,10 @@ export const PIGGY_BONUS_HOLD_DAYS = 3
  * 큰 금액부터 검사하므로 순서를 유지해 주세요.
  */
 export const PIGGY_BONUS_TIERS: ReadonlyArray<{ min: number; rate: number }> = [
-  { min: 200, rate: 0.25 },
-  { min: 100, rate: 0.2 },
-  { min: 50, rate: 0.15 },
-  { min: 10, rate: 0.1 },
+  { min: 200, rate: 0.025 },
+  { min: 100, rate: 0.02 },
+  { min: 50, rate: 0.015 },
+  { min: 10, rate: 0.01 },
 ]
 
 /** 지금 저금액에 적용되는 이자율(기준 미달이면 0) */
@@ -45,7 +46,7 @@ export type PiggyBonusProgress = {
   bonusReady: boolean
   /** 기간 시작 시각 ISO — 최소 저금액 미만이면 null */
   startedAtIso: string | null
-  /** 지금 잔액 기준 예상 지급액(표시용) */
+  /** 한 회차(3일)에 붙는 이자 — 1개 미만일 수 있습니다(표시용) */
   expectedAmount: number
 }
 
@@ -53,11 +54,27 @@ function msToWholeDays(ms: number): number {
   return Math.max(0, Math.floor(ms / (24 * 60 * 60 * 1000)))
 }
 
-/** 지금 잔액이면 이자를 얼마 받는지(서버 계산식과 동일: 구간 요율, 소수점 버림, 최소 1) */
+/**
+ * 한 회차(3일)에 붙는 이자 — 1개 미만일 수 있습니다(소수점은 이월되므로 버리지 않습니다).
+ * 예: 10개 저금 → 0.1 / 100개 저금 → 2
+ */
 export function piggyBonusAmountFor(piggyCredits: number): number {
-  const rate = piggyBonusRateFor(piggyCredits)
-  if (rate <= 0) return 0
-  return Math.max(1, Math.floor(piggyCredits * rate))
+  return piggyCredits * piggyBonusRateFor(piggyCredits)
+}
+
+/** 요율 표기 — 0.015 → "1.5%", 0.02 → "2%" (불필요한 소수점은 뗍니다) */
+export function formatPiggyBonusRate(rate: number): string {
+  return `${Number((rate * 100).toFixed(1))}%`
+}
+
+/**
+ * 「코인 1개를 받기까지 며칠 걸리는지」 — 저금액이 적어 한 회차에 1개가 안 될 때 안내용.
+ * 한 회차에 1개 이상 나오면 주기(3일)를 그대로 돌려줍니다.
+ */
+export function piggyBonusDaysPerCoin(piggyCredits: number): number {
+  const perPeriod = piggyBonusAmountFor(piggyCredits)
+  if (perPeriod <= 0) return 0
+  return Math.ceil(1 / perPeriod) * PIGGY_BONUS_HOLD_DAYS
 }
 
 /**
@@ -105,6 +122,8 @@ export interface PiggyBonusSettleResult {
   paid: number
   /** 아직 받아 가지 않고 쌓여 있는 이자(= 저금통 위에 뜰 코인 개수) */
   pending: number
+  /** 아직 코인 1개가 되지 못하고 이월된 소수점(0 이상 1 미만) */
+  fraction: number
   periods: number
   creditsPiggy: number
   nextAtIso: string | null
@@ -126,6 +145,7 @@ export async function settlePiggyBonus(childId?: string | null): Promise<PiggyBo
     const j = (await res.json()) as {
       paid?: number
       pending?: number
+      fraction?: number
       periods?: number
       credits_piggy?: number
       next_at?: string | null
@@ -133,6 +153,7 @@ export async function settlePiggyBonus(childId?: string | null): Promise<PiggyBo
     return {
       paid: Number(j.paid ?? 0),
       pending: Number(j.pending ?? 0),
+      fraction: Number(j.fraction ?? 0),
       periods: Number(j.periods ?? 0),
       creditsPiggy: Number(j.credits_piggy ?? 0),
       nextAtIso: j.next_at ?? null,

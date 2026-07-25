@@ -15,8 +15,11 @@ import { PIGGY_BANK_UNLOCK_MIN_LEVEL } from '@/constants/childAgeConfig'
 import { CHILD_CREDIT_COIN_PNG_SRC, formatChildCreditsDisplay } from '@/lib/childCreditDisplay'
 import {
   claimPiggyBonus,
+  formatPiggyBonusRate,
   PIGGY_BONUS_HOLD_DAYS,
   PIGGY_BONUS_MIN_BALANCE,
+  piggyBonusAmountFor,
+  piggyBonusDaysPerCoin,
   piggyBonusRateFor,
 } from '@/lib/piggyBankBonus'
 
@@ -370,8 +373,13 @@ export default function ChildHomePiggyBank({
     if (showHint) markPiggyTransferHintSeen(childId)
   }, [childId, depositEnabled])
 
-  /** 지금 저금액에 적용되는 이자율(%) — 안내 문구용 */
-  const bonusRatePercent = Math.round(piggyBonusRateFor(piggyCredits) * 100)
+  /**
+   * 안내 문구용 — 지금 저금액의 이자율과 「코인 1개까지 며칠」.
+   * 요율이 1.5% 처럼 소수라서 반올림하지 않고 그대로 표기합니다.
+   */
+  const bonusRate = piggyBonusRateFor(piggyCredits)
+  const bonusPerPeriod = piggyBonusAmountFor(piggyCredits)
+  const bonusDaysPerCoin = piggyBonusDaysPerCoin(piggyCredits)
 
   const canDeposit = depositEnabled && availableCredits >= 1
   const canWithdraw = depositEnabled && piggyCredits >= 1
@@ -417,9 +425,11 @@ export default function ChildHomePiggyBank({
           <p className="mb-4 mt-2 text-center text-xs font-semibold text-amber-900/90">
             {`저금통에 ${PIGGY_BONUS_MIN_BALANCE}개 넘게 모으면 ${PIGGY_BONUS_HOLD_DAYS}일마다 보너스 크레딧이 생겨요!`}
             <span className="mt-0.5 block text-[11px] font-bold text-amber-800/80">
-              {bonusRatePercent > 0
-                ? `지금은 ${bonusRatePercent}%씩 받아요 — 많이 모을수록 더 많이 받아요`
-                : '많이 모을수록 보너스도 커져요'}
+              {bonusRate <= 0
+                ? '많이 모을수록 보너스도 커져요'
+                : bonusPerPeriod >= 1
+                  ? `지금은 ${PIGGY_BONUS_HOLD_DAYS}일마다 ${formatPiggyBonusRate(bonusRate)}(코인 ${Math.floor(bonusPerPeriod)}개) — 많이 모을수록 더 빨라져요`
+                  : `지금은 ${formatPiggyBonusRate(bonusRate)}씩 쌓여서 ${bonusDaysPerCoin}일마다 코인 1개 — 많이 모을수록 더 빨라져요`}
             </span>
           </p>
           <div className="grid grid-cols-2 gap-3">
