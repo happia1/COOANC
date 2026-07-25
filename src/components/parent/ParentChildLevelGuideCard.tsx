@@ -76,7 +76,9 @@ export default function ParentChildLevelGuideCard({ childId, childName, level }:
 
           {/* 이 레벨에서 부모가 해 주면 좋은 것 */}
           {guide.guideText ? (
-            <p className="text-[12px] font-medium leading-relaxed text-gray-600">{guide.guideText}</p>
+            <p className="whitespace-pre-line text-[12px] font-medium leading-relaxed text-gray-600">
+              {guide.guideText}
+            </p>
           ) : null}
 
           {/* 지금 자녀 앱에서 쓸 수 있는 기능 */}

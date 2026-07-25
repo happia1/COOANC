@@ -220,7 +220,9 @@ export default function ParentChildLevelUpModal() {
           {hasParentGuide ? (
             <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
               <p className="text-xs font-semibold text-amber-700">💡 이 단계 부모 가이드</p>
-              <p className="mt-2 text-sm leading-relaxed text-gray-700">{modal.parentGuide}</p>
+              <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-gray-700">
+                {modal.parentGuide}
+              </p>
             </div>
           ) : null}
 

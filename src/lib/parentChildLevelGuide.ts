@@ -29,8 +29,8 @@ export type ParentChildLevelGuide = {
   badge: ChildBadgeEntry | null
   /** 지금까지 받은 칭호 중 가장 최근 것 — 헤더 라벨용 */
   currentBadge: ChildBadgeEntry | null
-  /** 이 레벨의 부모 안내 문구 */
-  guideText: string | null
+  /** 이 레벨의 부모 안내 문구 — 표에 없는 레벨은 공통 문구가 들어와 항상 값이 있습니다 */
+  guideText: string
   /** 지금 자녀 앱에서 쓸 수 있는 기능 */
   openedFeatures: ParentChildUnlockMilestone[]
   /** 이번 레벨에 새로 열린 기능(없으면 빈 배열) */

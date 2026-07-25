@@ -51,8 +51,9 @@ export default function ParentChildLevelGuideNoticeList({ items }: Props) {
                   <p className="text-xs font-extrabold text-gray-900">
                     {c.name} · Lv.{guide.level} {guide.zone.emoji} {guide.zone.zone}
                   </p>
+                  {/* 접힌 상태에서는 첫 문단만 한 줄로 — 줄바꿈이 들어가도 목록이 흐트러지지 않게 */}
                   <p className="mt-1 truncate text-[11px] leading-relaxed text-gray-600">
-                    {guide.guideText ?? '이 레벨의 안내는 준비 중이에요.'}
+                    {guide.guideText.split('\n')[0]}
                   </p>
                 </div>
                 <span
@@ -66,7 +67,7 @@ export default function ParentChildLevelGuideNoticeList({ items }: Props) {
               {expanded ? (
                 <div className="border-t border-gray-100 px-3 py-3">
                   {guide.guideText ? (
-                    <p className="text-[11px] font-medium leading-relaxed text-gray-600">
+                    <p className="whitespace-pre-line text-[11px] font-medium leading-relaxed text-gray-600">
                       {guide.guideText}
                     </p>
                   ) : null}
@@ -128,7 +129,7 @@ export default function ParentChildLevelGuideNoticeList({ items }: Props) {
                               <span className="mt-px shrink-0 rounded-full bg-gray-50 px-1.5 py-0.5 text-[9px] font-bold text-gray-500 ring-1 ring-gray-200">
                                 Lv.{h.level}
                               </span>
-                              <p className="min-w-0 text-[11px] leading-relaxed text-gray-500">
+                              <p className="min-w-0 whitespace-pre-line text-[11px] leading-relaxed text-gray-500">
                                 {h.guideText}
                               </p>
                             </li>

@@ -19,14 +19,26 @@ import {
   STICKER_UNLOCK_MIN_LEVEL,
 } from '@/constants/childScreenFeatures'
 import { PIGGY_BANK_UNLOCK_MIN_LEVEL } from '@/constants/childAgeConfig'
-import { CHILD_CONTENT_TREASURE_ICON_URL } from '@/constants/childContentMenu'
+import {
+  CHILD_CONTENT_TREASURE_ICON_URL,
+  CONTENT_MINIGAME_TICKET_IMAGE_URL,
+  MINIGAME_UNLOCK_LEVEL,
+} from '@/constants/childContentMenu'
 import { PIGGY_BANK_STAGE_URLS } from '@/constants/piggyBankStages'
 
 /** 부모 팝업·안내용 저금통 아이콘 — 자녀 홈과 같은 14단계 PNG 초기 모습 */
 const PARENT_PIGGY_BANK_ICON_SRC =
   PIGGY_BANK_STAGE_URLS[0] ?? '/assets/img/items/rewards/piggybank/piggy_bank1.png'
 
-export type ParentChildUnlockFeatureId = 'sticker' | 'piggyBank' | 'contentZone'
+/** 처음부터 쓸 수 있는 기본 기능(레벨 0)과, 레벨을 올려야 열리는 기능을 모두 담습니다 */
+export type ParentChildUnlockFeatureId =
+  | 'missions'
+  | 'market'
+  | 'plant'
+  | 'sticker'
+  | 'piggyBank'
+  | 'contentZone'
+  | 'minigame'
 
 export type ParentChildUnlockMilestone = {
   id: ParentChildUnlockFeatureId
@@ -40,8 +52,38 @@ export type ParentChildUnlockMilestone = {
   iconSrc: string
 }
 
-/** 레벨 순 — 부모 팝업에 표시할 해금 마일스톤 */
+/**
+ * 레벨 순 — 부모 안내에 표시할 기능 목록.
+ *
+ * `minLevel: 0` 인 항목은 「처음부터 쓸 수 있는 기본 기능」입니다.
+ * 레벨업 팝업(`unlocksNewlyOpenedBetweenLevels`)은 `minLevel > prevLevel` 만 고르므로,
+ * 0레벨 항목이 「새로 열렸어요」 팝업으로 뜨는 일은 없습니다.
+ */
 export const PARENT_CHILD_UNLOCK_MILESTONES: readonly ParentChildUnlockMilestone[] = [
+  {
+    id: 'missions',
+    minLevel: 0,
+    title: '미션·항해지도',
+    shortLabel: '미션',
+    description: '매일 미션을 끝내면 크레딧과 하트를 받고, 항해지도의 배가 앞으로 나가요.',
+    iconSrc: '/assets/img/common/ui/map.png',
+  },
+  {
+    id: 'market',
+    minLevel: 0,
+    title: '마켓',
+    shortLabel: '마켓',
+    description: '갖고 싶은 것을 고르면 부모님께 구매 요청이 가고, 승인하면 크레딧이 빠져요.',
+    iconSrc: `/assets/img/common/ui/${encodeURIComponent('크레딧.png')}`,
+  },
+  {
+    id: 'plant',
+    minLevel: 0,
+    title: '화분 키우기',
+    shortLabel: '화분',
+    description: '하트로 물을 주면 화분이 자라요. 보상 없이 돌보는 경험을 합니다.',
+    iconSrc: '/assets/img/common/ui/basket_filled.png',
+  },
   {
     id: 'sticker',
     minLevel: STICKER_UNLOCK_MIN_LEVEL,
@@ -63,8 +105,16 @@ export const PARENT_CHILD_UNLOCK_MILESTONES: readonly ParentChildUnlockMilestone
     minLevel: CONTENT_ZONE_UNLOCK_MIN_LEVEL,
     title: '보물상자',
     shortLabel: '보물상자',
-    description: '영상·미니게임 이용권을 쓸 수 있는 보물상자가 열려요.',
+    description: '모은 크레딧으로 영상 이용권을 직접 살 수 있어요.',
     iconSrc: CHILD_CONTENT_TREASURE_ICON_URL,
+  },
+  {
+    id: 'minigame',
+    minLevel: MINIGAME_UNLOCK_LEVEL,
+    title: '미니게임',
+    shortLabel: '미니게임',
+    description: '보물상자에 미니게임 이용권이 추가돼요. 크레딧으로 사서 즐길 수 있어요.',
+    iconSrc: CONTENT_MINIGAME_TICKET_IMAGE_URL,
   },
   // 감정카드·일기 — minLevel: 10, 단계명: 탐험가 (미구현, 향후 추가 예정)
   // 과일·꽃 팔기  — minLevel: 12, 단계명: 선장   (미구현, 향후 추가 예정)
