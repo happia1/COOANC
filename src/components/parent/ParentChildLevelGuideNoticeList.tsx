@@ -14,6 +14,7 @@ import {
   buildParentChildLevelGuide,
   buildParentChildLevelGuideHistory,
 } from '@/lib/parentChildLevelGuide'
+import ParentFeatureHowToCard from '@/components/parent/ParentFeatureHowToCard'
 
 type Props = {
   /** React 예약 prop 인 `children` 과 헷갈리지 않도록 `items` 로 받습니다 */
@@ -23,6 +24,8 @@ type Props = {
 export default function ParentChildLevelGuideNoticeList({ items }: Props) {
   const [openChildId, setOpenChildId] = useState<string | null>(null)
   const [historyOpenId, setHistoryOpenId] = useState<string | null>(null)
+  /** 사용법을 펼쳐 둔 기능 — `자녀id:기능id` */
+  const [howToOpenKey, setHowToOpenKey] = useState<string | null>(null)
 
   if (items.length === 0) return null
 
@@ -77,24 +80,44 @@ export default function ParentChildLevelGuideNoticeList({ items }: Props) {
                       <p className="mb-1 text-[10px] font-black uppercase tracking-wide text-gray-400">
                         지금 쓸 수 있어요
                       </p>
+                      {/* 기능마다 눌러서 사용 순서를 펼쳐 볼 수 있게 — 레벨업 팝업을 놓쳐도 여기서 봅니다 */}
                       <ul className="space-y-1">
-                        {guide.openedFeatures.map((f) => (
-                          <li key={f.id} className="flex items-start gap-1.5">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                              src={f.iconSrc}
-                              alt=""
-                              width={16}
-                              height={16}
-                              className="mt-0.5 h-4 w-4 shrink-0 object-contain"
-                            />
-                            <p className="min-w-0 text-[11px] leading-relaxed text-gray-600">
-                              <b className="font-bold text-gray-700">{f.title}</b>
-                              <span className="text-gray-400"> · </span>
-                              {f.description}
-                            </p>
-                          </li>
-                        ))}
+                        {guide.openedFeatures.map((f) => {
+                          const key = `${c.childId}:${f.id}`
+                          const howToOpen = howToOpenKey === key
+                          return (
+                            <li key={f.id}>
+                              <button
+                                type="button"
+                                onClick={() => setHowToOpenKey(howToOpen ? null : key)}
+                                aria-expanded={howToOpen}
+                                className="flex w-full items-start gap-1.5 rounded-lg py-0.5 text-left transition-colors hover:bg-gray-50"
+                              >
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                  src={f.iconSrc}
+                                  alt=""
+                                  width={16}
+                                  height={16}
+                                  className="mt-0.5 h-4 w-4 shrink-0 object-contain"
+                                />
+                                <p className="min-w-0 flex-1 text-[11px] leading-relaxed text-gray-600">
+                                  <b className="font-bold text-gray-700">{f.title}</b>
+                                  <span className="text-gray-400"> · </span>
+                                  {f.description}
+                                </p>
+                                <span className="shrink-0 text-[10px] font-bold text-[#2563EB]">
+                                  {howToOpen ? '접기' : '사용법'}
+                                </span>
+                              </button>
+                              {howToOpen ? (
+                                <div className="mt-1.5">
+                                  <ParentFeatureHowToCard feature={f} />
+                                </div>
+                              ) : null}
+                            </li>
+                          )
+                        })}
                       </ul>
                     </div>
                   ) : null}

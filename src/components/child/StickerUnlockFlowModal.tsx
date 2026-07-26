@@ -17,25 +17,31 @@ type TutorialStep = {
   emoji: string
 }
 
+/**
+ * 자녀용 4단계 안내.
+ *
+ * 글을 못 읽는 아이도 있으므로 문장은 짧게, 「무엇을 누르는지」만 남깁니다.
+ * 자세한 설명과 활용법은 부모 앱의 레벨업 팝업에서 부모가 보고 함께 해 주는 쪽으로 나눴습니다.
+ */
 const TUTORIAL_STEPS: TutorialStep[] = [
   {
     title: '1. 미션 완료',
-    description: '오늘의 미션을 끝내면 하트와 칭찬 스티커를 받을 수 있어요.',
+    description: '미션을 끝내면 스티커를 받아요.',
     emoji: '✅',
   },
   {
-    title: '2. 스티커 아이콘',
-    description: '화면 오른쪽 위 선물 상자 아이콘을 눌러 스티커 판을 열어요.',
+    title: '2. 선물상자 열기',
+    description: '오른쪽 위 선물상자를 누르면 스티커 판이 열려요.',
     emoji: '🎁',
   },
   {
-    title: '3. 곰돌이 판',
-    description: '받은 스티커를 곰돌이 판 칸에 붙여 성취를 모아요.',
-    emoji: '🐻',
+    title: '3. 스티커 붙이기',
+    description: '스티커를 누르고, 붙이고 싶은 칸을 누르면 붙어요.',
+    emoji: '👆',
   },
   {
-    title: '4. 20칸 완주',
-    description: '칸을 다 채우면 새 판으로 다시 시작할 수 있어요!',
+    title: '4. 다 모으면',
+    description: '판을 다 채우면 부모님과 선물을 받기로 약속해요!',
     emoji: '⭐',
   },
 ]
