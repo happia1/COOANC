@@ -42,8 +42,12 @@ function playPiggyStageUpSound() {
   }
 }
 
-/** 저금통 위에 한 번에 그릴 코인 최대 개수 — 넘으면 「+n」으로 줄여 보여 줍니다 */
-const MAX_BONUS_COINS_SHOWN = 12
+/**
+ * 저금통 위에 한 번에 그릴 코인 최대 개수 — 넘으면 「+n」으로 줄여 보여 줍니다.
+ * 코인이 저금통 위 **한 줄**에 머물도록 5개로 둡니다.
+ * (하나 누르면 그 자리에 다음 코인이 채워지므로, 10개가 쌓여 있어도 열 번 다 누를 수 있습니다.)
+ */
+const MAX_BONUS_COINS_SHOWN = 5
 
 /** 저금통 입구(동전이 들어가는 지점) — 저금통 그림 기준 세로 % */
 const PIGGY_SLOT_Y_RATIO = 0.42
@@ -499,13 +503,13 @@ export default function ChildHomePiggyBank({
               * 하나 누를 때마다 크레딧으로 날아가며 사라집니다(10개면 열 번 눌러야 다 받아요).
               */}
             {bonusCount > 0 ? (
-              <div className="pointer-events-none absolute inset-x-0 -top-3 z-[2] flex flex-wrap items-center justify-center gap-[3px] px-1">
+              <div className="pointer-events-none absolute inset-x-0 -top-7 z-[2] flex items-center justify-center gap-[3px] px-1">
                 {Array.from({ length: Math.min(bonusCount, MAX_BONUS_COINS_SHOWN) }).map((_, i) => (
                   <button
                     key={i}
                     type="button"
                     onClick={(e) => claimOneBonus(e.currentTarget.getBoundingClientRect())}
-                    className="pointer-events-auto relative h-[22px] w-[22px] shrink-0 border-0 bg-transparent p-0 transition active:scale-90"
+                    className="pointer-events-auto relative h-[28px] w-[28px] shrink-0 border-0 bg-transparent p-0 transition active:scale-90"
                     style={{ animation: `piggyBonusSparkle 1.4s ease-in-out ${(i % 5) * 0.18}s infinite` }}
                     aria-label="선물 받기"
                   >
@@ -513,16 +517,16 @@ export default function ChildHomePiggyBank({
                     <img
                       src={CHILD_CREDIT_COIN_PNG_SRC}
                       alt=""
-                      width={22}
-                      height={22}
-                      className="h-[22px] w-[22px] object-contain"
-                      style={{ filter: 'drop-shadow(0 0 4px rgba(255,214,80,0.95))' }}
+                      width={28}
+                      height={28}
+                      className="h-[28px] w-[28px] object-contain"
+                      style={{ filter: 'drop-shadow(0 0 5px rgba(255,214,80,0.95))' }}
                       draggable={false}
                     />
                   </button>
                 ))}
                 {bonusCount > MAX_BONUS_COINS_SHOWN ? (
-                  <span className="ml-0.5 shrink-0 text-[11px] font-black text-amber-700">
+                  <span className="ml-0.5 shrink-0 text-[9px] font-black text-amber-700">
                     {`+${bonusCount - MAX_BONUS_COINS_SHOWN}`}
                   </span>
                 ) : null}
@@ -592,11 +596,11 @@ export default function ChildHomePiggyBank({
           {/* 받을 보너스가 있으면 저금통 위에 반짝이는 코인 뱃지를 띄워 알려 줍니다 */}
           {bonusCount > 0 ? (
             <span
-              className="pointer-events-none absolute -right-1 -top-2 flex items-center gap-[1px] rounded-full bg-amber-400/95 px-1 py-[1px] text-[9px] font-black leading-none text-amber-950 shadow"
+              className="pointer-events-none absolute -right-1.5 -top-4 flex items-center gap-px rounded-full bg-amber-400/95 px-1 py-px text-[8px] font-black leading-none text-amber-950 shadow"
               style={{ animation: 'piggyBonusSparkle 1.4s ease-in-out infinite' }}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={CHILD_CREDIT_COIN_PNG_SRC} alt="" width={10} height={10} className="h-[10px] w-[10px]" />
+              <img src={CHILD_CREDIT_COIN_PNG_SRC} alt="" width={16} height={16} className="h-4 w-4" />
               {bonusCount}
             </span>
           ) : null}

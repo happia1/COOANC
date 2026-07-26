@@ -25,7 +25,6 @@ import {
   MINIGAME_UNLOCK_LEVEL,
 } from '@/constants/childContentMenu'
 import { PIGGY_BANK_STAGE_URLS } from '@/constants/piggyBankStages'
-import { NAV_MAP_UNLOCK_MIN_LEVEL } from '@/constants/navigationMap'
 
 /** 안내용 화분 아이콘 — 꽃이 핀 4단계 그림(싹만 있는 그림보다 무엇을 키우는지 잘 보입니다) */
 const PARENT_PLANT_ICON_SRC = '/assets/img/missions/routine/plant/apple/4.png'
@@ -40,7 +39,6 @@ const PARENT_PIGGY_BANK_ICON_SRC =
 /** 처음부터 쓸 수 있는 기본 기능(레벨 0)과, 레벨을 올려야 열리는 기능을 모두 담습니다 */
 export type ParentChildUnlockFeatureId =
   | 'missions'
-  | 'navMap'
   | 'market'
   | 'plant'
   | 'sticker'
@@ -118,7 +116,7 @@ export const PARENT_CHILD_UNLOCK_MILESTONES: readonly ParentChildUnlockMilestone
       '열매가 다 익으면 수확하고, 새 씨앗을 심어 다시 키워요.',
     ],
     withChildTip:
-      '수확한 열매를 시장에 파는 기능이 준비 중이에요. ' +
+      '수확한 열매를 시장에 파는 기능은 정식 버전에서 열려요. ' +
       '「열매를 모아 뒀다가 나중에 팔자」고 목표를 정해 두면 돌보는 재미가 커져요.',
   },
   {
@@ -173,7 +171,7 @@ export const PARENT_CHILD_UNLOCK_MILESTONES: readonly ParentChildUnlockMilestone
     minLevel: MINIGAME_UNLOCK_LEVEL,
     title: '미니게임',
     shortLabel: '미니게임',
-    description: '보물상자에 미니게임이 열려요. 갖고 있던 이용권으로 두뇌발달을 돕는 게임을 할 수 있어요.',
+    description: '보물상자 안에 미니게임이 열려요. 갖고 있던 이용권으로 두뇌발달을 돕는 게임을 할 수 있어요.',
     iconSrc: CONTENT_MINIGAME_TICKET_IMAGE_URL,
     howToSteps: [
       '보물상자를 열어요.',
@@ -184,23 +182,27 @@ export const PARENT_CHILD_UNLOCK_MILESTONES: readonly ParentChildUnlockMilestone
       '같은 이용권을 영상에 쓸지 게임에 쓸지 아이가 고르게 해주세요. ' +
       '저금통과 놀이 사이에서 어떻게 나누는지 지켜보는 것도 좋은 관찰이에요.',
   },
-  {
-    id: 'navMap',
-    minLevel: NAV_MAP_UNLOCK_MIN_LEVEL,
-    title: '항해지도',
-    shortLabel: '항해지도',
-    description: '지금까지의 여정을 지도로 보고, 미션을 꾸준히 하면 배가 앞으로 나아가요.',
-    iconSrc: '/assets/img/common/ui/map.png',
-    howToSteps: [
-      '홈 화면의 캐릭터를 눌러요.',
-      '팝업에서 항해지도를 열어요.',
-      '하루 미션을 90% 넘게 끝내면 배가 한 칸 앞으로 나아가요.',
-    ],
-    withChildTip: '아직 준비 중인 기능이에요. 열리면 지금까지 얼마나 왔는지 함께 되짚어 보세요.',
-  },
-  // 과일·꽃 팔기 — 화분에서 수확한 열매를 시장에 되파는 기능 (미구현, 향후 추가 예정)
-  // 감정카드·일기 — 미구현, 향후 추가 예정
+  // ── 아래는 「정식 버전 예정」이라 목록에 넣지 않습니다 ─────────────────
+  // 레벨을 붙여 예고하면 그 레벨에 도달한 부모에게 없는 기능을 약속하게 됩니다.
+  // 대신 `PARENT_UPCOMING_NOTE` 한 줄로만 안내합니다.
+  //   · 항해지도    — 캐릭터 팝업 안, 레벨 15 예정
+  //   · 열매 시장   — 화분에서 수확한 열매를 파는 기능, 레벨 12 예정(항해지도와 연결)
+  //   · 그림일기·감정카드 — 캐릭터 팝업 안
 ] as const
+
+/**
+ * 정식 버전에서 열 예정인 기능 안내 — **레벨을 붙이지 않습니다.**
+ *
+ * 왜 레벨을 안 쓰나:
+ * - 캐릭터 팝업(항해지도·그림일기·감정카드)은 글을 읽을 수 있어야 쓸 수 있는 기능이라,
+ *   레벨보다 **나이**가 기준입니다. 레벨 15로 예고해 두면 5살 아이가 레벨만 올려도
+ *   열릴 것처럼 읽힙니다.
+ * - MVP 단계에서는 「정식 버전에 열립니다」까지만 알리는 편이 정직합니다.
+ */
+export const PARENT_UPCOMING_NOTE =
+  '캐릭터를 누르면 열리는 화면(항해지도·그림일기·감정카드)과 ' +
+  '수확한 열매를 파는 시장은 정식 버전에서 열려요.\n' +
+  '글을 읽고 스스로 기록할 수 있는 7세 무렵부터 쓰기 좋은 기능이라, 지금은 준비만 해 두었습니다.'
 
 /**
  * `prevLevel` → `newLevel` 사이에 **이번에** 처음 열린 기능만 반환합니다.

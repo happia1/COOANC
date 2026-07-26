@@ -16,6 +16,7 @@ import {
   buildParentChildLevelGuideHistory,
 } from '@/lib/parentChildLevelGuide'
 import ParentFeatureHowToCard from '@/components/parent/ParentFeatureHowToCard'
+import { PARENT_UPCOMING_NOTE } from '@/lib/parentChildLevelUnlocks'
 
 type Props = {
   /** React 예약 prop 인 `children` 과 헷갈리지 않도록 `items` 로 받습니다 */
@@ -129,6 +130,11 @@ export default function ParentChildLevelGuideNoticeList({ items }: Props) {
                       {`이 열려요 (${guide.levelsToNextFeature}레벨 남음)`}
                     </p>
                   ) : null}
+
+                  {/* 정식 버전 예정 — 레벨을 붙이지 않고 「정식 버전에 열립니다」까지만 알립니다 */}
+                  <p className="mt-2.5 whitespace-pre-line border-t border-gray-100 pt-2.5 text-[10px] leading-relaxed text-gray-400">
+                    {PARENT_UPCOMING_NOTE}
+                  </p>
 
                   {history.length > 0 ? (
                     <div className="mt-2.5 border-t border-gray-100 pt-2.5">

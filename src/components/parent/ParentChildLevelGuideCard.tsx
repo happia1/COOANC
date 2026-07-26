@@ -14,6 +14,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { PARENT_NEUTRAL_CARD_CLASSNAME } from '@/lib/parentNeutralBlockStyle'
 import { buildParentChildLevelGuide } from '@/lib/parentChildLevelGuide'
+import { PARENT_UPCOMING_NOTE } from '@/lib/parentChildLevelUnlocks'
 import {
   readDismissedLevelGuideLevels,
   writeDismissedLevelGuideLevel,
@@ -117,6 +118,11 @@ export default function ParentChildLevelGuideCard({ childId, childName, level }:
               {`이 열려요 (${guide.levelsToNextFeature}레벨 남음)`}
             </p>
           ) : null}
+
+          {/* 정식 버전 예정 — 레벨을 붙이지 않고 「정식 버전에 열립니다」까지만 알립니다 */}
+          <p className="mt-2 whitespace-pre-line border-t border-gray-100 pt-2 text-[10px] leading-relaxed text-gray-400">
+            {PARENT_UPCOMING_NOTE}
+          </p>
         </div>
 
         <button
