@@ -25,6 +25,13 @@ import {
   MINIGAME_UNLOCK_LEVEL,
 } from '@/constants/childContentMenu'
 import { PIGGY_BANK_STAGE_URLS } from '@/constants/piggyBankStages'
+import { NAV_MAP_UNLOCK_MIN_LEVEL } from '@/constants/navigationMap'
+
+/** 안내용 화분 아이콘 — 꽃이 핀 4단계 그림(싹만 있는 그림보다 무엇을 키우는지 잘 보입니다) */
+const PARENT_PLANT_ICON_SRC = '/assets/img/missions/routine/plant/apple/4.png'
+
+/** 안내용 마켓 아이콘 — 자녀 마켓 탭과 같은 장바구니 그림 */
+const PARENT_MARKET_ICON_SRC = '/assets/img/common/ui/basket_filled.png'
 
 /** 부모 팝업·안내용 저금통 아이콘 — 자녀 홈과 같은 14단계 PNG 초기 모습 */
 const PARENT_PIGGY_BANK_ICON_SRC =
@@ -33,6 +40,7 @@ const PARENT_PIGGY_BANK_ICON_SRC =
 /** 처음부터 쓸 수 있는 기본 기능(레벨 0)과, 레벨을 올려야 열리는 기능을 모두 담습니다 */
 export type ParentChildUnlockFeatureId =
   | 'missions'
+  | 'navMap'
   | 'market'
   | 'plant'
   | 'sticker'
@@ -71,14 +79,14 @@ export const PARENT_CHILD_UNLOCK_MILESTONES: readonly ParentChildUnlockMilestone
   {
     id: 'missions',
     minLevel: 0,
-    title: '미션·항해지도',
+    title: '미션',
     shortLabel: '미션',
-    description: '매일 미션을 끝내면 크레딧과 하트를 받고, 항해지도의 배가 앞으로 나가요.',
+    description: '매일 미션을 끝내면 크레딧과 하트를 받아요. 모든 기능의 출발점입니다.',
     iconSrc: '/assets/img/common/ui/map.png',
     howToSteps: [
       '홈 화면에서 오늘의 미션 카드를 확인해요.',
       '미션을 끝내면 카드를 눌러 완료로 표시해요.',
-      '크레딧과 하트가 오르고, 항해지도의 배가 한 칸 나아가요.',
+      '크레딧과 하트가 올라요 — 크레딧은 사고 모으는 데, 하트는 화분에 물 주는 데 씁니다.',
     ],
     withChildTip: '첫날은 미션 카드를 함께 읽으며 「이건 언제 할까?」를 정해 보세요.',
   },
@@ -88,7 +96,7 @@ export const PARENT_CHILD_UNLOCK_MILESTONES: readonly ParentChildUnlockMilestone
     title: '마켓',
     shortLabel: '마켓',
     description: '갖고 싶은 것을 고르면 부모님께 구매 요청이 가고, 승인하면 크레딧이 빠져요.',
-    iconSrc: `/assets/img/common/ui/${encodeURIComponent('크레딧.png')}`,
+    iconSrc: PARENT_MARKET_ICON_SRC,
     howToSteps: [
       '아래 마켓 탭을 열어요.',
       '갖고 싶은 것을 골라 사기를 눌러요.',
@@ -101,14 +109,17 @@ export const PARENT_CHILD_UNLOCK_MILESTONES: readonly ParentChildUnlockMilestone
     minLevel: 0,
     title: '화분 키우기',
     shortLabel: '화분',
-    description: '하트로 물을 주면 화분이 자라요. 보상 없이 돌보는 경험을 합니다.',
-    iconSrc: '/assets/img/common/ui/basket_filled.png',
+    description: '하트로 물을 주면 싹이 나고 꽃이 펴서 열매가 맺혀요. 모은 열매는 나중에 시장에 팔 수 있게 됩니다.',
+    iconSrc: PARENT_PLANT_ICON_SRC,
     howToSteps: [
-      '홈 화면의 화분을 눌러요.',
-      '하트로 물을 줘요(크레딧이 아니라 하트입니다).',
-      '물을 줄수록 단계가 올라 나무가 자라요.',
+      '홈 화면의 화분을 눌러 화분 팝업을 열어요.',
+      '물조리개를 누르면 하트로 물을 줄 수 있어요(크레딧이 아니라 하트입니다).',
+      '하트 게이지가 다 차면 한 단계 자라요 — 싹 → 어린 나무 → 꽃봉오리 → 꽃 → 열매.',
+      '열매가 다 익으면 수확하고, 새 씨앗을 심어 다시 키워요.',
     ],
-    withChildTip: '보상이 없는 유일한 기능이에요. 그냥 돌보는 것 자체가 좋은 일이라고 말해 주세요.',
+    withChildTip:
+      '수확한 열매를 시장에 파는 기능이 준비 중이에요. ' +
+      '「열매를 모아 뒀다가 나중에 팔자」고 목표를 정해 두면 돌보는 재미가 커져요.',
   },
   {
     id: 'sticker',
@@ -145,31 +156,50 @@ export const PARENT_CHILD_UNLOCK_MILESTONES: readonly ParentChildUnlockMilestone
     minLevel: CONTENT_ZONE_UNLOCK_MIN_LEVEL,
     title: '보물상자',
     shortLabel: '보물상자',
-    description: '모은 크레딧으로 영상 이용권을 직접 살 수 있어요.',
+    description: '크레딧으로 「보물상자 이용권」을 사서 영상 같은 재미있는 콘텐츠를 즐겨요.',
     iconSrc: CHILD_CONTENT_TREASURE_ICON_URL,
     howToSteps: [
-      '아래 보물상자를 열어요.',
-      '영상 이용권을 크레딧으로 사요.',
-      '산 이용권으로 약속한 시간만큼 영상을 봐요.',
+      '아래 보물상자를 열어 이용권을 골라요.',
+      '이용권을 사면 부모님께 승인 요청이 가요.',
+      '승인하면 크레딧이 빠지고, 보물상자 옆에 쓸 수 있는 이용권 수가 숫자로 떠요.',
+      '그 이용권으로 영상을 봐요.',
     ],
-    withChildTip: '한 번에 얼마나 볼지 미리 정하고 사게 해주세요.',
+    withChildTip:
+      '몇 개 살지는 아이가 스스로 정하게 해주세요. ' +
+      '대신 「산 시간만큼만 이용한다」는 약속을 함께 정하는 것이 핵심이에요.',
   },
   {
     id: 'minigame',
     minLevel: MINIGAME_UNLOCK_LEVEL,
     title: '미니게임',
     shortLabel: '미니게임',
-    description: '보물상자에 미니게임 이용권이 추가돼요. 크레딧으로 사서 즐길 수 있어요.',
+    description: '보물상자에 미니게임이 열려요. 갖고 있던 이용권으로 두뇌발달을 돕는 게임을 할 수 있어요.',
     iconSrc: CONTENT_MINIGAME_TICKET_IMAGE_URL,
     howToSteps: [
       '보물상자를 열어요.',
-      '미니게임 이용권을 크레딧으로 사요.',
-      '산 이용권으로 게임을 즐겨요.',
+      '이제 영상과 미니게임 중에서 고를 수 있어요(이용권은 같은 것을 씁니다).',
+      '갖고 있는 이용권으로 미니게임을 즐겨요.',
     ],
-    withChildTip: '저금통과 놀이 사이에서 아이가 크레딧을 어떻게 나누는지 지켜봐 주세요.',
+    withChildTip:
+      '같은 이용권을 영상에 쓸지 게임에 쓸지 아이가 고르게 해주세요. ' +
+      '저금통과 놀이 사이에서 어떻게 나누는지 지켜보는 것도 좋은 관찰이에요.',
   },
-  // 감정카드·일기 — minLevel: 10, 단계명: 탐험가 (미구현, 향후 추가 예정)
-  // 과일·꽃 팔기  — minLevel: 12, 단계명: 선장   (미구현, 향후 추가 예정)
+  {
+    id: 'navMap',
+    minLevel: NAV_MAP_UNLOCK_MIN_LEVEL,
+    title: '항해지도',
+    shortLabel: '항해지도',
+    description: '지금까지의 여정을 지도로 보고, 미션을 꾸준히 하면 배가 앞으로 나아가요.',
+    iconSrc: '/assets/img/common/ui/map.png',
+    howToSteps: [
+      '홈 화면의 캐릭터를 눌러요.',
+      '팝업에서 항해지도를 열어요.',
+      '하루 미션을 90% 넘게 끝내면 배가 한 칸 앞으로 나아가요.',
+    ],
+    withChildTip: '아직 준비 중인 기능이에요. 열리면 지금까지 얼마나 왔는지 함께 되짚어 보세요.',
+  },
+  // 과일·꽃 팔기 — 화분에서 수확한 열매를 시장에 되파는 기능 (미구현, 향후 추가 예정)
+  // 감정카드·일기 — 미구현, 향후 추가 예정
 ] as const
 
 /**

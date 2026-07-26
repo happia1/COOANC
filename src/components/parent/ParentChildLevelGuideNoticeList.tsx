@@ -26,6 +26,8 @@ export default function ParentChildLevelGuideNoticeList({ items }: Props) {
   const [historyOpenId, setHistoryOpenId] = useState<string | null>(null)
   /** 사용법을 펼쳐 둔 기능 — `자녀id:기능id` */
   const [howToOpenKey, setHowToOpenKey] = useState<string | null>(null)
+  /** 지난 레벨 안내 중 펼쳐 둔 한 줄 — `자녀id:레벨` */
+  const [historyLevelOpenKey, setHistoryLevelOpenKey] = useState<string | null>(null)
 
   if (items.length === 0) return null
 
@@ -145,18 +147,41 @@ export default function ParentChildLevelGuideNoticeList({ items }: Props) {
                           : `지난 레벨 안내 보기 (${history.length})`}
                       </button>
 
+                      {/* 레벨마다 접어 두고, 보고 싶은 줄만 눌러서 펼칩니다 */}
                       {historyOpenId === c.childId ? (
-                        <ul className="mt-2 space-y-1.5">
-                          {history.map((h) => (
-                            <li key={h.level} className="flex gap-1.5">
-                              <span className="mt-px shrink-0 rounded-full bg-gray-50 px-1.5 py-0.5 text-[9px] font-bold text-gray-500 ring-1 ring-gray-200">
-                                Lv.{h.level}
-                              </span>
-                              <p className="min-w-0 whitespace-pre-line text-[11px] leading-relaxed text-gray-500">
-                                {h.guideText}
-                              </p>
-                            </li>
-                          ))}
+                        <ul className="mt-2 space-y-1">
+                          {history.map((h) => {
+                            const hKey = `${c.childId}:${h.level}`
+                            const hOpen = historyLevelOpenKey === hKey
+                            return (
+                              <li key={h.level} className="rounded-lg bg-gray-50/70">
+                                <button
+                                  type="button"
+                                  onClick={() => setHistoryLevelOpenKey(hOpen ? null : hKey)}
+                                  aria-expanded={hOpen}
+                                  className="flex w-full items-center gap-1.5 px-2 py-1.5 text-left transition-colors hover:bg-gray-100/70"
+                                >
+                                  <span className="shrink-0 rounded-full bg-white px-1.5 py-0.5 text-[9px] font-bold text-gray-500 ring-1 ring-gray-200">
+                                    Lv.{h.level}
+                                  </span>
+                                  <p className="min-w-0 flex-1 truncate text-[11px] leading-relaxed text-gray-500">
+                                    {h.guideText.split('\n')[0]}
+                                  </p>
+                                  <span
+                                    className={`shrink-0 text-[11px] font-bold text-gray-400 transition-transform ${hOpen ? 'rotate-90' : ''}`}
+                                    aria-hidden
+                                  >
+                                    ›
+                                  </span>
+                                </button>
+                                {hOpen ? (
+                                  <p className="whitespace-pre-line px-2 pb-2 text-[11px] leading-relaxed text-gray-600">
+                                    {h.guideText}
+                                  </p>
+                                ) : null}
+                              </li>
+                            )
+                          })}
                         </ul>
                       ) : null}
                     </div>

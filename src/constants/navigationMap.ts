@@ -50,3 +50,12 @@ export type NavMapSection = (typeof NAV_MAP_SECTIONS)[number]
 
 /** 섹션당 배 이동 칸 수 */
 export const STEPS_PER_SECTION = 5
+
+/**
+ * 항해지도가 자녀 앱에 열리는 최소 레벨.
+ *
+ * 지금은 캐릭터를 눌러야 나오는 팝업 안에 있고 아직 준비 중인 기능이라,
+ * 초반 레벨에서 안내하지 않고 후반(레벨 15)에 열리는 것으로 잡아 두었습니다.
+ * 세계관(정원·마을·항구·바다)을 다시 설계할 때 이 값과 위 섹션 minLevel 을 함께 맞춰 주세요.
+ */
+export const NAV_MAP_UNLOCK_MIN_LEVEL = 15
