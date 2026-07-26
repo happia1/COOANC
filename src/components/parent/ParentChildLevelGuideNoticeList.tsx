@@ -1,4 +1,5 @@
 'use client'
+import ParentChevron from '@/components/parent/ParentChevron'
 
 /**
  * 상단 알림창(공지센터) 안의 「자녀 레벨 안내」 목록입니다.
@@ -61,11 +62,8 @@ export default function ParentChildLevelGuideNoticeList({ items }: Props) {
                     {guide.guideText.split('\n')[0]}
                   </p>
                 </div>
-                <span
-                  className={`shrink-0 text-lg font-bold text-gray-400 transition-transform ${expanded ? 'rotate-90' : ''}`}
-                  aria-hidden
-                >
-                  ›
+                <span className="flex shrink-0 items-center text-gray-400" aria-hidden>
+                  <ParentChevron direction={expanded ? 'up' : 'down'} />
                 </span>
               </button>
 
@@ -167,11 +165,8 @@ export default function ParentChildLevelGuideNoticeList({ items }: Props) {
                                   <p className="min-w-0 flex-1 truncate text-[11px] leading-relaxed text-gray-500">
                                     {h.guideText.split('\n')[0]}
                                   </p>
-                                  <span
-                                    className={`shrink-0 text-[11px] font-bold text-gray-400 transition-transform ${hOpen ? 'rotate-90' : ''}`}
-                                    aria-hidden
-                                  >
-                                    ›
+                                  <span className="flex shrink-0 items-center text-gray-400" aria-hidden>
+                                    <ParentChevron direction={hOpen ? 'up' : 'down'} size="sm" />
                                   </span>
                                 </button>
                                 {hOpen ? (

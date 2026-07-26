@@ -1,4 +1,5 @@
 'use client'
+import ParentChevron from '@/components/parent/ParentChevron'
 
 /**
  * 부모 승인 탭 — 자녀 마켓 메뉴 제어
@@ -834,13 +835,8 @@ export default function ParentMarketMenuControl({
                       </span>
                     )}
                   </div>
-                  <span
-                    aria-hidden
-                    className={`shrink-0 text-sm font-bold leading-none text-gray-400 transition-transform duration-200 ${
-                      expanded ? 'rotate-180' : ''
-                    }`}
-                  >
-                    ▼
+                  <span className="flex shrink-0 items-center text-gray-400" aria-hidden>
+                    <ParentChevron open={expanded} />
                   </span>
                 </button>
                 {/**

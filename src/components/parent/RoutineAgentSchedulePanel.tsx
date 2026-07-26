@@ -1,4 +1,5 @@
 'use client'
+import ParentChevron from '@/components/parent/ParentChevron'
 
 /**
  * 루틴 탭 — 우측 하단에서 열리는 「챗봇」슬라이딩 패널입니다.
@@ -1833,9 +1834,10 @@ export default function RoutineAgentSchedulePanel({
                               type="button"
                               disabled={idx <= 0}
                               onClick={() => setMultiIndex(m.id, idx - 1)}
-                              className="rounded-lg border border-gray-200 bg-gray-50 px-2 py-1 text-[10px] disabled:opacity-40"
+                              aria-label="이전 일정"
+                              className="flex items-center justify-center rounded-lg border border-gray-200 bg-gray-50 px-2 py-1 text-gray-500 disabled:opacity-40"
                             >
-                              ◀
+                              <ParentChevron direction="left" size="sm" />
                             </button>
                             <span>
                               &lt; {idx + 1} / {n} &gt;
@@ -1844,9 +1846,10 @@ export default function RoutineAgentSchedulePanel({
                               type="button"
                               disabled={idx >= n - 1}
                               onClick={() => setMultiIndex(m.id, idx + 1)}
-                              className="rounded-lg border border-gray-200 bg-gray-50 px-2 py-1 text-[10px] disabled:opacity-40"
+                              aria-label="다음 일정"
+                              className="flex items-center justify-center rounded-lg border border-gray-200 bg-gray-50 px-2 py-1 text-gray-500 disabled:opacity-40"
                             >
-                              ▶
+                              <ParentChevron direction="right" size="sm" />
                             </button>
                           </div>
                           {isEditingThis && multiEdit ? (

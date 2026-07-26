@@ -8,6 +8,7 @@
 import type { ReactNode, TouchEvent } from 'react'
 import { getChildBadge } from '@/constants/childGrowthLevels'
 import ParentEnterChildUiLink from '@/components/parent/ParentEnterChildUiLink'
+import ParentChevron from '@/components/parent/ParentChevron'
 
 /** 홈 탭에서만 넘기면 카드 안에 오늘 미션 달성률 바가 붙습니다 */
 export type ProfileMissionSummary = {
@@ -348,7 +349,6 @@ function SiblingNavArrow({
   orientation: 'prev' | 'next'
   onPress: () => void
 }) {
-  const glyph = orientation === 'prev' ? '\u2039' : '\u203a'
   return (
     <button
       type="button"
@@ -368,9 +368,9 @@ function SiblingNavArrow({
       onTouchEnd={(e) => {
         e.stopPropagation()
       }}
-      className="shrink-0 select-none border-0 bg-transparent px-1 py-0.5 text-[1.0625rem] font-extralight leading-none text-gray-400 transition-colors hover:text-gray-500 active:text-gray-600 focus-visible:rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4A90E2]/35"
+      className="flex shrink-0 select-none items-center justify-center border-0 bg-transparent px-1 py-0.5 text-gray-400 transition-colors hover:text-gray-500 active:text-gray-600 focus-visible:rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4A90E2]/35"
     >
-      {glyph}
+      <ParentChevron direction={orientation === 'prev' ? 'left' : 'right'} size="lg" />
     </button>
   )
 }

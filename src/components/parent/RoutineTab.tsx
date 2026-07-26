@@ -1,4 +1,5 @@
 'use client'
+import ParentChevron from '@/components/parent/ParentChevron'
 
 /**
  * 부모 앱 — 루틴 관리 탭
@@ -154,20 +155,12 @@ function splitMissionsAmPm(sortedList: Mission[]): { am: Mission[]; pm: Mission[
   return { am, pm }
 }
 
-/** 펼침 시 화살표 위쪽(접기), 접힘 시 아래쪽(펼치기) */
+/**
+ * 펼침 시 화살표 위쪽(접기), 접힘 시 아래쪽(펼치기).
+ * 모양·굵기는 부모 앱 공용 `ParentChevron` 을 그대로 씁니다.
+ */
 function ChevronToggleIcon({ open, className }: { open: boolean; className?: string }) {
-  return (
-    <svg
-      className={`${className ?? ''} h-4 w-4 shrink-0 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      aria-hidden
-    >
-      <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
+  return <ParentChevron open={open} className={className} />
 }
 
 /** 일상·스페셜 공통: 접기 헤더 아래 가로 슬라이드 카드 영역(동일 여백) */

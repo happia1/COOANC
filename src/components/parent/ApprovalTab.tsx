@@ -14,6 +14,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import { CompactChildProfileCard } from '@/components/parent/CompactChildProfileCard'
+import ParentChevron from '@/components/parent/ParentChevron'
+import ParentApprovalGuideCard from '@/components/parent/ParentApprovalGuideCard'
 import { useParentStore } from '@/store/parentStore'
 import { useChildSiblingAvatarNav, type ChildTab } from '@/components/parent/ChildProfileNav'
 import ParentMarketMenuControl from '@/components/parent/ParentMarketMenuControl'
@@ -817,11 +819,23 @@ export default function ApprovalTab({
           />
         )}
 
+        {/* 이 탭에서 할 수 있는 일 안내 — X 로 닫으면 다시 뜨지 않습니다 */}
+        <ParentApprovalGuideCard />
+
         {/* 칭찬 스티커 보상 — 모바일·태블릿 공통, 좌 컬럼 상단(프로필 아래) */}
         <PraiseStickerPanel childId={currentId} childName={currentChild?.name ?? '자녀'} />
 
-        {/* 오늘 완료 미션 — 버튼 → 하단 시트 (모바일·태블릿 공통) */}
+        {/**
+          * 오늘 완료 미션 — 제목·설명을 카드 밖으로 빼서 「구매 요청」·「메뉴 제어」와 같은 형식으로 맞춥니다.
+          * (예전에는 제목이 카드 안에 들어 있어 다른 블록과 눈높이가 달랐습니다.)
+          */}
         <section>
+          <div className="mb-1">
+            <h2 className="text-sm font-bold text-brand-text">오늘 완료 미션</h2>
+            <p className="mt-0.5 text-[11px] leading-snug text-gray-600">
+              오늘 완료한 미션을 확인해보세요.
+            </p>
+          </div>
           <button
             type="button"
             onClick={() => {
@@ -829,17 +843,18 @@ export default function ApprovalTab({
               setRollbackSheetShowAll(false)
               setRollbackSheetOpen(true)
             }}
-            className="w-full rounded-2xl bg-white px-4 py-2.5 text-left shadow-sm transition-all active:scale-[0.99]"
+            className="w-full rounded-2xl bg-white px-4 py-3 text-left shadow-sm transition-all active:scale-[0.99]"
           >
             <div className="flex items-center gap-3">
-              <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <span className="text-sm font-black text-brand-text">오늘 완료 미션</span>
-                <span className="text-[11px] text-gray-400">탭하여 다시 하기 · 롤백</span>
-              </div>
+              <span className="min-w-0 flex-1 text-[13px] font-bold text-gray-500">
+                탭하여 다시 하기 · 롤백
+              </span>
               <span className="shrink-0 rounded-full bg-brand-blue/10 px-2.5 py-1 text-xs font-black tabular-nums text-brand-blue">
                 {todayCompletedLogs.length}건
               </span>
-              <span className="shrink-0 text-lg font-bold text-gray-300" aria-hidden>›</span>
+              <span className="flex shrink-0 items-center text-gray-300" aria-hidden>
+                <ParentChevron direction="right" />
+              </span>
             </div>
           </button>
 

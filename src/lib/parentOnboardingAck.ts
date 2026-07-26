@@ -12,6 +12,9 @@ import { createClient } from '@/lib/supabase/client'
 /** 가입 직후 시작 안내(미션·마켓·화분 사용법) */
 export const PARENT_ONBOARDING_WELCOME_BASICS = 'welcome_basics_v1'
 
+/** 승인 탭 상단 안내(칭찬 스티커·오늘 완료 미션·메뉴 제어) */
+export const PARENT_ONBOARDING_APPROVAL_TAB = 'approval_tab_guide_v1'
+
 /**
  * 이 안내를 이미 확인했는지 확인합니다.
  * 판단이 불가능하면(미로그인·오류·마이그레이션 미적용) `true` 를 돌려주어

@@ -1,4 +1,5 @@
 'use client'
+import ParentChevron from '@/components/parent/ParentChevron'
 
 /**
  * 부모 루틴 탭 — 캘린더
@@ -668,10 +669,10 @@ export default function CalendarSection({ childId, focusDate = null, focusNonce 
         <button
           type="button"
           onClick={prevMonth}
-          className="flex min-h-9 min-w-9 items-center justify-center text-2xl font-light leading-none text-gray-400 transition-opacity active:opacity-50"
+          className="flex min-h-9 min-w-9 items-center justify-center text-gray-400 transition-opacity active:opacity-50"
           aria-label="이전 달"
         >
-          ‹
+          <ParentChevron direction="left" size="lg" />
         </button>
         <p className="font-bold text-brand-text">
           {year}년 {month + 1}월
@@ -679,10 +680,10 @@ export default function CalendarSection({ childId, focusDate = null, focusNonce 
         <button
           type="button"
           onClick={nextMonth}
-          className="flex min-h-9 min-w-9 items-center justify-center text-2xl font-light leading-none text-gray-400 transition-opacity active:opacity-50"
+          className="flex min-h-9 min-w-9 items-center justify-center text-gray-400 transition-opacity active:opacity-50"
           aria-label="다음 달"
         >
-          ›
+          <ParentChevron direction="right" size="lg" />
         </button>
       </div>
 
@@ -819,23 +820,8 @@ export default function CalendarSection({ childId, focusDate = null, focusNonce 
               <span className="ml-1 font-black text-gray-500">({monthTotalCount})</span>
             ) : null}
           </p>
-          <span
-            className={`flex h-5 w-5 shrink-0 items-center justify-center text-gray-400 transition-transform duration-200 ${
-              monthScheduleOpen ? 'rotate-180' : ''
-            }`}
-            aria-hidden
-          >
-            <svg
-              className="h-5 w-5"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M6 9l6 6 6-6" />
-            </svg>
+          <span className="flex shrink-0 items-center justify-center text-gray-400" aria-hidden>
+            <ParentChevron open={monthScheduleOpen} size="lg" />
           </span>
         </div>
         {monthScheduleOpen ? (

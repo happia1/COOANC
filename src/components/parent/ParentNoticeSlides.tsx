@@ -1,4 +1,5 @@
 'use client'
+import ParentChevron from '@/components/parent/ParentChevron'
 
 /**
  * 부모 「알림·공지」시트 안의 공지 목록입니다.
@@ -106,22 +107,11 @@ function NoticeLinkButton({
   )
 }
 
-/** 접기·펼치기 화살표(비개발자: 열렸을 때 아래를 향함) */
+/**
+ * 접기·펼치기 화살표 — 모양·굵기는 부모 앱 공용 `ParentChevron` 을 그대로 씁니다.
+ */
 function ChevronDownIcon({ className, open }: { className?: string; open: boolean }) {
-  return (
-    <svg
-      className={`${className ?? ''} shrink-0 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      aria-hidden
-    >
-      <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
+  return <ParentChevron open={open} className={className} />
 }
 
 /**

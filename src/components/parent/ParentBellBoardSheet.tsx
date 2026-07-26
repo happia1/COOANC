@@ -1,4 +1,5 @@
 'use client'
+import ParentChevron from '@/components/parent/ParentChevron'
 
 /**
  * 부모 상단 「알림·공지」버튼용 게시판 시트입니다.
@@ -116,7 +117,9 @@ export default function ParentBellBoardSheet({
                           <p className="text-xs font-extrabold text-gray-900">구매 요청 {unreadPendingCount}건 대기 중</p>
                           <p className="mt-1 text-[11px] leading-relaxed text-gray-600">승인 탭에서 처리할 수 있어요</p>
                         </div>
-                        <span className="shrink-0 text-lg font-bold text-gray-400" aria-hidden>›</span>
+                        <span className="flex shrink-0 items-center text-gray-400" aria-hidden>
+                          <ParentChevron direction="right" />
+                        </span>
                       </Link>
                     </li>
                   ) : null}
@@ -154,7 +157,9 @@ export default function ParentBellBoardSheet({
                             })} 발생
                           </p>
                         </div>
-                        <span className="shrink-0 text-lg font-bold text-red-400" aria-hidden>›</span>
+                        <span className="flex shrink-0 items-center text-red-400" aria-hidden>
+                          <ParentChevron direction="right" />
+                        </span>
                       </Link>
                     </li>
                   ) : null}
