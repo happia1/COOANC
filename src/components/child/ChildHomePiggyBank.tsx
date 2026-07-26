@@ -566,7 +566,7 @@ export default function ChildHomePiggyBank({
           */}
         {bonusCount > 0 ? (
           <span
-            className="pointer-events-none absolute -top-8 left-1/2 flex -translate-x-1/2 items-center gap-px"
+            className="pointer-events-none absolute -top-9 left-1/2 -ml-2.5 flex -translate-x-1/2 items-center gap-px"
             style={{ animation: 'piggyBonusSparkle 1.4s ease-in-out infinite' }}
           >
             <button
@@ -582,9 +582,9 @@ export default function ChildHomePiggyBank({
               <img
                 src={CHILD_CREDIT_COIN_PNG_SRC}
                 alt=""
-                width={34}
-                height={34}
-                className="h-[34px] w-[34px] object-contain"
+                width={40}
+                height={40}
+                className="h-10 w-10 object-contain"
                 style={{ filter: 'drop-shadow(0 0 5px rgba(255,214,80,0.95))' }}
                 draggable={false}
               />
