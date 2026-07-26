@@ -4,6 +4,21 @@
 
 ---
 
+## [2026-07-26] - 예전 캘린더 일정의 잘못된 자녀 ID 자동 복구
+- **Status:** 완료
+- **Files Modified:**
+  - `src/components/parent/CalendarSection.tsx`
+  - `src/lib/mergeParentCalendarEvents.ts`
+- **Summary:**
+  - 현재 부모에게 연결된 전체 자녀 ID와 선택 자녀 ID를 구분해 조회합니다.
+  - 다른 정상 연결 자녀의 일정은 건드리지 않고, 연결 목록에 없는 오래된 childId만 현재 선택 자녀로 교정해 서버에 재저장합니다.
+  - 동기화 성공 후 localStorage 일정도 서버 UUID와 올바른 자녀 ID로 함께 교체해 403 재시도를 끝냅니다.
+- **Verification:**
+  - `tsc --noEmit` 통과
+  - `git diff --check` 통과
+
+---
+
 ## [2026-07-26] - 캘린더 기기 동기화 403·주말 매일 스페셜 누락 수정
 - **Status:** 완료
 - **Files Modified:**

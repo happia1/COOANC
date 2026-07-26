@@ -256,7 +256,12 @@ export default function CalendarSection({ childId, focusDate = null, focusNonce 
        * ② 서버 저장이 도입되기 전에 이 기기에만 저장된 예전 일정(예: 여름 돌봄)을 한 번 올려
        * 모든 기기가 같은 DB 를 보도록 정리합니다. 이미 올린 일정은 다시 올리지 않습니다.
        */
-      const backfill = await backfillLocalOnlyCalendarEvents(local, server, childId)
+      const backfill = await backfillLocalOnlyCalendarEvents(
+        local,
+        server,
+        childId,
+        fetched.linkedChildIds,
+      )
       if (backfill.failures.length > 0) {
         /**
          * 조용히 실패하면 "동기화가 안 된다"는 것만 보이고 원인을 알 수 없습니다.
@@ -277,7 +282,7 @@ export default function CalendarSection({ childId, focusDate = null, focusNonce 
          */
         local = local.map((e) => {
           const newId = backfill.idMap.get(e.id)
-          return newId ? { ...e, id: newId, childId: e.childId ?? childId } : e
+          return newId ? { ...e, id: newId, childId: childId ?? e.childId } : e
         })
         try {
           localStorage.setItem(STORAGE_KEY, JSON.stringify(local))

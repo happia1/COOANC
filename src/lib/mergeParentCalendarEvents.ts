@@ -321,6 +321,7 @@ export async function backfillLocalOnlyCalendarEvents(
   local: LocalCalendarEvent[],
   server: LocalCalendarEvent[],
   selectedChildId: string | null,
+  linkedChildIds: Set<string> = new Set(),
 ): Promise<CalendarBackfillResult> {
   const idMap = new Map<string, string>()
   const failures: { title: string; reason: string }[] = []
@@ -350,7 +351,21 @@ export async function backfillLocalOnlyCalendarEvents(
      * 서버는 자녀(family_link) 귀속이 필요합니다.
      * 자녀 지정이 없던 예전 일정은 현재 보고 있는 자녀로 붙여 올립니다(같은 가족이라 브리핑·캘린더 모두 정상 표시).
      */
-    const childId = ev.childId ?? selectedChildId
+    if (
+      selectedChildId &&
+      ev.childId &&
+      ev.childId !== selectedChildId &&
+      linkedChildIds.has(ev.childId)
+    ) {
+      // 현재 부모에게 연결된 다른 자녀 일정은 그 자녀의 캘린더에서 처리합니다.
+      continue
+    }
+    const canRepairLegacyChildId =
+      Boolean(selectedChildId) && linkedChildIds.has(selectedChildId as string)
+    const childId =
+      canRepairLegacyChildId && (!ev.childId || !linkedChildIds.has(ev.childId))
+        ? selectedChildId
+        : (ev.childId ?? selectedChildId)
     if (!childId) {
       failures.push({ title: ev.title, reason: '자녀를 고를 수 없어요(자녀 선택 후 다시 열어주세요)' })
       continue
@@ -408,29 +423,42 @@ export interface ServerCalendarFetch {
   events: LocalCalendarEvent[]
   /** 이번 조회가 담당한 자녀 id 들 — 이 범위 밖 일정은 삭제 판단을 하지 않습니다 */
   scopedChildIds: Set<string>
+  linkedChildIds: Set<string>
 }
 
 export async function fetchParentCalendarEventsFromServerScoped(
   childId: string | null,
 ): Promise<ServerCalendarFetch> {
-  const empty: ServerCalendarFetch = { ok: false, events: [], scopedChildIds: new Set() }
+  const empty: ServerCalendarFetch = {
+    ok: false,
+    events: [],
+    scopedChildIds: new Set(),
+    linkedChildIds: new Set(),
+  }
   const supabase = createClient()
   /** 서버 `/user` 대신 로컬 세션 — Auth storage 락 경쟁을 줄입니다 */
   const userId = await getBrowserSessionUserId(supabase)
   if (!userId) return empty
 
-  let linksQuery = supabase.from('family_links').select('id, child_id').eq('parent_id', userId)
-  if (childId) {
-    linksQuery = linksQuery.eq('child_id', childId)
-  }
-  const { data: allLinks, error: linkErr } = await linksQuery
+  const { data: allLinks, error: linkErr } = await supabase
+    .from('family_links')
+    .select('id, child_id')
+    .eq('parent_id', userId)
   if (linkErr) return empty
-  const familyLinkIds = (allLinks ?? []).map((r) => r.id).filter(Boolean)
-  const scopedChildIds = new Set<string>(
+  const linkedChildIds = new Set<string>(
     (allLinks ?? []).map((row: { id: string; child_id: string }) => row.child_id).filter(Boolean),
   )
+  const scopedLinks = childId
+    ? (allLinks ?? []).filter((row: { id: string; child_id: string }) => row.child_id === childId)
+    : (allLinks ?? [])
+  const familyLinkIds = scopedLinks.map((r) => r.id).filter(Boolean)
+  const scopedChildIds = new Set<string>(
+    scopedLinks.map((row: { id: string; child_id: string }) => row.child_id).filter(Boolean),
+  )
   /** 연결된 자녀가 없으면 서버에 일정도 없음 — 조회 자체는 성공입니다 */
-  if (familyLinkIds.length === 0) return { ok: true, events: [], scopedChildIds }
+  if (familyLinkIds.length === 0) {
+    return { ok: true, events: [], scopedChildIds, linkedChildIds }
+  }
 
   /**
    * description 은 126 마이그레이션에서 추가됩니다.
@@ -443,7 +471,7 @@ export async function fetchParentCalendarEventsFromServerScoped(
   if (res.error) {
     res = await supabase.from('calendar_events').select(COLS_BASE).in('family_link_id', familyLinkIds)
   }
-  if (res.error || !res.data) return { ...empty, scopedChildIds }
+  if (res.error || !res.data) return { ...empty, scopedChildIds, linkedChildIds }
 
   const childIdByFamilyLink = new Map<string, string>(
     (allLinks ?? []).map((row: { id: string; child_id: string }) => [row.id, row.child_id] as const),
@@ -452,6 +480,7 @@ export async function fetchParentCalendarEventsFromServerScoped(
     ok: true,
     events: (res.data as CalRow[]).map((row) => calendarEventRowToLocal(row, childIdByFamilyLink)),
     scopedChildIds,
+    linkedChildIds,
   }
 }
 
