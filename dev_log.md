@@ -4,6 +4,23 @@
 
 ---
 
+## [2026-07-26] - 캘린더 기기 동기화 403·주말 매일 스페셜 누락 수정
+- **Status:** 완료
+- **Files Modified:**
+  - `src/app/api/calendar-event/create/route.ts`
+  - `src/components/parent/CalendarSection.tsx`
+  - `src/lib/missionDayTemplatePool.ts`
+- **Summary:**
+  - 캘린더 일정 저장 시 인증된 부모 ID로 서버에서 가족 연결을 검증해 기기별 RLS 상태에 따른 잘못된 403을 막았습니다.
+  - 과거 중복 family link 행이 있어도 연결 한 건을 안전하게 선택하며, 연결 조회 자체가 실패하면 403 대신 서버 오류로 구분합니다.
+  - 캘린더 화면이 열린 상태에서도 15초마다 서버 일정을 확인해 다른 기기에서 추가한 일정을 반영합니다.
+  - `매일` 스페셜 미션을 평일·주말·휴일 루틴 선택과 분리해 모든 날짜에 자동 배정합니다.
+- **Verification:**
+  - `tsc --noEmit` 통과
+  - `git diff --check` 통과
+
+---
+
 ## [2026-07-23] - 빠른 연속 입력 시 크레딧·하트 숫자 역행 수정
 - **Status:** 완료
 - **Files Modified:**

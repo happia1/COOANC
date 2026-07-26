@@ -27,8 +27,6 @@ export function templatePoolForMissionDay(
   routineType: MissionDayRoutineType,
   holidayRoutineMode: 'as_weekday' | 'custom' | null,
 ): Mission[] {
-  if (routineType === 'holiday') return []
-
   const linked = templates.filter(
     (m) =>
       m.is_active &&
@@ -37,18 +35,41 @@ export function templatePoolForMissionDay(
       m.repeat_type !== 'event',
   )
 
-  const dailyOrWeekly = linked.filter((m) => m.repeat_type === 'daily' || m.repeat_type === 'weekly')
+  /**
+   * `매일`로 지정한 스페셜 미션은 평일/주말 루틴 선택과 별개입니다.
+   * 기존에는 주말 custom 분기에서 weekly만 남기면서 daily 스페셜까지 빠졌습니다.
+   */
+  const dailySpecials = linked.filter(
+    (m) => isSpecialSectionMission(m) && m.repeat_type === 'daily',
+  )
+  const dailyOrWeeklyRoutine = linked.filter(
+    (m) =>
+      !isSpecialSectionMission(m) &&
+      (m.repeat_type === 'daily' || m.repeat_type === 'weekly'),
+  )
 
   if (routineType === 'weekday') {
-    return dailyOrWeekly.filter((m) => m.repeat_type === 'daily')
+    return [
+      ...dailyOrWeeklyRoutine.filter((m) => m.repeat_type === 'daily'),
+      ...dailySpecials,
+    ]
   }
+
+  if (routineType === 'holiday') return dailySpecials
 
   if (routineType === 'weekend' && holidayRoutineMode === 'custom') {
-    return dailyOrWeekly.filter((m) => m.repeat_type === 'weekly')
+    return [
+      ...dailyOrWeeklyRoutine.filter((m) => m.repeat_type === 'weekly'),
+      ...dailySpecials,
+    ]
   }
 
-  const weekly = dailyOrWeekly.filter((m) => m.repeat_type === 'weekly')
-  return weekly.length > 0 ? weekly : dailyOrWeekly.filter((m) => m.repeat_type === 'daily')
+  const weekly = dailyOrWeeklyRoutine.filter((m) => m.repeat_type === 'weekly')
+  const routines =
+    weekly.length > 0
+      ? weekly
+      : dailyOrWeeklyRoutine.filter((m) => m.repeat_type === 'daily')
+  return [...routines, ...dailySpecials]
 }
 
 /**

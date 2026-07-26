@@ -60,20 +60,29 @@ export async function POST(req: NextRequest) {
   /** 빈 문자열 = 설명 없음(126 적용 DB 에서만 저장됨) */
   const description = String(body.description ?? '').slice(0, 2000)
 
-  // 이 부모–자녀의 family_link 확인(권한 검증). 서버 행은 family_link_id 로 귀속됩니다.
-  const { data: link } = await supabase
+  /**
+   * 이 부모–자녀의 family_link 확인(권한 검증).
+   * 브라우저 세션의 RLS 상태에 기대면 기기별로 실제 연결을 못 읽어 403을 낼 수 있습니다.
+   * 인증된 user.id를 조건으로 고정한 뒤 서버 권한으로 확인합니다.
+   * 과거 중복 연결 행이 있어도 첫 행을 사용하도록 limit(1)을 둡니다.
+   */
+  const service = createServiceRoleClient()
+  const db = service ?? supabase
+  const { data: link, error: linkError } = await db
     .from('family_links')
     .select('id')
     .eq('parent_id', user.id)
     .eq('child_id', childId)
+    .limit(1)
     .maybeSingle()
 
+  if (linkError) {
+    console.error('[calendar-event/create] family link lookup', linkError.message)
+    return NextResponse.json({ error: '가족 연결을 확인하지 못했어요' }, { status: 500 })
+  }
   if (!link) {
     return NextResponse.json({ error: '연결된 자녀의 일정만 저장할 수 있어요' }, { status: 403 })
   }
-
-  const service = createServiceRoleClient()
-  const db = service ?? supabase
 
   const base = {
     family_link_id: link.id,

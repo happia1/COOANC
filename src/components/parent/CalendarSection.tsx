@@ -342,11 +342,16 @@ export default function CalendarSection({ childId, focusDate = null, focusNonce 
       if (document.visibilityState === 'hidden') return
       void refreshMergedEvents()
     }
+    // 태블릿 화면을 계속 켜 둔 상태에서도 휴대폰에서 등록한 일정을 자동으로 가져옵니다.
+    const syncInterval = window.setInterval(() => {
+      if (document.visibilityState === 'visible') void refreshMergedEvents()
+    }, 15_000)
     window.addEventListener(COOANC_CALENDAR_STORAGE_UPDATE_EVENT, onStorage)
     window.addEventListener('storage', onStorage)
     window.addEventListener('focus', onFocus)
     document.addEventListener('visibilitychange', onFocus)
     return () => {
+      window.clearInterval(syncInterval)
       window.removeEventListener(COOANC_CALENDAR_STORAGE_UPDATE_EVENT, onStorage)
       window.removeEventListener('storage', onStorage)
       window.removeEventListener('focus', onFocus)
