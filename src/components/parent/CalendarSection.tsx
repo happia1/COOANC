@@ -207,6 +207,7 @@ export default function CalendarSection({ childId, focusDate = null, focusNonce 
   })
 
   const [events, setEvents] = useState<LocalCalendarEvent[]>([])
+  const [checklistSummaryByEvent, setChecklistSummaryByEvent] = useState<Record<string, { total: number; done: number }>>({})
   const [sheet, setSheet] = useState<SheetState | null>(null)
   const [detailEvents, setDetailEvents] = useState<LocalCalendarEvent[] | null>(null)
   /** 일정이 없는 날을 눌렀을 때만 값이 있음(빈 날 시트 표시) */
@@ -233,6 +234,27 @@ export default function CalendarSection({ childId, focusDate = null, focusNonce 
   const [calendarDataRevision, setCalendarDataRevision] = useState(0)
   /** 예전(기기 전용) 일정 서버 정리 결과 안내 — 성공/실패 모두 눈에 보이게 */
   const [backfillNotice, setBackfillNotice] = useState<string | null>(null)
+
+  /** 달력의 작은 체크 표시용 집계 — 체크 항목이 있는 날짜를 한눈에 구분합니다. */
+  useEffect(() => {
+    const ids = events.filter((event) => !event.id.startsWith('__')).map((event) => event.id)
+    if (ids.length === 0) { setChecklistSummaryByEvent({}); return }
+    let cancelled = false
+    const supabase = createClient()
+    void supabase.from('calendar_event_checklists').select('calendar_event_id,is_completed').in('calendar_event_id', ids).then(({ data, error }) => {
+      if (cancelled || error) return
+      const next: Record<string, { total: number; done: number }> = {}
+      for (const row of data ?? []) {
+        const id = String(row.calendar_event_id)
+        const acc = next[id] ?? { total: 0, done: 0 }
+        acc.total += 1
+        if (row.is_completed) acc.done += 1
+        next[id] = acc
+      }
+      setChecklistSummaryByEvent(next)
+    })
+    return () => { cancelled = true }
+  }, [events])
 
   /**
    * localStorage + 서버 `calendar_events` 를 합쳐 `events` 를 맞춥니다.
@@ -756,8 +778,8 @@ export default function CalendarSection({ childId, focusDate = null, focusNonce 
         ))}
       </div>
 
-      {/* gap-y-2: 행 사이 여백을 조금 넓혀 도트가 있어도 답답하지 않게 함 */}
-      <div className="grid grid-cols-7 gap-y-2">
+      {/* 기간 바가 날짜 칸 사이에서 끊기지 않도록 행 간격은 바 영역 밖에서만 확보합니다. */}
+      <div className="grid grid-cols-7 gap-y-0">
         {cells.map((day, idx) => {
           if (!day) return <div key={idx} />
           const dk = dateKey(year, month, day)
@@ -765,11 +787,9 @@ export default function CalendarSection({ childId, focusDate = null, focusNonce 
           const isToday = dk === todayStr
           const isSun = idx % 7 === 0
           const isSat = idx % 7 === 6
-          /** 공휴일 칸 글자는 범례가「전체」또는「공휴일」일 때만 —「여행만」이면 도트와 같이 숨김 */
-          const showPublicHolidayCellText = legendFilter == null || legendFilter === 'holiday'
-          const publicHolidayName = showPublicHolidayCellText ? holidayNamesByDate[dk] : undefined
           /** 같은 날 중복 id 제거 후 최대 3개만 점으로 표시 */
-          const dotEvents = [...new Map(evHere.map((e) => [e.id, e])).values()].slice(0, 3)
+          /** 주요(하루) 일정은 점으로, 기간 일정은 아래 연결 바로 분리합니다. */
+          const dotEvents = [...new Map(evHere.filter((e) => e.startDate === e.endDate).map((e) => [e.id, e])).values()].slice(0, 3)
           const periodBars = (periodBarsByDate[dk] ?? []).sort((a, b) => a.lane - b.lane)
           const overflowTitles = overflowPeriodTitlesByDate[dk] ?? []
           return (
@@ -778,22 +798,13 @@ export default function CalendarSection({ childId, focusDate = null, focusNonce 
               type="button"
               onClick={() => handleDayClick(dk)}
               className={[
-                /* py-1.5 + min-h: 공휴일 이름이 있는 칸(한 줄 더 큼)까지 포함해 모든 주(마지막 주 포함) 높이를 동일하게 맞춤 */
-                'relative flex min-h-[3.25rem] flex-col items-center rounded-lg py-1.5 text-[11px] font-bold transition-all',
-                isToday ? 'ring-2 ring-brand-blue' : '',
+                'relative flex min-h-[3.9rem] flex-col items-center py-1 text-[11px] font-bold transition-all',
+                isToday ? 'bg-brand-blue/15' : '',
                 'hover:bg-gray-50',
                 isSun ? 'text-red-500' : isSat ? 'text-blue-500' : 'text-gray-700',
               ].join(' ')}
             >
               {day}
-              {publicHolidayName ? (
-                <span
-                  className="mt-0.5 block w-full min-w-0 max-w-[3.25rem] overflow-hidden whitespace-nowrap text-ellipsis px-0.5 text-center text-[10px] font-bold leading-none text-red-600"
-                  title={publicHolidayName}
-                >
-                  {shortPublicHolidayCellLabel(publicHolidayName)}
-                </span>
-              ) : null}
               {/*
                 일정이 없는 날도 같은 높이의 ‘도트 자리’를 항상 두어,
                 점이 생겼을 때만 행 높이가 커지는 현상(줄 간격 들쭉날쭉)을 막습니다.
@@ -804,13 +815,16 @@ export default function CalendarSection({ childId, focusDate = null, focusNonce 
                 aria-hidden={dotEvents.length === 0}
               >
                 {dotEvents.map((ev) => (
-                  <span
-                    key={ev.id}
-                    className={`h-1 w-1 shrink-0 rounded-full ${EVENT_COLORS[ev.eventType].dot}`}
-                  />
+                  <span key={ev.id} className="inline-flex items-center gap-px">
+                    <span className={`h-1 w-1 shrink-0 rounded-full ${EVENT_COLORS[ev.eventType].dot}`} />
+                    {checklistSummaryByEvent[ev.id]?.total ? <span className="flex h-2 w-2 items-center justify-center rounded-sm border border-gray-400 text-[7px] leading-none text-gray-600">✓</span> : null}
+                  </span>
                 ))}
               </div>
-              <div className="mt-0.5 flex h-2 w-full flex-col gap-px px-0.5">
+              <div className="mt-0.5 h-3 w-full overflow-visible text-left text-[8px] leading-none text-gray-600">
+                {periodBars.find((bar) => bar.isStart)?.event.title ?? ''}
+              </div>
+              <div className="flex h-[5px] w-full flex-col gap-px">
                 {periodBars.map((bar) => (
                   <span
                     key={`${bar.event.id}-${bar.lane}`}

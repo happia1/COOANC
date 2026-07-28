@@ -565,6 +565,9 @@ export function pruneLocalEventsDeletedOnServer(
   if (!fetched.ok) return { kept: local, prunedIds: [] }
 
   const serverIds = new Set(fetched.events.map((e) => e.id))
+  /** 서버 동기화가 실제로 성공했던 id만 원격 삭제 판단 대상입니다.
+   * crypto.randomUUID()로 만든 예전 로컬 일정은 UUID 모양이어도 아직 서버 행이 아닐 수 있습니다. */
+  const backfilledIds = readBackfilledIds()
   const prunedIds: string[] = []
   const kept = local.filter((ev) => {
     if (!ev?.id || ev.id.startsWith('__public_holiday__')) return true
@@ -572,6 +575,7 @@ export function pruneLocalEventsDeletedOnServer(
     if (serverIds.has(ev.id)) return true
     /** 조회 범위 밖(다른 자녀·자녀 미지정)이면 삭제 여부를 알 수 없으므로 보존 */
     if (!ev.childId || !fetched.scopedChildIds.has(ev.childId)) return true
+    if (!backfilledIds.has(ev.id)) return true
     prunedIds.push(ev.id)
     return false
   })
