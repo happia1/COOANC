@@ -85,24 +85,6 @@ const EVENT_TYPE_LABELS: Record<LocalCalendarEvent['eventType'], string> = {
   travel: '여행',
 }
 
-/**
- * 일정 추가·편집 시트 — 이벤트 종류 칩 (한 줄에 여러 개, etc/other·special/event 통합)
- * `value` 는 저장 시 DB `event_type` 으로 씁니다.
- */
-const EVENT_TYPE_PICKER_OPTIONS: {
-  value: LocalCalendarEvent['eventType']
-  label: string
-  matchTypes: LocalCalendarEvent['eventType'][]
-}[] = [
-  { value: 'holiday', label: '공휴일', matchTypes: ['holiday'] },
-  { value: 'vacation', label: '방학', matchTypes: ['vacation'] },
-  { value: 'travel', label: '여행', matchTypes: ['travel'] },
-  { value: 'birthday', label: '생일', matchTypes: ['birthday'] },
-  { value: 'school', label: '학교', matchTypes: ['school'] },
-  { value: 'special', label: '기념일/행사', matchTypes: ['special', 'event'] },
-  { value: 'etc', label: '기타', matchTypes: ['etc', 'other'] },
-]
-
 /** 범례·일정 시트에서 쓰는 종류 순서 (etc/other·special/event 는 각각 하나) */
 const EVENT_TYPES_ORDER: LocalCalendarEvent['eventType'][] = [
   'holiday',
@@ -131,6 +113,17 @@ function eventTypeForScheduleCategory(main: string, sub: string): LocalCalendarE
   if (main === '행사' && sub === '생일') return 'birthday'
   if (main === '교육') return 'school'
   return 'etc'
+}
+
+/** 기존 event_type만 있는 일정도 입력 시트에서는 새 분류 하나로 보이게 합니다. */
+function scheduleCategoryForLegacyEventType(type: LocalCalendarEvent['eventType']): { main: string; sub: string } {
+  if (type === 'holiday') return { main: '공휴일', sub: '' }
+  if (type === 'travel') return { main: '여행', sub: '' }
+  if (type === 'birthday') return { main: '행사', sub: '생일' }
+  if (type === 'vacation') return { main: '교육', sub: '방학' }
+  if (type === 'school') return { main: '교육', sub: '' }
+  if (type === 'special' || type === 'event') return { main: '행사', sub: '기념일' }
+  return { main: '기타', sub: '' }
 }
 
 type OverrideType = LocalCalendarEvent['routineOverride']
@@ -1064,14 +1057,12 @@ export function CalendarEventSheet({
   const [title, setTitle] = useState(existing?.title ?? '')
   const [startDate, setStart] = useState(existing?.startDate ?? initialStartDate)
   const [endDate, setEnd] = useState(existing?.endDate ?? initialEndDate)
-  const [eventType, setType] = useState<LocalCalendarEvent['eventType']>(
-    existing?.eventType ?? presetEventType ?? 'holiday',
-  )
+  const legacyCategory = scheduleCategoryForLegacyEventType(existing?.eventType ?? presetEventType ?? 'etc')
   const [override, setOverride] = useState<OverrideType>(existing?.routineOverride ?? 'weekend')
   // 구버전 일정(JSON)에는 description 키가 없을 수 있음 → 빈 문자열로 시작
   const [description, setDescription] = useState(existing?.description ?? '')
-  const [categoryMain, setCategoryMain] = useState(existing?.categoryMain ?? '')
-  const [categorySub, setCategorySub] = useState(existing?.categorySub ?? '')
+  const [categoryMain, setCategoryMain] = useState(existing?.categoryMain ?? legacyCategory.main)
+  const [categorySub, setCategorySub] = useState(existing?.categorySub ?? legacyCategory.sub)
   const [recurType, setRecurType] = useState<NonNullable<LocalCalendarEvent['recurType']>>(existing?.recurType ?? 'none')
   const [recurUntil, setRecurUntil] = useState(existing?.recurUntil ?? '')
   const [isImportant, setIsImportant] = useState(existing?.isImportant ?? false)
@@ -1098,7 +1089,8 @@ export function CalendarEventSheet({
       ...(trimmedNote ? { description: trimmedNote } : {}),
       startDate,
       endDate,
-      eventType: categoryMain ? eventTypeForScheduleCategory(categoryMain, categorySub) : eventType,
+      /** event_type은 기존 필터·색상 호환용으로 분류에서 파생하며 별도 입력은 받지 않습니다. */
+      eventType: eventTypeForScheduleCategory(categoryMain, categorySub),
       routineOverride: override,
       categoryMain: categoryMain || null,
       categorySub: categorySub || null,
@@ -1225,30 +1217,6 @@ export function CalendarEventSheet({
                 </div>
 
                 <div className="mt-4">
-                  <label className="mb-2 block text-xs font-bold text-gray-500">표시 종류</label>
-                  <div className="flex flex-wrap gap-1.5">
-                    {EVENT_TYPE_PICKER_OPTIONS.map((opt) => {
-                      const selected = opt.matchTypes.includes(eventType)
-                      const colors = EVENT_COLORS[opt.value]
-                      return (
-                        <button
-                          key={opt.value}
-                          type="button"
-                          onClick={() => setType(opt.value)}
-                          className={`shrink-0 rounded-lg border-2 px-2.5 py-1.5 text-[11px] font-bold transition-all ${
-                            selected
-                              ? `border-current ${colors.bg} ${colors.text}`
-                              : 'border-gray-200 text-gray-400'
-                          }`}
-                        >
-                          {opt.label}
-                        </button>
-                      )
-                    })}
-                  </div>
-                </div>
-
-                <div className="mt-4">
                   <label className="mb-2 block text-xs font-bold text-gray-500">반복</label>
                   <div className="flex flex-wrap gap-2">
                     {(['none', 'weekly', 'monthly', 'yearly'] as const).map((value) => (
@@ -1257,7 +1225,7 @@ export function CalendarEventSheet({
                       </button>
                     ))}
                   </div>
-                  {recurType !== 'none' ? <input type="date" value={recurUntil} onChange={(e) => setRecurUntil(e.target.value)} min={startDate} className="mt-2 w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm" aria-label="반복 종료일" /> : null}
+                  {recurType !== 'none' ? <div className="mt-2"><label className="mb-1 block text-[11px] font-bold text-gray-500">반복 종료일 (선택)</label><input type="date" value={recurUntil} onChange={(e) => setRecurUntil(e.target.value)} min={startDate} className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm" aria-label="반복 종료일" /><p className="mt-1 text-[10px] text-gray-400">비워두면 종료일 없이 계속 반복해요.</p></div> : null}
                 </div>
 
                 <label className="mt-4 flex items-center justify-between text-xs font-bold text-gray-600">

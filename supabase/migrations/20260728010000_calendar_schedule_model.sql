@@ -14,6 +14,29 @@ ALTER TABLE public.calendar_events
   ADD COLUMN IF NOT EXISTS recur_type text NOT NULL DEFAULT 'none',
   ADD COLUMN IF NOT EXISTS recur_until date;
 
+-- 기존 표시 종류(event_type)를 fridge식 일정 분류로 한 번 옮깁니다.
+-- 이미 부모가 새 분류를 골라 저장한 행은 보존합니다.
+UPDATE public.calendar_events
+SET
+  category_main = CASE event_type
+    WHEN 'holiday' THEN '공휴일'
+    WHEN 'travel' THEN '여행'
+    WHEN 'birthday' THEN '행사'
+    WHEN 'vacation' THEN '교육'
+    WHEN 'school' THEN '교육'
+    WHEN 'special' THEN '행사'
+    WHEN 'event' THEN '행사'
+    ELSE '기타'
+  END,
+  category_sub = CASE event_type
+    WHEN 'birthday' THEN '생일'
+    WHEN 'vacation' THEN '방학'
+    WHEN 'special' THEN '기념일'
+    WHEN 'event' THEN '기념일'
+    ELSE NULL
+  END
+WHERE category_main IS NULL OR btrim(category_main) = '';
+
 ALTER TABLE public.calendar_events
   DROP CONSTRAINT IF EXISTS calendar_events_recur_type_check;
 
@@ -68,6 +91,6 @@ CREATE POLICY "parent_manage_calendar_event_checklists"
   );
 
 COMMENT ON COLUMN public.calendar_events.event_type IS
-  '일정 색상·필터용 분류. 루틴은 routine_override를 부모가 직접 선택한다.';
+  '과거 일정 호환 및 색상 파생용 내부 값. 부모 입력은 category_main/category_sub만 사용하며, 루틴은 routine_override를 직접 선택한다.';
 
 NOTIFY pgrst, 'reload schema';
