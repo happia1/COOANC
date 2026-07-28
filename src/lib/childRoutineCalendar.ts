@@ -5,7 +5,51 @@ import { getSeoulWeekdayShort } from '@/lib/koreaDate'
  * 자녀 루틴(평일/주말/휴식) 판단용 — `calendar_events` 에서 날짜·루틴만 읽습니다.
  * (비개발자: 부모 캘린더에 「루틴 끔」이 오늘과 겹치면 미션 카드를 아예 안 만듭니다.)
  */
-export type CalEventRow = { start_date: string; end_date: string; routine_override: string }
+export type CalEventRow = {
+  start_date: string
+  end_date: string
+  routine_override: string
+  recur_type?: 'none' | 'weekly' | 'monthly' | 'yearly' | null
+  recur_until?: string | null
+}
+
+function dayNumber(value: string): number {
+  return Math.floor(Date.parse(`${value.slice(0, 10)}T00:00:00Z`) / 86_400_000)
+}
+
+/** 반복 원본이 오늘에 실제로 발생하는지. 기간 길이는 각 반복 회차에도 그대로 적용합니다. */
+function occursOnDay(row: CalEventRow, today: string): boolean {
+  const start = row.start_date.slice(0, 10)
+  const end = row.end_date.slice(0, 10)
+  const type = row.recur_type ?? 'none'
+  if (type === 'none') return start <= today && today <= end
+  if (today < start || (row.recur_until && today > row.recur_until.slice(0, 10))) return false
+  const duration = Math.max(0, dayNumber(end) - dayNumber(start))
+  const candidateStarts: string[] = []
+  if (type === 'weekly') {
+    const diff = dayNumber(today) - dayNumber(start)
+    const anchor = dayNumber(today) - (diff % 7)
+    for (let offset = 0; offset <= Math.ceil(duration / 7) + 1; offset++) {
+      candidateStarts.push(new Date((anchor - offset * 7) * 86_400_000).toISOString().slice(0, 10))
+    }
+  } else if (type === 'monthly' || type === 'yearly') {
+    const [sy, sm, sd] = start.split('-').map(Number)
+    const [ty, tm] = today.split('-').map(Number)
+    const count = type === 'monthly' ? 2 : 2
+    for (let back = 0; back <= count; back++) {
+      const y = type === 'monthly' ? ty : ty - back
+      const m = type === 'monthly' ? tm - back : sm
+      const d = new Date(y, m - 1, sd)
+      if (d.getMonth() !== ((m - 1 + 12) % 12)) continue
+      candidateStarts.push(d.toISOString().slice(0, 10))
+    }
+    void sy
+  }
+  return candidateStarts.some((candidate) => {
+    const until = new Date(Date.parse(`${candidate}T00:00:00Z`) + duration * 86_400_000).toISOString().slice(0, 10)
+    return candidate <= today && today <= until
+  })
+}
 
 export type ChildRoutineCalendarType = 'weekday' | 'weekend' | 'holiday' | 'vacation'
 
@@ -46,25 +90,21 @@ export async function fetchCalendarEventsForChildRoutine(
   if (familyLinkId) {
     const res = await missionDb
       .from('calendar_events')
-      .select('start_date, end_date, routine_override')
+      .select('start_date, end_date, routine_override, recur_type, recur_until')
       .eq('family_link_id', familyLinkId)
-      .lte('start_date', today)
-      .gte('end_date', today)
       .limit(25)
-    if (!res.error) return (res.data ?? []) as CalEventRow[]
+    if (!res.error) return ((res.data ?? []) as CalEventRow[]).filter((row) => occursOnDay(row, today))
     console.warn('[childRoutineCalendar] family_link_id calendar query failed, trying parent_id', res.error.message)
   }
 
   if (parentId) {
     const res = await missionDb
       .from('calendar_events')
-      .select('start_date, end_date, routine_override')
+      .select('start_date, end_date, routine_override, recur_type, recur_until')
       .eq('parent_id', parentId)
       .or(`child_id.is.null,child_id.eq.${childId}`)
-      .lte('start_date', today)
-      .gte('end_date', today)
       .limit(25)
-    if (!res.error) return (res.data ?? []) as CalEventRow[]
+    if (!res.error) return ((res.data ?? []) as CalEventRow[]).filter((row) => occursOnDay(row, today))
     console.warn('[childRoutineCalendar] parent_id calendar query failed', res.error.message)
   }
 

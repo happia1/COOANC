@@ -53,6 +53,17 @@ export function calendarEventRowToLocal(
     child_id?: string | null
     /** 126 미적용 DB 에서는 아예 없음(undefined) — 「서버가 모름」과 「빈 설명」을 구분 */
     description?: string | null
+    category_main?: string | null
+    category_sub?: string | null
+    is_all_day?: boolean | null
+    time_start?: string | null
+    time_end?: string | null
+    is_important?: boolean | null
+    place?: string | null
+    notify_offset?: string | null
+    notify_custom_at?: string | null
+    recur_type?: string | null
+    recur_until?: string | null
   },
   childIdByFamilyLink?: Map<string, string>,
 ): LocalCalendarEvent {
@@ -75,6 +86,17 @@ export function calendarEventRowToLocal(
      * 병합 단계에서 「서버가 모르는 값」과 「사용자가 지운 값('')」을 구분합니다.
      */
     ...(row.description === undefined ? {} : { description: row.description ?? '' }),
+    categoryMain: row.category_main ?? null,
+    categorySub: row.category_sub ?? null,
+    isAllDay: row.is_all_day ?? true,
+    timeStart: row.time_start ?? null,
+    timeEnd: row.time_end ?? null,
+    isImportant: row.is_important ?? false,
+    place: row.place ?? null,
+    notifyOffset: (row.notify_offset as LocalCalendarEvent['notifyOffset']) ?? null,
+    notifyCustomAt: row.notify_custom_at ?? null,
+    recurType: (row.recur_type as LocalCalendarEvent['recurType']) ?? 'none',
+    recurUntil: row.recur_until ?? null,
   }
 }
 
@@ -187,6 +209,17 @@ export async function createParentCalendarEvent(
         eventType: event.eventType,
         routineOverride: event.routineOverride,
         description: event.description ?? '',
+        categoryMain: event.categoryMain ?? null,
+        categorySub: event.categorySub ?? null,
+        isAllDay: event.isAllDay ?? true,
+        timeStart: event.timeStart ?? null,
+        timeEnd: event.timeEnd ?? null,
+        isImportant: event.isImportant ?? false,
+        place: event.place ?? null,
+        notifyOffset: event.notifyOffset ?? null,
+        notifyCustomAt: event.notifyCustomAt ?? null,
+        recurType: event.recurType ?? 'none',
+        recurUntil: event.recurUntil ?? null,
       }),
     })
     if (!res.ok) {
@@ -223,6 +256,17 @@ export async function updateParentCalendarEvent(event: LocalCalendarEvent): Prom
         eventType: event.eventType,
         routineOverride: event.routineOverride,
         description: event.description ?? '',
+        categoryMain: event.categoryMain ?? null,
+        categorySub: event.categorySub ?? null,
+        isAllDay: event.isAllDay ?? true,
+        timeStart: event.timeStart ?? null,
+        timeEnd: event.timeEnd ?? null,
+        isImportant: event.isImportant ?? false,
+        place: event.place ?? null,
+        notifyOffset: event.notifyOffset ?? null,
+        notifyCustomAt: event.notifyCustomAt ?? null,
+        recurType: event.recurType ?? 'none',
+        recurUntil: event.recurUntil ?? null,
       }),
     })
     return res.ok
@@ -400,6 +444,18 @@ type CalRow = {
   event_type: string | null
   routine_override: string | null
   family_link_id: string
+  description?: string | null
+  category_main?: string | null
+  category_sub?: string | null
+  is_all_day?: boolean | null
+  time_start?: string | null
+  time_end?: string | null
+  is_important?: boolean | null
+  place?: string | null
+  notify_offset?: string | null
+  notify_custom_at?: string | null
+  recur_type?: string | null
+  recur_until?: string | null
 }
 
 /**
@@ -465,7 +521,7 @@ export async function fetchParentCalendarEventsFromServerScoped(
    * 아직 적용되지 않은 DB 에서는 이 칼럼을 요청하면 select 전체가 실패하므로,
    * 실패 시 설명 없이 한 번 더 조회해 캘린더가 통째로 비지 않게 합니다.
    */
-  const COLS_WITH_DESC = 'id, title, start_date, end_date, event_type, routine_override, family_link_id, description'
+  const COLS_WITH_DESC = 'id, title, start_date, end_date, event_type, routine_override, family_link_id, description, category_main, category_sub, is_all_day, time_start, time_end, is_important, place, notify_offset, notify_custom_at, recur_type, recur_until'
   const COLS_BASE = 'id, title, start_date, end_date, event_type, routine_override, family_link_id'
   let res = await supabase.from('calendar_events').select(COLS_WITH_DESC).in('family_link_id', familyLinkIds)
   if (res.error) {

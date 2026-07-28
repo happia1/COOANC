@@ -16,6 +16,7 @@ const uuidOk = (s: string) =>
 
 const DB_EVENT_TYPES = new Set(['holiday', 'vacation', 'travel', 'birthday', 'etc', 'school'])
 const DB_OVERRIDES = new Set(['weekend', 'none', 'weekday'])
+const RECUR_TYPES = new Set(['none', 'weekly', 'monthly', 'yearly'])
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 
 export async function POST(req: NextRequest) {
@@ -59,6 +60,15 @@ export async function POST(req: NextRequest) {
   const routineOverride = DB_OVERRIDES.has(routineOverrideRaw) ? routineOverrideRaw : 'none'
   /** 빈 문자열 = 사용자가 설명을 지운 상태(다른 기기에도 그대로 반영) */
   const description = String(body.description ?? '').slice(0, 2000)
+  const categoryMain = String(body.categoryMain ?? '').trim().slice(0, 40) || null
+  const categorySub = String(body.categorySub ?? '').trim().slice(0, 40) || null
+  const isAllDay = body.isAllDay !== false
+  const timeStart = isAllDay ? null : String(body.timeStart ?? '').slice(0, 5) || null
+  const timeEnd = isAllDay ? null : String(body.timeEnd ?? '').slice(0, 5) || null
+  const recurRaw = String(body.recurType ?? 'none').toLowerCase()
+  const recurType = RECUR_TYPES.has(recurRaw) ? recurRaw : 'none'
+  const recurUntilRaw = String(body.recurUntil ?? '').slice(0, 10)
+  const recurUntil = recurType !== 'none' && DATE_RE.test(recurUntilRaw) ? recurUntilRaw : null
 
   // 대상 일정 + family_link 확인(권한)
   const { data: event } = await supabase
@@ -91,12 +101,26 @@ export async function POST(req: NextRequest) {
   const service = createServiceRoleClient()
   const db = service ?? supabase
 
-  const base = {
+  const legacyBase = {
     title,
     start_date: startDate,
     end_date: endDate,
     event_type: eventType,
     routine_override: routineOverride,
+  }
+  const base = {
+    ...legacyBase,
+    category_main: categoryMain,
+    category_sub: categorySub,
+    is_all_day: isAllDay,
+    time_start: timeStart,
+    time_end: timeEnd,
+    is_important: body.isImportant === true,
+    place: String(body.place ?? '').trim().slice(0, 200) || null,
+    notify_offset: String(body.notifyOffset ?? '').trim().slice(0, 40) || null,
+    notify_custom_at: String(body.notifyCustomAt ?? '').trim() || null,
+    recur_type: recurType,
+    recur_until: recurUntil,
   }
   /**
    * description 은 126 마이그레이션에서 추가됩니다.
@@ -108,7 +132,7 @@ export async function POST(req: NextRequest) {
     .update({ ...base, description })
     .eq('id', eventId)
   if (upErr) {
-    const retry = await db.from('calendar_events').update(base).eq('id', eventId)
+    const retry = await db.from('calendar_events').update(legacyBase).eq('id', eventId)
     if (!retry.error) {
       console.warn('[calendar-event/update] description 칼럼 없음 — 126 마이그레이션 필요')
       return NextResponse.json({ ok: true, descriptionSkipped: true }, { status: 200 })

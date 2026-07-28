@@ -4,6 +4,21 @@
 
 ---
 
+## [2026-07-28] - fridge식 일정 모델 1차 적용 (달력 개편 브랜치)
+- **Status:** 진행 중
+- **Branch:** `codex/calendar-fridge-architecture`
+- **Files Created:**
+  - `supabase/migrations/20260728010000_calendar_schedule_model.sql`
+  - `src/app/api/calendar-event/checklist/route.ts`
+- **Summary:**
+  - 일정 분류와 부모가 직접 선택하는 루틴 적용을 분리하고, 반복·시간·중요·장소·알림 필드를 추가했습니다.
+  - 기간·반복 일정의 루틴 적용을 자녀 앱 서버 판정에도 반영하고, 월간 달력에 최대 2줄 기간 바를 표시합니다.
+  - 일정 상세에서 연결 체크리스트를 추가·완료할 수 있게 했고, 홈 다가오는 일정은 기간을 한 줄 범위로 요약합니다.
+- **Remaining:**
+  - 홈 다가오는 일정의 체크리스트 진행률 집계, 반복 일정의 월간/홈 발생일 전개, 에이전트 일정 편집 화면 확장.
+
+---
+
 ## [2026-07-28] - 홈 기간 일정 중복 브리핑 보정
 - **Status:** 완료
 - **Files Modified:**
