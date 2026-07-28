@@ -393,7 +393,8 @@ export default function HomeTab({
     : 0
 
   /**
-   * 서버 `calendar_events`와 기기 localStorage 일정을 합칩니다(동일 일정은 id·날짜+제목 키로 1개만).
+   * 서버 `calendar_events`와 기기 localStorage 일정을 합칩니다.
+   * 같은 기간 일정이 서버 UUID와 로컬 임시 id로 각각 남아 있어도, 내용이 같으면 한 건으로 표시합니다.
    * 예전: local 이 1건만 있어도 서버 쪽이 전부 버려져, Vercel(로컬 스토리지 비어 있음)과 본의 아니게 달랐습니다.
    */
   const effectiveUpcomingEvents = useMemo(() => {
@@ -411,24 +412,33 @@ export default function HomeTab({
       briefingOverlapsSeoulWeekWindow(e, briefingWindowStart, briefingWindowEndInclusive),
     )
 
-    /** `end_date` 는 DB에 빈값일 수 있어 `start_date` 로 대체합니다(캘린더 병합과 동일) */
+    /**
+     * `id`가 달라도 제목·기간·종류·루틴 적용이 같으면 같은 일정입니다.
+     * 로컬 사본이 남은 기기에서 서버 일정과 중복 노출되는 문제를 막고,
+     * 서버 행을 먼저 넣어 다른 기기의 수정값을 우선합니다.
+     */
     const keyOf = (e: {
-      id?: string
       start_date: string
       end_date: string | null
       title?: string | null
+      event_type?: string | null
+      routine_override?: string | null
     }) => {
-      if (e.id && String(e.id).length >= 8 && !String(e.id).startsWith('__')) return `id:${e.id}`
-      const t = (e.title ?? '').trim()
+      const t = (e.title ?? '').trim().toLocaleLowerCase()
+      const start = String(e.start_date).slice(0, 10)
       const end = String(e.end_date ?? e.start_date).slice(0, 10)
-      return `r:${e.start_date.slice(0, 10)}|${end}|${t}`
+      const type = String(e.event_type ?? '').trim().toLocaleLowerCase()
+      const routine = String(e.routine_override ?? '').trim().toLocaleLowerCase()
+      return `event:${start}|${end}|${type}|${routine}|${t}`
     }
     const map = new Map<string, Ev>()
     for (const e of server) {
       map.set(keyOf(e), e)
     }
     for (const e of local) {
-      map.set(keyOf(e), e)
+      /** 같은 내용의 서버 행이 있으면 서버 값을 유지합니다. */
+      const key = keyOf(e)
+      if (!map.has(key)) map.set(key, e)
     }
 
     /** 창 안 전체 노출 — 비정상 대량 저장 대비 여유 한도만 둠 */
