@@ -73,6 +73,7 @@ function MissionIconThumb({ mission, size = 36 }: { mission: Mission; size?: num
     title: mission.title,
     iconEmoji: mission.icon_emoji,
     block: mission.block,
+    difficulty: mission.difficulty,
     description: mission.description,
   })
   if (png) {

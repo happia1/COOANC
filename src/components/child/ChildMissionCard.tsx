@@ -160,6 +160,7 @@ export default function ChildMissionCard({ mission, onComplete, tapResetKey = 0 
     title: m.title,
     iconEmoji: m.icon_emoji,
     block: m.block,
+    difficulty: m.difficulty,
     description: m.description,
   })
   /**

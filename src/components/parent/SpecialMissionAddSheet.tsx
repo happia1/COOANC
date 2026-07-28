@@ -49,7 +49,7 @@ type Props = {
  *   부모 앱의 선택 리스트와 자녀 앱 표시 이미지를 일치시킵니다.
  */
 function SpecialMissionChipIcon({ title, fallbackEmoji }: { title: string; fallbackEmoji: string }) {
-  const png = resolveRoutineMissionPngUrl({ title, iconEmoji: null })
+  const png = resolveRoutineMissionPngUrl({ title, iconEmoji: null, difficulty: 'special' })
   if (png) {
     /** 「밥 다 먹기」 PNG — 자녀 카드와 같은 필터로 살짝 어둡게 */
     const fix = isFinishMealRoutinePngUrl(png)
@@ -222,7 +222,7 @@ export default function SpecialMissionAddSheet({
           body: JSON.stringify({
             title: chip.title,
             description: desc,
-            icon_emoji: routineMissionIconEmojiForCreate(chip.title),
+            icon_emoji: routineMissionIconEmojiForCreate(chip.title, 'special'),
             block: 'afternoon',
             scheduled_time: null,
             credit_reward: 15,

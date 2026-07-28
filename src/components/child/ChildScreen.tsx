@@ -1269,6 +1269,13 @@ export default function ChildScreen({
       })
       .subscribe()
 
+    const routineSyncChannel = supabase
+      .channel(`child-routine-sync-${childId}`)
+      .on('broadcast', { event: 'routine_saved' }, () => {
+        router.refresh()
+      })
+      .subscribe()
+
     const dmChannel = supabase
       .channel(`child-screen-dm-${childId}`)
       .on(
@@ -1339,11 +1346,12 @@ export default function ChildScreen({
 
     return () => {
       void supabase.removeChannel(broadcastChannel)
+      void supabase.removeChannel(routineSyncChannel)
       void supabase.removeChannel(dmChannel)
       void supabase.removeChannel(mlChannel)
       void supabase.removeChannel(statsChannel)
     }
-  }, [childId, seoulDayKey])
+  }, [childId, router, seoulDayKey])
 
   /** 루틴 시각 알림은 ref 로 ‘하루 1회’만 — 축하·수면·아침 화면만 막음 */
   useEffect(() => {

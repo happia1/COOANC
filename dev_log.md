@@ -4,6 +4,34 @@
 
 ---
 
+## [2026-07-28] - 옷 갈아입기 즉시 동기화·미션 아이콘 폴더 정리
+- **Status:** 완료
+- **Files Created:**
+  - `src/app/api/mission/sync-today/route.ts`
+  - `supabase/migrations/20260728000000_reorganize_routine_mission_icons.sql`
+  - `public/assets/img/missions/routine/etc/`
+- **Files Modified (핵심):**
+  - `src/lib/routineChips.ts`, `src/components/parent/RoutineKeywordBuilderSheet.tsx` — 부모 루틴 저장 완료 뒤 오늘 미션 보충 및 자녀 기기 알림
+  - `src/components/child/ChildScreen.tsx` — 루틴 저장 완료 신호 수신 즉시 최신 오늘 미션 새로고침
+  - `src/lib/routineMissionThumbnail.ts` 및 미션 카드 컴포넌트 — 오전·오후·스페셜·기타 폴더 경로와 난이도별 공용 제목 이미지 선택
+  - `public/assets/img/missions/routine/{a.m,p.m,special,etc}/` — 현재 미션 분류에 맞춰 PNG 이동·공용 파일 복제
+- **Summary:**
+  - 부모 화면에는 있으나 자녀 오늘 미션에 없던 `옷 갈아입기`는 아이콘 문제가 아니라 루틴 템플릿 재생성 후 오늘 배정 행과 자녀 화면 갱신이 늦는 흐름이 원인이었습니다.
+  - 저장이 모두 끝난 뒤에만 오늘 빠진 카드를 보충하고 자녀 기기에 완료 신호를 보내, 저장 중간의 불완전한 목록을 읽지 않게 했습니다.
+  - 현재 칩 기준으로 오전·오후·스페셜 아이콘을 분류하고, 미지정·퇴역 아이콘은 `etc`로 이동했습니다.
+  - 후속 검수에서 중복 `etc/organize_toys.png`를 삭제하고, `stop.png`는 미션 커스텀 후보가 아닌 팝업용으로 `popup/`에 분리했습니다.
+  - `빨래통에넣기`는 `roundrybasket.png`, `빨래정리`는 `organize_cloth.png`로 서로 다른 개념과 그림을 연결했습니다.
+  - 이불·머리·로션·숙제·빨래 관련 과거 제목은 마이그레이션에서 현재 표준 제목 하나로 변환하며, 과거 기록을 보존하기 위해 행 자체를 무조건 삭제하지 않습니다.
+- **Edge Cases Checked:**
+  - 완료된 오늘 카드와 기존 스페셜 카드는 동기화 API에서 삭제하거나 덮어쓰지 않습니다.
+  - 주말 사용자 지정·휴일 루틴 없음·매일 스페셜 분기를 기존 템플릿 풀 계산으로 그대로 적용합니다.
+  - `숙제·공부하기`처럼 오후 일상과 스페셜에 동시에 쓰이는 제목은 난이도에 따라 서로 다른 폴더 이미지를 사용합니다.
+- **Verification:**
+  - `tsc --noEmit` 통과
+  - `git diff --check` 통과
+
+---
+
 ## [2026-07-26] - 예전 캘린더 일정의 잘못된 자녀 ID 자동 복구
 - **Status:** 완료
 - **Files Modified:**

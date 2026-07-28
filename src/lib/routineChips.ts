@@ -26,7 +26,7 @@ export type ChipDef = {
 
 export const AM_CHIPS: ChipDef[] = [
   { id: 'am-wake', title: '기상', emoji: '', type: 'fixed', apiBlock: 'morning' },
-  { id: 'am-bed', title: '이불 정리하기', emoji: '', type: 'recommended', apiBlock: 'morning' },
+  { id: 'am-bed', title: '이불정리하기', emoji: '', type: 'recommended', apiBlock: 'morning' },
   { id: 'am-wash', title: '세수하기', emoji: '', type: 'recommended', apiBlock: 'morning' },
   { id: 'am-brush', title: '양치', emoji: '', type: 'recommended', apiBlock: 'morning' },
   { id: 'am-gargle', title: '가글하기', emoji: '', type: 'recommended', apiBlock: 'morning' },
@@ -159,7 +159,13 @@ export function sortMissionsByRoutineFlow<T extends RoutineFlowSortable>(mission
 }
 
 /** 키워드 칩 제목 집합 — 삭제·동기화 시 이 제목의 daily/weekly 템플릿만 정리 */
-export const ROUTINE_KEYWORD_CHIP_TITLES: string[] = [...AM_CHIPS, ...PM_CHIPS].map((c) => c.title)
+export const ROUTINE_KEYWORD_CHIP_TITLES: string[] = Array.from(
+  new Set([
+    ...[...AM_CHIPS, ...PM_CHIPS].map((c) => c.title),
+    /** DB 마이그레이션 전 기기에서도 저장 시 옛 표기 템플릿을 함께 정리합니다. */
+    ...Object.keys(MISSION_TITLE_ALIASES),
+  ]),
+)
 
 /**
  * 더 이상 노출하지 않는(폐지된) 일상 미션 제목 목록입니다.
@@ -428,7 +434,7 @@ async function createMissionsFromIds(
   const payloads: Record<string, unknown>[] = ordered.map((chip) => ({
     title: chip.title,
     description: missionDescriptionForChip(chip, pmIds, ctx.soundWake, ctx.soundReturn, ctx.soundSleep, hasSchoolForAnchor),
-    icon_emoji: routineMissionIconEmojiForCreate(chip.title),
+    icon_emoji: routineMissionIconEmojiForCreate(chip.title, 'easy'),
     block: chip.apiBlock,
     scheduled_time: scheduledTimeForChip(chip, {
       selPmIds: pmIds,
@@ -584,5 +590,23 @@ export async function postRoutineKeywordMissions(
   if (!modeRes.ok) {
     const t = await modeRes.text().catch(() => '')
     console.warn('[postRoutineKeywordMissions] holiday_routine_mode 저장 실패', t)
+  }
+
+  /**
+   * 모든 템플릿과 휴일 모드 저장이 끝난 시점에만 오늘 카드를 보충합니다.
+   * 저장 도중 자녀 앱이 반쯤 만들어진 목록을 읽는 현상을 막습니다.
+   */
+  const syncTodayRes = await fetchApi('/api/mission/sync-today', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ childId: input.linkedChildId }),
+  })
+  if (!syncTodayRes.ok) {
+    const j = (await syncTodayRes.json().catch(() => ({}))) as { error?: string }
+    throw new Error(
+      typeof j.error === 'string'
+        ? j.error
+        : '루틴은 저장했지만 오늘 미션 화면에 바로 반영하지 못했어요.',
+    )
   }
 }

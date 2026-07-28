@@ -64,13 +64,13 @@ const COMB_HAIR_PNG_CACHE_BUST = '1'
  */
 const CLEAN_BED_PNG_CACHE_BUST = '3'
 
-const CLEAN_BED_ROUTINE_PNG = `${BASE}/special/clean_bed.png?v=${CLEAN_BED_PNG_CACHE_BUST}`
+const CLEAN_BED_ROUTINE_PNG = `${BASE}/a.m/clean_bed.png?v=${CLEAN_BED_PNG_CACHE_BUST}`
 
 /** 샤워·씻기 루틴 공통 — `목욕/샤워` 옛 제목은 별칭으로 여기와 같은 파일을 씁니다 */
 const SHOWER_ROUTINE_PNG = `${BASE}/p.m/shower.png?v=${SHOWER_PNG_CACHE_BUST}`
 
-/** 스페셜 칩 「머리빗기」— `comb_hair.png` */
-const COMB_HAIR_ROUTINE_PNG = `${BASE}/special/comb_hair.png?v=${COMB_HAIR_PNG_CACHE_BUST}`
+/** 오전 일상 「머리빗기」— `comb_hair.png` */
+const COMB_HAIR_ROUTINE_PNG = `${BASE}/a.m/comb_hair.png?v=${COMB_HAIR_PNG_CACHE_BUST}`
 
 /** 「식사 준비 돕기」계열 전용 PNG — 제목 표기가 조금 달라도 같은 파일을 씁니다. */
 const MEAL_PREP_HELP_ROUTINE_PNG = `${BASE}/special/put_cutrary.png?v=${MEAL_PREP_PNG_CACHE_BUST}`
@@ -164,7 +164,7 @@ const PNG_BY_TITLE: Record<string, string> = {
   기도하기: `${BASE}/special/pray.png`,
   장난감정리: `${BASE}/p.m/organize_toys.png`,
   잠옷갈아입기: `${BASE}/p.m/pajama.png`,
-  '빨래통에 옷넣기': `${BASE}/p.m/roundrybasket.png`,
+  '빨래통에 옷넣기': `${BASE}/special/roundrybasket.png`,
   /** 잠자리 독서 — `book.png` */
   '잠자리 독서': `${BASE}/p.m/book.png`,
   잠자리독서: `${BASE}/p.m/book.png`,
@@ -176,14 +176,14 @@ const PNG_BY_TITLE: Record<string, string> = {
   /** 일상 칩 「샤워하기」— 전용 PNG */
   샤워하기: SHOWER_ROUTINE_PNG,
   '모두 제자리': `${BASE}/p.m/organize_toys.png`,
-  '잠자리 양치': `${BASE}/a.m/brush_teeth.png`,
+  '잠자리 양치': `${BASE}/p.m/brush_teeth.png`,
   '잠옷 갈아입기': `${BASE}/p.m/pajama.png`,
-  숙제하기: `${BASE}/special/diary_homework.png`,
-  '숙제·공부하기': `${BASE}/special/diary_homework.png`,
+  숙제하기: `${BASE}/p.m/diary_homework.png`,
+  '숙제·공부하기': `${BASE}/p.m/diary_homework.png`,
 
   // --- 스페셜 시드(046 긴 이름) ---
   스스로옷입기: `${BASE}/special/self_change.png`,
-  스스로양말신기: `${BASE}/special/self_socks.png`,
+  스스로양말신기: `${BASE}/etc/self_socks.png`,
   화분에물주기: `${BASE}/special/water_plant.png`,
   '화분 물주기': `${BASE}/special/water_plant.png`,
   식사준비하기: MEAL_PREP_HELP_ROUTINE_PNG,
@@ -197,7 +197,6 @@ const PNG_BY_TITLE: Record<string, string> = {
   밥먹고정리하기: FINISH_MEAL_ROUTINE_PNG,
   '밥먹고 정리하기': FINISH_MEAL_ROUTINE_PNG,
   분리수거하기: `${BASE}/special/sort_recycle.png`,
-  장난감정리하기: `${BASE}/special/organize_toys.png`,
   '옷 개키기': ORGANIZE_CLOTH_ROUTINE_PNG,
   빨래개기: ORGANIZE_CLOTH_ROUTINE_PNG,
   /** DB·사용자 입력 별칭(공백/표현 차이 흡수) — 모두 같은 옷 정리 일러스트로 매칭 */
@@ -212,23 +211,22 @@ const PNG_BY_TITLE: Record<string, string> = {
   /** 오전 일상 — 양치 다음 위생 루틴 */
   머리빗기: COMB_HAIR_ROUTINE_PNG,
   '머리 빗기': COMB_HAIR_ROUTINE_PNG,
-  가글하기: `${BASE}/special/gargle.png`,
-  로션바르기: `${BASE}/special/lotion.png`,
-  '로션 바르기': `${BASE}/special/lotion.png`,
-  '로션(선크림)바르기': `${BASE}/special/lotion.png`,
-  '이불 정리하기': CLEAN_BED_ROUTINE_PNG,
+  가글하기: `${BASE}/a.m/gargle.png`,
+  로션바르기: `${BASE}/a.m/lotion.png`,
+  '로션 바르기': `${BASE}/a.m/lotion.png`,
+  '로션(선크림)바르기': `${BASE}/a.m/lotion.png`,
   이불정리하기: CLEAN_BED_ROUTINE_PNG,
   이불개기: CLEAN_BED_ROUTINE_PNG,
   '이불 개기': CLEAN_BED_ROUTINE_PNG,
   인사잘하기: `${BASE}/special/say_hello.png`,
   어른께인사하기: `${BASE}/special/bow_to_adult.png`,
-  목욕하기: `${BASE}/special/bath.png`,
+  목욕하기: `${BASE}/etc/bath.png`,
 
   // --- 스페셜 키워드 칩(짧은 제목) — `displaySpecialMissionTitle` 후에도 매칭되도록 ---
   식사준비: MEAL_PREP_HELP_ROUTINE_PNG,
-  빨래통에넣기: `${BASE}/p.m/roundrybasket.png`,
-  빨래정리: `${BASE}/p.m/roundrybasket.png`,
-  '빨래 정리': `${BASE}/p.m/roundrybasket.png`,
+  빨래통에넣기: `${BASE}/special/roundrybasket.png`,
+  빨래정리: ORGANIZE_CLOTH_ROUTINE_PNG,
+  '빨래 정리': ORGANIZE_CLOTH_ROUTINE_PNG,
   외투걸어놓기: `${BASE}/special/hanging_cloth.png`,
   어깨마사지: `${BASE}/special/parent_massage.png`,
   분리수거: `${BASE}/special/sort_recycle.png`,
@@ -242,7 +240,7 @@ const PNG_BY_TITLE: Record<string, string> = {
   /** 스페셜 칩 「밥 다 먹기」— 골고루 먹기·식사 마무리 장면 */
   '밥 다 먹기': FINISH_MEAL_ROUTINE_PNG,
   '밥 다먹기': FINISH_MEAL_ROUTINE_PNG,
-  '빨래통에 넣기': `${BASE}/p.m/roundrybasket.png`,
+  '빨래통에 넣기': `${BASE}/special/roundrybasket.png`,
   외투걸어두기: `${BASE}/special/hanging_cloth.png`,
   '외투 걸어두기': `${BASE}/special/hanging_cloth.png`,
 }
@@ -398,9 +396,18 @@ export function resolveRoutineMissionPngUrl(params: {
   iconEmoji?: string | null
   /** daily_missions 조인 시 템플릿 블록 — 「물마시기」등 블록별 칩 이름 구분에 씁니다 */
   block?: string | null
+  /** 같은 제목이 일상·스페셜 양쪽에 있을 때(숙제·공부하기) 폴더를 정확히 고릅니다. */
+  difficulty?: string | null
   /** 시드(S046)처럼 제목은 짧고 설명에만 단서가 있을 때 야외·실내 등을 잡습니다 */
   description?: string | null
 }): string | null {
+  if (
+    compactTitleNoSpaces(params.title) === compactTitleNoSpaces('숙제·공부하기') &&
+    params.difficulty === 'special'
+  ) {
+    return `${BASE}/special/diary_homework.png`
+  }
+
   for (const seqTitle of titlesForRoutinePngLookup(params.title, params.block)) {
     for (const key of uniqueLookupKeys(seqTitle)) {
       /** 이 키만 아틀라스 전용이면 건너뛰고, 같은 제목의 다른 별칭 키는 계속 봅니다 */
@@ -440,6 +447,6 @@ export function resolveRoutineMissionPngUrl(params: {
  * 새 미션 생성 시 DB `icon_emoji` 에 넣을 값 — 스페셜·루틴 공통으로 **PNG 경로**를 우선 저장합니다.
  * 이미지가 없으면 플레이스홀더 `·` 를 씁니다.
  */
-export function routineMissionIconEmojiForCreate(title: string): string {
-  return resolveRoutineMissionPngUrl({ title, iconEmoji: null }) ?? '·'
+export function routineMissionIconEmojiForCreate(title: string, difficulty?: string | null): string {
+  return resolveRoutineMissionPngUrl({ title, iconEmoji: null, difficulty }) ?? '·'
 }

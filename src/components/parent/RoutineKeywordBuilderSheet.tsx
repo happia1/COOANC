@@ -8,6 +8,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
 import { useSwipeToDismiss } from '@/hooks/useSwipeToDismiss'
 import type { Mission } from '@/types/database'
 import {
@@ -23,6 +24,21 @@ import { DEFAULT_ROUTINE_ALARM_SOUND_IDS } from '@/lib/routineAlarmSounds'
 
 /** 루틴 도우미 패널 안 「주간 루틴」탭 전용 단계 — 부모가 뒤로가기와 동기화합니다 */
 export type RoutinePanelWizardStep = 'route' | 'weekday' | 'weekend' | 'holiday' | 'holiday_direct' | 'done'
+
+/** 저장·오늘 카드 보충이 모두 끝난 뒤 자녀 기기에 한 번만 새 목록을 요청합니다. */
+function notifyChildRoutineSaved(childId: string) {
+  const supabase = createClient()
+  const channel = supabase.channel(`child-routine-sync-${childId}`)
+  channel.subscribe((status) => {
+    if (status !== 'SUBSCRIBED') return
+    void channel.send({
+      type: 'broadcast',
+      event: 'routine_saved',
+      payload: { childId },
+    })
+    window.setTimeout(() => void supabase.removeChannel(channel), 1000)
+  })
+}
 
 type Props = {
   open: boolean
@@ -132,6 +148,7 @@ export default function RoutineKeywordBuilderSheet({
         soundSleep: prefs.soundSleep || DEFAULT_ROUTINE_ALARM_SOUND_IDS.sleep,
         customAlarms: prefs.customAlarms,
       })
+      notifyChildRoutineSaved(linkedChildId)
       await router.refresh()
       onSuccess?.()
       if (!suppressCloseAfterSuccess) onClose()

@@ -36,6 +36,7 @@ export default function ParentMissionRedoNoticeModal({ mission, onClose }: Props
     title: m.title,
     iconEmoji: m.icon_emoji,
     block: m.block,
+    difficulty: m.difficulty,
     description: m.description,
   })
   /** 「밥 다 먹기」 PNG 보정 — 자녀 미션 카드와 동일한 필터(살짝 어둡게) */
