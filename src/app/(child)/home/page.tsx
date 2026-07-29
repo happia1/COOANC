@@ -19,7 +19,7 @@ import { getSeoulDateString } from '@/lib/koreaDate'
 import { applyStoreItemCreditOverrides } from '@/lib/applyStoreItemCreditOverrides'
 import { readChildStatInt } from '@/lib/childCreditsSplit'
 import { isCategoryExcludedFromMarket } from '@/lib/parentMarketMenuSections'
-import { fetchCalendarEventsForChildRoutine, resolveRoutineTypeFromCalEvents } from '@/lib/childRoutineCalendar'
+import { fetchCalendarEventsForChildRoutine, fetchDailyRoutineOverride, resolveRoutineTypeForDay } from '@/lib/childRoutineCalendar'
 import { fetchChildHomeContentZoneData, EMPTY_CHILD_HOME_CONTENT_ZONE } from '@/lib/fetchChildHomeContentZone'
 import { CONTENT_ZONE_UNLOCK_MIN_LEVEL } from '@/constants/childScreenFeatures'
 import {
@@ -224,13 +224,14 @@ export default async function ChildHomePage() {
       ? fetchChildHomeContentZoneData(supabase, childId)
       : Promise.resolve(EMPTY_CONTENT_ZONE)
 
-  const [calEvents, dailyMissionsResWithSort, contentZone] = await Promise.all([
+  const [calEvents, dailyRoutineOverride, dailyMissionsResWithSort, contentZone] = await Promise.all([
     fetchCalendarEventsForChildRoutine(missionDb, {
       today,
       childId,
       familyLinkId,
       parentId,
     }),
+    fetchDailyRoutineOverride(missionDb, childId, today),
     missionDb
       .from('daily_missions')
       .select(`*, missions:mission_template_id(${missionJoinWithSort})`)
@@ -248,7 +249,7 @@ export default async function ChildHomePage() {
         .order('scheduled_time', { ascending: true, nullsFirst: false })
     : dailyMissionsResWithSort
 
-  const routineType: MissionDayRoutineType = resolveRoutineTypeFromCalEvents(today, calEvents)
+  const routineType: MissionDayRoutineType = resolveRoutineTypeForDay(today, dailyRoutineOverride)
 
   if (templatesRes.error) {
     const msg = templatesRes.error.message ?? 'unknown'

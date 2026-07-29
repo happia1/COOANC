@@ -53,6 +53,20 @@ function occursOnDay(row: CalEventRow, today: string): boolean {
 
 export type ChildRoutineCalendarType = 'weekday' | 'weekend' | 'holiday' | 'vacation'
 
+export async function fetchDailyRoutineOverride(missionDb: SupabaseClient, childId: string, today: string): Promise<ChildRoutineCalendarType | null> {
+  const { data, error } = await missionDb.from('daily_routine_overrides').select('routine_type').eq('child_id', childId).eq('routine_date', today).maybeSingle()
+  if (error || !data) return null
+  const type = String(data.routine_type)
+  return type === 'weekday' || type === 'weekend' || type === 'holiday' ? type : null
+}
+
+/** 일정은 제안값만 보관하고, 실제 아이 앱 루틴은 날짜별 선택값 하나로 결정한다. */
+export function resolveRoutineTypeForDay(today: string, dailyOverride: ChildRoutineCalendarType | null): ChildRoutineCalendarType {
+  if (dailyOverride) return dailyOverride
+  const weekday = getSeoulWeekdayShort(today)
+  return weekday === '토' || weekday === '일' ? 'weekend' : 'weekday'
+}
+
 /**
  * 오늘 날짜가 각 일정 구간 안에 들어가는 행만 고른 뒤,
  * - 겹치는 일정이 없으면 → 요일로 평일/주말

@@ -4,6 +4,12 @@ import { createServiceRoleClient } from '@/lib/supabase/admin'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
+function checklistStorageError(error: { code?: string } | null) {
+  return error?.code === '42P01' || error?.code === 'PGRST205'
+    ? '체크리스트 저장 기능을 아직 준비하지 못했어요. 데이터베이스 업데이트가 필요해요.'
+    : null
+}
+
 async function parentOwnsEvent(eventId: string) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -24,7 +30,7 @@ export async function GET(req: NextRequest) {
   if (!auth.allowed) return NextResponse.json({ error: '권한이 없어요' }, { status: 403 })
   const db = createServiceRoleClient() ?? auth.supabase
   const { data, error } = await db.from('calendar_event_checklists').select('*').eq('calendar_event_id', eventId).order('sort_order')
-  if (error) return NextResponse.json({ error: '체크리스트를 불러오지 못했어요' }, { status: 500 })
+  if (error) return NextResponse.json({ error: checklistStorageError(error) ?? '체크리스트를 불러오지 못했어요' }, { status: checklistStorageError(error) ? 503 : 500 })
   return NextResponse.json({ items: data ?? [] })
 }
 
@@ -43,7 +49,7 @@ export async function POST(req: NextRequest) {
     child_id: UUID.test(String(body.childId ?? '')) ? String(body.childId) : null,
     sort_order: Number.isInteger(body.sortOrder) ? Number(body.sortOrder) : 0,
   }).select().single()
-  if (error) return NextResponse.json({ error: '체크리스트를 저장하지 못했어요' }, { status: 500 })
+  if (error) return NextResponse.json({ error: checklistStorageError(error) ?? '체크리스트를 저장하지 못했어요' }, { status: checklistStorageError(error) ? 503 : 500 })
   return NextResponse.json({ item: data }, { status: 201 })
 }
 

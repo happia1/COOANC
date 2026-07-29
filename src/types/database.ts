@@ -228,6 +228,17 @@ export type CalendarEventChecklistItem = {
   completed_at: string | null
 }
 
+export type CalendarChecklistItem = {
+  id: string
+  family_link_id: string
+  child_id: string | null
+  checklist_date: string
+  title: string
+  sort_order: number
+  is_completed: boolean
+  completed_at: string | null
+}
+
 export type MissionLog = {
   id: string
   child_id: string
