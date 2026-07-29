@@ -23,7 +23,6 @@ import { fetchCalendarEventsForChildRoutine, fetchDailyRoutineOverride, resolveR
 import { fetchChildHomeContentZoneData, EMPTY_CHILD_HOME_CONTENT_ZONE } from '@/lib/fetchChildHomeContentZone'
 import { CONTENT_ZONE_UNLOCK_MIN_LEVEL } from '@/constants/childScreenFeatures'
 import {
-  filterDailyMissionsByTemplatePool,
   templatePoolForMissionDay,
   type MissionDayRoutineType,
 } from '@/lib/missionDayTemplatePool'
@@ -336,7 +335,8 @@ export default async function ChildHomePage() {
    * 오늘의 일상 템플릿 풀에 맞지 않는 `daily_missions` 행은 카드에서 제외합니다.
    * (크론·구버전 삽입으로 평일 템플릿이 주말 행에 남은 경우 등 — DB 행은 그대로 두고 표시만 정리)
    */
-  const dailyMissions = filterDailyMissionsByTemplatePool(existing, pool, routineType)
+  /** 오늘 이미 생성된 카드는 일정·루틴을 수정해도 그날 동안 숨기거나 바꾸지 않는다. */
+  const dailyMissions = existing.filter((mission) => mission.missions != null)
 
   // ── 마켓 ─────────────────────────────────────────────────────────────────
 

@@ -784,7 +784,7 @@ export default function RoutineTab({
     /** 스페셜 미션은 보상 배율(1·2·3배)도 함께 저장합니다 — 별도 「보상 배율」버튼을 대체 */
     if (typeof multiplier === 'number') {
       const mres = await fetch('/api/mission/patch-reward-multiplier', {
-        method: 'POST',
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ missionId, reward_multiplier: multiplier }),
       })

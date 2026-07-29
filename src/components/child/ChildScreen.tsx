@@ -2427,7 +2427,6 @@ export default function ChildScreen({
                       heartRef={levelHeartsRef}
                       shine={badgeShine}
                       heartsCount={heartsForHomeUi}
-                      onRefresh={handleChildHomeRefresh}
                     />
                     {/*
                       레벨 블록 아래 한 줄: 왼쪽 뽀모도로, 오른쪽 음악.
@@ -2726,9 +2725,12 @@ export default function ChildScreen({
               }`}
               style={{ transitionDelay: '50ms' }}
             >
-              <p className="min-w-0 text-[clamp(0.875rem,calc(0.8rem+0.2vw),1.125rem)] font-black text-white drop-shadow">
-                오늘의 미션
-              </p>
+              <div className="flex min-w-0 items-center gap-1.5">
+                <p className="min-w-0 text-[clamp(0.875rem,calc(0.8rem+0.2vw),1.125rem)] font-black text-white drop-shadow">오늘의 미션</p>
+                <button type="button" onClick={handleChildHomeRefresh} className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-white/15 text-white/85 transition active:scale-90" aria-label="오늘의 미션 새로고침">
+                  <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 1 0 2 5.3" /><path d="M20 4v7h-7" /></svg>
+                </button>
+              </div>
               {visibleMissions.length > 0 ? (
                 <div className="flex shrink-0 items-center gap-1.5">
                   {/**
