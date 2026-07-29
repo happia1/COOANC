@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createServiceRoleClient } from '@/lib/supabase/admin'
 
 const BUCKET = 'store_item_images'
 const ALLOWED_TYPES = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'])
@@ -148,15 +149,17 @@ export async function POST(req: NextRequest) {
 
   /** 마켓에 올리는 상품은 모두 실물·체험류로 통일(real) */
   const itemType: 'digital' | 'real' = 'real'
+  // 부모·자녀 연결을 검증한 뒤 저장하므로, RLS 누락으로 가족 전용 상품 추가가 막히지 않게 한다.
+  const db = createServiceRoleClient() ?? supabase
 
   let imageUrl: string | null = null
   if (imageFile) {
-    const upload = await uploadStoreItemImage(supabase, auth.userId, imageFile)
+    const upload = await uploadStoreItemImage(db, auth.userId, imageFile)
     if (upload.response) return upload.response
     imageUrl = upload.publicUrl
   }
 
-  const { data: inserted, error: insErr } = await supabase
+  const { data: inserted, error: insErr } = await db
     .from('store_items')
     .insert({
       family_link_id: linkId,
