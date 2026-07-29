@@ -461,6 +461,15 @@ export default function HomeTab({
     return `${mm}/${dd} (${days[date.getDay()]})`
   }
 
+  /** 기간 일정은 매일 같은 카드가 생기지 않도록 한 줄 범위로 요약합니다. */
+  function formatEventRange(startDate: string, endDate?: string | null): string {
+    const start = formatEventDate(startDate)
+    const end = String(endDate ?? startDate).slice(0, 10)
+    if (!end || end === startDate.slice(0, 10)) return start
+    const [mm = '', dd = ''] = end.slice(5).split('-')
+    return `${start}–${mm}/${dd}`
+  }
+
   function getCategoryLabel(event: {
     routine_override?: string | null
     event_type?: string | null
@@ -570,7 +579,7 @@ export default function HomeTab({
                 calendarUpcomingEvents={effectiveUpcomingEvents.map((ev) => ({
                   id: ev.id ?? `${ev.start_date}-${ev.title ?? 'event'}`,
                   date: ev.start_date,
-                  dateLabel: formatEventDate(ev.start_date),
+                  dateLabel: formatEventRange(ev.start_date, ev.end_date),
                   title: ev.title?.trim() || getCategoryLabel(ev),
                   /** 「루틴 조정 필요」 문구 대신 일정 유형 키워드(공휴일·방학·여행·기념일 등) 표시 */
                   impactLabel: getCategoryLabel(ev),

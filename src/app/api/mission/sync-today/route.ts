@@ -4,7 +4,8 @@ import { createServiceRoleClient } from '@/lib/supabase/admin'
 import { getSeoulDateString } from '@/lib/koreaDate'
 import {
   fetchCalendarEventsForChildRoutine,
-  resolveRoutineTypeFromCalEvents,
+  fetchDailyRoutineOverride,
+  resolveRoutineTypeForDay,
 } from '@/lib/childRoutineCalendar'
 import { templatePoolForMissionDay } from '@/lib/missionDayTemplatePool'
 import type { Mission } from '@/types/database'
@@ -51,7 +52,7 @@ export async function POST(req: NextRequest) {
 
   const db = createServiceRoleClient() ?? supabase
   const today = getSeoulDateString()
-  const [templatesRes, childProfileRes, statsRes, existingRes, calendarEvents] = await Promise.all([
+  const [templatesRes, childProfileRes, statsRes, existingRes, calendarEvents, dailyRoutineOverride] = await Promise.all([
     db.from('missions').select('*').eq('linked_child_id', childId).eq('is_active', true),
     db.from('profiles').select('holiday_routine_mode').eq('id', childId).maybeSingle(),
     db.from('child_stats').select('current_level').eq('child_id', childId).maybeSingle(),
@@ -66,6 +67,7 @@ export async function POST(req: NextRequest) {
       familyLinkId: link.id,
       parentId: user.id,
     }),
+    fetchDailyRoutineOverride(db, childId, today),
   ])
 
   const firstError =
@@ -75,7 +77,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: '오늘 미션을 불러오지 못했어요' }, { status: 500 })
   }
 
-  const routineType = resolveRoutineTypeFromCalEvents(today, calendarEvents)
+  const routineType = resolveRoutineTypeForDay(today, dailyRoutineOverride)
   const holidayMode = childProfileRes.data?.holiday_routine_mode as
     | 'as_weekday'
     | 'custom'

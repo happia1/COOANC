@@ -198,12 +198,45 @@ export type LocalCalendarEvent = {
   title: string
   /** 일정에 대한 짧은 메모(구버전 데이터에는 없을 수 있음) */
   description?: string
+  /** fridge식 화면 분류(루틴 동작과 분리) */
+  categoryMain?: string | null
+  categorySub?: string | null
+  isAllDay?: boolean
+  timeStart?: string | null
+  timeEnd?: string | null
+  isImportant?: boolean
+  place?: string | null
+  notifyOffset?: 'same_day_morning' | 'day_before' | 'week_before' | 'custom' | null
+  notifyCustomAt?: string | null
+  recurType?: 'none' | 'weekly' | 'monthly' | 'yearly'
+  recurUntil?: string | null
   startDate: string       // YYYY-MM-DD
   endDate: string         // YYYY-MM-DD
   /** DB `event_type` 과 동일 — holiday·vacation·travel·birthday·etc·school·special·other·event */
   eventType: CalendarEventType
   /** 로컬 캘린더용 — `CalendarEvent` 와 동일한 세 가지 */
   routineOverride: 'weekend' | 'none' | 'weekday'
+}
+
+export type CalendarEventChecklistItem = {
+  id: string
+  calendar_event_id: string
+  child_id: string | null
+  title: string
+  sort_order: number
+  is_completed: boolean
+  completed_at: string | null
+}
+
+export type CalendarChecklistItem = {
+  id: string
+  family_link_id: string
+  child_id: string | null
+  checklist_date: string
+  title: string
+  sort_order: number
+  is_completed: boolean
+  completed_at: string | null
 }
 
 export type MissionLog = {

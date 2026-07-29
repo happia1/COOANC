@@ -19,7 +19,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { flushSync } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { useSwipeToDismiss } from '@/hooks/useSwipeToDismiss'
-import type { LocalCalendarEvent } from '@/types/database'
+import type { CalendarChecklistItem, LocalCalendarEvent } from '@/types/database'
 import { getSeoulDateString } from '@/lib/koreaDate'
 import {
   COOANC_CALENDAR_EVENTS_STORAGE_KEY,
@@ -85,24 +85,6 @@ const EVENT_TYPE_LABELS: Record<LocalCalendarEvent['eventType'], string> = {
   travel: '여행',
 }
 
-/**
- * 일정 추가·편집 시트 — 이벤트 종류 칩 (한 줄에 여러 개, etc/other·special/event 통합)
- * `value` 는 저장 시 DB `event_type` 으로 씁니다.
- */
-const EVENT_TYPE_PICKER_OPTIONS: {
-  value: LocalCalendarEvent['eventType']
-  label: string
-  matchTypes: LocalCalendarEvent['eventType'][]
-}[] = [
-  { value: 'holiday', label: '공휴일', matchTypes: ['holiday'] },
-  { value: 'vacation', label: '방학', matchTypes: ['vacation'] },
-  { value: 'travel', label: '여행', matchTypes: ['travel'] },
-  { value: 'birthday', label: '생일', matchTypes: ['birthday'] },
-  { value: 'school', label: '학교', matchTypes: ['school'] },
-  { value: 'special', label: '기념일/행사', matchTypes: ['special', 'event'] },
-  { value: 'etc', label: '기타', matchTypes: ['etc', 'other'] },
-]
-
 /** 범례·일정 시트에서 쓰는 종류 순서 (etc/other·special/event 는 각각 하나) */
 const EVENT_TYPES_ORDER: LocalCalendarEvent['eventType'][] = [
   'holiday',
@@ -113,6 +95,51 @@ const EVENT_TYPES_ORDER: LocalCalendarEvent['eventType'][] = [
   'special',
   'etc',
 ]
+
+/** fridge와 동일한 주 분류. 이벤트 종류는 표시 색상 호환용, 이 분류는 부모 입력용입니다. */
+const SCHEDULE_CATEGORY_GROUPS = [
+  { main: '공휴일', subs: ['법정공휴일', '대체공휴일'] },
+  { main: '여행', subs: ['국내여행', '해외여행', '당일치기'] },
+  { main: '행사', subs: ['생일', '기념일', '기일', '결혼식', '장례식'] },
+  { main: '교육', subs: ['방학', '시험', '현장학습', '입학', '졸업'] },
+  { main: '건강', subs: ['병원', '검진', '예방접종'] },
+  { main: '기타', subs: [] },
+] as const
+const SCHEDULE_CATEGORY_ORDER = ['공휴일', '여행', '행사', '교육', '건강', '기타'] as const
+
+function eventTypeForScheduleCategory(main: string, sub: string): LocalCalendarEvent['eventType'] {
+  if (main === '공휴일') return 'holiday'
+  if (main === '여행') return 'travel'
+  if (main === '교육' && sub === '방학') return 'vacation'
+  if (main === '행사' && sub === '생일') return 'birthday'
+  if (main === '교육') return 'school'
+  return 'etc'
+}
+
+const SCHEDULE_CATEGORY_COLORS: Record<string, { bg: string; text: string; dot: string }> = {
+  '공휴일': { bg: 'bg-red-50', text: 'text-red-700', dot: 'bg-red-400' },
+  '여행': { bg: 'bg-sky-50', text: 'text-sky-800', dot: 'bg-sky-500' },
+  '행사': { bg: 'bg-amber-50', text: 'text-amber-800', dot: 'bg-amber-500' },
+  '교육': { bg: 'bg-indigo-50', text: 'text-indigo-800', dot: 'bg-indigo-500' },
+  '건강': { bg: 'bg-teal-50', text: 'text-teal-800', dot: 'bg-teal-500' },
+  '기타': { bg: 'bg-purple-50', text: 'text-purple-800', dot: 'bg-purple-500' },
+}
+
+/** 일정 분류가 있으면 분류를 우선해 표시색을 정한다. event_type은 이전 데이터 호환용이다. */
+function eventColors(event: LocalCalendarEvent) {
+  return event.categoryMain ? SCHEDULE_CATEGORY_COLORS[event.categoryMain] ?? EVENT_COLORS[event.eventType] : EVENT_COLORS[event.eventType]
+}
+
+/** 기존 event_type만 있는 일정도 입력 시트에서는 새 분류 하나로 보이게 합니다. */
+function scheduleCategoryForLegacyEventType(type: LocalCalendarEvent['eventType']): { main: string; sub: string } {
+  if (type === 'holiday') return { main: '공휴일', sub: '' }
+  if (type === 'travel') return { main: '여행', sub: '' }
+  if (type === 'birthday') return { main: '행사', sub: '생일' }
+  if (type === 'vacation') return { main: '교육', sub: '방학' }
+  if (type === 'school') return { main: '교육', sub: '' }
+  if (type === 'special' || type === 'event') return { main: '행사', sub: '기념일' }
+  return { main: '기타', sub: '' }
+}
 
 type OverrideType = LocalCalendarEvent['routineOverride']
 
@@ -188,8 +215,11 @@ export default function CalendarSection({ childId, focusDate = null, focusNonce 
   })
 
   const [events, setEvents] = useState<LocalCalendarEvent[]>([])
+  const [checklistSummaryByDate, setChecklistSummaryByDate] = useState<Record<string, { total: number; done: number }>>({})
+  const [checklistRevision, setChecklistRevision] = useState(0)
   const [sheet, setSheet] = useState<SheetState | null>(null)
   const [detailEvents, setDetailEvents] = useState<LocalCalendarEvent[] | null>(null)
+  const [detailDate, setDetailDate] = useState<string | null>(null)
   /** 일정이 없는 날을 눌렀을 때만 값이 있음(빈 날 시트 표시) */
   const [emptyDayKey, setEmptyDayKey] = useState<string | null>(null)
   /** 이번 달 일정 — 기본 접힘(탭하면 펼침) */
@@ -198,7 +228,7 @@ export default function CalendarSection({ childId, focusDate = null, focusNonce 
    * 상단 범례(유형 칩): null 이면 전체, 값이면 **격자·이번 달 일정 목록**만 해당 유형으로 쌓기.
    * 날짜 **상세 시트**는 `events`에서 그날 전체를 따로 뽑아 범례를 적용하지 않음.
    */
-  const [legendFilter, setLegendFilter] = useState<LocalCalendarEvent['eventType'] | null>(null)
+  const [legendFilter, setLegendFilter] = useState<string | null>(null)
   /** `public_holidays` 에서 읽은 법정 공휴일 이름 — 날짜 키(YYYY-MM-DD) → 표시명 */
   const [holidayNamesByDate, setHolidayNamesByDate] = useState<Record<string, string>>({})
   /**
@@ -214,6 +244,31 @@ export default function CalendarSection({ childId, focusDate = null, focusNonce 
   const [calendarDataRevision, setCalendarDataRevision] = useState(0)
   /** 예전(기기 전용) 일정 서버 정리 결과 안내 — 성공/실패 모두 눈에 보이게 */
   const [backfillNotice, setBackfillNotice] = useState<string | null>(null)
+
+  /** 달력의 작은 체크 표시용 집계 — 체크 항목이 있는 날짜를 한눈에 구분합니다. */
+  useEffect(() => {
+    const refreshChecklistMarker = () => setChecklistRevision((revision) => revision + 1)
+    window.addEventListener('cooanc:calendar-checklist-updated', refreshChecklistMarker)
+    return () => window.removeEventListener('cooanc:calendar-checklist-updated', refreshChecklistMarker)
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    const monthStart = `${year}-${String(month + 1).padStart(2, '0')}-01`
+    const monthEnd = `${year}-${String(month + 1).padStart(2, '0')}-${String(new Date(year, month + 1, 0).getDate()).padStart(2, '0')}`
+    void fetch(`/api/calendar-checklist?startDate=${monthStart}&endDate=${monthEnd}&childId=${encodeURIComponent(childId)}`).then((response) => response.ok ? response.json() : { items: [] }).then((data: { items?: CalendarChecklistItem[] }) => {
+      if (cancelled) return
+      const next: Record<string, { total: number; done: number }> = {}
+      for (const row of data.items ?? []) {
+        const acc = next[row.checklist_date] ?? { total: 0, done: 0 }
+        acc.total += 1
+        if (row.is_completed) acc.done += 1
+        next[row.checklist_date] = acc
+      }
+      setChecklistSummaryByDate(next)
+    }).catch(() => { if (!cancelled) setChecklistSummaryByDate({}) })
+    return () => { cancelled = true }
+  }, [year, month, childId, checklistRevision])
 
   /**
    * localStorage + 서버 `calendar_events` 를 합쳐 `events` 를 맞춥니다.
@@ -444,9 +499,11 @@ export default function CalendarSection({ childId, focusDate = null, focusNonce 
   /** 범례 필터 — 통합 라벨(special↔event, etc↔other)도 같이 걸러짐 */
   function eventMatchesLegendFilter(ev: LocalCalendarEvent): boolean {
     if (!legendFilter) return true
-    if (legendFilter === 'special') return ev.eventType === 'special' || ev.eventType === 'event'
-    if (legendFilter === 'etc') return ev.eventType === 'etc' || ev.eventType === 'other'
-    return ev.eventType === legendFilter
+    return scheduleCategoryForEvent(ev) === legendFilter
+  }
+
+  function scheduleCategoryForEvent(ev: LocalCalendarEvent): string {
+    return ev.categoryMain || scheduleCategoryForLegacyEventType(ev.eventType).main
   }
 
   /**
@@ -494,11 +551,11 @@ export default function CalendarSection({ childId, focusDate = null, focusNonce 
    * 이번 달에 실제로 존재하는 일정 유형만 범례 칩으로 노출(요청: 해당 달 키워드만).
    * 공휴일은 법정 공휴일이 하나라도 있으면 포함. 현재 선택된 필터는 해제할 수 있게 항상 포함.
    */
-  const presentEventTypes = new Set<LocalCalendarEvent['eventType']>()
-  for (const ev of monthEventsAll) presentEventTypes.add(legendCanonicalType(ev.eventType))
-  if (monthPublicHolidayEvents.length > 0) presentEventTypes.add('holiday')
-  if (legendFilter) presentEventTypes.add(legendCanonicalType(legendFilter))
-  const legendTypes = EVENT_TYPES_ORDER.filter((t) => presentEventTypes.has(t))
+  const presentCategories = new Set<string>()
+  for (const ev of monthEventsAll) presentCategories.add(scheduleCategoryForEvent(ev))
+  if (monthPublicHolidayEvents.length > 0) presentCategories.add('공휴일')
+  if (legendFilter) presentCategories.add(legendFilter)
+  const legendTypes = SCHEDULE_CATEGORY_ORDER.filter((category) => presentCategories.has(category))
 
   /**
    * 「이번 달 일정」목록에 쓸 최종 배열 = 사용자·서버 일정 + 법정 공휴일(범례가 전체/공휴일일 때).
@@ -506,7 +563,7 @@ export default function CalendarSection({ childId, focusDate = null, focusNonce 
    */
   const monthScheduleList = [
     ...monthEvents,
-    ...(legendFilter == null || legendFilter === 'holiday' ? monthPublicHolidayEvents : []),
+    ...(legendFilter == null || legendFilter === '공휴일' ? monthPublicHolidayEvents : []),
   ].sort((a, b) => a.startDate.localeCompare(b.startDate) || a.title.localeCompare(b.title))
   /** 개수 배지·빈 상태 판단에 쓰는 이번 달 전체 건수(공휴일 포함) */
   const monthTotalCount = monthEventsAll.length + monthPublicHolidayEvents.length
@@ -522,11 +579,35 @@ export default function CalendarSection({ childId, focusDate = null, focusNonce 
       dateEventMap[d].push(ev)
     }
   }
+
+  /** fridge와 같은 기간 바: 겹치는 기간은 최대 두 레인, 나머지는 시작일 제목을 합쳐 보여줍니다. */
+  type PeriodBar = { event: LocalCalendarEvent; lane: number; isStart: boolean; isEnd: boolean }
+  const periodBarsByDate: Record<string, PeriodBar[]> = {}
+  const laneEnds: string[] = []
+  const periodEvents = monthEvents
+    .filter((ev) => ev.endDate > ev.startDate)
+    .sort((a, b) => {
+      const al = datesInRange(a.startDate, a.endDate).length
+      const bl = datesInRange(b.startDate, b.endDate).length
+      return bl - al || a.startDate.localeCompare(b.startDate)
+    })
+  for (const ev of periodEvents) {
+    let lane = laneEnds.findIndex((end) => !end || ev.startDate > end)
+    if (lane < 0) { lane = laneEnds.length; laneEnds.push('') }
+    laneEnds[lane] = ev.endDate
+    for (const d of datesInRange(ev.startDate, ev.endDate)) {
+      const [yv, mv] = d.split('-').map(Number)
+      if (yv !== year || mv - 1 !== month) continue
+      if (!periodBarsByDate[d]) periodBarsByDate[d] = []
+      periodBarsByDate[d].push({ event: ev, lane, isStart: d === ev.startDate, isEnd: d === ev.endDate })
+    }
+  }
+  const periodLaneCount = laneEnds.length
   /**
    * 법정 공휴일(`public_holidays`)은 **격자**에만 합성 행을 넣고, "여행만" 등 필터일 땐 점이 범례와 맞게 빠질 수 있음(상세에는 DB 이름으로만 여전히 표시 가능).
    * id 는 `__public_holiday__:` 로 시작.
    */
-  const showPublicHolidayDots = legendFilter == null || legendFilter === 'holiday'
+  const showPublicHolidayDots = legendFilter == null || legendFilter === '공휴일'
   if (showPublicHolidayDots) {
     for (const dk of Object.keys(holidayNamesByDate)) {
       const parts = dk.split('-').map(Number)
@@ -592,6 +673,7 @@ export default function CalendarSection({ childId, focusDate = null, focusNonce 
 
     if (detailList.length > 0) {
       setEmptyDayKey(null)
+      setDetailDate(dk)
       setDetailEvents(detailList)
     } else {
       setDetailEvents(null)
@@ -640,7 +722,7 @@ export default function CalendarSection({ childId, focusDate = null, focusNonce 
   }
 
   /** 범례 칩: 같은 유형을 다시 누르면 필터 해제(전체 보기) */
-  function toggleLegendFilter(type: LocalCalendarEvent['eventType']) {
+  function toggleLegendFilter(type: string) {
     setLegendFilter((cur) => (cur === type ? null : type))
   }
 
@@ -708,8 +790,8 @@ export default function CalendarSection({ childId, focusDate = null, focusNonce 
         ))}
       </div>
 
-      {/* gap-y-2: 행 사이 여백을 조금 넓혀 도트가 있어도 답답하지 않게 함 */}
-      <div className="grid grid-cols-7 gap-y-2">
+      {/* 기간 바가 날짜 칸 사이에서 끊기지 않도록 행 간격은 바 영역 밖에서만 확보합니다. */}
+      <div className="grid grid-cols-7 gap-y-0">
         {cells.map((day, idx) => {
           if (!day) return <div key={idx} />
           const dk = dateKey(year, month, day)
@@ -717,33 +799,24 @@ export default function CalendarSection({ childId, focusDate = null, focusNonce 
           const isToday = dk === todayStr
           const isSun = idx % 7 === 0
           const isSat = idx % 7 === 6
-          /** 공휴일 칸 글자는 범례가「전체」또는「공휴일」일 때만 —「여행만」이면 도트와 같이 숨김 */
-          const showPublicHolidayCellText = legendFilter == null || legendFilter === 'holiday'
-          const publicHolidayName = showPublicHolidayCellText ? holidayNamesByDate[dk] : undefined
           /** 같은 날 중복 id 제거 후 최대 3개만 점으로 표시 */
-          const dotEvents = [...new Map(evHere.map((e) => [e.id, e])).values()].slice(0, 3)
+          /** 주요(하루) 일정은 점으로, 기간 일정은 아래 연결 바로 분리합니다. */
+          const dotEvents = [...new Map(evHere.filter((e) => e.startDate === e.endDate).map((e) => [e.id, e])).values()]
+          const checklistSummary = checklistSummaryByDate[dk]
+          const periodBars = (periodBarsByDate[dk] ?? []).sort((a, b) => a.lane - b.lane)
           return (
             <button
               key={idx}
               type="button"
               onClick={() => handleDayClick(dk)}
               className={[
-                /* py-1.5 + min-h: 공휴일 이름이 있는 칸(한 줄 더 큼)까지 포함해 모든 주(마지막 주 포함) 높이를 동일하게 맞춤 */
-                'relative flex min-h-[3.25rem] flex-col items-center rounded-lg py-1.5 text-[11px] font-bold transition-all',
-                isToday ? 'ring-2 ring-brand-blue' : '',
+                'relative flex min-h-[3.9rem] flex-col items-center py-1 text-[11px] font-bold transition-all',
+                isToday ? 'bg-brand-blue/15' : '',
                 'hover:bg-gray-50',
                 isSun ? 'text-red-500' : isSat ? 'text-blue-500' : 'text-gray-700',
               ].join(' ')}
             >
               {day}
-              {publicHolidayName ? (
-                <span
-                  className="mt-0.5 block w-full min-w-0 max-w-[3.25rem] overflow-hidden whitespace-nowrap text-ellipsis px-0.5 text-center text-[10px] font-bold leading-none text-red-600"
-                  title={publicHolidayName}
-                >
-                  {shortPublicHolidayCellLabel(publicHolidayName)}
-                </span>
-              ) : null}
               {/*
                 일정이 없는 날도 같은 높이의 ‘도트 자리’를 항상 두어,
                 점이 생겼을 때만 행 높이가 커지는 현상(줄 간격 들쭉날쭉)을 막습니다.
@@ -753,12 +826,14 @@ export default function CalendarSection({ childId, focusDate = null, focusNonce 
                 className="mt-0.5 flex h-3 w-full flex-nowrap items-center justify-center gap-px overflow-hidden"
                 aria-hidden={dotEvents.length === 0}
               >
-                {dotEvents.map((ev) => (
-                  <span
-                    key={ev.id}
-                    className={`h-1 w-1 shrink-0 rounded-full ${EVENT_COLORS[ev.eventType].dot}`}
-                  />
-                ))}
+                {checklistSummary?.total ? <span className="flex h-2.5 w-2.5 shrink-0 items-center justify-center rounded-full bg-brand-blue text-white shadow-sm" title={`체크리스트 ${checklistSummary.done}/${checklistSummary.total}`} aria-label={`체크리스트 ${checklistSummary.done}/${checklistSummary.total}`}><svg viewBox="0 0 12 12" className="h-2 w-2" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m2.5 6 2.1 2.1L9.5 3.5" /></svg></span> : null}
+              </div>
+              <div className="mt-1 flex w-full flex-col gap-0.5">
+                {Array.from({ length: periodLaneCount }, (_, lane) => {
+                  const bar = periodBars.find((item) => item.lane === lane)
+                  return bar ? <span key={`${bar.event.id}-${lane}`} className={`block h-4 w-full truncate px-1 text-left text-[8px] font-bold leading-4 text-white ${eventColors(bar.event).dot} ${bar.isStart ? 'rounded-l-full' : ''} ${bar.isEnd ? 'rounded-r-full' : ''}`} title={bar.event.title}>{bar.isStart ? bar.event.title : ''}</span> : <span key={`empty-${lane}`} className="block h-4" aria-hidden />
+                })}
+                {dotEvents.map((event) => <span key={`single-${event.id}`} className={`block h-4 w-full truncate rounded-full px-1 text-left text-[8px] font-bold leading-4 text-white ${eventColors(event).dot}`} title={event.title}>{event.title}</span>)}
               </div>
             </button>
           )
@@ -773,11 +848,9 @@ export default function CalendarSection({ childId, focusDate = null, focusNonce 
         aria-label="일정 유형 범례 — 칩을 누르면 달의 점과 아래 이번 달 일정 목록이 해당 유형으로 좁혀짐(날짜 상세는 항상 그날 전체)"
       >
         {legendTypes.map((type) => {
-          const selected =
-            legendFilter === type ||
-            (type === 'special' && legendFilter === 'event') ||
-            (type === 'etc' && legendFilter === 'other')
-          const chip = selected ? EVENT_LEGEND_CHIP_SELECTED[type] : EVENT_COLORS[type]
+          const selected = legendFilter === type
+          const categoryColor = SCHEDULE_CATEGORY_COLORS[type]
+          const chip = selected ? { bg: categoryColor.bg.replace('-50', '-200'), text: categoryColor.text.replace('-800', '-900').replace('-700', '-900'), dot: categoryColor.dot } : categoryColor
           return (
             <button
               key={type}
@@ -797,7 +870,7 @@ export default function CalendarSection({ childId, focusDate = null, focusNonce 
               ].join(' ')}
             >
               <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${chip.dot}`} aria-hidden />
-              {EVENT_TYPE_LABELS[type]}
+              {type}
             </button>
           )
         })}
@@ -855,10 +928,10 @@ export default function CalendarSection({ childId, focusDate = null, focusNonce 
                     e.stopPropagation()
                     setDetailEvents([ev])
                   }}
-                  className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left ${EVENT_COLORS[ev.eventType].bg}`}
+                  className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left ${eventColors(ev).bg}`}
                 >
                   <div className="min-w-0">
-                    <p className={`truncate text-xs font-bold ${EVENT_COLORS[ev.eventType].text}`}>{ev.title}</p>
+                    <p className={`truncate text-xs font-bold ${eventColors(ev).text}`}>{ev.title}</p>
                     <p className="text-[10px] text-gray-500">
                       {isPublicHoliday ? (
                         <>
@@ -926,7 +999,9 @@ export default function CalendarSection({ childId, focusDate = null, focusNonce 
       {detailEvents && detailEvents.length > 0 && (
         <EventDetailBottomSheet
           events={detailEvents}
-          onClose={() => setDetailEvents(null)}
+          date={detailDate ?? detailEvents[0].startDate}
+          childId={childId}
+          onClose={() => { setDetailEvents(null); setDetailDate(null) }}
           onAddSchedule={() => {
             setDetailEvents(null)
             openAddSheet()
@@ -988,12 +1063,15 @@ export function CalendarEventSheet({
   const [title, setTitle] = useState(existing?.title ?? '')
   const [startDate, setStart] = useState(existing?.startDate ?? initialStartDate)
   const [endDate, setEnd] = useState(existing?.endDate ?? initialEndDate)
-  const [eventType, setType] = useState<LocalCalendarEvent['eventType']>(
-    existing?.eventType ?? presetEventType ?? 'holiday',
-  )
+  const legacyCategory = scheduleCategoryForLegacyEventType(existing?.eventType ?? presetEventType ?? 'etc')
   const [override, setOverride] = useState<OverrideType>(existing?.routineOverride ?? 'weekend')
   // 구버전 일정(JSON)에는 description 키가 없을 수 있음 → 빈 문자열로 시작
   const [description, setDescription] = useState(existing?.description ?? '')
+  const [categoryMain, setCategoryMain] = useState(existing?.categoryMain ?? legacyCategory.main)
+  const [categorySub, setCategorySub] = useState(existing?.categorySub ?? legacyCategory.sub)
+  const [recurType, setRecurType] = useState<NonNullable<LocalCalendarEvent['recurType']>>(existing?.recurType ?? 'none')
+  const [recurUntil, setRecurUntil] = useState(existing?.recurUntil ?? '')
+  const [isImportant, setIsImportant] = useState(existing?.isImportant ?? false)
   /**
    * 저장 성공 후에는 즉시 닫지 않고 완료 액션을 보여 줍니다.
    * - routine 탭 내부에서 쓰일 때는 "캘린더 보러가기" 버튼을 숨길 수 있게 확장할 예정입니다.
@@ -1017,8 +1095,14 @@ export function CalendarEventSheet({
       ...(trimmedNote ? { description: trimmedNote } : {}),
       startDate,
       endDate,
-      eventType,
+      /** event_type은 기존 필터·색상 호환용으로 분류에서 파생하며 별도 입력은 받지 않습니다. */
+      eventType: eventTypeForScheduleCategory(categoryMain, categorySub),
       routineOverride: override,
+      categoryMain: categoryMain || null,
+      categorySub: categorySub || null,
+      recurType,
+      recurUntil: recurType === 'none' ? null : recurUntil || null,
+      isImportant,
     })
     setSavedDone(true)
   }
@@ -1111,47 +1195,49 @@ export function CalendarEventSheet({
                 </div>
 
                 <div className="mt-4">
-                  <label className="mb-2 block text-xs font-bold text-gray-500">이벤트 종류</label>
+                  <label className="mb-2 block text-xs font-bold text-gray-500">일정 분류</label>
                   <div className="flex flex-wrap gap-1.5">
-                    {EVENT_TYPE_PICKER_OPTIONS.map((opt) => {
-                      const selected = opt.matchTypes.includes(eventType)
-                      const colors = EVENT_COLORS[opt.value]
-                      return (
-                        <button
-                          key={opt.value}
-                          type="button"
-                          onClick={() => setType(opt.value)}
-                          className={`shrink-0 rounded-lg border-2 px-2.5 py-1.5 text-[11px] font-bold transition-all ${
-                            selected
-                              ? `border-current ${colors.bg} ${colors.text}`
-                              : 'border-gray-200 text-gray-400'
-                          }`}
-                        >
-                          {opt.label}
-                        </button>
-                      )
-                    })}
-                  </div>
-                </div>
-
-                <div className="mt-4">
-                  <label className="mb-2 block text-xs font-bold text-gray-500">루틴 적용</label>
-                  {/* 주중 / 주말(주간) 휴일 루틴 / 루틴 없음 — 가로 3칸(좁은 화면은 줄바꿈) */}
-                  <div className="flex flex-wrap gap-2">
-                    {(['weekday', 'weekend', 'none'] as const).map((v) => (
+                    {SCHEDULE_CATEGORY_GROUPS.map((group) => (
                       <button
-                        key={v}
+                        key={group.main}
                         type="button"
-                        onClick={() => setOverride(v)}
-                        className={`min-w-[30%] flex-1 rounded-xl border-2 py-2 text-xs font-bold transition-all ${
-                          override === v ? 'border-brand-blue bg-brand-blue/10 text-brand-blue' : 'border-gray-200 text-gray-400'
-                        }`}
+                        onClick={() => {
+                          setCategoryMain(categoryMain === group.main ? '' : group.main)
+                          setCategorySub('')
+                        }}
+                        className={`rounded-lg border-2 px-2.5 py-1.5 text-[11px] font-bold ${categoryMain === group.main ? 'border-brand-blue bg-brand-blue/10 text-brand-blue' : 'border-gray-200 text-gray-500'}`}
                       >
-                        {v === 'weekday' ? '주중 루틴' : v === 'weekend' ? '주말/휴일 루틴' : '루틴 없음'}
+                        {group.main}
                       </button>
                     ))}
                   </div>
+                  {categoryMain ? (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {(SCHEDULE_CATEGORY_GROUPS.find((g) => g.main === categoryMain)?.subs ?? []).map((sub) => (
+                        <button key={sub} type="button" onClick={() => setCategorySub(categorySub === sub ? '' : sub)} className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${categorySub === sub ? 'bg-gray-700 text-white' : 'bg-gray-100 text-gray-500'}`}>
+                          {sub}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
+
+                <div className="mt-4">
+                  <label className="mb-2 block text-xs font-bold text-gray-500">반복</label>
+                  <div className="flex flex-wrap gap-2">
+                    {(['none', 'weekly', 'monthly', 'yearly'] as const).map((value) => (
+                      <button key={value} type="button" onClick={() => setRecurType(value)} className={`rounded-xl border-2 px-3 py-2 text-xs font-bold ${recurType === value ? 'border-brand-blue bg-brand-blue/10 text-brand-blue' : 'border-gray-200 text-gray-500'}`}>
+                        {{ none: '반복 없음', weekly: '매주', monthly: '매월', yearly: '매년' }[value]}
+                      </button>
+                    ))}
+                  </div>
+                  {recurType !== 'none' ? <div className="mt-2"><label className="mb-1 block text-[11px] font-bold text-gray-500">반복 종료일 (선택)</label><input type="date" value={recurUntil} onChange={(e) => setRecurUntil(e.target.value)} min={startDate} className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm" aria-label="반복 종료일" /><p className="mt-1 text-[10px] text-gray-400">비워두면 종료일 없이 계속 반복해요.</p></div> : null}
+                </div>
+
+                <label className="mt-4 flex items-center justify-between text-xs font-bold text-gray-600">
+                  중요한 일정
+                  <input type="checkbox" checked={isImportant} onChange={(e) => setIsImportant(e.target.checked)} />
+                </label>
 
                 {/* 루틴 설정 아래: 부가 정보(여러 줄 가능) */}
                 <div className="mt-4">
@@ -1280,12 +1366,16 @@ function EmptyDayBottomSheet({
 
 function EventDetailBottomSheet({
   events,
+  date,
+  childId,
   onClose,
   onAddSchedule,
   onEdit,
   onDelete,
 }: {
   events: LocalCalendarEvent[]
+  date: string
+  childId: string
   onClose: () => void
   /** 헤더 + : 캘린더 상단 +와 동일한 일정 추가(EventSheet) 시트 */
   onAddSchedule: () => void
@@ -1324,7 +1414,8 @@ function EventDetailBottomSheet({
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto p-5 pb-2 pt-4">
           {/* 제목은 가운데, +는 오른쪽(캘린더 헤더 +와 같은 스타일·동작) */}
-          <div className="relative mb-3 flex min-h-7 items-center justify-center">
+          <TodayRoutine date={date} childId={childId} />
+          <div className="relative mb-3 mt-4 flex min-h-7 items-center justify-center">
             <p className="text-sm font-black text-brand-text">선택한 날짜 일정</p>
             <button
               type="button"
@@ -1343,9 +1434,9 @@ function EventDetailBottomSheet({
               return (
               <div
                 key={ev.id}
-                className={`rounded-2xl border border-gray-100 p-3 ${EVENT_COLORS[ev.eventType].bg}`}
+                className={`relative rounded-2xl border border-gray-100 p-3 ${eventColors(ev).bg}`}
               >
-                <p className={`text-sm font-black ${EVENT_COLORS[ev.eventType].text}`}>{ev.title}</p>
+                <p className={`pr-14 text-sm font-black ${eventColors(ev).text}`}>{ev.title}</p>
                 {isReadonlyPublicHoliday ? (
                   <>
                     {/* 법정 공휴일은 요청에 맞춰 최소 정보(이름 + 분류)만 단순 표시합니다. */}
@@ -1355,28 +1446,17 @@ function EventDetailBottomSheet({
                 <>
                 <p className="mt-1 text-[11px] font-bold text-gray-600">{EVENT_TYPE_LABELS[ev.eventType]}</p>
                 <p className="mt-1 text-xs text-gray-600">
-                  기간: {ev.startDate} ~ {ev.endDate}
-                </p>
-                <p className="mt-0.5 text-xs text-gray-600">
-                  루틴: {routineOverrideLabel(ev.routineOverride)}
+                  {ev.startDate !== ev.endDate ? `종일 | ${ev.title}` : `날짜: ${ev.startDate}`}
                 </p>
                 {ev.description?.trim() && (
                   <p className="mt-2 whitespace-pre-wrap text-xs leading-relaxed text-gray-600">{ev.description.trim()}</p>
                 )}
-                <div className="mt-3 flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => onEdit(ev)}
-                    className="flex-1 rounded-xl bg-brand-blue py-2.5 text-xs font-bold text-white"
-                  >
-                    편집
+                <div className="absolute right-2 top-2 flex items-center gap-1">
+                  <button type="button" onClick={() => onEdit(ev)} className="grid h-7 w-7 place-items-center rounded-full bg-white/70 text-gray-500 transition-colors hover:bg-white hover:text-brand-blue" aria-label="일정 편집">
+                    <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z" /></svg>
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => onDelete(ev.id)}
-                    className="rounded-xl border border-red-200 px-4 py-2.5 text-xs font-bold text-red-500"
-                  >
-                    삭제
+                  <button type="button" onClick={() => onDelete(ev.id)} className="grid h-7 w-7 place-items-center rounded-full bg-white/70 text-gray-400 transition-colors hover:bg-white hover:text-red-500" aria-label="일정 삭제">
+                    <span className="text-lg font-light leading-none" aria-hidden="true">×</span>
                   </button>
                 </div>
                 </>
@@ -1385,6 +1465,7 @@ function EventDetailBottomSheet({
               )
             })}
           </div>
+          <DateChecklist date={date} childId={childId} />
         </div>
 
         <div className="shrink-0 border-t border-gray-100 bg-white px-5 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
@@ -1399,4 +1480,91 @@ function EventDetailBottomSheet({
       </div>
     </div>
   )
+}
+
+/** 일정 상세에 붙는 준비 체크리스트 — 일정 자체와 별도 행이라 기기 간 완료 상태도 함께 동기화됩니다. */
+function TodayRoutine({ date, childId }: { date: string; childId: string }) {
+  const [selected, setSelected] = useState<'weekday' | 'weekend' | 'holiday' | null>(null)
+  const [saving, setSaving] = useState(false)
+  useEffect(() => {
+    let cancelled = false
+    void fetch(`/api/daily-routine?childId=${encodeURIComponent(childId)}&date=${date}`).then((response) => response.ok ? response.json() : { override: null }).then((data: { override?: { routine_type?: 'weekday' | 'weekend' | 'holiday' } | null }) => { if (!cancelled) setSelected(data.override?.routine_type ?? null) }).catch(() => { if (!cancelled) setSelected(null) })
+    return () => { cancelled = true }
+  }, [date, childId])
+  const choose = async (routineType: 'weekday' | 'weekend' | 'holiday', sourceEventId?: string) => {
+    if (saving) return
+    setSelected(routineType); setSaving(true)
+    try {
+      const response = await fetch('/api/daily-routine', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ childId, date, routineType, sourceEventId }) })
+      if (!response.ok) setSelected(null)
+    } finally { setSaving(false) }
+  }
+  const choices: { type: 'weekday' | 'weekend' | 'holiday'; label: string }[] = [
+    { type: 'weekday', label: '주중 루틴' }, { type: 'weekend', label: '주말/휴일 루틴' }, { type: 'holiday', label: '휴식' },
+  ]
+  return <div className="mt-3 rounded-2xl border border-brand-blue/15 bg-brand-blue/[0.04] p-3">
+    <p className="text-xs font-black text-brand-text">오늘의 루틴</p>
+    <p className="mt-0.5 text-[10px] text-gray-500">하루에는 하나만 적용돼요. 선택한 값이 아이 앱에 적용돼요.</p>
+    <div className="mt-2 flex flex-wrap gap-1.5">
+      {choices.map((choice) => <button key={choice.type} type="button" disabled={saving} onClick={() => void choose(choice.type)} className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${selected === choice.type ? 'bg-brand-blue text-white' : 'bg-white text-gray-500 ring-1 ring-gray-200'}`}>{choice.label}</button>)}
+    </div>
+  </div>
+}
+
+function DateChecklist({ date, childId }: { date: string; childId: string }) {
+  const [items, setItems] = useState<CalendarChecklistItem[]>([])
+  const [draft, setDraft] = useState('')
+  const [errorMessage, setErrorMessage] = useState('')
+  const [isSaving, setIsSaving] = useState(false)
+  const [isAdding, setIsAdding] = useState(false)
+  useEffect(() => {
+    let cancelled = false
+    void fetch(`/api/calendar-checklist?startDate=${date}&endDate=${date}&childId=${encodeURIComponent(childId)}`)
+      .then((r) => r.ok ? r.json() : { items: [] })
+      .then((data: { items?: CalendarChecklistItem[] }) => { if (!cancelled) setItems(data.items ?? []) })
+      .catch(() => { if (!cancelled) setItems([]) })
+    return () => { cancelled = true }
+  }, [date, childId])
+  const add = async () => {
+    const title = draft.trim()
+    if (!title || isSaving) return
+    setErrorMessage('')
+    setIsSaving(true)
+    try {
+      const res = await fetch('/api/calendar-checklist', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ checklistDate: date, childId, title, sortOrder: items.length }) })
+      const data = await res.json().catch(() => ({})) as { item?: CalendarChecklistItem; error?: string }
+      if (res.ok && data.item) {
+        setItems((prev) => [...prev, data.item!])
+        setDraft('')
+        setIsAdding(false)
+        window.dispatchEvent(new Event('cooanc:calendar-checklist-updated'))
+      } else {
+        setErrorMessage(data.error ?? '체크리스트를 추가하지 못했어요. 다시 시도해 주세요.')
+      }
+    } catch {
+      setErrorMessage('네트워크 연결을 확인한 뒤 다시 시도해 주세요.')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+  const toggle = async (item: CalendarChecklistItem) => {
+    const next = !item.is_completed
+    setItems((prev) => prev.map((x) => x.id === item.id ? { ...x, is_completed: next } : x))
+    const res = await fetch('/api/calendar-checklist', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: item.id, isCompleted: next }) })
+    if (!res.ok) setItems((prev) => prev.map((x) => x.id === item.id ? { ...x, is_completed: item.is_completed } : x))
+    else window.dispatchEvent(new Event('cooanc:calendar-checklist-updated'))
+  }
+  const remove = async (item: CalendarChecklistItem) => {
+    setItems((prev) => prev.filter((current) => current.id !== item.id))
+    const res = await fetch(`/api/calendar-checklist?id=${encodeURIComponent(item.id)}`, { method: 'DELETE' })
+    if (!res.ok) setItems((prev) => [...prev, item].sort((a, b) => a.sort_order - b.sort_order))
+    else window.dispatchEvent(new Event('cooanc:calendar-checklist-updated'))
+  }
+  const done = items.filter((item) => item.is_completed).length
+  return <div className="mt-3 border-t border-black/5 pt-2">
+    <div className="mb-1 flex items-center justify-between"><p className="text-[11px] font-bold text-gray-600">체크리스트 {items.length ? `(${done}/${items.length})` : ''}</p><button type="button" onClick={() => { setIsAdding(true); setErrorMessage('') }} className="grid h-5 w-5 place-items-center rounded-full text-lg font-medium leading-none text-brand-blue hover:bg-white/70" aria-label="체크리스트 추가">+</button></div>
+    {items.map((item) => <div key={item.id} className="flex items-center gap-2 py-0.5 text-xs text-gray-700"><input type="checkbox" checked={item.is_completed} onChange={() => void toggle(item)} /><span className={`flex-1 ${item.is_completed ? 'line-through text-gray-400' : ''}`}>{item.title}</span><button type="button" onClick={() => void remove(item)} className="text-gray-400 hover:text-red-500" aria-label="체크리스트 삭제">×</button></div>)}
+    {isAdding && <div className="mt-1 flex gap-1"><input autoFocus value={draft} disabled={isSaving} onChange={(e) => { setDraft(e.target.value); setErrorMessage('') }} onKeyDown={(e) => { if (e.key === 'Enter') void add(); if (e.key === 'Escape') { setIsAdding(false); setDraft('') } }} placeholder="체크할 내용" className="min-w-0 flex-1 rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs disabled:bg-gray-50" /><button type="button" disabled={isSaving || !draft.trim()} onClick={() => void add()} className="rounded-lg bg-white px-2 text-xs font-bold text-brand-blue disabled:text-gray-300">{isSaving ? '추가 중' : '추가'}</button></div>}
+    {errorMessage && <p role="alert" className="mt-1 text-[11px] text-rose-500">{errorMessage}</p>}
+  </div>
 }
