@@ -47,14 +47,17 @@ export function parentMarketSectionIdForItem(category: StoreItem['category']): P
   return 'other'
 }
 
-/** 상품 추가 폼용 — DB 값 + 화면 라벨 (마켓 전용, digital 제외) */
+/**
+ * 상품 추가 폼용 — 부모 메뉴 제어와 동일한 네 카테고리.
+ * 기존 DB의 `activity`와 `experience`는 모두 이벤트 구역에 속하므로
+ * 새 이벤트 상품은 대표 저장값인 `experience`를 사용합니다.
+ */
 export const PARENT_ADD_ITEM_CATEGORY_OPTIONS: {
   value: StoreItemCategory
   label: string
 }[] = [
+  { value: 'experience', label: '이벤트' },
   { value: 'food', label: '간식' },
+  { value: 'content', label: '콘텐츠' },
   { value: 'toy', label: '장난감' },
-  { value: 'activity', label: '이벤트 · 활동' },
-  { value: 'experience', label: '이벤트 · 특별 체험' },
-  { value: 'content', label: '콘텐츠 · 이용권' },
 ]

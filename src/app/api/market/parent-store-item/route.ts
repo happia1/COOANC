@@ -102,7 +102,7 @@ export async function POST(req: NextRequest) {
 
   const ct = req.headers.get('content-type') ?? ''
   /** digital(캐릭터 꾸미기) 는 마켓 추가 대상에서 제외 — 홈 탭에서 구매 */
-  const ALLOWED_CATEGORY = new Set(['food', 'toy', 'activity', 'experience'])
+  const ALLOWED_CATEGORY = new Set(['food', 'toy', 'activity', 'experience', 'content'])
 
   let childId: string
   let name: string
@@ -187,7 +187,7 @@ export async function POST(req: NextRequest) {
 /**
  * PATCH /api/market/parent-store-item
  * - 가족 전용 상품만 수정합니다.
- * - multipart/form-data: { childId, storeItemId, name?, image?, removeImage? }
+ * - multipart/form-data: { childId, storeItemId, name?, category?, image?, removeImage? }
  */
 export async function PATCH(req: NextRequest) {
   const supabase = await createClient()
@@ -203,6 +203,8 @@ export async function PATCH(req: NextRequest) {
   const childId = String(form.get('childId') ?? '').trim()
   const storeItemId = String(form.get('storeItemId') ?? '').trim()
   const nameRaw = String(form.get('name') ?? '').trim()
+  const category = String(form.get('category') ?? '').trim()
+  const allowedCategory = new Set(['food', 'toy', 'experience', 'content'])
   const removeImage = String(form.get('removeImage') ?? '').toLowerCase() === 'true'
   const image = form.get('image')
   const imageFile = image instanceof File && image.size > 0 ? image : null
@@ -212,6 +214,9 @@ export async function PATCH(req: NextRequest) {
   }
   if (!nameRaw || nameRaw.length > 80) {
     return NextResponse.json({ error: '상품 이름을 확인해 주세요' }, { status: 400 })
+  }
+  if (!allowedCategory.has(category)) {
+    return NextResponse.json({ error: '상품 카테고리를 확인해 주세요' }, { status: 400 })
   }
 
   const linkId = await resolveFamilyLinkIdForChild(supabase, auth.userId, childId)
@@ -246,6 +251,7 @@ export async function PATCH(req: NextRequest) {
     .from('store_items')
     .update({
       name: nameRaw,
+      category,
       image_url: nextImageUrl,
     })
     .eq('id', storeItemId)

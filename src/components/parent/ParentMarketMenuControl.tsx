@@ -179,6 +179,7 @@ export default function ParentMarketMenuControl({
   const [editItem, setEditItem] = useState<StoreItem | null>(null)
   const [editName, setEditName] = useState('')
   const [editPrice, setEditPrice] = useState('')
+  const [editCategory, setEditCategory] = useState<string>('food')
   const [editLoading, setEditLoading] = useState(false)
   const [editDeleteLoading, setEditDeleteLoading] = useState(false)
   const [editErr, setEditErr] = useState<string | null>(null)
@@ -429,6 +430,7 @@ export default function ParentMarketMenuControl({
     setEditItem(it)
     setEditName(it.name)
     setEditPrice(String(effectiveCreditPrice(it)))
+    setEditCategory(it.category === 'activity' ? 'experience' : (it.category ?? 'food'))
     setEditImageFile(null)
     setEditRemoveImage(false)
   }
@@ -473,13 +475,17 @@ export default function ParentMarketMenuControl({
       const canMeta = canEditItemMeta(editItem)
       const needMetaSave =
         canMeta &&
-        (nameTrimmed !== editItem.name || editImageFile != null || editRemoveImage)
+        (nameTrimmed !== editItem.name ||
+          editCategory !== editItem.category ||
+          editImageFile != null ||
+          editRemoveImage)
 
       if (needMetaSave) {
         const fd = new FormData()
         fd.append('childId', childId)
         fd.append('storeItemId', editItem.id)
         fd.append('name', nameTrimmed)
+        fd.append('category', editCategory)
         fd.append('removeImage', editRemoveImage ? 'true' : 'false')
         if (editImageFile) fd.append('image', editImageFile)
         const saveRes = await fetch('/api/market/parent-store-item', {
@@ -1048,7 +1054,7 @@ export default function ParentMarketMenuControl({
               상품 수정
             </p>
             <p className="mb-4 text-[11px] text-gray-400">
-              가격은 자녀별로 저장되고, 이미지/이름/삭제는 가족 전용 상품에서만 가능합니다.
+              가격은 자녀별로 저장되고, 이미지/이름/카테고리/삭제는 가족 전용 상품에서만 가능합니다.
             </p>
             <label className="mb-3 block text-xs font-bold text-gray-600">
               상품 이름
@@ -1059,6 +1065,21 @@ export default function ParentMarketMenuControl({
                 disabled={!canEditItemMeta(editItem)}
                 className="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm disabled:bg-gray-50 disabled:text-gray-400"
               />
+            </label>
+            <label className="mb-3 block text-xs font-bold text-gray-600">
+              카테고리
+              <select
+                value={editCategory}
+                onChange={(e) => setEditCategory(e.target.value)}
+                disabled={!canEditItemMeta(editItem)}
+                className="mt-1 w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm disabled:bg-gray-50 disabled:text-gray-400"
+              >
+                {PARENT_ADD_ITEM_CATEGORY_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
             </label>
             <label className="mb-2 block text-xs font-bold text-gray-600">
               크레딧 수정

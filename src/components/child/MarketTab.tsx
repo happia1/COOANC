@@ -176,30 +176,54 @@ export default function MarketTab({
   const betaItems = useMemo(() => {
     const activeFood = BETA_MARKET_CONFIG.activeFood as readonly string[]
     const activeEvents = BETA_MARKET_CONFIG.activeEvents as readonly string[]
+    const isFamilyItem = (item: StoreItem) => item.family_link_id != null
+    const customItemSort = (a: StoreItem, b: StoreItem) =>
+      a.credit_price !== b.credit_price
+        ? a.credit_price - b.credit_price
+        : a.name.localeCompare(b.name, 'ko')
 
     const events = visibleItems
       .filter(
         (i) =>
           (i.category === 'experience' || i.category === 'activity') &&
-          activeEvents.includes(i.name),
+          (isFamilyItem(i) || activeEvents.includes(i.name)),
       )
-      .sort((a, b) => activeEventSortIndex(a.name) - activeEventSortIndex(b.name))
+      .sort((a, b) => {
+        if (isFamilyItem(a) && isFamilyItem(b)) return customItemSort(a, b)
+        if (isFamilyItem(a)) return 1
+        if (isFamilyItem(b)) return -1
+        return activeEventSortIndex(a.name) - activeEventSortIndex(b.name)
+      })
     const content = visibleItems
       .filter(
         (i) =>
           i.category === 'content' &&
           contentZoneUnlocked &&
-          isBetaActive(i.name, i.category),
+          (isFamilyItem(i) || isBetaActive(i.name, i.category)),
       )
-      .sort((a, b) => activeContentSortIndex(a.name) - activeContentSortIndex(b.name))
+      .sort((a, b) => {
+        if (isFamilyItem(a) && isFamilyItem(b)) return customItemSort(a, b)
+        if (isFamilyItem(a)) return 1
+        if (isFamilyItem(b)) return -1
+        return activeContentSortIndex(a.name) - activeContentSortIndex(b.name)
+      })
     const food = visibleItems
       .filter(
         (i) =>
           i.category === 'food' &&
-          activeFood.includes(canonicalSnackCatalogName(i.name)),
+          (isFamilyItem(i) || activeFood.includes(canonicalSnackCatalogName(i.name))),
       )
-      .sort((a, b) => activeFoodSortIndex(a.name) - activeFoodSortIndex(b.name))
-    return [...events, ...food, ...content]
+      .sort((a, b) => {
+        if (isFamilyItem(a) && isFamilyItem(b)) return customItemSort(a, b)
+        if (isFamilyItem(a)) return 1
+        if (isFamilyItem(b)) return -1
+        return activeFoodSortIndex(a.name) - activeFoodSortIndex(b.name)
+      })
+    const toys = visibleItems
+      .filter((i) => i.category === 'toy' && isFamilyItem(i))
+      .sort(customItemSort)
+
+    return [...events, ...food, ...content, ...toys]
   }, [visibleItems, contentZoneUnlocked])
 
   /** 보물상자 팝업에서 티켓이 없을 때 등 — 잠깐 카드 테두리를 강조해 눈에 띄게 합니다 */
