@@ -451,6 +451,29 @@ export default function HomeTab({
       .slice(0, 24)
   }, [localUpcomingEvents, upcomingEvents, currentId])
 
+  const [dailyRoutineByDate, setDailyRoutineByDate] = useState<Record<string, 'weekday' | 'weekend'>>({})
+  useEffect(() => {
+    if (!currentId) return
+    const dates = [...new Set(effectiveUpcomingEvents.map((event) => event.start_date.slice(0, 10)))].slice(0, 7)
+    let cancelled = false
+    void Promise.all(dates.map(async (date) => {
+      const response = await fetch(`/api/daily-routine?childId=${encodeURIComponent(currentId)}&date=${date}`)
+      const data = response.ok ? await response.json().catch(() => ({})) as { override?: { routine_type?: string } | null } : {}
+      const saved = data.override?.routine_type
+      return [date, saved === 'weekday' ? 'weekday' : saved ? 'weekend' : null] as const
+    })).then((rows) => {
+      if (cancelled) return
+      setDailyRoutineByDate(Object.fromEntries(rows.filter((row): row is readonly [string, 'weekday' | 'weekend'] => row[1] !== null)))
+    }).catch(() => { if (!cancelled) setDailyRoutineByDate({}) })
+    const onUpdate = (event: Event) => {
+      const detail = (event as CustomEvent<{ childId?: string; date?: string; routineType?: string }>).detail
+      if (detail?.childId !== currentId || !detail.date) return
+      setDailyRoutineByDate((prev) => ({ ...prev, [detail.date!]: detail.routineType === 'weekday' ? 'weekday' : 'weekend' }))
+    }
+    window.addEventListener('cooanc:daily-routine-updated', onUpdate)
+    return () => { cancelled = true; window.removeEventListener('cooanc:daily-routine-updated', onUpdate) }
+  }, [currentId, effectiveUpcomingEvents])
+
   function formatEventDate(dateStr: string): string {
     const parts = dateStr.split('-')
     if (parts.length < 3) return dateStr
@@ -471,31 +494,13 @@ export default function HomeTab({
   }
 
   function getCategoryLabel(event: {
+    start_date?: string | null
     routine_override?: string | null
     event_type?: string | null
   }): string {
-    const routineMap: Record<string, string> = {
-      none: '공휴일',
-      weekend: '방학·특별일정',
-      weekday: '주중 루틴',
-    }
-    const eventMap: Record<string, string> = {
-      holiday: '공휴일',
-      vacation: '방학',
-      travel: '여행',
-      event: '행사',
-      special: '기념일',
-      birthday: '기념일',
-      etc: '특별 일정',
-      other: '특별 일정',
-    }
-    if (event.routine_override && routineMap[event.routine_override]) {
-      return routineMap[event.routine_override]
-    }
-    if (event.event_type && eventMap[event.event_type]) {
-      return eventMap[event.event_type]
-    }
-    return '특별 일정'
+    const selectedForDay = event.start_date ? dailyRoutineByDate[event.start_date.slice(0, 10)] : null
+    if (selectedForDay) return selectedForDay === 'weekday' ? '주중' : '주말·휴일'
+    return event.routine_override === 'weekday' ? '주중' : '주말·휴일'
   }
 
   const calendarNoticeText = useMemo(() => {
@@ -511,7 +516,7 @@ export default function HomeTab({
       return `이번 주 ${dateStr}에 ${label}이 있어요. 루틴 조정이 필요할 수 있어요.`
     }
     return `이번 주 ${dateStr} 외 ${effectiveUpcomingEvents.length - 1}개 일정이 있어요.`
-  }, [effectiveUpcomingEvents])
+  }, [effectiveUpcomingEvents, dailyRoutineByDate])
 
   const tabs: ChildTab[] = childrenData.map((c) => ({ id: c.id, name: c.name }))
   /** 다자녀일 때만 — 프로필 카드 속 캐릭터 좌우 ‹ › 에 연결합니다 */

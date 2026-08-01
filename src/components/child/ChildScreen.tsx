@@ -668,15 +668,6 @@ export default function ChildScreen({
    */
   const [seoulDayKey, setSeoulDayKey] = useState(() => today)
 
-  /**
-   * 레벨 카드 오른쪽 아래 새로고침에서 호출합니다.
-   * - `router.refresh()`만 쓰면 서버에서 내려준 props는 갱신되지만, 이 화면 안의 `useState` 등은 그대로일 수 있습니다.
-   * - 그래서 꼬임·버그를 풀 때는 브라우저 전체 새로고침과 같은 `location.reload()`로 한 번에 맞춥니다.
-   */
-  const handleChildHomeRefresh = useCallback(() => {
-    window.location.reload()
-  }, [])
-
   /** 자녀 홈 본문 — SSR 직후 바로 보이게 (추가 rAF 대기 없음) */
   const [enterReveal, setEnterReveal] = useState(true)
 
@@ -937,6 +928,49 @@ export default function ChildScreen({
     () => new Set(dailyMissions.filter((dm) => dm.is_completed).map((dm) => dm.id)),
   )
   const [missionList, setMissionList] = useState<DailyMissionWithTemplate[]>(dailyMissions)
+  const [missionSyncing, setMissionSyncing] = useState(false)
+  const [missionSyncError, setMissionSyncError] = useState<string | null>(null)
+  const missionAutoSyncAttemptedRef = useRef(false)
+
+  /** 전체 홈을 다시 읽지 않고 오늘의 미션만 생성·조회해 즉시 화면에 반영합니다. */
+  const handleChildHomeRefresh = useCallback(async () => {
+    if (missionSyncing) return
+    setMissionSyncing(true)
+    setMissionSyncError(null)
+    try {
+      const res = await fetch('/api/mission/child-today', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ childId }),
+        credentials: 'include',
+        cache: 'no-store',
+      })
+      const { data, parseError } = await parseJsonFromResponse<{
+        ok?: boolean
+        date?: string
+        missions?: DailyMissionWithTemplate[]
+        error?: string
+      }>(res)
+      if (!res.ok || parseError || !data?.ok || !Array.isArray(data.missions)) {
+        throw new Error(data?.error || '오늘의 미션을 불러오지 못했어요')
+      }
+      setMissionList(data.missions)
+      setDone(new Set(data.missions.filter((dm) => dm.is_completed).map((dm) => dm.id)))
+      if (data.date) setSeoulDayKey(data.date)
+    } catch (error) {
+      console.error('[child/home] today mission sync', error)
+      setMissionSyncError(error instanceof Error ? error.message : '오늘의 미션을 불러오지 못했어요')
+    } finally {
+      setMissionSyncing(false)
+    }
+  }, [childId, missionSyncing])
+
+  /** 첫 화면에 카드가 비었으면 아이가 버튼을 누르기 전에 한 번 자동 복구합니다. */
+  useEffect(() => {
+    if (missionList.length > 0 || missionAutoSyncAttemptedRef.current) return
+    missionAutoSyncAttemptedRef.current = true
+    void handleChildHomeRefresh()
+  }, [handleChildHomeRefresh, missionList.length])
 
   // ── 연속 탭 감지 ───────────────────────────────────────────────────────────
 
@@ -2727,8 +2761,8 @@ export default function ChildScreen({
             >
               <div className="flex min-w-0 items-center gap-1.5">
                 <p className="min-w-0 text-[clamp(0.875rem,calc(0.8rem+0.2vw),1.125rem)] font-black text-white drop-shadow">오늘의 미션</p>
-                <button type="button" onClick={handleChildHomeRefresh} className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-white/15 text-white/85 transition active:scale-90" aria-label="오늘의 미션 새로고침">
-                  <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 1 0 2 5.3" /><path d="M20 4v7h-7" /></svg>
+                <button type="button" onClick={() => void handleChildHomeRefresh()} disabled={missionSyncing} className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-white/15 text-white/85 transition active:scale-90 disabled:opacity-60" aria-label={missionSyncing ? '오늘의 미션 불러오는 중' : '오늘의 미션 새로고침'}>
+                  <svg viewBox="0 0 24 24" className={`h-3 w-3 ${missionSyncing ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 1 0 2 5.3" /><path d="M20 4v7h-7" /></svg>
                 </button>
               </div>
               {visibleMissions.length > 0 ? (
@@ -2766,8 +2800,12 @@ export default function ChildScreen({
             {visibleMissions.length === 0 ? (
               <div className="px-5 min-[400px]:px-6">
                 <div className="bg-white/80 backdrop-blur-sm rounded-2xl px-4 py-5 text-center">
-                  <p className="font-bold text-gray-600 text-sm">아직 미션이 없어요</p>
-                  <p className="text-xs text-gray-400 mt-1">부모님이 미션을 만들어주실 거예요!</p>
+                  <p className="font-bold text-gray-600 text-sm">
+                    {missionSyncing ? '오늘의 미션을 불러오는 중이에요' : missionSyncError ? '미션을 불러오지 못했어요' : '아직 미션이 없어요'}
+                  </p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    {missionSyncing ? '잠시만 기다려 주세요.' : missionSyncError ? '위의 새로고침 버튼을 다시 눌러 주세요.' : '부모님이 미션을 만들어주실 거예요!'}
+                  </p>
                 </div>
               </div>
             ) : incompleteOrdered.length === 0 ? (

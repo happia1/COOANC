@@ -19,7 +19,7 @@ import { getSeoulDateString } from '@/lib/koreaDate'
 import { applyStoreItemCreditOverrides } from '@/lib/applyStoreItemCreditOverrides'
 import { readChildStatInt } from '@/lib/childCreditsSplit'
 import { isCategoryExcludedFromMarket } from '@/lib/parentMarketMenuSections'
-import { fetchCalendarEventsForChildRoutine, fetchDailyRoutineOverride, resolveRoutineTypeForDay } from '@/lib/childRoutineCalendar'
+import { fetchDailyRoutineOverride, resolveRoutineTypeForDay } from '@/lib/childRoutineCalendar'
 import { fetchChildHomeContentZoneData, EMPTY_CHILD_HOME_CONTENT_ZONE } from '@/lib/fetchChildHomeContentZone'
 import { CONTENT_ZONE_UNLOCK_MIN_LEVEL } from '@/constants/childScreenFeatures'
 import {
@@ -130,6 +130,13 @@ export default async function ChildHomePage() {
   })()
 
   const EMPTY_CONTENT_ZONE = EMPTY_CHILD_HOME_CONTENT_ZONE
+  const dailyRoutineOverridePromise = fetchDailyRoutineOverride(missionDb, childId, today)
+  const dailyMissionsPromise = missionDb
+    .from('daily_missions')
+    .select(`*, missions:mission_template_id(${missionJoinWithSort})`)
+    .eq('child_id', childId)
+    .eq('date', today)
+    .order('scheduled_time', { ascending: true, nullsFirst: false })
 
   /**
    * 1단계: childId 만 알면 되는 병렬 조회
@@ -150,6 +157,8 @@ export default async function ChildHomePage() {
     creditOvRes,
     itemsRes,
     requestsRes,
+    dailyRoutineOverride,
+    dailyMissionsResWithSort,
   ] = await Promise.all([
     supabase.from('child_stats').select('*').eq('child_id', childId).maybeSingle(),
     getCachedProfileRowById(childId),
@@ -182,6 +191,8 @@ export default async function ChildHomePage() {
       .in('status', ['pending', 'parent_buying', 'approved', 'rejected', 'delivered'])
       .order('requested_at', { ascending: false })
       .limit(12),
+    dailyRoutineOverridePromise,
+    dailyMissionsPromise,
   ])
 
   // ── 기본 자녀 정보 ────────────────────────────────────────────────────────
@@ -210,35 +221,11 @@ export default async function ChildHomePage() {
 
   // ── 미션 ─────────────────────────────────────────────────────────────────
 
-  const parentId = familyRows[0]?.parent_id ?? null
-  /** 부모 홈과 동일하게 이 자녀의 `family_links.id` 로 캘린더를 좁힙니다(형제 일정 섞임 방지). */
-  const familyLinkId = familyRows[0]?.id ?? null
-
-  /**
-   * 2단계: 캘린더·오늘 미션·콘텐츠존(레벨 8+) 병렬 조회
-   * — 콘텐츠존 SSR 에서 유튜브 썸네일을 일괄 조회하지 않아 홈 TTFB 가 짧아집니다.
-   */
-  const contentZonePromise =
+  /** 콘텐츠존은 레벨이 필요한 조회라 1단계 통계가 끝난 뒤에만 실행합니다. */
+  const contentZone =
     level >= CONTENT_ZONE_UNLOCK_MIN_LEVEL
-      ? fetchChildHomeContentZoneData(supabase, childId)
-      : Promise.resolve(EMPTY_CONTENT_ZONE)
-
-  const [calEvents, dailyRoutineOverride, dailyMissionsResWithSort, contentZone] = await Promise.all([
-    fetchCalendarEventsForChildRoutine(missionDb, {
-      today,
-      childId,
-      familyLinkId,
-      parentId,
-    }),
-    fetchDailyRoutineOverride(missionDb, childId, today),
-    missionDb
-      .from('daily_missions')
-      .select(`*, missions:mission_template_id(${missionJoinWithSort})`)
-      .eq('child_id', childId)
-      .eq('date', today)
-      .order('scheduled_time', { ascending: true, nullsFirst: false }),
-    contentZonePromise,
-  ])
+      ? await fetchChildHomeContentZoneData(supabase, childId)
+      : EMPTY_CONTENT_ZONE
   const dailyMissionsRes = isMissingSortOrderColumn(dailyMissionsResWithSort.error?.message)
     ? await missionDb
         .from('daily_missions')

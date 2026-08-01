@@ -4,7 +4,7 @@ import { createServiceRoleClient } from '@/lib/supabase/admin'
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-const ROUTINES = new Set(['weekday', 'weekend', 'holiday'])
+const ROUTINES = new Set(['weekday', 'weekend'])
 
 async function parentLink(childId: string) {
   const supabase = await createClient()

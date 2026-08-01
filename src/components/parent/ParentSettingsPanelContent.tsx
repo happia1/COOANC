@@ -49,6 +49,8 @@ export default function ParentSettingsPanelContent() {
 
   const [profileName, setProfileName] = useState('')
   const [editingName, setEditingName] = useState(false)
+  const [contactOpen, setContactOpen] = useState(false)
+  const [contactMessage, setContactMessage] = useState('')
   const [nameSaving, setNameSaving] = useState(false)
 
   const [userName, setUserName] = useState('')
@@ -302,13 +304,22 @@ export default function ParentSettingsPanelContent() {
                       {userRole === 'parent' ? '부모' : '자녀'} 계정
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setEditingName(true)}
-                    className="shrink-0 rounded-xl bg-[#4A90E2]/10 px-3 py-1.5 text-xs font-bold text-[#4A90E2]"
-                  >
-                    편집
-                  </button>
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setEditingName(true)}
+                      className="rounded-xl bg-[#4A90E2]/10 px-3 py-1.5 text-xs font-bold text-[#4A90E2]"
+                    >
+                      편집
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleLogout()}
+                      className="rounded-xl bg-red-50 px-3 py-1.5 text-xs font-bold text-red-500"
+                    >
+                      로그아웃
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -447,13 +458,43 @@ export default function ParentSettingsPanelContent() {
           <ToggleRow label="효과음" emoji="🔊" on={soundOn} onToggle={toggleSound} />
         </div>
 
-        <button
-          type="button"
-          onClick={handleLogout}
-          className="w-full rounded-2xl border-2 border-red-200 bg-white py-4 text-sm font-bold text-red-500 shadow-sm transition-all active:scale-95"
-        >
-          🚪 로그아웃
-        </button>
+        <footer className="rounded-2xl bg-white p-5 text-xs text-gray-500 shadow-sm ring-1 ring-gray-100">
+          <div className="flex items-center gap-3">
+            <img src="/favicon-96x96.png" alt="쿠앤크" className="h-10 w-10 rounded-xl" />
+            <div>
+              <p className="font-black text-gray-800">COOANC 베타</p>
+              <p className="mt-0.5 text-[10px]">아이와 부모를 위한 루틴 서비스</p>
+            </div>
+          </div>
+
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            <details className="rounded-xl bg-gray-50 px-3 py-2.5">
+              <summary className="cursor-pointer font-bold text-gray-700">개인정보 안내</summary>
+              <p className="mt-2 text-[10px] leading-relaxed text-gray-500">
+                서비스 제공에 필요한 계정·자녀·루틴 정보를 처리합니다. 이용자는 자신의 개인정보와 자녀 정보에 대해 열람, 수정, 삭제 및 처리정지를 요청할 수 있습니다. 정식 개인정보 처리방침은 베타 운영 정보가 확정되는 대로 이 화면에 공개합니다.
+              </p>
+              <a href="https://law.go.kr/법령/개인정보보호법/제30조" target="_blank" rel="noreferrer" className="mt-2 inline-block text-[10px] font-bold text-brand-blue">개인정보 보호법 보기</a>
+            </details>
+            <details className="rounded-xl bg-gray-50 px-3 py-2.5">
+              <summary className="cursor-pointer font-bold text-gray-700">저작권 안내</summary>
+              <p className="mt-2 text-[10px] leading-relaxed text-gray-500">
+                COOANC의 로고, 캐릭터, 일러스트, 화면 구성 및 콘텐츠는 저작권 또는 관련 권리의 보호를 받습니다. 권리자의 허락 없는 복제, 배포, 수정 및 상업적 이용을 금지합니다.
+              </p>
+              <a href="https://law.go.kr/법령/저작권법" target="_blank" rel="noreferrer" className="mt-2 inline-block text-[10px] font-bold text-brand-blue">저작권법 보기</a>
+            </details>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setContactOpen(true)}
+            className="mt-3 w-full rounded-xl border border-brand-blue/25 bg-brand-blue/[0.06] py-2.5 font-bold text-brand-blue active:scale-[0.99]"
+          >
+            개발자에게 문의하기
+          </button>
+          <p className="mt-4 border-t border-gray-100 pt-3 text-center text-[10px] text-gray-400">
+            © 2026 COOANC. All rights reserved.
+          </p>
+        </footer>
 
         {profileLoaded && userRole === 'parent' ? <DeleteParentAccountSection /> : null}
       </div>
@@ -483,6 +524,40 @@ export default function ParentSettingsPanelContent() {
           }
         }}
       />
+
+      {contactOpen ? (
+        <div className="fixed inset-0 z-[220] flex items-end justify-center bg-black/40 p-4 sm:items-center" role="dialog" aria-modal="true" aria-labelledby="developer-contact-title">
+          <button type="button" className="absolute inset-0" aria-label="문의창 닫기" onClick={() => setContactOpen(false)} />
+          <div className="relative z-10 w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl">
+            <p id="developer-contact-title" className="text-base font-black text-gray-900">개발자 문의</p>
+            <p className="mt-1 text-[11px] leading-relaxed text-gray-500">내용을 작성하면 기기에 연결된 메일 앱이 열립니다.</p>
+            <textarea
+              autoFocus
+              value={contactMessage}
+              onChange={(event) => setContactMessage(event.target.value.slice(0, 1000))}
+              rows={6}
+              placeholder="문의 내용을 입력해 주세요"
+              className="mt-3 w-full resize-none rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue/30"
+            />
+            <div className="mt-3 flex gap-2">
+              <button type="button" onClick={() => setContactOpen(false)} className="flex-1 rounded-xl bg-gray-100 py-2.5 text-sm font-bold text-gray-600">취소</button>
+              <button
+                type="button"
+                disabled={!contactMessage.trim()}
+                onClick={() => {
+                  const email = process.env.NEXT_PUBLIC_DEVELOPER_CONTACT_EMAIL?.trim() || 'theotter@naver.com'
+                  const subject = encodeURIComponent('[COOANC 베타] 개발자 문의')
+                  const body = encodeURIComponent(contactMessage.trim())
+                  window.location.href = `mailto:${email}?subject=${subject}&body=${body}`
+                }}
+                className="flex-1 rounded-xl bg-brand-blue py-2.5 text-sm font-bold text-white disabled:bg-gray-200"
+              >
+                메일 보내기
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </>
   )
 }

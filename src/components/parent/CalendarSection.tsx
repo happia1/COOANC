@@ -16,7 +16,7 @@ import ParentChevron from '@/components/parent/ParentChevron'
  */
 
 import { useState, useEffect, useCallback } from 'react'
-import { flushSync } from 'react-dom'
+import { createPortal, flushSync } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { useSwipeToDismiss } from '@/hooks/useSwipeToDismiss'
 import type { CalendarChecklistItem, LocalCalendarEvent } from '@/types/database'
@@ -107,6 +107,14 @@ const SCHEDULE_CATEGORY_GROUPS = [
 ] as const
 const SCHEDULE_CATEGORY_ORDER = ['공휴일', '여행', '행사', '교육', '건강', '기타'] as const
 
+function normalizedScheduleCategory(event: LocalCalendarEvent): { main: string; sub: string } {
+  const main = String(event.categoryMain ?? '')
+  const group = SCHEDULE_CATEGORY_GROUPS.find((item) => item.main === main)
+  if (!group) return scheduleCategoryForLegacyEventType(event.eventType)
+  const sub = String(event.categorySub ?? '')
+  return { main: group.main, sub: group.subs.some((item) => item === sub) ? sub : '' }
+}
+
 function eventTypeForScheduleCategory(main: string, sub: string): LocalCalendarEvent['eventType'] {
   if (main === '공휴일') return 'holiday'
   if (main === '여행') return 'travel'
@@ -127,7 +135,12 @@ const SCHEDULE_CATEGORY_COLORS: Record<string, { bg: string; text: string; dot: 
 
 /** 일정 분류가 있으면 분류를 우선해 표시색을 정한다. event_type은 이전 데이터 호환용이다. */
 function eventColors(event: LocalCalendarEvent) {
-  return event.categoryMain ? SCHEDULE_CATEGORY_COLORS[event.categoryMain] ?? EVENT_COLORS[event.eventType] : EVENT_COLORS[event.eventType]
+  return SCHEDULE_CATEGORY_COLORS[normalizedScheduleCategory(event).main] ?? EVENT_COLORS[event.eventType]
+}
+
+function eventCategoryDisplayLabel(event: LocalCalendarEvent): string {
+  const category = normalizedScheduleCategory(event)
+  return category.sub ? `${category.main} · ${category.sub}` : category.main
 }
 
 /** 기존 event_type만 있는 일정도 입력 시트에서는 새 분류 하나로 보이게 합니다. */
@@ -148,9 +161,7 @@ type OverrideType = LocalCalendarEvent['routineOverride']
  * (비개발자: 주중/주말(주간) 휴일 루틴/아예 루틴 없음 중 하나)
  */
 function routineOverrideLabel(override: LocalCalendarEvent['routineOverride']): string {
-  if (override === 'none') return '루틴 없음'
-  if (override === 'weekend') return '주말/휴일 루틴'
-  return '주중 루틴'
+  return override === 'weekday' ? '주중' : '주말·휴일'
 }
 
 interface Props {
@@ -186,6 +197,67 @@ function datesInRange(start: string, end: string): string[] {
     cur.setDate(cur.getDate() + 1)
   }
   return result
+}
+
+type EventOccurrenceRange = { start: string; end: string }
+
+function addDays(date: string, amount: number): string {
+  const value = parseDate(date)
+  value.setDate(value.getDate() + amount)
+  return dateKey(value.getFullYear(), value.getMonth(), value.getDate())
+}
+
+function dayDistance(start: string, end: string): number {
+  return Math.max(0, Math.round((parseDate(end).getTime() - parseDate(start).getTime()) / 86_400_000))
+}
+
+function recurringAnchorDate(start: string, type: NonNullable<LocalCalendarEvent['recurType']>, index: number): string | null {
+  const [year, month, day] = start.split('-').map(Number)
+  if (type === 'weekly') return addDays(start, index * 7)
+  if (type === 'monthly') {
+    const candidate = new Date(year, month - 1 + index, day)
+    if (candidate.getDate() !== day) return null
+    return dateKey(candidate.getFullYear(), candidate.getMonth(), candidate.getDate())
+  }
+  if (type === 'yearly') {
+    const candidate = new Date(year + index, month - 1, day)
+    if (candidate.getMonth() !== month - 1 || candidate.getDate() !== day) return null
+    return dateKey(candidate.getFullYear(), candidate.getMonth(), candidate.getDate())
+  }
+  return start
+}
+
+/** 원본 한 건으로 저장된 반복 일정을 조회 월의 실제 발생 구간들로 확장합니다. */
+function eventOccurrenceRangesInWindow(
+  event: LocalCalendarEvent,
+  windowStart: string,
+  windowEnd: string,
+): EventOccurrenceRange[] {
+  const type = event.recurType ?? 'none'
+  const duration = dayDistance(event.startDate, event.endDate)
+  if (type === 'none') {
+    return event.endDate < windowStart || event.startDate > windowEnd
+      ? []
+      : [{ start: event.startDate, end: event.endDate }]
+  }
+
+  const lastAnchor = event.recurUntil || windowEnd
+  const ranges: EventOccurrenceRange[] = []
+  /** 종료일 없는 반복도 현재 조회 범위까지만 계산하며 비정상 데이터의 무한 반복을 막습니다. */
+  for (let index = 0; index < 1200; index += 1) {
+    const anchor = recurringAnchorDate(event.startDate, type, index)
+    if (!anchor) continue
+    if (anchor > lastAnchor || anchor > windowEnd) break
+    const occurrenceEnd = addDays(anchor, duration)
+    if (occurrenceEnd >= windowStart) ranges.push({ start: anchor, end: occurrenceEnd })
+  }
+  return ranges
+}
+
+function eventDatesInWindow(event: LocalCalendarEvent, windowStart: string, windowEnd: string): string[] {
+  return eventOccurrenceRangesInWindow(event, windowStart, windowEnd).flatMap((range) =>
+    datesInRange(range.start, range.end).filter((date) => date >= windowStart && date <= windowEnd),
+  )
 }
 
 /** 달력 칸 폭 한정: 공휴일 이름은 5글자 이하이면 그대로, 초과 시 앞 4글자 + '..' (예: 부처님오신날 → 부처님오.., 노동절 → 노동절) */
@@ -509,12 +581,11 @@ export default function CalendarSection({ childId, focusDate = null, focusNonce 
   /**
    * 이번 달에 걸리는 일정(범례 적용 전).
    */
+  const visibleMonthStart = `${year}-${String(month + 1).padStart(2, '0')}-01`
+  const visibleMonthEnd = `${year}-${String(month + 1).padStart(2, '0')}-${String(new Date(year, month + 1, 0).getDate()).padStart(2, '0')}`
   const monthEventsAll = events.filter((ev) => {
     if (!eventVisibleForSelectedChild(ev)) return false
-    return datesInRange(ev.startDate, ev.endDate).some((d) => {
-      const [y, m] = d.split('-').map(Number)
-      return y === year && m - 1 === month
-    })
+    return eventDatesInWindow(ev, visibleMonthStart, visibleMonthEnd).length > 0
   })
   /** 범례가 있으면 격자·이번 달 일정 **목록**에만 해당 유형(통합 칩 포함) */
   const monthEvents = (legendFilter ? monthEventsAll.filter(eventMatchesLegendFilter) : monthEventsAll).sort(
@@ -574,7 +645,7 @@ export default function CalendarSection({ childId, focusDate = null, focusNonce 
    */
   const dateEventMap: Record<string, LocalCalendarEvent[]> = {}
   for (const ev of monthEvents) {
-    for (const d of datesInRange(ev.startDate, ev.endDate)) {
+    for (const d of eventDatesInWindow(ev, visibleMonthStart, visibleMonthEnd)) {
       if (!dateEventMap[d]) dateEventMap[d] = []
       dateEventMap[d].push(ev)
     }
@@ -584,22 +655,25 @@ export default function CalendarSection({ childId, focusDate = null, focusNonce 
   type PeriodBar = { event: LocalCalendarEvent; lane: number; isStart: boolean; isEnd: boolean }
   const periodBarsByDate: Record<string, PeriodBar[]> = {}
   const laneEnds: string[] = []
-  const periodEvents = monthEvents
-    .filter((ev) => ev.endDate > ev.startDate)
+  const periodOccurrences = monthEvents
+    .flatMap((event) =>
+      eventOccurrenceRangesInWindow(event, visibleMonthStart, visibleMonthEnd).map((range) => ({ event, range })),
+    )
+    .filter(({ range }) => range.end > range.start)
     .sort((a, b) => {
-      const al = datesInRange(a.startDate, a.endDate).length
-      const bl = datesInRange(b.startDate, b.endDate).length
-      return bl - al || a.startDate.localeCompare(b.startDate)
+      const al = datesInRange(a.range.start, a.range.end).length
+      const bl = datesInRange(b.range.start, b.range.end).length
+      return bl - al || a.range.start.localeCompare(b.range.start)
     })
-  for (const ev of periodEvents) {
-    let lane = laneEnds.findIndex((end) => !end || ev.startDate > end)
+  for (const { event: ev, range } of periodOccurrences) {
+    let lane = laneEnds.findIndex((end) => !end || range.start > end)
     if (lane < 0) { lane = laneEnds.length; laneEnds.push('') }
-    laneEnds[lane] = ev.endDate
-    for (const d of datesInRange(ev.startDate, ev.endDate)) {
+    laneEnds[lane] = range.end
+    for (const d of datesInRange(range.start, range.end)) {
       const [yv, mv] = d.split('-').map(Number)
       if (yv !== year || mv - 1 !== month) continue
       if (!periodBarsByDate[d]) periodBarsByDate[d] = []
-      periodBarsByDate[d].push({ event: ev, lane, isStart: d === ev.startDate, isEnd: d === ev.endDate })
+      periodBarsByDate[d].push({ event: ev, lane, isStart: d === range.start, isEnd: d === range.end })
     }
   }
   const periodLaneCount = laneEnds.length
@@ -643,7 +717,7 @@ export default function CalendarSection({ childId, focusDate = null, focusNonce 
    */
   function userEventsOverlappingDay(dk: string): LocalCalendarEvent[] {
     return events.filter(
-      (ev) => eventVisibleForSelectedChild(ev) && datesInRange(ev.startDate, ev.endDate).includes(dk),
+      (ev) => eventVisibleForSelectedChild(ev) && eventDatesInWindow(ev, dk, dk).includes(dk),
     )
   }
 
@@ -859,8 +933,8 @@ export default function CalendarSection({ childId, focusDate = null, focusNonce 
               aria-pressed={selected}
               aria-label={
                 selected
-                  ? `${EVENT_TYPE_LABELS[type]} 필터 해제, 달과 목록을 전체 유형으로`
-                  : `${EVENT_TYPE_LABELS[type]}만 달 점·이번 달 일정에 표시`
+                  ? `${type} 필터 해제, 달과 목록을 전체 유형으로`
+                  : `${type}만 달 점·이번 달 일정에 표시`
               }
               onClick={() => toggleLegendFilter(type)}
               className={[
@@ -914,7 +988,7 @@ export default function CalendarSection({ childId, focusDate = null, focusNonce 
                 {monthTotalCount === 0
                   ? '이번 달 등록된 일정이 없어요'
                   : legendFilter
-                    ? `${EVENT_TYPE_LABELS[legendFilter]} 일정은 이번 달에 없어요. 위 칩을 다시 누르면 전체를 볼 수 있어요`
+                    ? `${legendFilter} 일정은 이번 달에 없어요. 위 칩을 다시 누르면 전체를 볼 수 있어요`
                     : '이번 달 등록된 일정이 없어요'}
               </p>
             ) : (
@@ -926,6 +1000,9 @@ export default function CalendarSection({ childId, focusDate = null, focusNonce 
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation()
+                    setDetailDate(
+                      eventDatesInWindow(ev, visibleMonthStart, visibleMonthEnd)[0] ?? ev.startDate,
+                    )
                     setDetailEvents([ev])
                   }}
                   className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left ${eventColors(ev).bg}`}
@@ -957,7 +1034,7 @@ export default function CalendarSection({ childId, focusDate = null, focusNonce 
       </div>
       </div>
 
-      {sheet && (
+      {sheet && typeof document !== 'undefined' && createPortal(
         <CalendarEventSheet
           key={sheet.existing?.id ?? `new-${sheet.startDate}-${sheet.presetType ?? 'p'}`}
           initialStartDate={sheet.startDate}
@@ -993,18 +1070,21 @@ export default function CalendarSection({ childId, focusDate = null, focusNonce 
               : undefined
           }
           onClose={closeSheet}
-        />
+        />,
+        document.body,
       )}
 
-      {detailEvents && detailEvents.length > 0 && (
+      {detailEvents && detailEvents.length > 0 && typeof document !== 'undefined' && createPortal(
         <EventDetailBottomSheet
           events={detailEvents}
           date={detailDate ?? detailEvents[0].startDate}
           childId={childId}
           onClose={() => { setDetailEvents(null); setDetailDate(null) }}
           onAddSchedule={() => {
+            const selectedDate = detailDate ?? detailEvents[0]?.startDate ?? todayStr
             setDetailEvents(null)
-            openAddSheet()
+            setDetailDate(null)
+            setSheet({ startDate: selectedDate, endDate: selectedDate })
           }}
           onEdit={(ev) => {
             setDetailEvents(null)
@@ -1021,10 +1101,11 @@ export default function CalendarSection({ childId, focusDate = null, focusNonce 
               })
             })
           }}
-        />
+        />,
+        document.body,
       )}
 
-      {emptyDayKey && (
+      {emptyDayKey && typeof document !== 'undefined' && createPortal(
         <EmptyDayBottomSheet
           dateKey={emptyDayKey}
           onClose={() => setEmptyDayKey(null)}
@@ -1032,7 +1113,8 @@ export default function CalendarSection({ childId, focusDate = null, focusNonce 
             setEmptyDayKey(null)
             setSheet({ startDate: dk, endDate: dk })
           }}
-        />
+        />,
+        document.body,
       )}
     </section>
   )
@@ -1108,14 +1190,14 @@ export function CalendarEventSheet({
   }
 
   return (
-    <div className="fixed inset-0 z-[100]" role="dialog" aria-modal="true" aria-labelledby="event-sheet-title">
+    <div className="fixed inset-0 z-[200]" role="dialog" aria-modal="true" aria-labelledby="event-sheet-title">
       {/* 오버레이: 패널 뒤 배경 클릭 시 닫기 */}
       <button type="button" className="absolute inset-0 z-40 bg-black/40" aria-label="닫기" onClick={onClose} />
       {/* 오른쪽 슬라이드 패널: 닫힘=오른쪽 바깥, 열림=제자리 */}
       <div
         className={[
           // 모바일: 하단 시트 / md+: 우측 슬라이드 패널
-          'fixed inset-x-0 bottom-0 z-50 h-[min(88dvh,100vh-2rem)] w-full rounded-t-3xl bg-white shadow-xl md:inset-x-auto md:top-0 md:right-0 md:h-full md:max-w-[420px] md:rounded-none',
+          'fixed inset-x-0 bottom-0 z-50 h-[min(92dvh,100dvh-0.5rem)] w-full max-w-full overflow-x-hidden rounded-t-3xl bg-white shadow-xl md:inset-x-auto md:top-0 md:right-0 md:h-full md:max-w-[420px] md:rounded-none',
           'transform transition-transform duration-300 ease-in-out',
           panelOpen
             ? 'translate-y-0 md:translate-y-0 md:translate-x-0'
@@ -1134,7 +1216,7 @@ export function CalendarEventSheet({
               {existing ? '일정 편집' : '일정 추가'}
             </p>
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-2 pt-4">
+          <div className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-4 pb-2 pt-4 sm:px-5">
             {savedDone ? (
               <div className="flex flex-col items-center gap-3 py-8">
                 <p className="font-medium text-gray-800">일정이 등록됐어요!</p>
@@ -1172,24 +1254,24 @@ export function CalendarEventSheet({
                   />
                 </div>
 
-                <div className="mt-4 grid grid-cols-2 gap-3">
-                  <div>
+                <div className="mt-4 grid min-w-0 grid-cols-2 gap-2">
+                  <div className="min-w-0">
                     <label className="mb-1 block text-xs font-bold text-gray-500">시작일</label>
                     <input
                       type="date"
                       value={startDate}
                       onChange={(e) => setStart(e.target.value)}
-                      className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue/40"
+                      className="block w-full min-w-0 max-w-full rounded-xl border border-gray-200 px-2 py-2.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-brand-blue/40 sm:px-3 sm:text-sm"
                     />
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <label className="mb-1 block text-xs font-bold text-gray-500">종료일</label>
                     <input
                       type="date"
                       value={endDate}
                       min={startDate}
                       onChange={(e) => setEnd(e.target.value)}
-                      className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue/40"
+                      className="block w-full min-w-0 max-w-full rounded-xl border border-gray-200 px-2 py-2.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-brand-blue/40 sm:px-3 sm:text-sm"
                     />
                   </div>
                 </div>
@@ -1231,7 +1313,7 @@ export function CalendarEventSheet({
                       </button>
                     ))}
                   </div>
-                  {recurType !== 'none' ? <div className="mt-2"><label className="mb-1 block text-[11px] font-bold text-gray-500">반복 종료일 (선택)</label><input type="date" value={recurUntil} onChange={(e) => setRecurUntil(e.target.value)} min={startDate} className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm" aria-label="반복 종료일" /><p className="mt-1 text-[10px] text-gray-400">비워두면 종료일 없이 계속 반복해요.</p></div> : null}
+                  {recurType !== 'none' ? <div className="mt-2 min-w-0"><label className="mb-1 block text-[11px] font-bold text-gray-500">반복 종료일 (선택)</label><input type="date" value={recurUntil} onChange={(e) => setRecurUntil(e.target.value)} min={startDate} className="block w-full min-w-0 max-w-full rounded-xl border border-gray-200 px-2 py-2.5 text-[12px] sm:px-3 sm:text-sm" aria-label="반복 종료일" /><p className="mt-1 text-[10px] text-gray-400">비워두면 종료일 없이 계속 반복해요.</p></div> : null}
                 </div>
 
                 <label className="mt-4 flex items-center justify-between text-xs font-bold text-gray-600">
@@ -1317,7 +1399,7 @@ function EmptyDayBottomSheet({
   }, [])
 
   return (
-    <div className="fixed inset-0 z-[100]" role="dialog" aria-modal="true">
+    <div className="fixed inset-0 z-[200]" role="dialog" aria-modal="true">
       <button type="button" className="absolute inset-0 z-40 bg-black/40" aria-label="닫기" onClick={onClose} />
       <div
         className={[
@@ -1391,7 +1473,7 @@ function EventDetailBottomSheet({
   }, [])
 
   return (
-    <div className="fixed inset-0 z-[100]" role="dialog" aria-modal="true">
+    <div className="fixed inset-0 z-[200]" role="dialog" aria-modal="true">
       <button type="button" className="absolute inset-0 z-40 bg-black/40" aria-label="닫기" onClick={onClose} />
       <div
         className={[
@@ -1444,9 +1526,13 @@ function EventDetailBottomSheet({
                   </>
                 ) : (
                 <>
-                <p className="mt-1 text-[11px] font-bold text-gray-600">{EVENT_TYPE_LABELS[ev.eventType]}</p>
+                <p className="mt-1 text-[11px] font-bold text-gray-600">{eventCategoryDisplayLabel(ev)}</p>
                 <p className="mt-1 text-xs text-gray-600">
-                  {ev.startDate !== ev.endDate ? `종일 | ${ev.title}` : `날짜: ${ev.startDate}`}
+                  {ev.recurType && ev.recurType !== 'none'
+                    ? `날짜: ${date} · ${{ weekly: '매주', monthly: '매월', yearly: '매년' }[ev.recurType]} 반복`
+                    : ev.startDate !== ev.endDate
+                      ? `종일 | ${ev.title}`
+                      : `날짜: ${ev.startDate}`}
                 </p>
                 {ev.description?.trim() && (
                   <p className="mt-2 whitespace-pre-wrap text-xs leading-relaxed text-gray-600">{ev.description.trim()}</p>
@@ -1455,7 +1541,14 @@ function EventDetailBottomSheet({
                   <button type="button" onClick={() => onEdit(ev)} className="grid h-7 w-7 place-items-center rounded-full bg-white/70 text-gray-500 transition-colors hover:bg-white hover:text-brand-blue" aria-label="일정 편집">
                     <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z" /></svg>
                   </button>
-                  <button type="button" onClick={() => onDelete(ev.id)} className="grid h-7 w-7 place-items-center rounded-full bg-white/70 text-gray-400 transition-colors hover:bg-white hover:text-red-500" aria-label="일정 삭제">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (window.confirm(`“${ev.title}” 일정을 삭제할까요?`)) onDelete(ev.id)
+                    }}
+                    className="grid h-7 w-7 place-items-center rounded-full bg-white/70 text-gray-400 transition-colors hover:bg-white hover:text-red-500"
+                    aria-label="일정 삭제"
+                  >
                     <span className="text-lg font-light leading-none" aria-hidden="true">×</span>
                   </button>
                 </div>
@@ -1484,23 +1577,26 @@ function EventDetailBottomSheet({
 
 /** 일정 상세에 붙는 준비 체크리스트 — 일정 자체와 별도 행이라 기기 간 완료 상태도 함께 동기화됩니다. */
 function TodayRoutine({ date, childId }: { date: string; childId: string }) {
-  const [selected, setSelected] = useState<'weekday' | 'weekend' | 'holiday' | null>(null)
+  const [selected, setSelected] = useState<'weekday' | 'weekend' | null>(null)
   const [saving, setSaving] = useState(false)
   useEffect(() => {
     let cancelled = false
-    void fetch(`/api/daily-routine?childId=${encodeURIComponent(childId)}&date=${date}`).then((response) => response.ok ? response.json() : { override: null }).then((data: { override?: { routine_type?: 'weekday' | 'weekend' | 'holiday' } | null }) => { if (!cancelled) setSelected(data.override?.routine_type ?? null) }).catch(() => { if (!cancelled) setSelected(null) })
+    void fetch(`/api/daily-routine?childId=${encodeURIComponent(childId)}&date=${date}`).then((response) => response.ok ? response.json() : { override: null }).then((data: { override?: { routine_type?: 'weekday' | 'weekend' | 'holiday' } | null }) => {
+      if (!cancelled) setSelected(data.override?.routine_type === 'weekday' ? 'weekday' : data.override?.routine_type ? 'weekend' : null)
+    }).catch(() => { if (!cancelled) setSelected(null) })
     return () => { cancelled = true }
   }, [date, childId])
-  const choose = async (routineType: 'weekday' | 'weekend' | 'holiday', sourceEventId?: string) => {
+  const choose = async (routineType: 'weekday' | 'weekend', sourceEventId?: string) => {
     if (saving) return
     setSelected(routineType); setSaving(true)
     try {
       const response = await fetch('/api/daily-routine', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ childId, date, routineType, sourceEventId }) })
       if (!response.ok) setSelected(null)
+      else window.dispatchEvent(new CustomEvent('cooanc:daily-routine-updated', { detail: { childId, date, routineType } }))
     } finally { setSaving(false) }
   }
-  const choices: { type: 'weekday' | 'weekend' | 'holiday'; label: string }[] = [
-    { type: 'weekday', label: '주중 루틴' }, { type: 'weekend', label: '주말/휴일 루틴' }, { type: 'holiday', label: '휴식' },
+  const choices: { type: 'weekday' | 'weekend'; label: string }[] = [
+    { type: 'weekday', label: '주중' }, { type: 'weekend', label: '주말·휴일' },
   ]
   return <div className="mt-3 rounded-2xl border border-brand-blue/15 bg-brand-blue/[0.04] p-3">
     <p className="text-xs font-black text-brand-text">오늘의 루틴</p>

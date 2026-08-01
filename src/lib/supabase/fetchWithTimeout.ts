@@ -39,7 +39,8 @@ export function wrapFetchWithTimeout(baseFetch: typeof fetch, timeoutMs = 12000)
         const transient = isTransientFetchError(err)
         const isLast = attempt >= SUPABASE_FETCH_RETRY_DELAYS_MS.length - 1
 
-        if (isTimeout && !transient) {
+        /** 시간 제한까지 이미 기다린 요청은 다시 2번 반복해 36초 이상 막지 않습니다. */
+        if (isTimeout) {
           throw new Error(`Supabase request timed out after ${timeoutMs}ms`, { cause: err })
         }
         if (!transient || isLast) {

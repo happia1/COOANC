@@ -53,7 +53,7 @@ export function syncAgentEventToLocalCalendar(
   childId: string | null,
   event: AgentParseEvent,
   savedEventId: string | null,
-  opts?: { routineOverride?: LocalCalendarEvent['routineOverride'] },
+  opts?: { routineOverride?: LocalCalendarEvent['routineOverride']; categoryMain?: string },
 ): string | null {
   if (typeof window === 'undefined' || !childId) return null
   /** 추출 실패·모델 과부하 응답은 달력에 절대 반영하지 않음 */
@@ -74,6 +74,7 @@ export function syncAgentEventToLocalCalendar(
     endDate: end,
     eventType: agentParseTypeToLocalEventType(event.type),
     routineOverride: opts?.routineOverride ?? 'weekend',
+    categoryMain: opts?.categoryMain ?? event.category_main ?? null,
   }
 
   try {
@@ -131,7 +132,7 @@ export function rewriteLocalCalendarEventIdInStorage(oldId: string, newId: strin
 export function patchLocalCalendarEventInStorage(
   eventId: string | null | undefined,
   patch: Partial<
-    Pick<LocalCalendarEvent, 'eventType' | 'description' | 'routineOverride' | 'title' | 'startDate' | 'endDate'>
+    Pick<LocalCalendarEvent, 'eventType' | 'description' | 'routineOverride' | 'title' | 'startDate' | 'endDate' | 'categoryMain'>
   >,
 ): void {
   if (typeof window === 'undefined' || !eventId) return
@@ -156,6 +157,7 @@ export function patchLocalCalendarEventInStorage(
     }
     if (patch.eventType != null) nextRow.eventType = patch.eventType
     if (patch.routineOverride != null) nextRow.routineOverride = patch.routineOverride
+    if (patch.categoryMain !== undefined) nextRow.categoryMain = patch.categoryMain
     if (patch.description !== undefined) {
       const trimmed = patch.description.trim()
       if (trimmed) nextRow.description = trimmed

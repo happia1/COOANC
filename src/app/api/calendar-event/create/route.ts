@@ -125,14 +125,23 @@ export async function POST(req: NextRequest) {
     .insert({ ...base, description })
     .select('id')
     .single()
-  if (insErr) {
-    const retry = await db.from('calendar_events').insert(legacyBase).select('id').single()
+  if (insErr && /description/i.test(insErr.message) && /column|schema cache|does not exist/i.test(insErr.message)) {
+    /** 설명 칼럼만 미적용이면 반복·분류 등 나머지 신규 필드는 그대로 보존합니다. */
+    const retry = await db.from('calendar_events').insert(base).select('id').single()
     if (!retry.error && retry.data) {
       console.warn('[calendar-event/create] description 칼럼 없음 — 126 마이그레이션 필요')
       return NextResponse.json({ id: retry.data.id }, { status: 201 })
     }
     insErr = retry.error
     inserted = retry.data
+  }
+
+  if (insErr && /category_main|category_sub|recur_type|recur_until/i.test(insErr.message)) {
+    console.error('[calendar-event/create] schedule columns missing', insErr.message)
+    return NextResponse.json(
+      { error: '일정 분류·반복 기능 DB 업데이트가 필요해요. 캘린더 마이그레이션을 확인해 주세요.' },
+      { status: 503 },
+    )
   }
 
   if (insErr || !inserted) {

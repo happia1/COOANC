@@ -101,7 +101,7 @@ type AgentPanelShell =
   | 'routine_manage'
 
 /** 빠른 입력 칩 → 에이전트 event_type 및 폼 기본값 */
-type KeywordPresetId = 'school' | 'travel' | 'vacation' | 'birthday' | 'etc'
+type KeywordPresetId = 'holiday' | 'travel' | 'event' | 'education' | 'health' | 'etc'
 
 type SuggestionUi = AgentParseSuggestion & { status: 'pending' | 'approved' | 'rejected' }
 
@@ -272,6 +272,7 @@ type ScheduleConfirmRegisterPayload = {
   agentTypeCode: string
   routineOffOn: boolean
   description: string
+  categoryMain?: string
 }
 
 /** 행 한 줄 — 누르면 연한 파란 배경으로 어떤 칸을 고치는 중인지 보여 줍니다 */
@@ -345,9 +346,8 @@ function UnifiedScheduleConfirmCard(props: {
     return e || s
   })
   const [agentCode, setAgentCode] = useState(() => normalizeAgentTypeForPicker(ev.type))
-  const [routineOffOn, setRoutineOffOn] = useState(
-    () => Boolean(ev.routine_off) || pending.some((s) => isRoutineOffSuggestion(s)),
-  )
+  /** 일정 등록 카드에서는 루틴을 별도로 바꾸지 않습니다. 날짜 상세의 두 가지 설정이 유일한 기준입니다. */
+  const routineOffOn = false
   const [descriptionDraft, setDescriptionDraft] = useState(() => ev.description ?? '')
   const [openPicker, setOpenPicker] = useState<null | 'start' | 'end' | 'type'>(null)
 
@@ -363,11 +363,6 @@ function UnifiedScheduleConfirmCard(props: {
     if (!autoEditTitleOnMount) setEditingTitle(false)
     setOpenPicker(null)
   }, [ev.title, ev.type, ev.start_date, ev.end_date, ev.description, ev.routine_off, autoEditTitleOnMount])
-
-  useEffect(() => {
-    const pend = suggestions.filter((s) => s.status === 'pending')
-    setRoutineOffOn(Boolean(ev.routine_off) || pend.some((s) => isRoutineOffSuggestion(s)))
-  }, [suggestions, ev.routine_off])
 
   const typeOptions = SCHEDULE_TYPE_PICKER_OPTIONS.map((o) => ({
     value: o.agentType,
@@ -493,35 +488,6 @@ function UnifiedScheduleConfirmCard(props: {
         />
       </RoutineAgentPickerPresence>
 
-      <div className="mt-1 rounded-xl bg-white/70 px-2 py-2 ring-1 ring-gray-100">
-        <p className="mb-1 text-[10px] font-black text-gray-500">루틴</p>
-        <div className="flex rounded-xl border border-gray-200 bg-gray-50 p-0.5">
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => setRoutineOffOn(false)}
-            className={`min-w-0 flex-1 rounded-lg py-1.5 text-[11px] font-black transition ${
-              !routineOffOn ? 'bg-sky-500 text-white shadow-sm' : 'text-gray-500'
-            }`}
-          >
-            유지
-          </button>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => setRoutineOffOn(true)}
-            className={`min-w-0 flex-1 rounded-lg py-1.5 text-[11px] font-black transition ${
-              routineOffOn ? 'bg-violet-500 text-white shadow-sm' : 'text-gray-500'
-            }`}
-          >
-            끄기
-          </button>
-        </div>
-        <p className="mt-1 text-[9px] font-medium text-gray-400">
-          {routineOffOn ? '그날은 미션·루틴을 쉬게 해요.' : '휴일 루틴 패턴을 유지해요.'}
-        </p>
-      </div>
-
       <div className="mt-2">
         <label className="mb-1 block text-[10px] font-bold text-gray-500" htmlFor={descFieldId}>
           설명
@@ -553,6 +519,7 @@ function UnifiedScheduleConfirmCard(props: {
               agentTypeCode: agentCode,
               routineOffOn,
               description: descriptionDraft.trim(),
+              categoryMain: ev.category_main,
             })
           }
           className="min-w-0 flex-1 rounded-xl bg-emerald-500 py-2.5 text-[11px] font-black text-white shadow-sm active:scale-[0.99] disabled:opacity-50"
@@ -615,10 +582,11 @@ function newId() {
 /** 키워드 칩에 보이는 한글 제목 */
 function keywordPresetLabel(id: KeywordPresetId): string {
   const map: Record<KeywordPresetId, string> = {
-    school: '행사',
+    holiday: '공휴일',
     travel: '여행',
-    vacation: '방학',
-    birthday: '기념일',
+    event: '행사',
+    education: '교육',
+    health: '건강',
     etc: '기타',
   }
   return map[id]
@@ -627,23 +595,20 @@ function keywordPresetLabel(id: KeywordPresetId): string {
 /** 로컬 캘린더 타입 — `localBuiltScheduleFromParentForm` 과 맞춥니다 */
 function keywordToCalendarType(id: KeywordPresetId): LocalCalendarEvent['eventType'] {
   switch (id) {
-    case 'school':
+    case 'event':
       return 'event'
+    case 'holiday':
+      return 'holiday'
     case 'travel':
       return 'travel'
-    case 'vacation':
-      return 'vacation'
-    case 'birthday':
-      return 'special'
+    case 'education':
+      return 'school'
+    case 'health':
+      return 'etc'
     case 'etc':
     default:
       return 'other'
   }
-}
-
-/** 여행·방학은 기본으로 루틴 끄기(휴식), 나머지는 유지 */
-function defaultRoutineOffForPreset(id: KeywordPresetId): boolean {
-  return id === 'travel' || id === 'vacation'
 }
 
 export default function RoutineAgentSchedulePanel({
@@ -869,7 +834,7 @@ export default function RoutineAgentSchedulePanel({
         start_date: today,
         end_date: today,
         calendarEventType: keywordToCalendarType(preset),
-        routine_off: defaultRoutineOffForPreset(preset),
+        routine_off: false,
         note: '',
       })
       if (!built) {
@@ -877,6 +842,7 @@ export default function RoutineAgentSchedulePanel({
         return
       }
       const res = buildAgentParseResponseFromLocal(built)
+      if (res.event) res.event = { ...res.event, category_main: keywordPresetLabel(preset) }
       const sug: SuggestionUi[] = (res.suggestions ?? []).map((s) => ({ ...s, status: 'pending' as const }))
       const parseMsgId = newId()
       quickChipParseMessageIdsRef.current.add(parseMsgId)
@@ -1452,6 +1418,12 @@ export default function RoutineAgentSchedulePanel({
         )
         return
       }
+      if (payload.categoryMain) {
+        await fetch('/api/calendar-event/update', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ eventId: dbEventId, title: payload.title, startDate: payload.startDate, endDate: payload.endDate, eventType: localEventType, routineOverride: routineOv, description: payload.description, categoryMain: payload.categoryMain, categorySub: '', recurType: 'none' }),
+        })
+      }
 
       const priorLocal = calendarRowIdIn?.trim() || null
       if (priorLocal && priorLocal !== dbEventId) {
@@ -1466,6 +1438,7 @@ export default function RoutineAgentSchedulePanel({
         eventType: localEventType,
         description: payload.description,
         routineOverride: routineOv,
+        categoryMain: payload.categoryMain,
       })
 
       const rowId = dbEventId
@@ -1552,6 +1525,12 @@ export default function RoutineAgentSchedulePanel({
         )
         return
       }
+      if (payload.categoryMain) {
+        await fetch('/api/calendar-event/update', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ eventId: dbEventIdMulti, title: payload.title, startDate: payload.startDate, endDate: payload.endDate, eventType: localEventType, routineOverride: routineOvMulti, description: payload.description, categoryMain: payload.categoryMain, categorySub: '', recurType: 'none' }),
+        })
+      }
 
       const priorLocalMulti = calendarRowIdIn?.trim() || null
       if (priorLocalMulti && priorLocalMulti !== dbEventIdMulti) {
@@ -1566,6 +1545,7 @@ export default function RoutineAgentSchedulePanel({
         eventType: localEventType,
         description: payload.description,
         routineOverride: routineOvMulti,
+        categoryMain: payload.categoryMain,
       })
 
       const rowId = dbEventIdMulti
@@ -1743,10 +1723,11 @@ export default function RoutineAgentSchedulePanel({
                 <div className="flex flex-wrap justify-center gap-2">
                   {(
                     [
-                      ['school', '행사'],
+                      ['holiday', '공휴일'],
                       ['travel', '여행'],
-                      ['vacation', '방학'],
-                      ['birthday', '기념일'],
+                      ['event', '행사'],
+                      ['education', '교육'],
+                      ['health', '건강'],
                       ['etc', '기타'],
                     ] as const
                   ).map(([id, label]) => (

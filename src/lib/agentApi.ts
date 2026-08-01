@@ -92,6 +92,8 @@ export type AgentParseEvent = {
   description?: string
   /** 이미지 1회 파싱 등에서만 올 수 있음 — 커밋 시 routine_off 제안 생성에 씁니다 */
   routine_off?: boolean
+  /** 부모 빠른 입력에서 선택한 fridge식 주 분류. 에이전트 응답에는 없을 수 있습니다. */
+  category_main?: string
 }
 
 /** 에이전트가 `type`/`schedules_api` 로 주는 경우를 프론트 `mode`/`schedules` 로 맞출 때 씁니다. */

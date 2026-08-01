@@ -57,7 +57,9 @@ export async function fetchDailyRoutineOverride(missionDb: SupabaseClient, child
   const { data, error } = await missionDb.from('daily_routine_overrides').select('routine_type').eq('child_id', childId).eq('routine_date', today).maybeSingle()
   if (error || !data) return null
   const type = String(data.routine_type)
-  return type === 'weekday' || type === 'weekend' || type === 'holiday' ? type : null
+  if (type === 'weekday') return 'weekday'
+  /** 예전 `holiday`(휴식) 저장값은 새 단순 모델에서 주말·휴일 루틴으로 안전하게 흡수합니다. */
+  return type === 'weekend' || type === 'holiday' ? 'weekend' : null
 }
 
 /** 일정은 제안값만 보관하고, 실제 아이 앱 루틴은 날짜별 선택값 하나로 결정한다. */

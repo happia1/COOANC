@@ -1,4 +1,8 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import {
+  SUPABASE_SERVER_FETCH_TIMEOUT_MS,
+  wrapFetchWithTimeout,
+} from '@/lib/supabase/fetchWithTimeout'
 
 /**
  * 서버 전용 env 문자열 정리 — 복사·붙여넣기로 생기는 흔한 오류를 줄입니다.
@@ -60,5 +64,8 @@ export function createServiceRoleClient(): SupabaseClient | null {
   if (!env) return null
   return createClient(env.url, env.key, {
     auth: { persistSession: false, autoRefreshToken: false },
+    global: {
+      fetch: wrapFetchWithTimeout(fetch, SUPABASE_SERVER_FETCH_TIMEOUT_MS),
+    },
   })
 }
