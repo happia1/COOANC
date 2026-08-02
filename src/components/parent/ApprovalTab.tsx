@@ -131,6 +131,8 @@ type Props = {
   contentChannels: ContentChannel[]
   /** 자녀별로 숨긴 콘텐츠 채널 id */
   hiddenChannelIdsByChild: Record<string, string[]>
+  /** 자녀별 콘텐츠 채널 표시 순서(channel_id -> order_rank) */
+  channelOrdersByChild: Record<string, Record<string, number>>
 }
 
 export default function ApprovalTab({
@@ -146,6 +148,7 @@ export default function ApprovalTab({
   contentCategories,
   contentChannels: initialContentChannels,
   hiddenChannelIdsByChild: initialHiddenChannels,
+  channelOrdersByChild: initialChannelOrders,
 }: Props) {
   /**
    * `useRef(createClient())`는 매 렌더마다 `createClient()`가 호출됩니다.
@@ -224,6 +227,16 @@ export default function ApprovalTab({
     }
     return m
   })
+  /** 자녀별 채널 순서 — 드래그로 바뀌면 즉시 반영하고 서버에도 저장합니다 */
+  const [channelOrdersByChild, setChannelOrdersByChild] = useState<Record<string, Record<string, number>>>(
+    () => {
+      const m: Record<string, Record<string, number>> = {}
+      for (const c of childrenProfiles) {
+        m[c.id] = { ...(initialChannelOrders[c.id] ?? {}) }
+      }
+      return m
+    },
+  )
 
   /** 메뉴 제어 — 선택한 자녀마다 다른 크레딧 덮어쓰기(서버와 맞추기 위해 초기 스냅샷 키로 동기화) */
   const creditOverridesInitialKey = useMemo(
@@ -531,6 +544,22 @@ export default function ApprovalTab({
     (next: Set<string>) => {
       if (!currentId) return
       setHiddenChannelsByChild((prev) => ({ ...prev, [currentId]: next }))
+    },
+    [currentId],
+  )
+
+  const channelOrdersForCurrent = useMemo(() => {
+    if (!currentId) return {}
+    return channelOrdersByChild[currentId] ?? {}
+  }, [channelOrdersByChild, currentId])
+
+  const onChannelOrderSavedForCurrent = useCallback(
+    (nextOrderMap: Record<string, number>) => {
+      if (!currentId) return
+      setChannelOrdersByChild((prev) => ({
+        ...prev,
+        [currentId]: { ...(prev[currentId] ?? {}), ...nextOrderMap },
+      }))
     },
     [currentId],
   )
@@ -1188,7 +1217,7 @@ export default function ApprovalTab({
           />
         </section>
 
-        <section aria-label="콘텐츠존 채널 관리">
+        <section aria-label="콘텐츠 관리">
           <ParentContentChannelControl
             childId={currentId}
             categories={contentCategories}
@@ -1200,6 +1229,8 @@ export default function ApprovalTab({
             onChannelDeleted={(channelId) =>
               setContentChannels((prev) => prev.filter((c) => c.id !== channelId))
             }
+            channelOrders={channelOrdersForCurrent}
+            onChannelOrderSaved={onChannelOrderSavedForCurrent}
           />
         </section>
 

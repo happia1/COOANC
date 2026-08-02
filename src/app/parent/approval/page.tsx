@@ -204,8 +204,11 @@ export default async function ApprovalPage() {
   let contentCategories: ContentCategory[] = []
   let contentChannels: ContentChannel[] = []
   const hiddenChannelIdsByChild: Record<string, string[]> = {}
+  /** 자녀별 채널 순서(channel_id -> order_rank) — 없으면 기본 정렬 */
+  const channelOrdersByChild: Record<string, Record<string, number>> = {}
   for (const cid of childIds) {
     hiddenChannelIdsByChild[cid] = []
+    channelOrdersByChild[cid] = {}
   }
   try {
     const [categoriesRes, channelsRes, hiddenChannelRes] = await Promise.all([
@@ -228,6 +231,26 @@ export default async function ApprovalPage() {
         hiddenChannelIdsByChild[row.child_id].push(row.channel_id)
       }
     }
+
+    /** 순서 테이블(133)은 아직 없을 수 있으므로 따로 감싸 조회합니다 */
+    if (childIds.length > 0) {
+      const orderRes = await supabase
+        .from('content_channel_orders')
+        .select('child_id, channel_id, order_rank')
+        .in('child_id', childIds)
+      if (!orderRes.error && orderRes.data) {
+        for (const row of orderRes.data as {
+          child_id: string
+          channel_id: string
+          order_rank: number
+        }[]) {
+          if (!channelOrdersByChild[row.child_id]) channelOrdersByChild[row.child_id] = {}
+          channelOrdersByChild[row.child_id][row.channel_id] = row.order_rank
+        }
+      } else if (orderRes.error) {
+        console.warn('[parent approval] content_channel_orders — run migration 133:', orderRes.error.message)
+      }
+    }
   } catch (err) {
     console.warn('[parent approval] content channel data — run migration 132:', err)
   }
@@ -246,6 +269,7 @@ export default async function ApprovalPage() {
       contentCategories={contentCategories}
       contentChannels={contentChannels}
       hiddenChannelIdsByChild={hiddenChannelIdsByChild}
+      channelOrdersByChild={channelOrdersByChild}
     />
   )
 }
