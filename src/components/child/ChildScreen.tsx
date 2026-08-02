@@ -852,13 +852,12 @@ export default function ChildScreen({
         return prev
       }
       /**
-       * `total_credits_earned` 은 미션 보상으로만 늘어나는 누적치라 절대 줄어들 수 없습니다.
-       * 6초 가드가 끝난 뒤에도 복제 지연 등으로 예전 스냅샷(next)이 들어오면 그대로 덮어써
-       * 방금 모은 크레딧이 화면에서 갑자기 줄어드는 롤백이 생겼습니다. 더 옛 값이면 무시합니다.
+       * 위 6초 가드를 지난 뒤에는 **항상 서버 값이 정답**입니다.
+       * (한때 `total_credits_earned` 이 더 낮은 스냅샷을 무시하도록 막아 뒀는데, 낙관적 업데이트가
+       *  이 누적치도 같이 올리기 때문에 서버 저장이 한 번이라도 어긋나면 화면이 영구히 높은 값에
+       *  갇혀 버렸습니다. 그 상태로 마켓에 가면 잔액은 넉넉해 보이는데 결제만 "코인 부족"으로
+       *  거절돼 원인을 알 수 없게 됩니다. 그래서 무조건 서버 값으로 되돌아오게 둡니다.)
        */
-      if (readChildStatInt(next.total_credits_earned) < readChildStatInt(prev.total_credits_earned)) {
-        return prev
-      }
       return next
     })
   }, [initialStats])
@@ -1391,25 +1390,10 @@ export default function ChildScreen({
             )
             return
           }
-          setStats((prev) => {
-            /**
-             * 가드 창이 끝난 뒤에도, 늦게 도착한 이벤트가 `total_credits_earned` 기준으로
-             * 이미 화면이 아는 것보다 옛 스냅샷이면(EQ 재계산 트리거 지연 등) 돈 관련 필드만
-             * 무시합니다. 이 값은 미션 보상으로만 늘어나는 누적치라 줄어들 수 없습니다.
-             */
-            if (
-              prev &&
-              readChildStatInt(row.total_credits_earned) < readChildStatInt(prev.total_credits_earned)
-            ) {
-              const { credits, credits_piggy, hearts, total_credits_earned, ...rest } = row
-              void credits
-              void credits_piggy
-              void hearts
-              void total_credits_earned
-              return normalizeChildStatsCreditsSplit(mergeChildStatsPatch(prev, rest))
-            }
-            return normalizeChildStatsCreditsSplit(mergeChildStatsPatch(prev, row))
-          })
+          /** 가드 창 밖에서는 서버 값이 정답 — 화면이 옛 낙관값에 갇히지 않게 그대로 반영합니다. */
+          setStats((prev) =>
+            normalizeChildStatsCreditsSplit(mergeChildStatsPatch(prev, row)),
+          )
         },
       )
       .subscribe()

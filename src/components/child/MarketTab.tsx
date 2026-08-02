@@ -749,12 +749,14 @@ export default function MarketTab({
       if (!res.ok) {
         const msg = json.error ?? '요청에 실패했어요'
         /**
-         * 서버가 실제 잔액을 함께 내려주면(크레딧 부족 등) 화면에 남아 있던 낙관적 잔액을
-         * 실제 값으로 되돌려, 이미 차감된 것처럼 보이는 확인 화면에서 같은 요청이
-         * 반복 실패하는 걸 막습니다.
+         * 서버가 실제 잔액을 함께 내려주면(크레딧 부족 등) 화면 잔액을 그 값으로 맞춥니다.
+         * 마켓 안 숫자뿐 아니라 상단 레벨 카드까지 같이 고쳐야, "레벨 카드엔 크레딧이 넉넉한데
+         * 결제만 코인 부족으로 거절"되는 어긋난 상태가 남지 않습니다.
          */
         if (typeof json.available === 'number') {
-          setCurrentCredits(readChildStatInt(json.available))
+          const serverCredits = readChildStatInt(json.available)
+          setCurrentCredits(serverCredits)
+          onMarketCreditsChanged?.(serverCredits)
         }
         showToast(msg, false)
         return { ok: false, error: msg }
