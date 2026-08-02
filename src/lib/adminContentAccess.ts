@@ -48,12 +48,24 @@ function sign(payload: string): string {
   return createHmac('sha256', adminPassword()).update(payload).digest('base64url')
 }
 
+/**
+ * 서버에 개발자 비밀번호가 설정돼 있는지.
+ * Vercel 은 환경변수를 추가·수정한 뒤 **다시 배포해야** 값이 반영되므로,
+ * "비밀번호가 틀림" 과 "아직 설정 안 됨" 을 구분해 안내하는 데 씁니다.
+ */
+export function isAdminPasswordConfigured(): boolean {
+  return adminPassword().length > 0
+}
+
 /** 비밀번호가 맞는지 확인 — 환경변수가 비어 있으면 항상 실패 */
 export function verifyAdminPassword(input: unknown): boolean {
   const expected = adminPassword()
   if (!expected) return false
-  if (typeof input !== 'string' || input.length === 0) return false
-  return safeEqual(input, expected)
+  if (typeof input !== 'string') return false
+  /** 모바일 키보드가 끝에 공백을 붙이는 경우가 있어 입력값도 다듬어 비교합니다 */
+  const given = input.trim()
+  if (given.length === 0) return false
+  return safeEqual(given, expected)
 }
 
 /** 만료 시각이 담긴 서명 토큰을 만듭니다(비밀번호 자체는 쿠키에 넣지 않음) */

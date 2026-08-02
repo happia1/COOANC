@@ -3,6 +3,7 @@ import {
   CONTENT_ADMIN_COOKIE,
   CONTENT_ADMIN_SESSION_MAX_AGE,
   createAdminSessionToken,
+  isAdminPasswordConfigured,
   verifyAdminPassword,
 } from '@/lib/adminContentAccess'
 
@@ -19,6 +20,22 @@ export async function POST(req: NextRequest) {
     password = body?.password
   } catch {
     return NextResponse.json({ error: '요청 형식이 올바르지 않아요' }, { status: 400 })
+  }
+
+  /**
+   * 서버에 값이 아예 없는 경우와 비밀번호가 틀린 경우를 구분해 안내합니다.
+   * (비밀번호 자체는 노출하지 않고, "설정 여부" 만 알려 줍니다. Vercel 은 환경변수를
+   *  추가한 뒤 재배포해야 반영되기 때문에 이 구분이 없으면 원인을 찾기 어렵습니다.)
+   */
+  if (!isAdminPasswordConfigured()) {
+    return NextResponse.json(
+      {
+        error:
+          '서버에 개발자 비밀번호가 아직 반영되지 않았어요. Vercel 에 CONTENT_ADMIN_PASSWORD 를 추가한 뒤 재배포(Redeploy) 해야 적용돼요.',
+        code: 'not_configured',
+      },
+      { status: 503 },
+    )
   }
 
   /** 무차별 대입을 조금이라도 늦추기 위한 최소 지연 */
