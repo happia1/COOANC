@@ -223,6 +223,16 @@ export default function MarketPurchaseConfirmDialog({
     return () => window.clearTimeout(t)
   }, [checkoutStep, slotDone])
 
+  /**
+   * 계산 연출 안전장치 — 어떤 이유로든 슬롯 애니메이션이 끝나지 않아도 6초 뒤에는 다음 단계로
+   * 넘겨 「확인 / 닫기」 버튼이 반드시 나타나게 합니다. (버튼 없는 화면에 갇히지 않도록)
+   */
+  useEffect(() => {
+    if (checkoutStep !== 'animating') return
+    const t = window.setTimeout(() => setCheckoutStep('calcDone'), 6000)
+    return () => window.clearTimeout(t)
+  }, [checkoutStep, payRunId])
+
   /** 「정말 구매」확인 — 여기서부터 슬롯·동전 애니메이션 */
   function startCheckoutAnimation() {
     setSubmitError(null)
@@ -258,7 +268,6 @@ export default function MarketPurchaseConfirmDialog({
   }
 
   const showDeco = checkoutStep === 'animating' || checkoutStep === 'calcDone'
-  const backdropClosable = checkoutStep === 'finalSure' || submitError !== null
   /** 계산대 장식이 붙는 박스 — 단계마다 본문 높이가 달라져도 이 값으로 맞춰 장식 위치 고정 */
   const decoPhaseMinBodyHeight = 'min-h-[172px] sm:min-h-[186px]'
 
@@ -268,8 +277,12 @@ export default function MarketPurchaseConfirmDialog({
       role="dialog"
       aria-modal="true"
       aria-labelledby="market-purchase-title"
+      /**
+       * 배경(어두운 부분)을 누르면 **어느 단계에서든** 닫힙니다.
+       * 예전에는 계산 연출 중에 버튼도 배경도 막혀 있어 빠져나갈 방법이 없었습니다.
+       * 결제는 「확인」을 누른 뒤에만 이뤄지므로 도중에 닫아도 크레딧은 차감되지 않습니다.
+       */
       onClick={(e) => {
-        if (!backdropClosable) return
         if (e.target === e.currentTarget) onClose()
       }}
     >
@@ -417,10 +430,11 @@ export default function MarketPurchaseConfirmDialog({
                   <button
                     type="button"
                     disabled={requestBusy}
+                    /** 오류가 뜬 뒤에는 재시도하지 않고 그대로 팝업을 닫습니다(같은 오류 반복 방지) */
                     onClick={() => (submitError ? onClose() : void handleAcknowledgeAndSubmit())}
                     className="w-full rounded-2xl bg-brand-blue py-3 text-sm font-black text-white shadow-md active:scale-[0.98] disabled:opacity-50"
                   >
-                    {requestBusy ? '보내는 중…' : '확인'}
+                    {requestBusy ? '보내는 중…' : submitError ? '닫기' : '확인'}
                   </button>
                 )}
               </div>

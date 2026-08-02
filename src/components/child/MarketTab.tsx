@@ -741,10 +741,13 @@ export default function MarketTab({
       } catch {
         parseFailed = true
       }
+      /**
+       * 아래 실패 경로들은 토스트를 띄우지 않습니다.
+       * 같은 문구가 구매 확인 팝업 안에도 표시되는데, 토스트가 팝업(z-210)보다 위(z-220)에
+       * 겹쳐 떠서 문구가 두 번 보이고 버튼까지 가렸기 때문입니다. 문구는 팝업 안에서만 보여 줍니다.
+       */
       if (parseFailed) {
-        const msg = '네트워크 오류가 발생했어요'
-        showToast(msg, false)
-        return { ok: false, error: msg }
+        return { ok: false, error: '네트워크 오류가 발생했어요' }
       }
       if (!res.ok) {
         const msg = json.error ?? '요청에 실패했어요'
@@ -758,7 +761,6 @@ export default function MarketTab({
           setCurrentCredits(serverCredits)
           onMarketCreditsChanged?.(serverCredits)
         }
-        showToast(msg, false)
         return { ok: false, error: msg }
       }
       const nextCredits =
@@ -774,9 +776,7 @@ export default function MarketTab({
       /** 축하 오버레이에서 안내하므로 별도 토스트는 띄우지 않음(문구 겹침 방지) */
       return { ok: true }
     } catch {
-      const msg = '네트워크 오류가 발생했어요'
-      showToast(msg, false)
-      return { ok: false, error: msg }
+      return { ok: false, error: '네트워크 오류가 발생했어요' }
     } finally {
       setLoading(null)
     }
