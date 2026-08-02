@@ -170,6 +170,8 @@ export default function MarketPurchaseConfirmDialog({
   /** React Strict Mode 에서 입장 애니메이션이 두 번 도는 것을 줄이기 위해 다음 프레임에만 클래스 부여 */
   const [decoAnimate, setDecoAnimate] = useState(false)
   const [requestBusy, setRequestBusy] = useState(false)
+  /** 결제 요청이 이미 나갔는지 — state 와 달리 즉시 반영돼 같은 프레임의 연타를 막습니다 */
+  const submitLockRef = useRef(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const checkoutSoundStopRef = useRef<(() => void) | null>(null)
   const prevItemIdRef = useRef(item.id)
@@ -247,7 +249,15 @@ export default function MarketPurchaseConfirmDialog({
   }
 
   async function handleAcknowledgeAndSubmit() {
-    if (requestBusy) return
+    /**
+     * 중복 결제 방지 — `requestBusy` 는 state 라서 값이 바뀌기까지 한 프레임이 걸립니다.
+     * 아이가 「확인」을 빠르게 두 번 누르면 두 호출 모두 `requestBusy === false` 를 보고
+     * 결제 요청이 2개 나갔습니다. 그러면 먼저 도착한 요청이 크레딧을 차감한 뒤, 두 번째
+     * 요청이 남은 잔액(예: 11)을 보고 "코인이 부족해요" 를 돌려줘 정상 결제가 실패한 것처럼
+     * 보였습니다. ref 는 즉시 반영되므로 같은 프레임의 두 번째 탭도 확실히 막힙니다.
+     */
+    if (submitLockRef.current || requestBusy) return
+    submitLockRef.current = true
     setSubmitError(null)
     setRequestBusy(true)
     try {
@@ -263,6 +273,7 @@ export default function MarketPurchaseConfirmDialog({
         setSubmitError(result.error ?? '구매 요청에 실패했어요. 잠시 후 다시 시도해 주세요.')
       }
     } finally {
+      submitLockRef.current = false
       setRequestBusy(false)
     }
   }

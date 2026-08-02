@@ -236,6 +236,24 @@ export async function POST(req: NextRequest) {
   }
   const nextCredits = deduct.credits
 
+  /**
+   * 차감 직후 같은 상품의 진행 중 요청이 이미 있는지 한 번 더 확인합니다.
+   * 맨 위 검사는 병렬 조회 시점의 값이라, 같은 상품 결제가 거의 동시에 두 번 들어오면
+   * 둘 다 통과해 크레딧이 두 번 빠질 수 있습니다. 여기서 걸리면 차감분을 돌려주고 멈춥니다.
+   */
+  const { data: dupPending } = await supabase
+    .from('purchase_requests')
+    .select('id')
+    .eq('child_id', childId)
+    .eq('item_id', itemId)
+    .eq('status', 'pending')
+    .limit(1)
+    .maybeSingle()
+  if (dupPending) {
+    await refundCreditsWithCas(supabase, childId, effectivePrice, nextCredits)
+    return NextResponse.json({ error: '이미 요청 중인 상품이에요' }, { status: 409 })
+  }
+
   // 차감이 끝난 뒤, 단일/3버킷 구분 없이 동일한 구매 요청(pending) 레코드를 남깁니다.
   const { data: request, error: insertErr } = await supabase
     .from('purchase_requests')

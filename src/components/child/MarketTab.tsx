@@ -379,6 +379,8 @@ export default function MarketTab({
   )
 
   const [loading, setLoading] = useState<string | null>(null)
+  /** 결제 요청 진행 중 여부 — state 와 달리 즉시 반영돼 연타로 인한 중복 결제를 막습니다 */
+  const purchaseInFlightRef = useRef(false)
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null)
   const [selected, setSelected] = useState<SelectedInfo | null>(null)
   /** API 성공 직후 팝업을 먼저 닫은 뒤 적용할 결제 결과(중간 렌더에서 단계가 되돌아가는 깜빡임 방지) */
@@ -717,6 +719,15 @@ export default function MarketTab({
   /** 구매 요청 API — 성공 시 다이얼로그가 바로 닫힘 */
   async function submitPurchaseRequest(quantity = 1): Promise<{ ok: boolean; error?: string }> {
     if (!selected) return { ok: false, error: '상품 정보를 찾을 수 없어요. 다시 시도해 주세요.' }
+    /**
+     * 결제 요청은 한 번에 하나만 — `loading` 은 state 라 반영이 한 프레임 늦어서,
+     * 연타 시 같은 상품 결제가 두 번 나갈 수 있습니다(먼저 도착한 요청이 차감한 뒤
+     * 두 번째가 "코인 부족"으로 실패). ref 로 즉시 잠급니다.
+     */
+    if (purchaseInFlightRef.current) {
+      return { ok: false, error: '결제를 처리하고 있어요. 잠시만 기다려 주세요.' }
+    }
+    purchaseInFlightRef.current = true
     const { item } = selected
     const purchaseQty = isQuantityPurchasableMarketItem(item.name, item.category)
       ? Math.min(99, Math.max(1, Math.floor(quantity)))
@@ -778,6 +789,7 @@ export default function MarketTab({
     } catch {
       return { ok: false, error: '네트워크 오류가 발생했어요' }
     } finally {
+      purchaseInFlightRef.current = false
       setLoading(null)
     }
   }
