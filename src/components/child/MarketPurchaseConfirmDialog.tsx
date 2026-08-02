@@ -225,6 +225,7 @@ export default function MarketPurchaseConfirmDialog({
 
   /** 「정말 구매」확인 — 여기서부터 슬롯·동전 애니메이션 */
   function startCheckoutAnimation() {
+    setSubmitError(null)
     checkoutSoundStopRef.current?.()
     checkoutSoundStopRef.current = playAudioWithTimedFadeOut(CHILD_AUDIO.marketCheckout, {
       playMs: 800,
@@ -245,6 +246,14 @@ export default function MarketPurchaseConfirmDialog({
         onSuccessDismiss()
       } else {
         setSubmitError(result.error ?? '구매 요청에 실패했어요. 잠시 후 다시 시도해 주세요.')
+        /**
+         * 실패 시 이미 차감된 것처럼 보이던 계산대 화면(calcDone)에 그대로 머물면
+         * `calcDone` 단계엔 취소·닫기 버튼이 없어(backdrop 도 닫히지 않음) 같은 요청이
+         * 계속 실패만 반복되는 채로 팝업을 빠져나갈 수 없었습니다.
+         * finalSure 로 되돌려 취소 버튼과 최신 잔액(부모가 갱신한 balanceBefore)을 다시 보여줍니다.
+         */
+        setCheckoutStep('finalSure')
+        setPayRunId(0)
       }
     } finally {
       setRequestBusy(false)

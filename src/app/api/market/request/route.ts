@@ -112,7 +112,11 @@ export async function POST(req: NextRequest) {
 
   if (available < effectivePrice) {
     return NextResponse.json(
-      { error: '코인이 부족해요. 미션을 더 완료해서 코인을 모아보세요!' },
+      {
+        error: '코인이 부족해요. 미션을 더 완료해서 코인을 모아보세요!',
+        code: 'insufficient_credits',
+        available,
+      },
       { status: 400 },
     )
   }

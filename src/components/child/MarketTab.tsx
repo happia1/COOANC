@@ -734,7 +734,7 @@ export default function MarketTab({
         }),
       })
       const text = await res.text()
-      let json: { error?: string; credits?: number; request?: PurchaseRequest } = {}
+      let json: { error?: string; credits?: number; available?: number; request?: PurchaseRequest } = {}
       let parseFailed = false
       try {
         json = text ? JSON.parse(text) : {}
@@ -748,6 +748,14 @@ export default function MarketTab({
       }
       if (!res.ok) {
         const msg = json.error ?? '요청에 실패했어요'
+        /**
+         * 서버가 실제 잔액을 함께 내려주면(크레딧 부족 등) 화면에 남아 있던 낙관적 잔액을
+         * 실제 값으로 되돌려, 이미 차감된 것처럼 보이는 확인 화면에서 같은 요청이
+         * 반복 실패하는 걸 막습니다.
+         */
+        if (typeof json.available === 'number') {
+          setCurrentCredits(readChildStatInt(json.available))
+        }
         showToast(msg, false)
         return { ok: false, error: msg }
       }
