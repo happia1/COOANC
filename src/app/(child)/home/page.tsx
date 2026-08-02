@@ -385,6 +385,7 @@ export default async function ChildHomePage() {
       initialUnlockedItemIndexes={unlockedItemIndexes}
       exitHref={exitHref}
       contentChannels={contentZone.channels}
+      contentCategories={contentZone.categories}
       initialChestTicketQuantity={contentZone.chestTicketQuantity}
       initialActiveContentSession={contentZone.activeSession}
     />

@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
   CHILD_CONTENT_MENU_ITEMS,
@@ -12,7 +12,7 @@ import ContentChannelThumbnail from '@/components/child/ContentChannelThumbnail'
 import { ContentVideoWatchBalanceRow } from '@/components/child/ContentTicketBalanceDisplay'
 import ContentWatchTimer from '@/components/child/ContentWatchTimer'
 import ContentYouTubePlayer from '@/components/child/ContentYouTubePlayer'
-import type { ContentChannel, ContentSession } from '@/types/database'
+import type { ContentCategory, ContentChannel, ContentSession } from '@/types/database'
 import { useContentPlaybackTimer } from '@/hooks/useContentPlaybackTimer'
 import {
   formatWatchTimeClock,
@@ -29,6 +29,8 @@ type Props = {
   onClose: () => void
   childId: string
   channels: ContentChannel[]
+  /** 채널을 묶는 교육 카테고리 — 카테고리 선택 → 채널 선택 순으로 탐색 */
+  categories: ContentCategory[]
   /** 자녀 현재 레벨 — 미니게임 메뉴 레벨 게이트(10)에 사용 */
   level: number
   /** 영상 시청·인형뽑기 미니게임 공용 「보물상자 티켓」 수량 */
@@ -45,8 +47,11 @@ type Props = {
   onClawStatsSynced: (patch: Record<string, unknown>) => void
 }
 
-/** menu · browse · pickVideo(영상 선택) · watching · timeup · clawMachine(인형뽑기) */
-type Phase = 'menu' | 'browse' | 'pickVideo' | 'watching' | 'timeup' | 'clawMachine'
+/**
+ * menu · browse(카테고리 선택) · browseChannels(카테고리 안 채널 선택) ·
+ * pickVideo(영상 선택) · watching · timeup · clawMachine(인형뽑기)
+ */
+type Phase = 'menu' | 'browse' | 'browseChannels' | 'pickVideo' | 'watching' | 'timeup' | 'clawMachine'
 
 type ClawPrize =
   | { type: 'hearts'; amount: number }
@@ -108,6 +113,7 @@ export default function ChildContentZonePopup({
   onClose,
   childId,
   channels,
+  categories,
   level,
   initialChestTicketQuantity,
   initialActiveSession,
@@ -122,6 +128,8 @@ export default function ChildContentZonePopup({
   const [phase, setPhase] = useState<Phase>('menu')
   /** 잠긴 메뉴(레벨 미달)를 눌렀을 때 잠깐 보여줄 안내 문구 */
   const [lockHint, setLockHint] = useState<string | null>(null)
+  /** browse(카테고리 목록)에서 고른 카테고리 — browseChannels 에서 그 안의 채널만 보여줌 */
+  const [selectedCategoryKey, setSelectedCategoryKey] = useState<string | null>(null)
   const [selectedChannel, setSelectedChannel] = useState<ContentChannel | null>(null)
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [remainingPlaySeconds, setRemainingPlaySeconds] = useState(0)
@@ -152,6 +160,31 @@ export default function ChildContentZonePopup({
     watchSecondsPool,
     sessionId ? remainingPlaySeconds : 0,
   )
+
+  /** 카테고리 key → 그 안의 채널 목록(채널이 1개도 없는 카테고리는 목록에서 제외) */
+  const categoriesWithChannels = useMemo(() => {
+    const byKey = new Map<string, ContentChannel[]>()
+    for (const ch of channels) {
+      const key = ch.category_key || 'etc'
+      const list = byKey.get(key)
+      if (list) list.push(ch)
+      else byKey.set(key, [ch])
+    }
+    const ordered = categories
+      .filter((cat) => byKey.has(cat.key))
+      .map((cat) => ({ category: cat, channels: byKey.get(cat.key) ?? [] }))
+    // 카테고리 테이블에 없는 category_key(데이터 정합성 예외)도 놓치지 않게 뒤에 붙임
+    for (const [key, list] of byKey) {
+      if (ordered.some((g) => g.category.key === key)) continue
+      ordered.push({ category: { id: key, key, label: key, order_index: 999 }, channels: list })
+    }
+    return ordered
+  }, [channels, categories])
+
+  const channelsInSelectedCategory = useMemo(() => {
+    if (!selectedCategoryKey) return []
+    return categoriesWithChannels.find((g) => g.category.key === selectedCategoryKey)?.channels ?? []
+  }, [categoriesWithChannels, selectedCategoryKey])
 
   const saveSessionProgress = useCallback(
     async (secondsLeft: number) => {
@@ -203,12 +236,12 @@ export default function ChildContentZonePopup({
   const remainingSecRef = useRef(remainingSec)
   remainingSecRef.current = remainingSec
 
-  /** 영상 리스트에서 뒤로 — 남은 시간 저장 후 채널 목록으로 */
+  /** 영상 리스트에서 뒤로 — 남은 시간 저장 후 (카테고리 안) 채널 목록으로 */
   const handleBackToBrowse = useCallback(() => {
     setActiveVideoId(null)
     setIsVideoPlaying(false)
     void saveSessionProgress(remainingSecRef.current)
-    setPhase('browse')
+    setPhase('browseChannels')
   }, [saveSessionProgress])
 
   const loadPlaylistVideos = useCallback(async (sourceUrl: string): Promise<YouTubeListVideo[]> => {
@@ -240,11 +273,18 @@ export default function ChildContentZonePopup({
 
   const resetToMenu = useCallback(() => {
     setPhase('menu')
+    setSelectedCategoryKey(null)
     setSelectedChannel(null)
     setActiveVideoId(null)
     setIsVideoPlaying(false)
     setPlaylistVideos([])
     setTimerInitialRemaining(null)
+  }, [])
+
+  /** 채널 목록(browseChannels)에서 카테고리 목록으로 — 세션은 유지, 선택만 초기화 */
+  const backToCategoryList = useCallback(() => {
+    setSelectedCategoryKey(null)
+    setPhase('browse')
   }, [])
 
   /** 팝업이 처음 열릴 때만 화면·세션 초기화 (이용권 props 변경 시 browse 롤백 방지) */
@@ -332,7 +372,7 @@ export default function ChildContentZonePopup({
         if (active?.id && typeof active.remainingPlaySeconds === 'number' && active.remainingPlaySeconds > 0) {
           setSessionId(active.id)
           setRemainingPlaySeconds(active.remainingPlaySeconds)
-          if (phase === 'menu' || phase === 'browse') {
+          if (phase === 'menu' || phase === 'browse' || phase === 'browseChannels') {
             setTimerInitialRemaining(active.remainingPlaySeconds)
           }
         }
@@ -475,6 +515,11 @@ export default function ChildContentZonePopup({
     setClawReveal(null)
   }
 
+  function handleCategoryClick(categoryKey: string) {
+    setSelectedCategoryKey(categoryKey)
+    setPhase('browseChannels')
+  }
+
   function handleChannelClick(channel: ContentChannel) {
     setSelectedChannel(channel)
     if (busy) return
@@ -500,7 +545,7 @@ export default function ChildContentZonePopup({
       }
       if (!res.ok) {
         window.alert(json.error ?? '시청을 시작할 수 없어요')
-        setPhase('browse')
+        setPhase('browseChannels')
         return
       }
       if (typeof json.remainingQuantity === 'number') {
@@ -552,14 +597,14 @@ export default function ChildContentZonePopup({
 
   function handleCloseOverlay() {
     if (phase === 'watching' || phase === 'pickVideo' || phase === 'clawMachine') return
-    if (phase === 'browse' && sessionId && remainingSecRef.current > 0) {
+    if ((phase === 'browse' || phase === 'browseChannels') && sessionId && remainingSecRef.current > 0) {
       void saveSessionProgress(remainingSecRef.current).finally(() => onClose())
       return
     }
     onClose()
   }
 
-  const showModal = phase === 'menu' || phase === 'browse'
+  const showModal = phase === 'menu' || phase === 'browse' || phase === 'browseChannels'
 
   if (!open || !portalReady) return null
 
@@ -584,7 +629,7 @@ export default function ChildContentZonePopup({
       {showModal ? (
         <div
           className={`relative z-[1] mx-auto flex h-auto w-full flex-col overflow-hidden rounded-3xl bg-white shadow-2xl ${
-            phase === 'browse'
+            phase === 'browse' || phase === 'browseChannels'
               ? 'max-h-[min(90dvh,calc(100vh-1.5rem))] max-w-md'
               : 'max-h-[min(85dvh,calc(100vh-2rem))] max-w-xs'
           }`}
@@ -618,6 +663,40 @@ export default function ChildContentZonePopup({
                     ← 메뉴
                   </button>
                   <h3 className="flex-1 text-center text-base font-black text-gray-800">영상 보기</h3>
+                  <button
+                    type="button"
+                    onClick={handleCloseFromBrowse}
+                    className="shrink-0 rounded-lg bg-gray-100 px-2.5 py-1 text-[12px] font-bold text-gray-600"
+                    aria-label="닫기"
+                  >
+                    ✕
+                  </button>
+                </div>
+                <div className="mt-2 flex justify-center">
+                  <ContentVideoWatchBalanceRow
+                    ticketQuantity={chestTicketQty}
+                    watchTimeLabel={formatWatchTimeClock(displayWatchSeconds)}
+                  />
+                </div>
+                <p className="mt-1 text-center text-[11px] font-bold text-gray-400">
+                  시청권 1장 = 30분 · 보고 싶은 종류를 먼저 골라 주세요
+                </p>
+              </>
+            ) : phase === 'browseChannels' ? (
+              <>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={backToCategoryList}
+                    className="shrink-0 rounded-lg bg-gray-100 px-2.5 py-1 text-[12px] font-bold text-gray-600"
+                    aria-label="카테고리로 돌아가기"
+                  >
+                    ← 종류
+                  </button>
+                  <h3 className="flex-1 truncate text-center text-base font-black text-gray-800">
+                    {categoriesWithChannels.find((g) => g.category.key === selectedCategoryKey)?.category
+                      .label ?? '영상 보기'}
+                  </h3>
                   <button
                     type="button"
                     onClick={handleCloseFromBrowse}
@@ -704,14 +783,47 @@ export default function ChildContentZonePopup({
             </div>
           ) : null}
 
-          {/* ── 영상 채널 목록 (3열 그리드 · 세로 스크롤) ── */}
+          {/* ── 카테고리 목록 (2열 그리드 · 세로 스크롤) ── */}
           {phase === 'browse' ? (
             <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-y-contain px-3 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-              {channels.length === 0 ? (
+              {categoriesWithChannels.length === 0 ? (
+                <p className="py-8 text-center text-sm font-bold text-gray-400">준비된 영상이 없어요</p>
+              ) : (
+                <div className="grid grid-cols-2 gap-2 pb-1">
+                  {categoriesWithChannels.map(({ category, channels: chsInCategory }) => (
+                    <button
+                      key={category.key}
+                      type="button"
+                      onClick={() => handleCategoryClick(category.key)}
+                      className="overflow-hidden rounded-xl border border-gray-100 bg-white text-left shadow-sm transition active:scale-[0.98]"
+                    >
+                      <ContentChannelThumbnail
+                        playlistUrl={chsInCategory[0].playlist_url}
+                        storedThumbnailUrl={chsInCategory[0].thumbnail_url}
+                      />
+                      <div className="px-2 py-1.5">
+                        <p className="line-clamp-1 text-[11px] font-black leading-snug text-gray-900">
+                          {category.label}
+                        </p>
+                        <p className="mt-0.5 truncate text-[9px] font-bold text-gray-400">
+                          채널 {chsInCategory.length}개
+                        </p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : null}
+
+          {/* ── 카테고리 안 채널 목록 (3열 그리드 · 세로 스크롤) ── */}
+          {phase === 'browseChannels' ? (
+            <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-y-contain px-3 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+              {channelsInSelectedCategory.length === 0 ? (
                 <p className="py-8 text-center text-sm font-bold text-gray-400">준비된 영상이 없어요</p>
               ) : (
                 <div className="grid grid-cols-3 gap-2 pb-1">
-                  {channels.map((ch) => (
+                  {channelsInSelectedCategory.map((ch) => (
                     <button
                       key={ch.id}
                       type="button"
@@ -724,7 +836,11 @@ export default function ChildContentZonePopup({
                       />
                       <div className="px-1.5 py-1.5">
                         <p className="line-clamp-2 text-[10px] font-black leading-snug text-gray-900">{ch.title}</p>
-                        <p className="mt-0.5 truncate text-[9px] font-bold text-gray-400">{ch.category}</p>
+                        {ch.description ? (
+                          <p className="mt-0.5 line-clamp-2 text-[9px] font-bold leading-snug text-gray-400">
+                            {ch.description}
+                          </p>
+                        ) : null}
                       </div>
                     </button>
                   ))}

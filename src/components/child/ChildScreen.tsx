@@ -84,6 +84,7 @@ import type {
   PraiseStickerGrant,
   PraiseStickerPlacement,
   ContentChannel,
+  ContentCategory,
   ContentSession,
 } from '@/types/database'
 import { createClient } from '@/lib/supabase/client'
@@ -459,6 +460,8 @@ type Props = {
 
   /** 콘텐츠존 채널 목록 */
   contentChannels: ContentChannel[]
+  /** 콘텐츠존 카테고리(자기조절력·파닉스 등) — 카테고리별 탐색에 사용 */
+  contentCategories: ContentCategory[]
   /** 보유 보물상자 티켓 수 (영상 시청·인형뽑기 미니게임 공용) */
   initialChestTicketQuantity: number
   /** 진행 중 시청 세션 (있으면 복구) */
@@ -607,6 +610,7 @@ export default function ChildScreen({
   initialUnlockedItemIndexes,
   exitHref,
   contentChannels,
+  contentCategories,
   initialChestTicketQuantity,
   initialActiveContentSession,
 }: Props) {
@@ -3043,6 +3047,7 @@ export default function ChildScreen({
         onClose={() => setContentZoneOpen(false)}
         childId={childId}
         channels={contentChannels}
+        categories={contentCategories}
         level={stats?.current_level ?? 0}
         initialChestTicketQuantity={chestTicketQty}
         initialActiveSession={initialActiveContentSession}

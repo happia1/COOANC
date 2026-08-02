@@ -19,8 +19,9 @@ import ParentApprovalGuideCard from '@/components/parent/ParentApprovalGuideCard
 import { useParentStore } from '@/store/parentStore'
 import { useChildSiblingAvatarNav, type ChildTab } from '@/components/parent/ChildProfileNav'
 import ParentMarketMenuControl from '@/components/parent/ParentMarketMenuControl'
+import ParentContentChannelControl from '@/components/parent/ParentContentChannelControl'
 import PraiseStickerPanel from '@/components/parent/PraiseStickerPanel'
-import type { PurchaseRequest, StoreItem } from '@/types/database'
+import type { ContentCategory, ContentChannel, PurchaseRequest, StoreItem } from '@/types/database'
 import { createClient } from '@/lib/supabase/client'
 import MarketItemImage from '@/components/common/MarketItemImage'
 import { marketFrameKeyForItemId } from '@/lib/marketItemFrame'
@@ -124,6 +125,12 @@ type Props = {
   initialCreditOverridesByChild: Record<string, Record<string, number>>
   /** 자녀별 마켓 상품 표시 순서(없으면 기본 정렬 사용) */
   initialItemOrdersByChild: Record<string, Record<string, number>>
+  /** 콘텐츠존 카테고리(운영자 관리, 전 가족 공통) */
+  contentCategories: ContentCategory[]
+  /** 부모에게 보이는 콘텐츠 채널(기본 + 가족 전용) */
+  contentChannels: ContentChannel[]
+  /** 자녀별로 숨긴 콘텐츠 채널 id */
+  hiddenChannelIdsByChild: Record<string, string[]>
 }
 
 export default function ApprovalTab({
@@ -136,6 +143,9 @@ export default function ApprovalTab({
   hiddenItemIdsByChild: initialHidden,
   initialCreditOverridesByChild,
   initialItemOrdersByChild,
+  contentCategories,
+  contentChannels: initialContentChannels,
+  hiddenChannelIdsByChild: initialHiddenChannels,
 }: Props) {
   /**
    * `useRef(createClient())`는 매 렌더마다 `createClient()`가 호출됩니다.
@@ -201,6 +211,16 @@ export default function ApprovalTab({
     for (const c of childrenProfiles) {
       const ids = initialHidden[c.id] ?? []
       m[c.id] = new Set<string>(ids)
+    }
+    return m
+  })
+
+  /** 콘텐츠존 채널 관리 — 목록(가족 전용 추가/삭제 반영) + 자녀별 숨김 */
+  const [contentChannels, setContentChannels] = useState<ContentChannel[]>(initialContentChannels)
+  const [hiddenChannelsByChild, setHiddenChannelsByChild] = useState<Record<string, Set<string>>>(() => {
+    const m: Record<string, Set<string>> = {}
+    for (const c of childrenProfiles) {
+      m[c.id] = new Set<string>(initialHiddenChannels[c.id] ?? [])
     }
     return m
   })
@@ -498,6 +518,19 @@ export default function ApprovalTab({
     (next: Set<string>) => {
       if (!currentId) return
       setHiddenByChild((prev) => ({ ...prev, [currentId]: next }))
+    },
+    [currentId],
+  )
+
+  const hiddenChannelSetForCurrent = useMemo((): Set<string> => {
+    if (!currentId) return new Set()
+    return hiddenChannelsByChild[currentId] ?? new Set()
+  }, [hiddenChannelsByChild, currentId])
+
+  const onHiddenChannelChangeForCurrent = useCallback(
+    (next: Set<string>) => {
+      if (!currentId) return
+      setHiddenChannelsByChild((prev) => ({ ...prev, [currentId]: next }))
     },
     [currentId],
   )
@@ -1152,6 +1185,21 @@ export default function ApprovalTab({
             onItemUpdated={onItemUpdated}
             onItemDeleted={onItemDeleted}
             childLevel={childLevel}
+          />
+        </section>
+
+        <section aria-label="콘텐츠존 채널 관리">
+          <ParentContentChannelControl
+            childId={currentId}
+            categories={contentCategories}
+            channels={contentChannels}
+            hiddenChannelIds={hiddenChannelSetForCurrent}
+            familyLinkIdForChild={currentId ? linkByChild[currentId] ?? null : null}
+            onHiddenChange={onHiddenChannelChangeForCurrent}
+            onChannelCreated={(channel) => setContentChannels((prev) => [...prev, channel])}
+            onChannelDeleted={(channelId) =>
+              setContentChannels((prev) => prev.filter((c) => c.id !== channelId))
+            }
           />
         </section>
 

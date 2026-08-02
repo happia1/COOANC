@@ -381,7 +381,23 @@ export type ContentChannel = {
   title: string
   thumbnail_url: string | null
   playlist_url: string
+  /** 예전 자유 텍스트 카테고리명(마이그레이션 096) — 표시엔 category_key 를 우선 사용 */
   category: string
+  /** `content_categories.key` — 카테고리별 탐색에 사용 */
+  category_key: string
+  /** 채널 소개 문구(부모·자녀에게 보여줄 짧은 설명) */
+  description: string | null
+  /** null 이면 운영자가 기획한 기본(전 가족 공통) 채널, 값이 있으면 그 가족이 추가한 전용 채널 */
+  family_link_id: string | null
+  order_index: number
+  created_at?: string
+}
+
+/** 콘텐츠존 채널을 묶는 교육 카테고리(운영자 관리, 전 가족 공통) */
+export type ContentCategory = {
+  id: string
+  key: string
+  label: string
   order_index: number
   created_at?: string
 }

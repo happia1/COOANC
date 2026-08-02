@@ -16,7 +16,7 @@ import {
   profileInstitutionLabel,
   resolveProfileAgeGroup,
 } from '@/lib/childProfileDisplay'
-import type { StoreItem } from '@/types/database'
+import type { ContentCategory, ContentChannel, StoreItem } from '@/types/database'
 
 export default async function ApprovalPage() {
   const auth = await getCachedParentAuth()
@@ -197,6 +197,41 @@ export default async function ApprovalPage() {
     console.warn('[parent approval] purchase_requests history:', historyRes.error.message)
   }
 
+  /**
+   * 콘텐츠존 채널 관리(카테고리·기본 채널·가족 전용 채널·자녀별 숨김) 데이터.
+   * 마이그레이션 132 미적용 환경에서도 승인 탭 전체가 깨지지 않도록 별도로 감싸 조회합니다.
+   */
+  let contentCategories: ContentCategory[] = []
+  let contentChannels: ContentChannel[] = []
+  const hiddenChannelIdsByChild: Record<string, string[]> = {}
+  for (const cid of childIds) {
+    hiddenChannelIdsByChild[cid] = []
+  }
+  try {
+    const [categoriesRes, channelsRes, hiddenChannelRes] = await Promise.all([
+      supabase.from('content_categories').select('*').order('order_index', { ascending: true }),
+      linkIds.length === 0
+        ? supabase.from('content_channels').select('*').is('family_link_id', null)
+        : supabase
+            .from('content_channels')
+            .select('*')
+            .or(`family_link_id.is.null,family_link_id.in.(${linkIds.join(',')})`),
+      childIds.length > 0
+        ? supabase.from('content_channel_hidden').select('child_id, channel_id').in('child_id', childIds)
+        : Promise.resolve({ data: [], error: null }),
+    ])
+    if (!categoriesRes.error) contentCategories = (categoriesRes.data ?? []) as ContentCategory[]
+    if (!channelsRes.error) contentChannels = (channelsRes.data ?? []) as ContentChannel[]
+    if (!hiddenChannelRes.error && hiddenChannelRes.data) {
+      for (const row of hiddenChannelRes.data as { child_id: string; channel_id: string }[]) {
+        if (!hiddenChannelIdsByChild[row.child_id]) hiddenChannelIdsByChild[row.child_id] = []
+        hiddenChannelIdsByChild[row.child_id].push(row.channel_id)
+      }
+    }
+  } catch (err) {
+    console.warn('[parent approval] content channel data — run migration 132:', err)
+  }
+
   return (
     <ApprovalTab
       childrenProfiles={childrenProfiles}
@@ -208,6 +243,9 @@ export default async function ApprovalPage() {
       hiddenItemIdsByChild={hiddenItemIdsByChild}
       initialCreditOverridesByChild={initialCreditOverridesByChild}
       initialItemOrdersByChild={initialItemOrdersByChild}
+      contentCategories={contentCategories}
+      contentChannels={contentChannels}
+      hiddenChannelIdsByChild={hiddenChannelIdsByChild}
     />
   )
 }

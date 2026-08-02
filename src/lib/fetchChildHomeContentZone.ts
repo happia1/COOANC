@@ -1,8 +1,10 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { ContentChannel, ContentSession } from '@/types/database'
+import type { ContentCategory, ContentChannel, ContentSession } from '@/types/database'
 
 export type ChildHomeContentZoneData = {
   channels: ContentChannel[]
+  /** 카테고리별 탐색용 — order_index 순 */
+  categories: ContentCategory[]
   /** 영상 시청·인형뽑기 미니게임 공용 「보물상자 티켓」 수량 */
   chestTicketQuantity: number
   activeSession: ContentSession | null
@@ -10,6 +12,7 @@ export type ChildHomeContentZoneData = {
 
 export const EMPTY_CHILD_HOME_CONTENT_ZONE: ChildHomeContentZoneData = {
   channels: [],
+  categories: [],
   chestTicketQuantity: 0,
   activeSession: null,
 }
@@ -33,8 +36,9 @@ export async function fetchChildHomeContentZoneData(
   childId: string,
 ): Promise<ChildHomeContentZoneData> {
   try {
-    const [channelsRes, ticketRes, sessionRes] = await Promise.all([
+    const [channelsRes, categoriesRes, ticketRes, sessionRes, familyLinksRes, hiddenRes] = await Promise.all([
       supabase.from('content_channels').select('*').order('order_index', { ascending: true }),
+      supabase.from('content_categories').select('*').order('order_index', { ascending: true }),
       supabase
         .from('content_tickets')
         .select('quantity, watch_seconds_remaining')
@@ -48,6 +52,8 @@ export async function fetchChildHomeContentZoneData(
         .order('started_at', { ascending: false })
         .limit(1)
         .maybeSingle(),
+      supabase.from('family_links').select('id').eq('child_id', childId),
+      supabase.from('content_channel_hidden').select('channel_id').eq('child_id', childId),
     ])
 
     const zoneErr =
@@ -60,11 +66,30 @@ export async function fetchChildHomeContentZoneData(
     if (channelsRes.error) {
       console.warn('[child/home] content_channels', channelsRes.error.message)
     }
+    if (categoriesRes.error) {
+      console.warn('[child/home] content_categories', categoriesRes.error.message)
+    }
     if (sessionRes.error) {
       console.warn('[child/home] content_sessions', sessionRes.error.message)
     }
 
-    const channels = (channelsRes.data ?? []) as ContentChannel[]
+    /** 이 자녀의 가족 연결 id(보통 1개) — 가족 전용 채널 필터링에 사용 */
+    const familyLinkIds = new Set(
+      ((familyLinksRes.data ?? []) as { id: string }[]).map((r) => r.id),
+    )
+    const hiddenChannelIds = new Set(
+      ((hiddenRes.data ?? []) as { channel_id: string }[]).map((r) => r.channel_id),
+    )
+
+    const allChannels = (channelsRes.data ?? []) as ContentChannel[]
+    /** 기본(전 가족 공통) 채널 + 이 가족이 추가한 전용 채널만, 부모가 숨긴 채널은 제외 */
+    const channels = allChannels.filter((ch) => {
+      if (hiddenChannelIds.has(ch.id)) return false
+      if (ch.family_link_id == null) return true
+      return familyLinkIds.has(ch.family_link_id)
+    })
+
+    const categories = (categoriesRes.data ?? []) as ContentCategory[]
 
     const qty = readInt(ticketRes.data?.quantity)
 
@@ -86,6 +111,7 @@ export async function fetchChildHomeContentZoneData(
 
     return {
       channels,
+      categories,
       chestTicketQuantity: qty,
       activeSession,
     }
