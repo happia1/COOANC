@@ -37,6 +37,35 @@ export default function LoginPage() {
     background: 'parent',
   })
 
+  /** 맨 아래 「개발자 로그인」 — 비밀번호만으로 콘텐츠 관리 화면에 들어갑니다 */
+  const [devLoginOpen, setDevLoginOpen] = useState(false)
+  const [devPassword, setDevPassword] = useState('')
+  const [devError, setDevError] = useState<string | null>(null)
+  const [devLoading, setDevLoading] = useState(false)
+
+  async function submitDevLogin() {
+    if (devLoading || !devPassword) return
+    setDevLoading(true)
+    setDevError(null)
+    try {
+      const res = await fetch('/api/admin/dev-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: devPassword }),
+      })
+      const json = (await res.json().catch(() => ({}))) as { error?: string }
+      if (!res.ok) {
+        setDevError(json.error ?? '들어갈 수 없어요')
+        return
+      }
+      window.location.href = '/admin/content'
+    } catch {
+      setDevError('네트워크 오류가 발생했어요')
+    } finally {
+      setDevLoading(false)
+    }
+  }
+
   useEffect(() => {
     setAutoLoginEnabled(readAutoLoginEnabled())
     setAutoLoginPrefsReady(true)
@@ -277,6 +306,60 @@ export default function LoginPage() {
             회원가입
           </Link>
         </p>
+
+        {/*
+          운영자(개발자) 진입 — 일반 사용자 눈에 잘 띄지 않도록 맨 아래 흐린 작은 글씨로 둡니다.
+          별도 계정을 만들지 않고 비밀번호만으로 콘텐츠 관리 화면에 들어갑니다.
+        */}
+        <div className="pt-2 text-center">
+          {devLoginOpen ? (
+            <div className="mx-auto flex max-w-[15rem] flex-col gap-1.5">
+              <input
+                type="password"
+                value={devPassword}
+                onChange={(e) => setDevPassword(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    void submitDevLogin()
+                  }
+                }}
+                placeholder="개발자 비밀번호"
+                className="rounded-lg border border-gray-200 px-3 py-2 text-center text-xs text-brand-text placeholder:text-gray-300 focus:outline-none focus:ring-2 focus:ring-brand-blue/30"
+              />
+              {devError ? <p className="text-[11px] text-red-500">{devError}</p> : null}
+              <div className="flex gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDevLoginOpen(false)
+                    setDevPassword('')
+                    setDevError(null)
+                  }}
+                  className="flex-1 rounded-lg bg-gray-100 py-2 text-[11px] font-bold text-gray-500"
+                >
+                  취소
+                </button>
+                <button
+                  type="button"
+                  disabled={devLoading || !devPassword}
+                  onClick={() => void submitDevLogin()}
+                  className="flex-1 rounded-lg bg-gray-700 py-2 text-[11px] font-bold text-white disabled:opacity-40"
+                >
+                  {devLoading ? '확인 중…' : '들어가기'}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setDevLoginOpen(true)}
+              className="text-[10px] text-gray-300 underline underline-offset-2"
+            >
+              개발자 로그인
+            </button>
+          )}
+        </div>
       </form>
     </div>
   )
