@@ -245,15 +245,12 @@ export default function MarketPurchaseConfirmDialog({
       if (result.ok) {
         onSuccessDismiss()
       } else {
-        setSubmitError(result.error ?? '구매 요청에 실패했어요. 잠시 후 다시 시도해 주세요.')
         /**
-         * 실패 시 이미 차감된 것처럼 보이던 계산대 화면(calcDone)에 그대로 머물면
-         * `calcDone` 단계엔 취소·닫기 버튼이 없어(backdrop 도 닫히지 않음) 같은 요청이
-         * 계속 실패만 반복되는 채로 팝업을 빠져나갈 수 없었습니다.
-         * finalSure 로 되돌려 취소 버튼과 최신 잔액(부모가 갱신한 balanceBefore)을 다시 보여줍니다.
+         * 계산대 화면(calcDone)은 이미 「결제 완료」처럼 잔액을 보여준 뒤라, 실패했을 때
+         * 같은 버튼으로 재시도시키면(예전 동작) 같은 오류가 계속 반복되며 빠져나갈 수 없었습니다.
+         * 실패로 확정되면 재시도 대신 확인 버튼이 곧바로 팝업을 닫고 메인 화면으로 돌아가게 합니다.
          */
-        setCheckoutStep('finalSure')
-        setPayRunId(0)
+        setSubmitError(result.error ?? '구매 요청에 실패했어요. 잠시 후 다시 시도해 주세요.')
       }
     } finally {
       setRequestBusy(false)
@@ -261,7 +258,7 @@ export default function MarketPurchaseConfirmDialog({
   }
 
   const showDeco = checkoutStep === 'animating' || checkoutStep === 'calcDone'
-  const backdropClosable = checkoutStep === 'finalSure'
+  const backdropClosable = checkoutStep === 'finalSure' || submitError !== null
   /** 계산대 장식이 붙는 박스 — 단계마다 본문 높이가 달라져도 이 값으로 맞춰 장식 위치 고정 */
   const decoPhaseMinBodyHeight = 'min-h-[172px] sm:min-h-[186px]'
 
@@ -420,7 +417,7 @@ export default function MarketPurchaseConfirmDialog({
                   <button
                     type="button"
                     disabled={requestBusy}
-                    onClick={() => void handleAcknowledgeAndSubmit()}
+                    onClick={() => (submitError ? onClose() : void handleAcknowledgeAndSubmit())}
                     className="w-full rounded-2xl bg-brand-blue py-3 text-sm font-black text-white shadow-md active:scale-[0.98] disabled:opacity-50"
                   >
                     {requestBusy ? '보내는 중…' : '확인'}
