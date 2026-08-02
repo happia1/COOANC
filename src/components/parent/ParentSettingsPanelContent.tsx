@@ -50,6 +50,8 @@ export default function ParentSettingsPanelContent() {
   const [profileName, setProfileName] = useState('')
   const [editingName, setEditingName] = useState(false)
   const [contactOpen, setContactOpen] = useState(false)
+  /** 콘텐츠 운영자 계정인지 — 맞을 때만 「기본 라인업 관리」 진입 버튼을 보여 줍니다 */
+  const [isContentAdmin, setIsContentAdmin] = useState(false)
   const [contactMessage, setContactMessage] = useState('')
   const [nameSaving, setNameSaving] = useState(false)
 
@@ -90,6 +92,18 @@ export default function ParentSettingsPanelContent() {
       }
       if (!cancelled) setProfileLoaded(true)
     })()
+
+    /** 운영자 여부는 서버 환경변수 기준이라 API 로만 확인할 수 있습니다 */
+    void (async () => {
+      try {
+        const res = await fetch('/api/admin/content-access', { credentials: 'same-origin' })
+        const json = (await res.json().catch(() => ({}))) as { isAdmin?: boolean }
+        if (!cancelled) setIsContentAdmin(json.isAdmin === true)
+      } catch {
+        /* 확인 실패 시 버튼을 숨긴 채로 둡니다 */
+      }
+    })()
+
     return () => {
       cancelled = true
     }
@@ -491,6 +505,16 @@ export default function ParentSettingsPanelContent() {
           >
             개발자에게 문의하기
           </button>
+
+          {/* 운영자 계정(CONTENT_ADMIN_EMAILS)으로 로그인했을 때만 보이는 진입 버튼 */}
+          {isContentAdmin ? (
+            <a
+              href="/admin/content"
+              className="mt-2 block w-full rounded-xl border border-amber-300 bg-amber-50 py-2.5 text-center font-bold text-amber-700 active:scale-[0.99]"
+            >
+              콘텐츠 기본 라인업 관리 (운영자)
+            </a>
+          ) : null}
           <p className="mt-4 border-t border-gray-100 pt-3 text-center text-[10px] text-gray-400">
             © 2026 COOANC. All rights reserved.
           </p>

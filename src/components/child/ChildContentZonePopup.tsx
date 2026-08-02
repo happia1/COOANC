@@ -834,13 +834,9 @@ export default function ChildContentZonePopup({
                         playlistUrl={ch.playlist_url}
                         storedThumbnailUrl={ch.thumbnail_url}
                       />
+                      {/* 자녀 화면은 썸네일과 제목만 — 설명 문구는 부모 앱에서만 보여 줍니다 */}
                       <div className="px-1.5 py-1.5">
                         <p className="line-clamp-2 text-[10px] font-black leading-snug text-gray-900">{ch.title}</p>
-                        {ch.description ? (
-                          <p className="mt-0.5 line-clamp-2 text-[9px] font-bold leading-snug text-gray-400">
-                            {ch.description}
-                          </p>
-                        ) : null}
                       </div>
                     </button>
                   ))}
