@@ -851,6 +851,14 @@ export default function ChildScreen({
       ) {
         return prev
       }
+      /**
+       * `total_credits_earned` 은 미션 보상으로만 늘어나는 누적치라 절대 줄어들 수 없습니다.
+       * 6초 가드가 끝난 뒤에도 복제 지연 등으로 예전 스냅샷(next)이 들어오면 그대로 덮어써
+       * 방금 모은 크레딧이 화면에서 갑자기 줄어드는 롤백이 생겼습니다. 더 옛 값이면 무시합니다.
+       */
+      if (readChildStatInt(next.total_credits_earned) < readChildStatInt(prev.total_credits_earned)) {
+        return prev
+      }
       return next
     })
   }, [initialStats])
@@ -1039,6 +1047,14 @@ export default function ChildScreen({
   const pendingStatsWritesRef = useRef(0)
   /** 미션 완료로 stats 를 올린 마지막 시각(performance.now, 단조 시계). 직후엔 스테일 서버 프롭으로 덮어쓰지 않음. */
   const lastLocalStatsBumpAtRef = useRef(0)
+  /**
+   * 미션 완료 API 요청을 순서대로만 보내는 큐(Promise 체인).
+   * 카드 연타로 여러 건이 거의 동시에 커밋되면 이전에는 각자 독립적으로 fetch 를 쐈는데,
+   * 서버가 크레딧을 "읽은 값 + 보상"으로 저장하는 예전(RPC 미적용) 경로에서는 동시 요청이
+   * 같은 잔액을 읽고 서로 덮어써 보상이 유실됐습니다(Lost Update). 요청을 직렬화해 두면
+   * 서버 쪽 원자화 여부와 무관하게 이 경합 자체가 발생하지 않습니다.
+   */
+  const missionCompleteRequestQueueRef = useRef<Promise<void>>(Promise.resolve())
 
   /**
    * 뽀모도로·알람 팝업(ChildAlarmClockPopup) 열림 여부
@@ -1375,9 +1391,25 @@ export default function ChildScreen({
             )
             return
           }
-          setStats((prev) =>
-            normalizeChildStatsCreditsSplit(mergeChildStatsPatch(prev, row)),
-          )
+          setStats((prev) => {
+            /**
+             * 가드 창이 끝난 뒤에도, 늦게 도착한 이벤트가 `total_credits_earned` 기준으로
+             * 이미 화면이 아는 것보다 옛 스냅샷이면(EQ 재계산 트리거 지연 등) 돈 관련 필드만
+             * 무시합니다. 이 값은 미션 보상으로만 늘어나는 누적치라 줄어들 수 없습니다.
+             */
+            if (
+              prev &&
+              readChildStatInt(row.total_credits_earned) < readChildStatInt(prev.total_credits_earned)
+            ) {
+              const { credits, credits_piggy, hearts, total_credits_earned, ...rest } = row
+              void credits
+              void credits_piggy
+              void hearts
+              void total_credits_earned
+              return normalizeChildStatsCreditsSplit(mergeChildStatsPatch(prev, rest))
+            }
+            return normalizeChildStatsCreditsSplit(mergeChildStatsPatch(prev, row))
+          })
         },
       )
       .subscribe()
@@ -1663,7 +1695,11 @@ export default function ChildScreen({
       })
 
       pendingStatsWritesRef.current += 1
-      void (async () => {
+      /**
+       * 실제 네트워크 요청은 큐에 넣어 이전 완료 요청이 끝난 뒤 순서대로만 나가게 합니다.
+       * (낙관적 UI·카운터 증가는 위에서 이미 즉시 처리됨 — 탭 반응성은 그대로 유지됩니다.)
+       */
+      const runMissionCompleteRequest = async () => {
         try {
           const res = await fetch('/api/daily-mission/complete', {
             method: 'POST',
@@ -1755,7 +1791,11 @@ export default function ChildScreen({
         } finally {
           pendingStatsWritesRef.current = Math.max(0, pendingStatsWritesRef.current - 1)
         }
-      })()
+      }
+      missionCompleteRequestQueueRef.current = missionCompleteRequestQueueRef.current.then(
+        runMissionCompleteRequest,
+        runMissionCompleteRequest,
+      )
     },
     [
       seoulDayKey,
