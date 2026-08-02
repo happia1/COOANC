@@ -15,7 +15,7 @@ import type { ContentCategory, ContentChannel } from '@/types/database'
 export default async function AdminContentPage() {
   const supabase = await createClient()
   const auth = await resolveContentAdminUser(supabase)
-  if (!auth.ok) {
+  if (auth.ok === false) {
     redirect(auth.reason === 'unauthenticated' ? '/login' : '/home')
   }
 

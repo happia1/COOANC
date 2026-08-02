@@ -221,7 +221,7 @@ export async function POST(req: NextRequest) {
    * 비개발자: 화면에 보이는 총 크레딧만 충분하면 구매가 되며, 결제 후 그 숫자에서 차감됩니다.
    */
   const deduct = await deductCreditsWithCas(supabase, childId, effectivePrice, stats.credits)
-  if (!deduct.ok) {
+  if (deduct.ok === false) {
     if (deduct.reason === 'insufficient') {
       return NextResponse.json(
         {

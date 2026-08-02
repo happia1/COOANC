@@ -12,7 +12,7 @@ import { resolveContentAdminUser } from '@/lib/adminContentAccess'
 async function requireAdmin() {
   const supabase = await createClient()
   const auth = await resolveContentAdminUser(supabase)
-  if (!auth.ok) {
+  if (auth.ok === false) {
     const status = auth.reason === 'unauthenticated' ? 401 : 403
     const error = auth.reason === 'unauthenticated' ? '인증이 필요해요' : '운영자 계정만 사용할 수 있어요'
     return { ok: false as const, response: NextResponse.json({ error }, { status }) }
@@ -95,7 +95,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: '요청 형식이 올바르지 않아요' }, { status: 400 })
   }
   const parsed = parseChannelInput(body)
-  if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 400 })
+  if (parsed.ok === false) return NextResponse.json({ error: parsed.error }, { status: 400 })
 
   const dbRes = requireServiceRole()
   if (!dbRes.ok) return dbRes.response
@@ -139,7 +139,7 @@ export async function PATCH(req: NextRequest) {
   if (!id) return NextResponse.json({ error: '채널 정보가 필요해요' }, { status: 400 })
 
   const parsed = parseChannelInput(body)
-  if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 400 })
+  if (parsed.ok === false) return NextResponse.json({ error: parsed.error }, { status: 400 })
 
   const dbRes = requireServiceRole()
   if (!dbRes.ok) return dbRes.response

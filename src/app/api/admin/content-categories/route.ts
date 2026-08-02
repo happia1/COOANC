@@ -6,7 +6,7 @@ import { resolveContentAdminUser } from '@/lib/adminContentAccess'
 async function requireAdmin() {
   const supabase = await createClient()
   const auth = await resolveContentAdminUser(supabase)
-  if (!auth.ok) {
+  if (auth.ok === false) {
     const status = auth.reason === 'unauthenticated' ? 401 : 403
     const error = auth.reason === 'unauthenticated' ? '인증이 필요해요' : '운영자 계정만 사용할 수 있어요'
     return { ok: false as const, response: NextResponse.json({ error }, { status }) }
