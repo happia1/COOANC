@@ -4,6 +4,7 @@ import { createServiceRoleClient } from '@/lib/supabase/admin'
 import { resolveApiActorChildId } from '@/lib/resolveApiActorChildId'
 import { normalizeUuidParam } from '@/lib/normalizeUuid'
 import { readChildStatInt } from '@/lib/childCreditsSplit'
+import { applyChildCreditsCas } from '@/lib/childStatsCreditsCas'
 import { findHitSlot, type ClawSlot } from '@/lib/clawMachine'
 
 /**
@@ -97,15 +98,18 @@ export async function POST(req: NextRequest) {
     let chestTicketQuantity: number | undefined
 
     if (prize.type === 'hearts') {
-      const { data: row } = await db.from('child_stats').select('hearts').eq('child_id', childId).maybeSingle()
-      const nextHearts = readChildStatInt(row?.hearts) + prize.amount
-      await db.from('child_stats').update({ hearts: nextHearts }).eq('child_id', childId)
-      statsPatch.hearts = nextHearts
+      /** CAS 로 더합니다 — 읽고 덮어쓰는 사이 다른 보상이 저장돼도 지워지지 않게 */
+      const applied = await applyChildCreditsCas(db, childId, (current) => ({
+        ok: true as const,
+        hearts: current.hearts + prize.amount,
+      }))
+      if (applied.ok === true) statsPatch.hearts = applied.hearts
     } else if (prize.type === 'credits') {
-      const { data: row } = await db.from('child_stats').select('credits').eq('child_id', childId).maybeSingle()
-      const nextCredits = readChildStatInt(row?.credits) + prize.amount
-      await db.from('child_stats').update({ credits: nextCredits }).eq('child_id', childId)
-      statsPatch.credits = nextCredits
+      const applied = await applyChildCreditsCas(db, childId, (current) => ({
+        ok: true as const,
+        credits: current.credits + prize.amount,
+      }))
+      if (applied.ok === true) statsPatch.credits = applied.credits
     } else if (prize.type === 'seed') {
       const { error: seedErr } = await db.from('plant_seed_inventory').insert({
         child_id: childId,

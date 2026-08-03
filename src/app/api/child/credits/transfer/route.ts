@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { resolveApiActorChildId } from '@/lib/resolveApiActorChildId'
-import { readChildStatInt } from '@/lib/childCreditsSplit'
+import { applyChildCreditsCas } from '@/lib/childStatsCreditsCas'
 import { fireGameTrigger } from '@/lib/gameLayer/fireGameTrigger'
 import { isPiggyBankUnlocked } from '@/constants/childAgeConfig'
 
@@ -73,45 +73,39 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: '저금통은 레벨 5부터 사용할 수 있어요' }, { status: 403 })
   }
 
-  const available = readChildStatInt(stats.credits)
-  const piggy = readChildStatInt(stats.credits_piggy)
+  const fromBucket: 'basket' | 'piggy' = kind === 'credits_to_piggy' ? 'basket' : 'piggy'
+  const toBucket: 'basket' | 'piggy' = kind === 'credits_to_piggy' ? 'piggy' : 'basket'
 
-  let nextCredits = available
-  let nextPiggy = piggy
-  let fromBucket: 'basket' | 'piggy'
-  let toBucket: 'basket' | 'piggy'
-
-  if (kind === 'credits_to_piggy') {
-    if (amount > available) {
-      return NextResponse.json({ error: '크레딧이 부족해요' }, { status: 400 })
+  /**
+   * 옮기기는 CAS 로 처리합니다.
+   * 예전에는 읽은 잔액으로 credits·credits_piggy 를 통째로 덮어써서, 그사이 미션 보상이나
+   * 결제가 저장되면 그 결과가 지워지고 화면 숫자가 튀었습니다(저금통에서 크레딧이 왔다갔다).
+   */
+  const applied = await applyChildCreditsCas(supabase, childId, (current) => {
+    if (kind === 'credits_to_piggy') {
+      if (amount > current.credits) return { ok: false as const, message: '크레딧이 부족해요' }
+      return { ok: true as const, credits: current.credits - amount, piggy: current.piggy + amount }
     }
-    nextCredits = available - amount
-    nextPiggy = piggy + amount
-    fromBucket = 'basket'
-    toBucket = 'piggy'
-  } else {
-    if (amount > piggy) {
-      return NextResponse.json({ error: '저금통에 크레딧이 부족해요' }, { status: 400 })
+    if (amount > current.piggy) return { ok: false as const, message: '저금통에 크레딧이 부족해요' }
+    return { ok: true as const, credits: current.credits + amount, piggy: current.piggy - amount }
+  })
+
+  if (applied.ok === false) {
+    if (applied.reason === 'rejected') {
+      return NextResponse.json(
+        {
+          error: applied.message,
+          credits: applied.current.credits,
+          credits_piggy: applied.current.piggy,
+        },
+        { status: 400 },
+      )
     }
-    nextCredits = available + amount
-    nextPiggy = piggy - amount
-    fromBucket = 'piggy'
-    toBucket = 'basket'
-  }
-
-  const { error } = await supabase
-    .from('child_stats')
-    .update({
-      credits: nextCredits,
-      credits_piggy: nextPiggy,
-      credits_wallet: 0,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('child_id', childId)
-
-  if (error) {
     return NextResponse.json({ error: '저장에 실패했어요' }, { status: 500 })
   }
+
+  const nextCredits = applied.credits
+  const nextPiggy = applied.piggy
 
   void supabase
     .from('credit_transfer_logs')

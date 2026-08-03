@@ -857,7 +857,12 @@ export default function ChildScreen({
        *  이 누적치도 같이 올리기 때문에 서버 저장이 한 번이라도 어긋나면 화면이 영구히 높은 값에
        *  갇혀 버렸습니다. 그 상태로 마켓에 가면 잔액은 넉넉해 보이는데 결제만 "코인 부족"으로
        *  거절돼 원인을 알 수 없게 됩니다. 그래서 무조건 서버 값으로 되돌아오게 둡니다.)
+       *
+       * 단, **서버 스냅샷끼리는 저장 시각(updated_at) 순서를 지킵니다.** 이미 더 최신 서버 값을
+       * 반영한 뒤라면 뒤늦게 도착한 옛 스냅샷은 무시합니다(아래 Realtime 도 동일).
        */
+      if (isStaleServerStats(next)) return prev
+      rememberServerStatsAt(next)
       return next
     })
   }, [initialStats])
@@ -1054,6 +1059,38 @@ export default function ChildScreen({
    * 서버 쪽 원자화 여부와 무관하게 이 경합 자체가 발생하지 않습니다.
    */
   const missionCompleteRequestQueueRef = useRef<Promise<void>>(Promise.resolve())
+
+  /**
+   * 마지막으로 화면에 반영한 **서버 스냅샷의 저장 시각**(child_stats.updated_at, ms).
+   *
+   * 비개발자 설명:
+   *   저금통에서 코인을 여러 번 옮기면 서버가 그만큼 여러 번 저장하고, 그 알림(Realtime)이
+   *   순서가 뒤바뀌어 도착할 수 있습니다. 예전에는 늦게 도착한 **옛 알림**이 최신 숫자를 덮어써서
+   *   크레딧이 올라갔다 내려갔다 했습니다. 이제는 저장 시각을 비교해, 이미 반영한 것보다 오래된
+   *   알림은 무시합니다. (서버 값끼리만 비교하므로 화면이 옛 값에 갇히지 않습니다.)
+   */
+  const lastServerStatsAtRef = useRef(0)
+
+  /** child_stats 행에서 저장 시각(ms)을 읽습니다. 없으면 0. */
+  function readServerStatsAt(row: unknown): number {
+    const raw = (row as Record<string, unknown> | null)?.updated_at
+    if (typeof raw !== 'string') return 0
+    const ms = Date.parse(raw)
+    return Number.isFinite(ms) ? ms : 0
+  }
+
+  /** 이미 반영한 서버 스냅샷보다 오래된(=뒤늦게 도착한) 값인지 */
+  function isStaleServerStats(row: unknown): boolean {
+    const at = readServerStatsAt(row)
+    /** 시각을 알 수 없으면 순서 판단을 하지 않고 그대로 반영합니다 */
+    if (at === 0) return false
+    return at < lastServerStatsAtRef.current
+  }
+
+  function rememberServerStatsAt(row: unknown): void {
+    const at = readServerStatsAt(row)
+    if (at > lastServerStatsAtRef.current) lastServerStatsAtRef.current = at
+  }
 
   /**
    * 뽀모도로·알람 팝업(ChildAlarmClockPopup) 열림 여부
@@ -1379,7 +1416,12 @@ export default function ChildScreen({
             pendingStatsWritesRef.current > 0 ||
             (typeof performance !== 'undefined' &&
               performance.now() - lastLocalStatsBumpAtRef.current < STALE_STATS_GUARD_MS)
-          if (withinLocalStatsGuard) {
+          /**
+           * 순서가 뒤바뀌어 도착한 **옛 저장 알림**도 돈 관련 필드에서 제외합니다.
+           * (저금통에서 코인을 연달아 옮기면 저장이 여러 번 일어나고, 그 알림이 뒤늦게 도착해
+           *  최신 잔액을 옛 값으로 되돌리며 숫자가 왔다갔다 했습니다.)
+           */
+          if (withinLocalStatsGuard || isStaleServerStats(row)) {
             const { credits, credits_piggy, hearts, total_credits_earned, ...rest } = row
             void credits
             void credits_piggy
@@ -1391,6 +1433,7 @@ export default function ChildScreen({
             return
           }
           /** 가드 창 밖에서는 서버 값이 정답 — 화면이 옛 낙관값에 갇히지 않게 그대로 반영합니다. */
+          rememberServerStatsAt(row)
           setStats((prev) =>
             normalizeChildStatsCreditsSplit(mergeChildStatsPatch(prev, row)),
           )
@@ -2397,6 +2440,12 @@ export default function ChildScreen({
 
   /** 저금통 팝업에서 가용·저금통 잔액을 반영합니다. */
   const patchPiggyFromHome = useCallback((p: { credits: number; credits_piggy: number }) => {
+    /**
+     * 옮기기 직후 짧은 창 동안은 뒤늦게 도착한 서버 알림이 이 값을 덮어쓰지 않게 합니다.
+     * (미션 완료와 같은 보호 — 예전에는 저금통 쪽에만 이 표시가 없어서, 마지막 옮기기가 끝나
+     *  대기 카운터가 0이 되는 순간 밀린 옛 알림들이 들어와 숫자가 왔다갔다 했습니다.)
+     */
+    if (typeof performance !== 'undefined') lastLocalStatsBumpAtRef.current = performance.now()
     setStats((prev) => (prev ? mergeChildStatsPatch(prev, p) : prev))
   }, [])
 
@@ -2662,6 +2711,10 @@ export default function ChildScreen({
                     bonusPending={piggyBonusPending}
                     onBonusClaimed={({ pending, credits }) => {
                       setPiggyBonusPending(pending)
+                      /** 보너스 코인도 같은 보호 창을 엽니다(옛 알림이 덮어쓰지 않도록) */
+                      if (typeof performance !== 'undefined') {
+                        lastLocalStatsBumpAtRef.current = performance.now()
+                      }
                       setStats((prev) =>
                         normalizeChildStatsCreditsSplit(mergeChildStatsPatch(prev, { credits })),
                       )
