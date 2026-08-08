@@ -42,6 +42,13 @@ function playPiggyStageUpSound() {
   }
 }
 
+/**
+ * 한 번에 옮길 수 있는 묶음.
+ * 1개씩만 옮길 수 있으면 1000개를 저금하는 데 1000번을 눌러야 해서 추가했습니다.
+ * 서버 요청 수도 그만큼 줄어듭니다.
+ */
+const TRANSFER_CHUNKS = [10, 50, 100] as const
+
 /** 저금통 입구(동전이 들어가는 지점) — 저금통 그림 기준 세로 % */
 const PIGGY_SLOT_Y_RATIO = 0.42
 
@@ -176,13 +183,13 @@ export default function ChildHomePiggyBank({
   }, [spawnFlyCoinAt])
 
   const rollbackOptimistic = useCallback(
-    (kind: TransferKind) => {
+    (kind: TransferKind, amount: number) => {
       if (kind === 'credits_to_piggy') {
-        optimisticCreditsRef.current += 1
-        optimisticPiggyRef.current = Math.max(0, optimisticPiggyRef.current - 1)
+        optimisticCreditsRef.current += amount
+        optimisticPiggyRef.current = Math.max(0, optimisticPiggyRef.current - amount)
       } else {
-        optimisticCreditsRef.current = Math.max(0, optimisticCreditsRef.current - 1)
-        optimisticPiggyRef.current += 1
+        optimisticCreditsRef.current = Math.max(0, optimisticCreditsRef.current - amount)
+        optimisticPiggyRef.current += amount
       }
       onPiggyUpdate({
         credits: optimisticCreditsRef.current,
@@ -193,14 +200,14 @@ export default function ChildHomePiggyBank({
   )
 
   const syncTransferToServer = useCallback(
-    async (kind: TransferKind) => {
+    async (kind: TransferKind, amount: number) => {
       try {
         const res = await fetch('/api/child/credits/transfer', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           kind,
-          amount: 1,
+          amount,
           childId,
         }),
       })
@@ -215,7 +222,7 @@ export default function ChildHomePiggyBank({
         typeof json.credits !== 'number' ||
         typeof json.credits_piggy !== 'number'
       ) {
-        rollbackOptimistic(kind)
+        rollbackOptimistic(kind, amount)
         console.warn('[ChildHomePiggyBank] transfer failed', json.error ?? res.status)
         return
       }
@@ -243,14 +250,14 @@ export default function ChildHomePiggyBank({
   )
 
   const enqueueTransfer = useCallback(
-    (kind: TransferKind) => {
+    (kind: TransferKind, amount: number) => {
       pendingTransferCountRef.current += 1
       if (pendingTransferCountRef.current === 1) {
         lastConfirmedBalanceRef.current = null
         onPiggyTransferPending?.(true)
       }
       apiQueueRef.current = apiQueueRef.current
-        .then(() => syncTransferToServer(kind))
+        .then(() => syncTransferToServer(kind, amount))
         .catch((err) => {
           console.warn('[ChildHomePiggyBank] transfer queue failed', err)
         })
@@ -258,12 +265,17 @@ export default function ChildHomePiggyBank({
     [onPiggyTransferPending, syncTransferToServer],
   )
 
-  const depositOne = useCallback(() => {
-    if (!depositEnabled || optimisticCreditsRef.current < 1) return
+  /**
+   * 저금통에 넣기 — `amount` 만큼 한 번에(기본 1).
+   * 가진 것보다 많이 눌러도 가진 만큼만 옮깁니다.
+   */
+  const deposit = useCallback((amountRaw = 1) => {
+    const amount = Math.min(Math.max(1, Math.floor(amountRaw)), optimisticCreditsRef.current)
+    if (!depositEnabled || amount < 1) return
 
     const prevPiggy = optimisticPiggyRef.current
-    const nextCredits = optimisticCreditsRef.current - 1
-    const nextPiggy = optimisticPiggyRef.current + 1
+    const nextCredits = optimisticCreditsRef.current - amount
+    const nextPiggy = optimisticPiggyRef.current + amount
     optimisticCreditsRef.current = nextCredits
     optimisticPiggyRef.current = nextPiggy
 
@@ -278,14 +290,16 @@ export default function ChildHomePiggyBank({
     if (nextFrame > prevFrame) playPiggyStageUpSound()
     setPiggyBounceKey((k) => k + 1)
 
-    enqueueTransfer('credits_to_piggy')
+    enqueueTransfer('credits_to_piggy', amount)
   }, [depositEnabled, childId, onPiggyUpdate, spawnFlyCoin, enqueueTransfer])
 
-  const withdrawOne = useCallback(() => {
-    if (!depositEnabled || optimisticPiggyRef.current < 1) return
+  /** 저금통에서 꺼내기 — `amount` 만큼 한 번에(기본 1). 있는 만큼만 나옵니다. */
+  const withdraw = useCallback((amountRaw = 1) => {
+    const amount = Math.min(Math.max(1, Math.floor(amountRaw)), optimisticPiggyRef.current)
+    if (!depositEnabled || amount < 1) return
 
-    const nextCredits = optimisticCreditsRef.current + 1
-    const nextPiggy = optimisticPiggyRef.current - 1
+    const nextCredits = optimisticCreditsRef.current + amount
+    const nextPiggy = optimisticPiggyRef.current - amount
     optimisticCreditsRef.current = nextCredits
     optimisticPiggyRef.current = nextPiggy
 
@@ -296,7 +310,7 @@ export default function ChildHomePiggyBank({
     onPiggyUpdate({ credits: nextCredits, credits_piggy: nextPiggy })
     setCreditsBounceKey((k) => k + 1)
 
-    enqueueTransfer('piggy_to_credits')
+    enqueueTransfer('piggy_to_credits', amount)
   }, [depositEnabled, onPiggyUpdate, spawnFlyCoin, enqueueTransfer])
 
   /**
@@ -423,7 +437,7 @@ export default function ChildHomePiggyBank({
           <div className="grid grid-cols-2 gap-3">
             <button
               type="button"
-              onClick={withdrawOne}
+              onClick={() => withdraw(1)}
               disabled={!canWithdraw}
               className="flex min-h-[11.5rem] flex-col items-center rounded-2xl border-2 border-sky-100/90 bg-white/90 px-2 py-3 shadow-sm transition active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-45"
               aria-label="저금통에서 크레딧 꺼내기"
@@ -458,7 +472,7 @@ export default function ChildHomePiggyBank({
 
             <button
               type="button"
-              onClick={depositOne}
+              onClick={() => deposit(1)}
               disabled={!canDeposit}
               className="flex min-h-[11.5rem] w-full flex-col items-center rounded-2xl border-2 border-amber-100/90 bg-white/90 px-2 py-3 shadow-sm transition active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-45"
               aria-label={depositEnabled ? '저금통에 크레딧 넣기' : `저금통 — 레벨 ${PIGGY_BANK_UNLOCK_MIN_LEVEL}부터`}
@@ -494,9 +508,49 @@ export default function ChildHomePiggyBank({
             </button>
           </div>
 
+          {/**
+            * 묶음 옮기기 — 위 두 패널과 같은 좌·우 배치라 어느 쪽으로 가는지 헷갈리지 않습니다.
+            * 왼쪽(파랑) = 저금통에서 꺼내기, 오른쪽(노랑) = 저금통에 넣기.
+            */}
+          {depositEnabled ? (
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              <div className="flex items-center gap-1">
+                {TRANSFER_CHUNKS.map((n) => (
+                  <button
+                    key={`out-${n}`}
+                    type="button"
+                    onClick={() => withdraw(n)}
+                    disabled={piggyCredits < 1}
+                    className="min-w-0 flex-1 rounded-lg border border-sky-200 bg-white/90 py-1.5 text-[11px] font-black tabular-nums text-sky-700 shadow-sm transition active:scale-95 disabled:opacity-40"
+                    aria-label={`저금통에서 ${n}개 꺼내기`}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
+              <div className="flex items-center gap-1">
+                {TRANSFER_CHUNKS.map((n) => (
+                  <button
+                    key={`in-${n}`}
+                    type="button"
+                    onClick={() => deposit(n)}
+                    disabled={availableCredits < 1}
+                    className="min-w-0 flex-1 rounded-lg border border-amber-200 bg-white/90 py-1.5 text-[11px] font-black tabular-nums text-amber-700 shadow-sm transition active:scale-95 disabled:opacity-40"
+                    aria-label={`저금통에 ${n}개 넣기`}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
           {transferHintVisible && depositEnabled ? (
             <p className="mt-3 text-center text-xs font-black text-gray-600">
               저금통을 누르면 모으고, 크레딧을 누르면 꺼내요
+              <span className="mt-0.5 block font-bold text-gray-500">
+                아래 10·50·100을 누르면 한 번에 옮겨요
+              </span>
             </p>
           ) : !depositEnabled ? (
             <p className="mt-3 text-center text-xs font-black text-gray-600">
