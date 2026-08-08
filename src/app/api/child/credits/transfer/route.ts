@@ -81,13 +81,31 @@ export async function POST(req: NextRequest) {
    * 예전에는 읽은 잔액으로 credits·credits_piggy 를 통째로 덮어써서, 그사이 미션 보상이나
    * 결제가 저장되면 그 결과가 지워지고 화면 숫자가 튀었습니다(저금통에서 크레딧이 왔다갔다).
    */
+  /**
+   * 실제로 옮긴 수량 — **서버가 정합니다.**
+   *
+   * 왜 서버가 정하나: 예전에는 화면이 「가진 만큼만」 잘라서 보냈는데,
+   * 화면의 낙관적 잔액이 서버와 어긋나 있으면 50을 눌러도 10만 옮겨졌습니다.
+   * 이제 화면은 누른 수량을 그대로 보내고, 서버가 잔액을 보고 가능한 만큼 옮깁니다.
+   */
+  let movedAmount = 0
+
   const applied = await applyChildCreditsCas(supabase, childId, (current) => {
-    if (kind === 'credits_to_piggy') {
-      if (amount > current.credits) return { ok: false as const, message: '크레딧이 부족해요' }
-      return { ok: true as const, credits: current.credits - amount, piggy: current.piggy + amount }
+    const room = kind === 'credits_to_piggy' ? current.credits : current.piggy
+    /** 잔액보다 많이 눌렀으면 실패시키지 않고 잔액만큼만 옮깁니다 */
+    const move = Math.min(amount, room)
+
+    if (move < 1) {
+      return {
+        ok: false as const,
+        message: kind === 'credits_to_piggy' ? '크레딧이 부족해요' : '저금통에 크레딧이 부족해요',
+      }
     }
-    if (amount > current.piggy) return { ok: false as const, message: '저금통에 크레딧이 부족해요' }
-    return { ok: true as const, credits: current.credits + amount, piggy: current.piggy - amount }
+
+    movedAmount = move
+    return kind === 'credits_to_piggy'
+      ? { ok: true as const, credits: current.credits - move, piggy: current.piggy + move }
+      : { ok: true as const, credits: current.credits + move, piggy: current.piggy - move }
   })
 
   if (applied.ok === false) {
@@ -113,7 +131,7 @@ export async function POST(req: NextRequest) {
       child_id: childId,
       from_bucket: fromBucket,
       to_bucket: toBucket,
-      amount,
+      amount: movedAmount,
     })
     .then(({ error: logErr }) => {
       if (logErr) console.error('[credit_transfer_logs]', logErr.message)
@@ -147,6 +165,8 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({
     credits: nextCredits,
     credits_piggy: nextPiggy,
+    /** 실제로 옮겨진 수량 — 누른 수량보다 적을 수 있습니다(잔액 한도) */
+    moved: movedAmount,
     /** 이번 옮기기 직후 새로 붙은 이자(0이면 없음) */
     piggy_bonus_paid: bonusPaid,
     /** 아직 받아 가지 않고 쌓여 있는 이자 = 저금통 위에 뜰 코인 개수 */

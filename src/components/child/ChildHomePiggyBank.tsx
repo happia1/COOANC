@@ -200,14 +200,14 @@ export default function ChildHomePiggyBank({
   )
 
   const syncTransferToServer = useCallback(
-    async (kind: TransferKind, amount: number) => {
+    async (kind: TransferKind, requested: number, optimisticAmount: number) => {
       try {
         const res = await fetch('/api/child/credits/transfer', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           kind,
-          amount,
+          amount: requested,
           childId,
         }),
       })
@@ -222,7 +222,7 @@ export default function ChildHomePiggyBank({
         typeof json.credits !== 'number' ||
         typeof json.credits_piggy !== 'number'
       ) {
-        rollbackOptimistic(kind, amount)
+        rollbackOptimistic(kind, optimisticAmount)
         console.warn('[ChildHomePiggyBank] transfer failed', json.error ?? res.status)
         return
       }
@@ -250,14 +250,14 @@ export default function ChildHomePiggyBank({
   )
 
   const enqueueTransfer = useCallback(
-    (kind: TransferKind, amount: number) => {
+    (kind: TransferKind, requested: number, optimisticAmount: number) => {
       pendingTransferCountRef.current += 1
       if (pendingTransferCountRef.current === 1) {
         lastConfirmedBalanceRef.current = null
         onPiggyTransferPending?.(true)
       }
       apiQueueRef.current = apiQueueRef.current
-        .then(() => syncTransferToServer(kind, amount))
+        .then(() => syncTransferToServer(kind, requested, optimisticAmount))
         .catch((err) => {
           console.warn('[ChildHomePiggyBank] transfer queue failed', err)
         })
@@ -266,12 +266,18 @@ export default function ChildHomePiggyBank({
   )
 
   /**
-   * 저금통에 넣기 — `amount` 만큼 한 번에(기본 1).
-   * 가진 것보다 많이 눌러도 가진 만큼만 옮깁니다.
+   * 저금통에 넣기 — 누른 수량을 **그대로 서버에 보냅니다**.
+   *
+   * 화면에서 자르지 않는 이유: 화면이 들고 있는 낙관적 잔액이 서버와 어긋나 있으면
+   * 50을 눌러도 10만 옮겨지는 일이 생깁니다(실제로 발생했습니다).
+   * 얼마나 옮길 수 있는지는 서버가 잔액을 보고 정하고, 응답의 확정값으로 화면을 맞춥니다.
+   * 화면에는 우선 「지금 보이는 잔액 한도」로만 미리 반영해 둡니다.
    */
   const deposit = useCallback((amountRaw = 1) => {
-    const amount = Math.min(Math.max(1, Math.floor(amountRaw)), optimisticCreditsRef.current)
-    if (!depositEnabled || amount < 1) return
+    const requested = Math.max(1, Math.floor(amountRaw))
+    if (!depositEnabled || optimisticCreditsRef.current < 1) return
+    /** 미리 보여 줄 양(로컬 한도) — 서버가 더 적게 옮기면 확정값이 바로잡습니다 */
+    const amount = Math.min(requested, optimisticCreditsRef.current)
 
     const prevPiggy = optimisticPiggyRef.current
     const nextCredits = optimisticCreditsRef.current - amount
@@ -290,13 +296,14 @@ export default function ChildHomePiggyBank({
     if (nextFrame > prevFrame) playPiggyStageUpSound()
     setPiggyBounceKey((k) => k + 1)
 
-    enqueueTransfer('credits_to_piggy', amount)
+    enqueueTransfer('credits_to_piggy', requested, amount)
   }, [depositEnabled, childId, onPiggyUpdate, spawnFlyCoin, enqueueTransfer])
 
-  /** 저금통에서 꺼내기 — `amount` 만큼 한 번에(기본 1). 있는 만큼만 나옵니다. */
+  /** 저금통에서 꺼내기 — 넣기와 같은 규칙(누른 수량을 보내고 서버가 정함) */
   const withdraw = useCallback((amountRaw = 1) => {
-    const amount = Math.min(Math.max(1, Math.floor(amountRaw)), optimisticPiggyRef.current)
-    if (!depositEnabled || amount < 1) return
+    const requested = Math.max(1, Math.floor(amountRaw))
+    if (!depositEnabled || optimisticPiggyRef.current < 1) return
+    const amount = Math.min(requested, optimisticPiggyRef.current)
 
     const nextCredits = optimisticCreditsRef.current + amount
     const nextPiggy = optimisticPiggyRef.current - amount
@@ -310,7 +317,7 @@ export default function ChildHomePiggyBank({
     onPiggyUpdate({ credits: nextCredits, credits_piggy: nextPiggy })
     setCreditsBounceKey((k) => k + 1)
 
-    enqueueTransfer('piggy_to_credits', amount)
+    enqueueTransfer('piggy_to_credits', requested, amount)
   }, [depositEnabled, onPiggyUpdate, spawnFlyCoin, enqueueTransfer])
 
   /**
