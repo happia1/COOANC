@@ -49,6 +49,9 @@ function playPiggyStageUpSound() {
  */
 const TRANSFER_CHUNKS = [10, 50, 100] as const
 
+/** 저장이 이 시간보다 오래 걸릴 때만 「계산 중」을 띄웁니다(짧은 저장까지 깜빡이지 않게) */
+const SYNCING_NOTICE_DELAY_MS = 400
+
 /** 저금통 입구(동전이 들어가는 지점) — 저금통 그림 기준 세로 % */
 const PIGGY_SLOT_Y_RATIO = 0.42
 
@@ -119,6 +122,16 @@ export default function ChildHomePiggyBank({
   const optimisticPiggyRef = useRef(piggyCredits)
   const apiQueueRef = useRef(Promise.resolve())
   const pendingTransferCountRef = useRef(0)
+  /**
+   * 「계산 중」 표시 — 서버 저장이 밀려 있을 때만 켭니다.
+   *
+   * 왜 필요한가: 빠르게 여러 번 누르면 저장이 줄을 서고, 마지막 응답이 와야 최종 금액이
+   * 확정됩니다. 그 전까지 화면 숫자가 잠깐 흔들려 보여 아이·부모가 오해했습니다.
+   * 이제 계산이 끝날 때까지 「계산 중이에요」를 보여 주고 버튼을 잠급니다.
+   */
+  const [syncing, setSyncing] = useState(false)
+  /** 아주 짧은 저장까지 깜빡이지 않도록, 이 시간 넘게 걸릴 때만 표시합니다 */
+  const syncingTimerRef = useRef<number | null>(null)
   const lastConfirmedBalanceRef = useRef<{ credits: number; credits_piggy: number } | null>(null)
   const [piggySrc, setPiggySrc] = useState(piggyBankVisualUrlFromSavedCredits(piggyCredits))
   /** 저금통 위에 떠 있는(아직 안 받은) 보너스 코인 개수 — 낙관적으로 먼저 줄입니다 */
@@ -129,6 +142,9 @@ export default function ChildHomePiggyBank({
 
   useEffect(() => {
     setPortalReady(true)
+    return () => {
+      if (syncingTimerRef.current !== null) window.clearTimeout(syncingTimerRef.current)
+    }
   }, [])
 
   useEffect(() => {
@@ -243,6 +259,11 @@ export default function ChildHomePiggyBank({
           lastConfirmedBalanceRef.current = null
         }
         onPiggyTransferPending?.(false)
+        if (syncingTimerRef.current !== null) {
+          window.clearTimeout(syncingTimerRef.current)
+          syncingTimerRef.current = null
+        }
+        setSyncing(false)
       }
     }
     },
@@ -255,6 +276,12 @@ export default function ChildHomePiggyBank({
       if (pendingTransferCountRef.current === 1) {
         lastConfirmedBalanceRef.current = null
         onPiggyTransferPending?.(true)
+        if (syncingTimerRef.current === null) {
+          syncingTimerRef.current = window.setTimeout(() => {
+            syncingTimerRef.current = null
+            if (pendingTransferCountRef.current > 0) setSyncing(true)
+          }, SYNCING_NOTICE_DELAY_MS)
+        }
       }
       apiQueueRef.current = apiQueueRef.current
         .then(() => syncTransferToServer(kind, requested, optimisticAmount))
@@ -393,8 +420,9 @@ export default function ChildHomePiggyBank({
     if (showHint) markPiggyTransferHintSeen(childId)
   }, [childId, depositEnabled])
 
-  const canDeposit = depositEnabled && availableCredits >= 1
-  const canWithdraw = depositEnabled && piggyCredits >= 1
+  /** 계산 중에는 잠급니다 — 최종 금액이 확정되기 전에 또 누르면 숫자가 더 흔들립니다 */
+  const canDeposit = depositEnabled && !syncing && availableCredits >= 1
+  const canWithdraw = depositEnabled && !syncing && piggyCredits >= 1
 
   const flyLayer =
     flyCoins.length > 0 && portalReady ? (
@@ -527,7 +555,7 @@ export default function ChildHomePiggyBank({
                     key={`out-${n}`}
                     type="button"
                     onClick={() => withdraw(n)}
-                    disabled={piggyCredits < 1}
+                    disabled={syncing || piggyCredits < 1}
                     className="min-w-0 flex-1 rounded-lg border border-sky-200 bg-white/90 py-1.5 text-[11px] font-black tabular-nums text-sky-700 shadow-sm transition active:scale-95 disabled:opacity-40"
                     aria-label={`저금통에서 ${n}개 꺼내기`}
                   >
@@ -541,7 +569,7 @@ export default function ChildHomePiggyBank({
                     key={`in-${n}`}
                     type="button"
                     onClick={() => deposit(n)}
-                    disabled={availableCredits < 1}
+                    disabled={syncing || availableCredits < 1}
                     className="min-w-0 flex-1 rounded-lg border border-amber-200 bg-white/90 py-1.5 text-[11px] font-black tabular-nums text-amber-700 shadow-sm transition active:scale-95 disabled:opacity-40"
                     aria-label={`저금통에 ${n}개 넣기`}
                   >
@@ -552,7 +580,20 @@ export default function ChildHomePiggyBank({
             </div>
           ) : null}
 
-          {transferHintVisible && depositEnabled ? (
+          {/**
+            * 계산 중 — 저장이 밀려 있는 동안에는 최종 금액이 아직 확정되지 않았습니다.
+            * 이때 숫자가 잠깐 흔들려 보였기 때문에, 끝날 때까지 알려 주고 버튼을 잠급니다.
+            */}
+          {syncing ? (
+            <p className="mt-3 flex items-center justify-center gap-1.5 text-center text-xs font-black text-amber-700">
+              <span
+                className="inline-block h-3 w-3 shrink-0 rounded-full border-2 border-amber-300 border-t-amber-700"
+                style={{ animation: 'piggySyncSpin 0.7s linear infinite' }}
+                aria-hidden
+              />
+              계산 중이에요
+            </p>
+          ) : transferHintVisible && depositEnabled ? (
             <p className="mt-3 text-center text-xs font-black text-gray-600">
               저금통을 누르면 모으고, 크레딧을 누르면 꺼내요
               <span className="mt-0.5 block font-bold text-gray-500">
@@ -578,6 +619,9 @@ export default function ChildHomePiggyBank({
             0% { transform: scale(1); }
             35% { transform: scale(1.08); }
             100% { transform: scale(1); }
+          }
+          @keyframes piggySyncSpin {
+            to { transform: rotate(360deg); }
           }
           @keyframes piggyCreditFly {
             0% {
