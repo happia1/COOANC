@@ -65,14 +65,17 @@ export async function refundDuplicatePlantSeedPurchases(
   }
 
   const newCredits = readChildStatInt(stats.credits) + refundedCredits
-  const piggy = readChildStatInt(stats.credits_piggy)
 
+  /**
+   * `credits_piggy` · `credits_wallet` 은 **일부러 넣지 않습니다.**
+   * 이 경로는 저금통을 관리하지 않는데도 읽어 둔 값을 다시 저장했습니다.
+   * 아이가 저금통에 크레딧을 옮기는 도중에 이 저장이 끼면
+   * 그 사이 저금이 예전 값으로 덮어써져 사라집니다(잃어버린 갱신).
+   */
   const { error: upErr } = await db
     .from('child_stats')
     .update({
       credits: newCredits,
-      credits_wallet: 0,
-      credits_piggy: piggy,
     })
     .eq('child_id', childId)
 

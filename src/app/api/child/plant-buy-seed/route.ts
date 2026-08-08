@@ -111,7 +111,7 @@ export async function POST(req: NextRequest) {
 
     const newCredits = currentCredits - cost
 
-    const { ok: updated, error: upErr } = await applySeedPurchaseUpdate(db, childId, newCredits, piggy, treeId)
+    const { ok: updated, error: upErr } = await applySeedPurchaseUpdate(db, childId, newCredits, treeId)
     if (!updated) {
       console.error('[plant-buy-seed] update failed', upErr)
       return NextResponse.json(

@@ -257,7 +257,6 @@ export async function POST(req: NextRequest) {
       newStreak = stats.last_mission_date === yesterday ? newStreak + 1 : 1
     }
 
-    const keepPiggy = readChildStatInt(stats.credits_piggy)
     const baseCredits = readChildStatInt(stats.credits)
     const baseHearts = readChildStatInt(stats.hearts)
     const baseTotalCreditsEarned = readChildStatInt(stats.total_credits_earned)
@@ -284,9 +283,14 @@ export async function POST(req: NextRequest) {
     const { error: statsUpdateErr } = await supabase
       .from('child_stats')
       .update({
+        /**
+         * `credits_piggy` · `credits_wallet` 은 **일부러 건드리지 않습니다.**
+         * 이 경로는 저금통을 관리하지 않는데도 요청 시작 시점에 읽어 둔 값을 다시 저장했습니다.
+         * 아이가 저금통에 크레딧을 옮기는 도중(1개씩 약 2초 간격) 미션 완료가 끼면,
+         * 그 사이에 들어간 저금이 예전 값으로 덮어써져 사라졌습니다(잃어버린 갱신).
+         * 저금통을 바꾸는 곳은 옮기기(CAS)와 이자 정산뿐이어야 합니다.
+         */
         credits: baseCredits + creditEarned,
-        credits_wallet: 0,
-        credits_piggy: keepPiggy,
         hearts: baseHearts + heartEarned,
         total_credits_earned: baseTotalCreditsEarned + creditEarned,
         exp: newExp,
