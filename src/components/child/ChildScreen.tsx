@@ -171,15 +171,6 @@ const STALE_STATS_GUARD_MS = 6000
 /** 이 시간이 지나도 미션 카드가 없으면 그때 「아직 미션이 없어요」로 확정합니다 */
 const MISSION_EMPTY_CONFIRM_MS = 2500
 
-/**
- * 저장이 이 시간보다 오래 밀릴 때만 「계산 중」을 띄웁니다.
- *
- * 카드를 연달아 누르고 마켓·저금통을 빠르게 오가면 저장이 줄을 서고,
- * 그동안 화면 숫자가 확정 전 값이라 잠깐 흔들려 보입니다.
- * 보통은 순식간에 끝나므로, 실제로 밀린 경우에만 알려 줍니다.
- */
-const STATS_CALCULATING_NOTICE_MS = 3000
-
 /** 화분 단계 상승(물주기로 stage+1) 시 재생할 효과음 */
 const PLANT_STAGE_UP_SOUND_SRC =
   '/assets/audio/missions/get_badge-christmas-reveal-tones-2988.wav' as const
@@ -966,9 +957,6 @@ export default function ChildScreen({
    * 이 시간 안에 카드가 오면 안내는 뜨지 않고, 지나도 없으면 그때 비었다고 알립니다.
    */
   const [missionEmptyConfirmed, setMissionEmptyConfirmed] = useState(false)
-  /** 저장이 밀려 숫자가 아직 확정되지 않았을 때 「계산 중」을 보여 줍니다 */
-  const [statsCalculating, setStatsCalculating] = useState(false)
-  const statsPendingSinceRef = useRef<number | null>(null)
   const missionAutoSyncAttemptedRef = useRef(false)
 
   /** 전체 홈을 다시 읽지 않고 오늘의 미션만 생성·조회해 즉시 화면에 반영합니다. */
@@ -1600,26 +1588,6 @@ export default function ChildScreen({
   const triggerBadgeShine = useCallback(() => {
     setBadgeShine(true)
     setTimeout(() => setBadgeShine(false), 600)
-  }, [])
-
-  /**
-   * 아직 저장되지 않은 값이 남아 있는지 주기적으로 확인합니다.
-   * (대기 카운터는 ref 라 값이 바뀌어도 화면이 다시 그려지지 않아 이렇게 봅니다.)
-   */
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      if (pendingStatsWritesRef.current <= 0) {
-        statsPendingSinceRef.current = null
-        setStatsCalculating(false)
-        return
-      }
-      if (statsPendingSinceRef.current === null) {
-        statsPendingSinceRef.current = Date.now()
-      } else if (Date.now() - statsPendingSinceRef.current >= STATS_CALCULATING_NOTICE_MS) {
-        setStatsCalculating(true)
-      }
-    }, 500)
-    return () => window.clearInterval(timer)
   }, [])
 
   /** 카드가 하나라도 오면 확정을 풀고, 계속 비어 있으면 잠시 뒤 「없음」으로 확정합니다 */
@@ -2922,21 +2890,12 @@ export default function ChildScreen({
                 </button>
               </div>
               {/**
-                * 계산 중 — 저장이 밀려 숫자가 아직 확정되지 않았을 때만 뜹니다.
-                * 새로고침 버튼과 헷갈리지 않도록 반대쪽에 두고, 도는 원 대신 깜빡이는 점을 씁니다.
-                * (저금통 옮기기와 미션 새로고침은 서로 아무 관계가 없습니다.)
+                * 「계산 중」은 여기 두지 않습니다.
+                * 저금통 저장 상태를 미션 카드 옆에 띄웠더니, 저금통을 옮기는데
+                * 미션이 새로 불러와지는 것처럼 보여 오히려 혼란스러웠습니다.
+                * 저장 안내는 그 일이 일어나는 자리(저금통 팝업)에서만 보여 줍니다.
                 */}
-              {statsCalculating ? (
-                <span
-                  className="flex shrink-0 items-center gap-1 rounded-full bg-white/25 px-2 py-0.5 text-[10px] font-black text-white"
-                  role="status"
-                  aria-live="polite"
-                >
-                  <span className="inline-block h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-white" aria-hidden />
-                  계산 중
-                </span>
-              ) : null}
-              {visibleMissions.length > 0 && !statsCalculating ? (
+              {visibleMissions.length > 0 ? (
                 <div className="flex shrink-0 items-center gap-1.5">
                   {/**
                    * 오늘의 미션 진행도 바(0~100%).

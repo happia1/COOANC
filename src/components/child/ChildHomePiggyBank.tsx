@@ -58,6 +58,12 @@ const TRANSFER_CHUNKS = [10, 50, 100] as const
  */
 const SYNCING_NOTICE_DELAY_MS = 3000
 
+/**
+ * 연속으로 누른 것을 이 시간만큼 모았다가 **한 번에** 보냅니다.
+ * 10을 세 번 누르면 요청 세 번이 아니라 「30을 한 번」이 나갑니다.
+ */
+const TRANSFER_COALESCE_MS = 350
+
 /** 저금통 입구(동전이 들어가는 지점) — 저금통 그림 기준 세로 % */
 const PIGGY_SLOT_Y_RATIO = 0.42
 
@@ -150,6 +156,7 @@ export default function ChildHomePiggyBank({
     setPortalReady(true)
     return () => {
       if (syncingTimerRef.current !== null) window.clearTimeout(syncingTimerRef.current)
+      if (coalesceTimerRef.current !== null) window.clearTimeout(coalesceTimerRef.current)
     }
   }, [])
 
@@ -276,26 +283,69 @@ export default function ChildHomePiggyBank({
     [childId, onPiggyUpdate, rollbackOptimistic],
   )
 
+  /**
+   * 연속으로 누른 것을 **한 번의 요청으로 합쳐서** 보냅니다.
+   *
+   * 왜: 예전에는 누를 때마다 요청을 하나씩 줄 세워 보냈습니다.
+   * 10을 세 번 누르면 요청이 세 번 나가고 순서대로 처리되니 그만큼 오래 걸렸습니다.
+   * 이제 잠깐(약 0.35초) 기다렸다가 그동안 누른 만큼을 더해서 한 번만 보냅니다.
+   * 화면 숫자는 누르는 즉시 바뀌므로 반응이 느려지지는 않습니다.
+   */
+  const pendingCoalesceRef = useRef<{
+    kind: TransferKind
+    requested: number
+    optimistic: number
+  } | null>(null)
+  const coalesceTimerRef = useRef<number | null>(null)
+
+  const flushTransfer = useCallback(() => {
+    if (coalesceTimerRef.current !== null) {
+      window.clearTimeout(coalesceTimerRef.current)
+      coalesceTimerRef.current = null
+    }
+    const batch = pendingCoalesceRef.current
+    pendingCoalesceRef.current = null
+    if (!batch) return
+
+    apiQueueRef.current = apiQueueRef.current
+      .then(() => syncTransferToServer(batch.kind, batch.requested, batch.optimistic))
+      .catch((err) => {
+        console.warn('[ChildHomePiggyBank] transfer queue failed', err)
+      })
+  }, [syncTransferToServer])
+
   const enqueueTransfer = useCallback(
     (kind: TransferKind, requested: number, optimisticAmount: number) => {
-      pendingTransferCountRef.current += 1
-      if (pendingTransferCountRef.current === 1) {
-        lastConfirmedBalanceRef.current = null
-        onPiggyTransferPending?.(true)
-        if (syncingTimerRef.current === null) {
-          syncingTimerRef.current = window.setTimeout(() => {
-            syncingTimerRef.current = null
-            if (pendingTransferCountRef.current > 0) setSyncing(true)
-          }, SYNCING_NOTICE_DELAY_MS)
+      /** 방향이 바뀌면 모아 둔 것을 먼저 보냅니다(넣기와 꺼내기를 섞어 더할 수 없으므로) */
+      if (pendingCoalesceRef.current && pendingCoalesceRef.current.kind !== kind) {
+        flushTransfer()
+      }
+
+      const prev = pendingCoalesceRef.current
+      pendingCoalesceRef.current = {
+        kind,
+        requested: (prev?.requested ?? 0) + requested,
+        optimistic: (prev?.optimistic ?? 0) + optimisticAmount,
+      }
+
+      if (prev === null) {
+        pendingTransferCountRef.current += 1
+        if (pendingTransferCountRef.current === 1) {
+          lastConfirmedBalanceRef.current = null
+          onPiggyTransferPending?.(true)
+          if (syncingTimerRef.current === null) {
+            syncingTimerRef.current = window.setTimeout(() => {
+              syncingTimerRef.current = null
+              if (pendingTransferCountRef.current > 0) setSyncing(true)
+            }, SYNCING_NOTICE_DELAY_MS)
+          }
         }
       }
-      apiQueueRef.current = apiQueueRef.current
-        .then(() => syncTransferToServer(kind, requested, optimisticAmount))
-        .catch((err) => {
-          console.warn('[ChildHomePiggyBank] transfer queue failed', err)
-        })
+
+      if (coalesceTimerRef.current !== null) window.clearTimeout(coalesceTimerRef.current)
+      coalesceTimerRef.current = window.setTimeout(flushTransfer, TRANSFER_COALESCE_MS)
     },
-    [onPiggyTransferPending, syncTransferToServer],
+    [flushTransfer, onPiggyTransferPending],
   )
 
   /**
