@@ -141,6 +141,12 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({
     credits: nextCredits,
     credits_piggy: nextPiggy,
+    /**
+     * 이 저장이 언제 것인지 — 화면이 「이보다 오래된 Realtime 알림」을 무시하는 데 씁니다.
+     * (미션 완료 시 DB 트리거가 옛 크레딧으로 한 번 더 저장하는데,
+     *  그 알림이 늦게 도착해 화면 숫자를 과거로 되돌리던 문제를 막습니다.)
+     */
+    updated_at: applied.updatedAt,
     /** 실제로 옮겨진 수량 — 누른 수량보다 적을 수 있습니다(잔액 한도) */
     moved: movedAmount,
     itemUnlocked:

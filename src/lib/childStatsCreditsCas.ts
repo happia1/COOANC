@@ -27,7 +27,7 @@ export type ChildCreditsSnapshot = {
 }
 
 export type CreditsCasResult =
-  | { ok: true; credits: number; piggy: number; hearts: number }
+  | { ok: true; credits: number; piggy: number; hearts: number; updatedAt: string }
   | { ok: false; reason: 'rejected'; message: string; current: ChildCreditsSnapshot }
   | { ok: false; reason: 'conflict' | 'db' }
 
@@ -72,13 +72,16 @@ export async function applyChildCreditsCas(
     const nextPiggy = decided.piggy ?? current.piggy
     const nextHearts = decided.hearts ?? current.hearts
 
+    /** 이 저장의 시각 — 화면이 「이보다 오래된 알림」을 걸러낼 수 있게 응답으로 돌려줍니다 */
+    const updatedAt = new Date().toISOString()
+
     const patch: Record<string, unknown> = {
       credits: nextCredits,
       credits_wallet: 0,
       credits_piggy: nextPiggy,
       hearts: nextHearts,
       /** Realtime 이벤트 순서를 화면이 판별할 수 있도록 매번 갱신합니다 */
-      updated_at: new Date().toISOString(),
+      updated_at: updatedAt,
       ...(options?.extraPatch ?? {}),
     }
 
@@ -97,7 +100,13 @@ export async function applyChildCreditsCas(
       return { ok: false as const, reason: 'db' as const }
     }
     if (updated && updated.length > 0) {
-      return { ok: true as const, credits: nextCredits, piggy: nextPiggy, hearts: nextHearts }
+      return {
+        ok: true as const,
+        credits: nextCredits,
+        piggy: nextPiggy,
+        hearts: nextHearts,
+        updatedAt,
+      }
     }
     /** 경합 — 최신 값으로 다시 계산해 재시도 */
   }
