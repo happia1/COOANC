@@ -2896,23 +2896,6 @@ export default function ChildScreen({
               <div className="flex min-w-0 items-center gap-1.5">
                 <p className="min-w-0 text-[clamp(0.875rem,calc(0.8rem+0.2vw),1.125rem)] font-black text-white drop-shadow">오늘의 미션</p>
                 {/**
-                  * 계산 중 — 저장이 밀려 숫자가 아직 확정되지 않았을 때만 뜹니다.
-                  * 「돈이 이상해졌다」가 아니라 「아직 계산이 안 끝났다」로 읽히게 하는 것이 목적입니다.
-                  */}
-                {statsCalculating ? (
-                  <span
-                    className="flex shrink-0 items-center gap-1 rounded-full bg-white/25 px-2 py-0.5 text-[10px] font-black text-white"
-                    role="status"
-                    aria-live="polite"
-                  >
-                    <span
-                      className="inline-block h-2.5 w-2.5 shrink-0 animate-spin rounded-full border-2 border-white/50 border-t-white"
-                      aria-hidden
-                    />
-                    계산 중
-                  </span>
-                ) : null}
-                {/**
                   * 새로고침 — 동그란 배경이 아이콘보다 작아 아래로 밀리고 찌그러져 보였습니다.
                   * 배경을 키우고(h-6 w-6) 아이콘을 가운데 정렬해 깔끔한 새로고침 모양으로 맞췄습니다.
                   */}
@@ -2938,7 +2921,22 @@ export default function ChildScreen({
                   </svg>
                 </button>
               </div>
-              {visibleMissions.length > 0 ? (
+              {/**
+                * 계산 중 — 저장이 밀려 숫자가 아직 확정되지 않았을 때만 뜹니다.
+                * 새로고침 버튼과 헷갈리지 않도록 반대쪽에 두고, 도는 원 대신 깜빡이는 점을 씁니다.
+                * (저금통 옮기기와 미션 새로고침은 서로 아무 관계가 없습니다.)
+                */}
+              {statsCalculating ? (
+                <span
+                  className="flex shrink-0 items-center gap-1 rounded-full bg-white/25 px-2 py-0.5 text-[10px] font-black text-white"
+                  role="status"
+                  aria-live="polite"
+                >
+                  <span className="inline-block h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-white" aria-hidden />
+                  계산 중
+                </span>
+              ) : null}
+              {visibleMissions.length > 0 && !statsCalculating ? (
                 <div className="flex shrink-0 items-center gap-1.5">
                   {/**
                    * 오늘의 미션 진행도 바(0~100%).

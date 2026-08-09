@@ -22,6 +22,8 @@ export type ChildCreditsSnapshot = {
   credits: number
   piggy: number
   hearts: number
+  /** 레벨도 같이 읽어 둡니다 — 레벨 확인 때문에 따로 한 번 더 조회하지 않으려고 */
+  level: number
 }
 
 export type CreditsCasResult =
@@ -48,7 +50,7 @@ export async function applyChildCreditsCas(
   for (let attempt = 0; attempt < CREDITS_CAS_MAX_ATTEMPTS; attempt += 1) {
     const { data: row, error: readErr } = await supabase
       .from('child_stats')
-      .select('credits, credits_piggy, hearts')
+      .select('credits, credits_piggy, hearts, current_level')
       .eq('child_id', childId)
       .maybeSingle()
 
@@ -58,6 +60,7 @@ export async function applyChildCreditsCas(
       credits: readChildStatInt(row.credits),
       piggy: readChildStatInt(row.credits_piggy),
       hearts: readChildStatInt(row.hearts),
+      level: readChildStatInt(row.current_level),
     }
 
     const decided = compute(current)

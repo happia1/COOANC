@@ -11,6 +11,12 @@ import { isPiggyBankUnlocked } from '@/constants/childAgeConfig'
  *
  * - `credits_to_piggy`: 레벨 블록 가용 크레딧(`credits`) → 저금통(`credits_piggy`)으로 옮깁니다.
  * - `piggy_to_credits`: 저금통(`credits_piggy`) → 가용 크레딧(`credits`)으로 옮깁니다.
+ *
+ * 속도에 대해(비개발자 설명):
+ *   예전에는 한 번 옮길 때마다 서버가 여러 번 왕복했습니다.
+ *   인증 → 역할 확인 → 레벨 조회 → 잔액 읽기 → 저장 → 게임 트리거 → 이자 정산.
+ *   그래서 옮기기 한 번에 몇 초가 걸렸고 「계산 중」이 계속 떠 있었습니다.
+ *   지금은 꼭 기다려야 하는 것만 남기고, 나머지는 응답을 보낸 뒤 뒤에서 처리합니다.
  */
 const KINDS = ['credits_to_piggy', 'piggy_to_credits'] as const
 
@@ -48,49 +54,23 @@ export async function POST(req: NextRequest) {
   if (resolved.ok === false) return resolved.response
   const childId = resolved.childId
 
-  const statsRes = await supabase
-    .from('child_stats')
-    .select('credits, credits_piggy, current_level')
-    .eq('child_id', childId)
-    .maybeSingle()
-
-  const stats = statsRes.data
-  const statsErr = statsRes.error
-
-  if (statsErr?.code === '42703') {
-    return NextResponse.json(
-      { error: '앱 업데이트가 필요해요. 관리자에게 데이터베이스 마이그레이션을 적용해 달라고 요청해 주세요.' },
-      { status: 503 },
-    )
-  }
-  if (statsErr) {
-    return NextResponse.json({ error: '스탯 정보를 읽지 못했어요' }, { status: 500 })
-  }
-  if (!stats) return NextResponse.json({ error: '스탯 정보를 찾을 수 없어요' }, { status: 404 })
-
-  const level = stats.current_level ?? 0
-  if (!isPiggyBankUnlocked(level)) {
-    return NextResponse.json({ error: '저금통은 레벨 5부터 사용할 수 있어요' }, { status: 403 })
-  }
-
-  const fromBucket: 'basket' | 'piggy' = kind === 'credits_to_piggy' ? 'basket' : 'piggy'
-  const toBucket: 'basket' | 'piggy' = kind === 'credits_to_piggy' ? 'piggy' : 'basket'
-
-  /**
-   * 옮기기는 CAS 로 처리합니다.
-   * 예전에는 읽은 잔액으로 credits·credits_piggy 를 통째로 덮어써서, 그사이 미션 보상이나
-   * 결제가 저장되면 그 결과가 지워지고 화면 숫자가 튀었습니다(저금통에서 크레딧이 왔다갔다).
-   */
   /**
    * 실제로 옮긴 수량 — **서버가 정합니다.**
    *
    * 왜 서버가 정하나: 예전에는 화면이 「가진 만큼만」 잘라서 보냈는데,
    * 화면의 낙관적 잔액이 서버와 어긋나 있으면 50을 눌러도 10만 옮겨졌습니다.
    * 이제 화면은 누른 수량을 그대로 보내고, 서버가 잔액을 보고 가능한 만큼 옮깁니다.
+   *
+   * 레벨 확인도 여기서 함께 합니다 — 잔액을 읽을 때 레벨도 같이 읽어 오므로,
+   * 레벨 때문에 서버가 한 번 더 왕복하지 않습니다.
    */
   let movedAmount = 0
 
   const applied = await applyChildCreditsCas(supabase, childId, (current) => {
+    if (!isPiggyBankUnlocked(current.level)) {
+      return { ok: false as const, message: '저금통은 레벨 5부터 사용할 수 있어요' }
+    }
+
     const room = kind === 'credits_to_piggy' ? current.credits : current.piggy
     /** 잔액보다 많이 눌렀으면 실패시키지 않고 잔액만큼만 옮깁니다 */
     const move = Math.min(amount, room)
@@ -124,7 +104,10 @@ export async function POST(req: NextRequest) {
 
   const nextCredits = applied.credits
   const nextPiggy = applied.piggy
+  const fromBucket: 'basket' | 'piggy' = kind === 'credits_to_piggy' ? 'basket' : 'piggy'
+  const toBucket: 'basket' | 'piggy' = kind === 'credits_to_piggy' ? 'piggy' : 'basket'
 
+  /** 옮김 기록 — 화면이 기다릴 이유가 없어 응답 뒤에 저장합니다 */
   void supabase
     .from('credit_transfer_logs')
     .insert({
@@ -137,40 +120,29 @@ export async function POST(req: NextRequest) {
       if (logErr) console.error('[credit_transfer_logs]', logErr.message)
     })
 
+  /**
+   * 저금통 이자 정산 — **기다리지 않습니다.**
+   * 자녀 앱이 열릴 때도 같은 정산이 돌기 때문에 여기서 결과를 기다릴 이유가 없고,
+   * 기다리면 옮기기 응답이 그만큼 늦어져 「계산 중」이 오래 떠 있었습니다.
+   */
+  void supabase.rpc('settle_piggy_bonus', { p_child_id: childId }).then(({ error }) => {
+    if (error) console.warn('[credits/transfer] 저금통 이자 정산 실패:', error.message)
+  })
+
+  /**
+   * 첫 저금 보상(게임 아이템 해금)만 기다립니다 — 응답에 실어 보내야 팝업이 뜹니다.
+   * 꺼내기(piggy_to_credits)는 해당 없으므로 아예 호출하지 않습니다.
+   */
   const triggerResult =
     kind === 'credits_to_piggy'
       ? await fireGameTrigger(supabase, childId, 'FIRST_SAVE')
       : { fired: false, unlockedItemIndex: null }
-
-  /**
-   * 저금통 이자 기간을 서버에서 갱신합니다.
-   * - 10크레딧 이상이 되면 기간 시작, 10 미만으로 내려가면 리셋
-   * - 3일이 지났으면 이자를 「받을 보너스」(piggy_bonus_pending)에 쌓습니다.
-   *   저금통 잔액은 건드리지 않습니다 — 자녀가 코인을 눌러서 받아 가야 크레딧이 됩니다.
-   * 실패해도(마이그레이션 미적용 등) 옮기기 자체는 이미 저장되었으므로 무시합니다.
-   */
-  let bonusPaid = 0
-  let bonusPending = 0
-  const { data: settled, error: settleErr } = await supabase.rpc('settle_piggy_bonus', {
-    p_child_id: childId,
-  })
-  if (settleErr) {
-    console.warn('[credits/transfer] 저금통 이자 정산 실패(128 마이그레이션 필요?):', settleErr.message)
-  } else if (settled && typeof settled === 'object') {
-    const s = settled as { paid?: number; pending?: number }
-    bonusPaid = Number(s.paid ?? 0)
-    bonusPending = Number(s.pending ?? 0)
-  }
 
   return NextResponse.json({
     credits: nextCredits,
     credits_piggy: nextPiggy,
     /** 실제로 옮겨진 수량 — 누른 수량보다 적을 수 있습니다(잔액 한도) */
     moved: movedAmount,
-    /** 이번 옮기기 직후 새로 붙은 이자(0이면 없음) */
-    piggy_bonus_paid: bonusPaid,
-    /** 아직 받아 가지 않고 쌓여 있는 이자 = 저금통 위에 뜰 코인 개수 */
-    piggy_bonus_pending: bonusPending,
     itemUnlocked:
       triggerResult.fired && triggerResult.unlockedItemIndex !== null
         ? { index: triggerResult.unlockedItemIndex, triggerKey: 'FIRST_SAVE' }
