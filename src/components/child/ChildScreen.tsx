@@ -168,6 +168,18 @@ function rollbackOptimisticMissionMoneyRewards(
  */
 const STALE_STATS_GUARD_MS = 6000
 
+/** 이 시간이 지나도 미션 카드가 없으면 그때 「아직 미션이 없어요」로 확정합니다 */
+const MISSION_EMPTY_CONFIRM_MS = 2500
+
+/**
+ * 저장이 이 시간보다 오래 밀릴 때만 「계산 중」을 띄웁니다.
+ *
+ * 카드를 연달아 누르고 마켓·저금통을 빠르게 오가면 저장이 줄을 서고,
+ * 그동안 화면 숫자가 확정 전 값이라 잠깐 흔들려 보입니다.
+ * 보통은 순식간에 끝나므로, 실제로 밀린 경우에만 알려 줍니다.
+ */
+const STATS_CALCULATING_NOTICE_MS = 3000
+
 /** 화분 단계 상승(물주기로 stage+1) 시 재생할 효과음 */
 const PLANT_STAGE_UP_SOUND_SRC =
   '/assets/audio/missions/get_badge-christmas-reveal-tones-2988.wav' as const
@@ -946,6 +958,17 @@ export default function ChildScreen({
   const [missionList, setMissionList] = useState<DailyMissionWithTemplate[]>(dailyMissions)
   const [missionSyncing, setMissionSyncing] = useState(false)
   const [missionSyncError, setMissionSyncError] = useState<string | null>(null)
+  /**
+   * 「미션이 없다」고 단정하기 전 잠깐 기다립니다.
+   *
+   * 왜: 화면이 뜨자마자 카드가 아직 안 왔을 뿐인데 「아직 미션이 없어요」가 보여서,
+   * 아이·부모가 카드가 다 사라진 줄 알고 당황했습니다.
+   * 이 시간 안에 카드가 오면 안내는 뜨지 않고, 지나도 없으면 그때 비었다고 알립니다.
+   */
+  const [missionEmptyConfirmed, setMissionEmptyConfirmed] = useState(false)
+  /** 저장이 밀려 숫자가 아직 확정되지 않았을 때 「계산 중」을 보여 줍니다 */
+  const [statsCalculating, setStatsCalculating] = useState(false)
+  const statsPendingSinceRef = useRef<number | null>(null)
   const missionAutoSyncAttemptedRef = useRef(false)
 
   /** 전체 홈을 다시 읽지 않고 오늘의 미션만 생성·조회해 즉시 화면에 반영합니다. */
@@ -1578,6 +1601,36 @@ export default function ChildScreen({
     setBadgeShine(true)
     setTimeout(() => setBadgeShine(false), 600)
   }, [])
+
+  /**
+   * 아직 저장되지 않은 값이 남아 있는지 주기적으로 확인합니다.
+   * (대기 카운터는 ref 라 값이 바뀌어도 화면이 다시 그려지지 않아 이렇게 봅니다.)
+   */
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      if (pendingStatsWritesRef.current <= 0) {
+        statsPendingSinceRef.current = null
+        setStatsCalculating(false)
+        return
+      }
+      if (statsPendingSinceRef.current === null) {
+        statsPendingSinceRef.current = Date.now()
+      } else if (Date.now() - statsPendingSinceRef.current >= STATS_CALCULATING_NOTICE_MS) {
+        setStatsCalculating(true)
+      }
+    }, 500)
+    return () => window.clearInterval(timer)
+  }, [])
+
+  /** 카드가 하나라도 오면 확정을 풀고, 계속 비어 있으면 잠시 뒤 「없음」으로 확정합니다 */
+  useEffect(() => {
+    if (visibleMissions.length > 0) {
+      setMissionEmptyConfirmed(false)
+      return
+    }
+    const timer = window.setTimeout(() => setMissionEmptyConfirmed(true), MISSION_EMPTY_CONFIRM_MS)
+    return () => window.clearTimeout(timer)
+  }, [visibleMissions.length])
 
   /**
    * 미션 완료 핸들러.
@@ -2842,8 +2895,47 @@ export default function ChildScreen({
             >
               <div className="flex min-w-0 items-center gap-1.5">
                 <p className="min-w-0 text-[clamp(0.875rem,calc(0.8rem+0.2vw),1.125rem)] font-black text-white drop-shadow">오늘의 미션</p>
-                <button type="button" onClick={() => void handleChildHomeRefresh()} disabled={missionSyncing} className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-white/15 text-white/85 transition active:scale-90 disabled:opacity-60" aria-label={missionSyncing ? '오늘의 미션 불러오는 중' : '오늘의 미션 새로고침'}>
-                  <svg viewBox="0 0 24 24" className={`h-3 w-3 ${missionSyncing ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 1 0 2 5.3" /><path d="M20 4v7h-7" /></svg>
+                {/**
+                  * 계산 중 — 저장이 밀려 숫자가 아직 확정되지 않았을 때만 뜹니다.
+                  * 「돈이 이상해졌다」가 아니라 「아직 계산이 안 끝났다」로 읽히게 하는 것이 목적입니다.
+                  */}
+                {statsCalculating ? (
+                  <span
+                    className="flex shrink-0 items-center gap-1 rounded-full bg-white/25 px-2 py-0.5 text-[10px] font-black text-white"
+                    role="status"
+                    aria-live="polite"
+                  >
+                    <span
+                      className="inline-block h-2.5 w-2.5 shrink-0 animate-spin rounded-full border-2 border-white/50 border-t-white"
+                      aria-hidden
+                    />
+                    계산 중
+                  </span>
+                ) : null}
+                {/**
+                  * 새로고침 — 동그란 배경이 아이콘보다 작아 아래로 밀리고 찌그러져 보였습니다.
+                  * 배경을 키우고(h-6 w-6) 아이콘을 가운데 정렬해 깔끔한 새로고침 모양으로 맞췄습니다.
+                  */}
+                <button
+                  type="button"
+                  onClick={() => void handleChildHomeRefresh()}
+                  disabled={missionSyncing}
+                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/20 text-white transition active:scale-90 disabled:opacity-60"
+                  aria-label={missionSyncing ? '오늘의 미션 불러오는 중' : '오늘의 미션 새로고침'}
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    className={`h-3.5 w-3.5 ${missionSyncing ? 'animate-spin' : ''}`}
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M20 11a8 8 0 1 0 2 5.3" />
+                    <path d="M20 4v7h-7" />
+                  </svg>
                 </button>
               </div>
               {visibleMissions.length > 0 ? (
@@ -2880,13 +2972,65 @@ export default function ChildScreen({
             {/* 미션 카드 가로 스크롤 */}
             {visibleMissions.length === 0 ? (
               <div className="px-5 min-[400px]:px-6">
+                {/**
+                  * 카드가 없을 때의 세 가지 상태.
+                  * 불러오는 중 → 오류 → 정말 없음 순으로 판단합니다.
+                  * 「없음」은 잠깐 기다려 확정된 뒤에만 보여 줍니다(로딩을 없음으로 오해하지 않게).
+                  */}
                 <div className="bg-white/80 backdrop-blur-sm rounded-2xl px-4 py-5 text-center">
-                  <p className="font-bold text-gray-600 text-sm">
-                    {missionSyncing ? '오늘의 미션을 불러오는 중이에요' : missionSyncError ? '미션을 불러오지 못했어요' : '아직 미션이 없어요'}
-                  </p>
-                  <p className="text-xs text-gray-400 mt-1">
-                    {missionSyncing ? '잠시만 기다려 주세요.' : missionSyncError ? '위의 새로고침 버튼을 다시 눌러 주세요.' : '부모님이 미션을 만들어주실 거예요!'}
-                  </p>
+                  {missionSyncing || (!missionSyncError && !missionEmptyConfirmed) ? (
+                    <>
+                      <p className="flex items-center justify-center gap-2 text-sm font-bold text-gray-600">
+                        <svg
+                          viewBox="0 0 24 24"
+                          className="h-4 w-4 shrink-0 animate-spin"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          aria-hidden
+                        >
+                          <path d="M20 11a8 8 0 1 0 2 5.3" />
+                          <path d="M20 4v7h-7" />
+                        </svg>
+                        미션 카드를 불러오는 중이에요
+                      </p>
+                      <p className="mt-1 text-xs text-gray-400">잠시만 기다려 주세요.</p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-sm font-bold text-gray-600">
+                        {missionSyncError ? '미션을 불러오지 못했어요' : '아직 미션이 없어요'}
+                      </p>
+                      <p className="mt-1 text-xs text-gray-400">
+                        {missionSyncError
+                          ? '아래 새로고침을 눌러 다시 불러와 주세요.'
+                          : '부모님이 미션을 만들어주실 거예요!'}
+                      </p>
+                      {/* 비었을 때는 여기서도 바로 다시 불러올 수 있게 합니다 */}
+                      <button
+                        type="button"
+                        onClick={() => void handleChildHomeRefresh()}
+                        className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-3.5 py-2 text-xs font-bold text-gray-600 transition active:scale-95"
+                      >
+                        <svg
+                          viewBox="0 0 24 24"
+                          className="h-3.5 w-3.5 shrink-0"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          aria-hidden
+                        >
+                          <path d="M20 11a8 8 0 1 0 2 5.3" />
+                          <path d="M20 4v7h-7" />
+                        </svg>
+                        새로고침
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             ) : incompleteOrdered.length === 0 ? (

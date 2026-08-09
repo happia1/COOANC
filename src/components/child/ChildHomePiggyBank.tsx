@@ -49,8 +49,14 @@ function playPiggyStageUpSound() {
  */
 const TRANSFER_CHUNKS = [10, 50, 100] as const
 
-/** 저장이 이 시간보다 오래 걸릴 때만 「계산 중」을 띄웁니다(짧은 저장까지 깜빡이지 않게) */
-const SYNCING_NOTICE_DELAY_MS = 400
+/**
+ * 저장이 이 시간보다 오래 걸릴 때만 「계산 중」을 띄웁니다.
+ *
+ * 3초로 둔 이유: 한두 개 옮기는 보통 상황은 순식간에 끝나는데 그때마다 안내가 깜빡이면
+ * 오히려 쓰기 불편합니다. 카드를 연달아 누르고 마켓·저금통을 빠르게 오갈 때처럼
+ * **실제로 처리가 밀린 경우에만** 알려 줍니다.
+ */
+const SYNCING_NOTICE_DELAY_MS = 3000
 
 /** 저금통 입구(동전이 들어가는 지점) — 저금통 그림 기준 세로 % */
 const PIGGY_SLOT_Y_RATIO = 0.42
@@ -587,8 +593,7 @@ export default function ChildHomePiggyBank({
           {syncing ? (
             <p className="mt-3 flex items-center justify-center gap-1.5 text-center text-xs font-black text-amber-700">
               <span
-                className="inline-block h-3 w-3 shrink-0 rounded-full border-2 border-amber-300 border-t-amber-700"
-                style={{ animation: 'piggySyncSpin 0.7s linear infinite' }}
+                className="inline-block h-3 w-3 shrink-0 animate-spin rounded-full border-2 border-amber-300 border-t-amber-700"
                 aria-hidden
               />
               계산 중이에요
@@ -619,9 +624,6 @@ export default function ChildHomePiggyBank({
             0% { transform: scale(1); }
             35% { transform: scale(1.08); }
             100% { transform: scale(1); }
-          }
-          @keyframes piggySyncSpin {
-            to { transform: rotate(360deg); }
           }
           @keyframes piggyCreditFly {
             0% {
