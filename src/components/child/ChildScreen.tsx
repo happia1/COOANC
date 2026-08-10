@@ -2460,27 +2460,15 @@ export default function ChildScreen({
   }, [])
 
   /** 저금통 팝업에서 가용·저금통 잔액을 반영합니다. */
-  const patchPiggyFromHome = useCallback(
-    (p: { credits: number; credits_piggy: number; updatedAt?: string }) => {
+  const patchPiggyFromHome = useCallback((p: { credits: number; credits_piggy: number }) => {
     /**
      * 옮기기 직후 짧은 창 동안은 뒤늦게 도착한 서버 알림이 이 값을 덮어쓰지 않게 합니다.
      * (미션 완료와 같은 보호 — 예전에는 저금통 쪽에만 이 표시가 없어서, 마지막 옮기기가 끝나
      *  대기 카운터가 0이 되는 순간 밀린 옛 알림들이 들어와 숫자가 왔다갔다 했습니다.)
      */
-      if (typeof performance !== 'undefined') lastLocalStatsBumpAtRef.current = performance.now()
-      /**
-       * 서버가 이 값을 저장한 시각을 기억해 둡니다.
-       *
-       * 왜 필요한가: 미션을 완료하면 DB 트리거가 `child_stats` 를 한 번 더 저장하는데,
-       * 그때 담기는 크레딧은 보상 반영 **전** 옛 값입니다.
-       * 그 알림이 뒤늦게 도착하면 화면 숫자가 저절로 과거로 되돌아가 보였습니다.
-       * 여기서 시각을 기록해 두면 그보다 오래된 알림은 돈 항목에서 걸러집니다.
-       */
-      if (p.updatedAt) rememberServerStatsAt({ updated_at: p.updatedAt })
-      setStats((prev) => (prev ? mergeChildStatsPatch(prev, p) : prev))
-    },
-    [],
-  )
+    if (typeof performance !== 'undefined') lastLocalStatsBumpAtRef.current = performance.now()
+    setStats((prev) => (prev ? mergeChildStatsPatch(prev, p) : prev))
+  }, [])
 
   const setPiggyTransferPending = useCallback((pending: boolean) => {
     pendingStatsWritesRef.current = Math.max(0, pendingStatsWritesRef.current + (pending ? 1 : -1))

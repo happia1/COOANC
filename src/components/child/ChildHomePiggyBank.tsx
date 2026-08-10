@@ -101,11 +101,7 @@ type Props = {
    * 코인이 날아갈 목적지로 이 위치를 씁니다(팝업이 닫혀 있어 패널 좌표가 없기 때문).
    */
   levelCreditRef?: React.RefObject<HTMLDivElement | null>
-  /**
-   * `updatedAt` 은 서버가 그 값을 저장한 시각입니다.
-   * 화면이 「이보다 오래된 서버 알림」을 무시하는 데 씁니다(숫자가 과거로 되돌아가지 않게).
-   */
-  onPiggyUpdate: (patch: { credits: number; credits_piggy: number; updatedAt?: string }) => void
+  onPiggyUpdate: (patch: { credits: number; credits_piggy: number }) => void
   onPiggyTransferPending?: (pending: boolean) => void
   /** 아직 받아 가지 않은 이자 개수 — 저금통 위에 이 수만큼 반짝이는 코인이 뜹니다 */
   bonusPending?: number
@@ -148,11 +144,7 @@ export default function ChildHomePiggyBank({
   const [syncing, setSyncing] = useState(false)
   /** 아주 짧은 저장까지 깜빡이지 않도록, 이 시간 넘게 걸릴 때만 표시합니다 */
   const syncingTimerRef = useRef<number | null>(null)
-  const lastConfirmedBalanceRef = useRef<{
-    credits: number
-    credits_piggy: number
-    updatedAt?: string
-  } | null>(null)
+  const lastConfirmedBalanceRef = useRef<{ credits: number; credits_piggy: number } | null>(null)
   const [piggySrc, setPiggySrc] = useState(piggyBankVisualUrlFromSavedCredits(piggyCredits))
   /** 저금통 위에 떠 있는(아직 안 받은) 보너스 코인 개수 — 낙관적으로 먼저 줄입니다 */
   const [bonusCount, setBonusCount] = useState(bonusPending)
@@ -252,7 +244,6 @@ export default function ChildHomePiggyBank({
         error?: string
         credits?: number
         credits_piggy?: number
-        updated_at?: string
       }
       if (
         !res.ok ||
@@ -269,7 +260,6 @@ export default function ChildHomePiggyBank({
       lastConfirmedBalanceRef.current = {
         credits: json.credits,
         credits_piggy: json.credits_piggy,
-        updatedAt: json.updated_at,
       }
     } finally {
       pendingTransferCountRef.current = Math.max(0, pendingTransferCountRef.current - 1)
