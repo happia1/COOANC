@@ -22,7 +22,12 @@ import {
   type ParentChildUnlockMilestone,
 } from '@/lib/parentChildLevelUnlocks'
 import { useParentStore } from '@/store/parentStore'
-import ParentFeatureHowToCard from '@/components/parent/ParentFeatureHowToCard'
+import { openNoticeCenter } from '@/lib/noticeCenterBus'
+import {
+  acknowledgeParentOnboarding,
+  hasAcknowledgedParentOnboarding,
+  PARENT_ONBOARDING_LEVEL_UP_POPUP,
+} from '@/lib/parentOnboardingAck'
 import {
   PARENT_POPUP_BTN,
   PARENT_POPUP_OVERLAY,
@@ -45,10 +50,24 @@ export default function ParentChildLevelUpModal() {
   const router = useRouter()
   const setSelectedChildId = useParentStore((s) => s.setSelectedChildId)
   const [modal, setModal] = useState<ModalState>({ open: false })
+  /** 「다시 보지 않기」 체크 상태 — 닫을 때 한 번만 저장합니다 */
+  const [dontShowAgain, setDontShowAgain] = useState(false)
+  /** 이미 「다시 보지 않기」를 켜 둔 부모에게는 아예 띄우지 않습니다 */
+  const optedOutRef = useRef(false)
   const queueRef = useRef<LevelUpModalPayload[]>([])
   const levelByChildRef = useRef<Map<string, number>>(new Map())
   const nameByChildRef = useRef<Map<string, string>>(new Map())
   const bootstrapDoneRef = useRef(false)
+
+  useEffect(() => {
+    let cancelled = false
+    void hasAcknowledgedParentOnboarding(PARENT_ONBOARDING_LEVEL_UP_POPUP).then((acked) => {
+      if (!cancelled && acked) optedOutRef.current = true
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const showNextFromQueue = useCallback(() => {
     const next = queueRef.current.shift()
@@ -65,6 +84,16 @@ export default function ParentChildLevelUpModal() {
     (payload: LevelUpModalPayload) => {
       const lastNotified = readParentLastNotifiedLevel(payload.childId)
       if (payload.newLevel <= lastNotified) return
+
+      /**
+       * 「다시 보지 않기」를 켜 둔 부모에게는 팝업을 띄우지 않습니다.
+       * 레벨 기록만 남겨 두어 나중에 밀린 팝업이 한꺼번에 뜨지 않게 합니다.
+       */
+      if (optedOutRef.current) {
+        writeParentLastNotifiedLevel(payload.childId, payload.newLevel)
+        levelByChildRef.current.set(payload.childId, payload.newLevel)
+        return
+      }
 
       levelByChildRef.current.set(payload.childId, payload.newLevel)
 
@@ -168,6 +197,14 @@ export default function ParentChildLevelUpModal() {
       writeParentLastNotifiedLevel(modal.childId, modal.newLevel)
       levelByChildRef.current.set(modal.childId, modal.newLevel)
     }
+    if (dontShowAgain) {
+      optedOutRef.current = true
+      void acknowledgeParentOnboarding(PARENT_ONBOARDING_LEVEL_UP_POPUP)
+      /** 대기 중인 다른 자녀의 레벨업도 함께 접습니다 */
+      queueRef.current = []
+      setModal({ open: false })
+      return
+    }
     showNextFromQueue()
   }
 
@@ -191,11 +228,16 @@ export default function ParentChildLevelUpModal() {
       aria-labelledby="parent-child-level-up-title"
       onClick={closeModal}
     >
+      {/**
+        * 최대 높이를 화면의 85% 로 묶고 본문만 스크롤합니다.
+        * 예전에는 높이 제한이 없어 내용이 길면 아래 버튼이 화면 밖으로 밀려
+        * 팝업을 닫지 못하는 일이 있었습니다. 버튼 줄은 항상 보이게 고정합니다.
+        */}
       <div
-        className="relative z-10 flex w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
+        className="relative z-10 flex max-h-[85dvh] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex flex-col px-6 py-5">
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
           <p className="text-center text-3xl leading-none" aria-hidden>
             🎉
           </p>
@@ -237,23 +279,52 @@ export default function ParentChildLevelUpModal() {
               <p className="mt-4 text-center text-xs font-bold text-gray-600">
                 아이 화면에 새로 열린 기능
               </p>
-              <p className="mt-1 text-center text-[11px] leading-relaxed text-gray-500">
-                아이는 아직 글을 읽기 어려워요.
-                <br />
-                아래 순서를 보면서 아이와 함께 한 번 해 보세요.
-              </p>
-              <ul className="mt-3 space-y-2.5">
+              {/**
+                * 여기서는 「무엇이 열렸는지」만 짧게 보여 줍니다.
+                * 사용 순서까지 펼치면 팝업이 화면을 넘어가 버려서,
+                * 자세한 내용은 아래 「자세히 알아보기」로 상단 알림창에 넘깁니다.
+                */}
+              <ul className="mt-2 space-y-1.5">
                 {modal.unlocks.map((u) => (
-                  <li key={u.id}>
-                    <ParentFeatureHowToCard feature={u} highlight />
+                  <li
+                    key={u.id}
+                    className="flex items-center gap-2 rounded-xl bg-sky-50/90 px-3 py-2 ring-1 ring-sky-100"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={u.iconSrc} alt="" width={24} height={24} className="h-6 w-6 shrink-0 object-contain" />
+                    <div className="min-w-0">
+                      <p className="text-xs font-black text-gray-800">{u.title}</p>
+                      <p className="truncate text-[11px] leading-relaxed text-gray-600">{u.description}</p>
+                    </div>
                   </li>
                 ))}
               </ul>
+              <button
+                type="button"
+                onClick={() => {
+                  closeModal()
+                  openNoticeCenter()
+                }}
+                className="mt-2.5 w-full rounded-xl border border-sky-200 bg-white py-2 text-[11px] font-bold text-[#2563EB] transition active:scale-[0.98]"
+              >
+                사용 순서 자세히 알아보기 →
+              </button>
             </>
           ) : null}
         </div>
 
-        <div className="flex shrink-0 flex-row gap-2 border-t border-gray-100 px-5 py-4">
+        <div className="shrink-0 border-t border-gray-100 px-5 py-3">
+          {/* 다시 보지 않기 — 체크하면 이후 레벨업에도 이 팝업이 뜨지 않습니다 */}
+          <label className="mb-2.5 flex cursor-pointer items-center gap-2 text-[11px] font-medium text-gray-500">
+            <input
+              type="checkbox"
+              checked={dontShowAgain}
+              onChange={(e) => setDontShowAgain(e.target.checked)}
+              className="h-4 w-4 shrink-0 rounded border-gray-300 accent-[#4A90E2]"
+            />
+            이 안내 다시 보지 않기
+          </label>
+          <div className="flex flex-row gap-2">
           <button
             type="button"
             onClick={closeModal}
@@ -268,6 +339,7 @@ export default function ParentChildLevelUpModal() {
           >
             자녀 화면 보기
           </button>
+          </div>
         </div>
       </div>
     </div>

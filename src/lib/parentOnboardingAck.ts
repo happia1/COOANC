@@ -15,6 +15,9 @@ export const PARENT_ONBOARDING_WELCOME_BASICS = 'welcome_basics_v1'
 /** 승인 탭 상단 안내(칭찬 스티커·오늘 완료 미션·메뉴 제어) */
 export const PARENT_ONBOARDING_APPROVAL_TAB = 'approval_tab_guide_v1'
 
+/** 자녀 레벨업 축하 팝업 — 「다시 보지 않기」를 체크하면 이후 레벨업에도 뜨지 않습니다 */
+export const PARENT_ONBOARDING_LEVEL_UP_POPUP = 'level_up_popup_v1'
+
 /**
  * 이 안내를 이미 확인했는지 확인합니다.
  * 판단이 불가능하면(미로그인·오류·마이그레이션 미적용) `true` 를 돌려주어
