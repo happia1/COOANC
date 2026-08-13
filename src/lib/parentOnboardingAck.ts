@@ -19,18 +19,20 @@ export const PARENT_ONBOARDING_APPROVAL_TAB = 'approval_tab_guide_v1'
 export const PARENT_ONBOARDING_LEVEL_UP_POPUP = 'level_up_popup_v1'
 
 /**
- * 이 안내를 이미 확인했는지 확인합니다.
- * 판단이 불가능하면(미로그인·오류·마이그레이션 미적용) `true` 를 돌려주어
- * 팝업이 잘못 뜨는 쪽보다 안 뜨는 쪽으로 안전하게 처리합니다.
+ * 이 안내를 확인했는지 **확실히 알 때만** true/false 를 돌려줍니다.
+ * 알 수 없으면(미로그인·오류·마이그레이션 미적용) `null` 입니다.
+ *
+ * 왜 구분하나: 「모름」을 「확인함」으로 뭉뚱그리면, 일시적인 오류 한 번으로
+ * 팝업이 영영 안 뜨게 만들 수 있습니다(되돌릴 방법도 없습니다).
  */
-export async function hasAcknowledgedParentOnboarding(key: string): Promise<boolean> {
-  if (typeof window === 'undefined') return true
+export async function readParentOnboardingAck(key: string): Promise<boolean | null> {
+  if (typeof window === 'undefined') return null
   try {
     const supabase = createClient()
     const {
       data: { user },
     } = await supabase.auth.getUser()
-    if (!user) return true
+    if (!user) return null
 
     const { data, error } = await supabase
       .from('parent_onboarding_acks')
@@ -41,12 +43,22 @@ export async function hasAcknowledgedParentOnboarding(key: string): Promise<bool
 
     if (error) {
       console.warn('[parentOnboardingAck] 조회 실패(131 마이그레이션 필요?):', error.message)
-      return true
+      return null
     }
     return Boolean(data)
   } catch {
-    return true
+    return null
   }
+}
+
+/**
+ * 이 안내를 이미 확인했는지 확인합니다.
+ * 판단이 불가능하면 `true` 로 봅니다 — 팝업이 잘못 뜨는 쪽보다 안 뜨는 쪽이 안전한
+ * 안내(가입 첫 팝업 등)에서만 쓰세요. 반대로 「모름 때문에 영영 안 뜨면 곤란한」
+ * 경우에는 `readParentOnboardingAck` 로 `null` 을 직접 다루세요.
+ */
+export async function hasAcknowledgedParentOnboarding(key: string): Promise<boolean> {
+  return (await readParentOnboardingAck(key)) ?? true
 }
 
 /** 이 안내를 확인한 것으로 기록합니다 */

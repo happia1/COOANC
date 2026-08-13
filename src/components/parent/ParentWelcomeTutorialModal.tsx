@@ -24,6 +24,12 @@ import {
 } from '@/lib/parentOnboardingAck'
 import { PARENT_POPUP_BTN_SOLO, PARENT_POPUP_OVERLAY } from '@/lib/parentPopupCardStyles'
 
+/**
+ * 이번 실행에서 이미 닫았다는 표시(브라우저 탭을 닫으면 사라집니다).
+ * 「다시 보지 않기」를 끄고 닫았을 때, 화면을 옮길 때마다 다시 뜨는 것을 막습니다.
+ */
+const WELCOME_SESSION_DISMISS_KEY = 'cooanc:welcome-tutorial-dismissed-this-session'
+
 /** 레벨 0부터 열려 있는 기본 기능 — 레벨업 팝업으로는 안내되지 않는 것들 */
 const BASIC_FEATURES = PARENT_CHILD_UNLOCK_MILESTONES.filter((m) => m.minLevel === 0)
 
@@ -31,6 +37,16 @@ export default function ParentWelcomeTutorialModal() {
   const [open, setOpen] = useState(false)
 
   useEffect(() => {
+    /**
+     * 이번 실행에서 이미 닫았으면 다시 띄우지 않습니다.
+     *
+     * 왜 필요한가: 이 컴포넌트는 화면을 옮길 때 함께 사라졌다 다시 만들어집니다.
+     * 「다시 보지 않기」를 끄고 닫으면 DB 에 아무것도 남지 않아,
+     * 탭을 옮길 때마다 팝업이 계속 다시 떴습니다.
+     * 이 표시는 브라우저를 닫으면 사라지므로 「다음에 앱을 열 때 한 번 더」가 지켜집니다.
+     */
+    if (window.sessionStorage.getItem(WELCOME_SESSION_DISMISS_KEY) === '1') return
+
     let cancelled = false
     void hasAcknowledgedParentOnboarding(PARENT_ONBOARDING_WELCOME_BASICS).then((acked) => {
       if (!cancelled && !acked) setOpen(true)
@@ -45,6 +61,11 @@ export default function ParentWelcomeTutorialModal() {
 
   const close = useCallback(() => {
     setOpen(false)
+    try {
+      window.sessionStorage.setItem(WELCOME_SESSION_DISMISS_KEY, '1')
+    } catch {
+      /* 저장 실패해도 이번 화면은 닫힘 유지 */
+    }
     if (dontShowAgain) void acknowledgeParentOnboarding(PARENT_ONBOARDING_WELCOME_BASICS)
   }, [dontShowAgain])
 

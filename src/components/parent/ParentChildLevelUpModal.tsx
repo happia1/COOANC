@@ -25,7 +25,7 @@ import { useParentStore } from '@/store/parentStore'
 import { openNoticeCenter } from '@/lib/noticeCenterBus'
 import {
   acknowledgeParentOnboarding,
-  hasAcknowledgedParentOnboarding,
+  readParentOnboardingAck,
   PARENT_ONBOARDING_LEVEL_UP_POPUP,
 } from '@/lib/parentOnboardingAck'
 import {
@@ -54,20 +54,15 @@ export default function ParentChildLevelUpModal() {
   const [dontShowAgain, setDontShowAgain] = useState(false)
   /** 이미 「다시 보지 않기」를 켜 둔 부모에게는 아예 띄우지 않습니다 */
   const optedOutRef = useRef(false)
+  /**
+   * 옵트아웃 조회가 끝났는지. 끝나기 전에는 팝업을 띄우지 않고 대기열에만 넣습니다.
+   * (조회가 늦으면 이미 끈 부모에게도 팝업이 한 번 뜨던 문제를 막습니다.)
+   */
+  const optOutResolvedRef = useRef(false)
   const queueRef = useRef<LevelUpModalPayload[]>([])
   const levelByChildRef = useRef<Map<string, number>>(new Map())
   const nameByChildRef = useRef<Map<string, string>>(new Map())
   const bootstrapDoneRef = useRef(false)
-
-  useEffect(() => {
-    let cancelled = false
-    void hasAcknowledgedParentOnboarding(PARENT_ONBOARDING_LEVEL_UP_POPUP).then((acked) => {
-      if (!cancelled && acked) optedOutRef.current = true
-    })
-    return () => {
-      cancelled = true
-    }
-  }, [])
 
   const showNextFromQueue = useCallback(() => {
     const next = queueRef.current.shift()
@@ -79,6 +74,30 @@ export default function ParentChildLevelUpModal() {
       setModal({ open: false })
     }
   }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    void readParentOnboardingAck(PARENT_ONBOARDING_LEVEL_UP_POPUP).then((acked) => {
+      if (cancelled) return
+      /** `null`(알 수 없음)은 끈 것으로 보지 않습니다 — 일시적 오류로 영영 안 뜨면 되돌릴 길이 없습니다 */
+      optedOutRef.current = acked === true
+      optOutResolvedRef.current = true
+
+      if (optedOutRef.current) {
+        /** 조회를 기다리며 쌓아 둔 것들은 레벨만 기록하고 접습니다 */
+        for (const p of queueRef.current) {
+          writeParentLastNotifiedLevel(p.childId, p.newLevel)
+          levelByChildRef.current.set(p.childId, p.newLevel)
+        }
+        queueRef.current = []
+        return
+      }
+      showNextFromQueue()
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [showNextFromQueue])
 
   const enqueueLevelUp = useCallback(
     (payload: LevelUpModalPayload) => {
@@ -92,6 +111,13 @@ export default function ParentChildLevelUpModal() {
       if (optedOutRef.current) {
         writeParentLastNotifiedLevel(payload.childId, payload.newLevel)
         levelByChildRef.current.set(payload.childId, payload.newLevel)
+        return
+      }
+
+      /** 옵트아웃 조회가 아직 안 끝났으면 띄우지 않고 대기열에만 넣습니다 */
+      if (!optOutResolvedRef.current) {
+        levelByChildRef.current.set(payload.childId, payload.newLevel)
+        queueRef.current.push(payload)
         return
       }
 
@@ -192,20 +218,56 @@ export default function ParentChildLevelUpModal() {
     }
   }, [handleLevelIncrease])
 
-  function closeModal() {
+  /** 이 팝업만 접고 다음 대기 팝업으로 — 「다시 보지 않기」는 반영하지 않습니다 */
+  function dismissModal() {
     if (modal.open) {
       writeParentLastNotifiedLevel(modal.childId, modal.newLevel)
       levelByChildRef.current.set(modal.childId, modal.newLevel)
     }
-    if (dontShowAgain) {
-      optedOutRef.current = true
-      void acknowledgeParentOnboarding(PARENT_ONBOARDING_LEVEL_UP_POPUP)
-      /** 대기 중인 다른 자녀의 레벨업도 함께 접습니다 */
-      queueRef.current = []
-      setModal({ open: false })
+    showNextFromQueue()
+  }
+
+  /**
+   * 버튼으로 닫을 때 — 체크했으면 「다시 보지 않기」를 확정합니다.
+   *
+   * 배경(딤) 클릭은 이 함수를 쓰지 않습니다.
+   * 되돌릴 수 없는 설정을 실수로 확정해 버리면 곤란하기 때문입니다.
+   */
+  function closeModal() {
+    if (!dontShowAgain) {
+      dismissModal()
       return
     }
-    showNextFromQueue()
+
+    optedOutRef.current = true
+    void acknowledgeParentOnboarding(PARENT_ONBOARDING_LEVEL_UP_POPUP)
+
+    /** 지금 것과 대기 중인 것 모두 레벨을 기록해 두어, 저장이 실패해도 다시 몰려 뜨지 않게 합니다 */
+    if (modal.open) {
+      writeParentLastNotifiedLevel(modal.childId, modal.newLevel)
+      levelByChildRef.current.set(modal.childId, modal.newLevel)
+    }
+    for (const p of queueRef.current) {
+      writeParentLastNotifiedLevel(p.childId, p.newLevel)
+      levelByChildRef.current.set(p.childId, p.newLevel)
+    }
+    queueRef.current = []
+    setModal({ open: false })
+  }
+
+  /** 알림창으로 넘어갈 때 — 다음 팝업이 그 위를 덮지 않도록 대기열을 비웁니다 */
+  function closeAllAndOpenNoticeCenter() {
+    if (modal.open) {
+      writeParentLastNotifiedLevel(modal.childId, modal.newLevel)
+      levelByChildRef.current.set(modal.childId, modal.newLevel)
+    }
+    for (const p of queueRef.current) {
+      writeParentLastNotifiedLevel(p.childId, p.newLevel)
+      levelByChildRef.current.set(p.childId, p.newLevel)
+    }
+    queueRef.current = []
+    setModal({ open: false })
+    openNoticeCenter()
   }
 
   function handleViewChildHome() {
@@ -226,7 +288,7 @@ export default function ParentChildLevelUpModal() {
       role="dialog"
       aria-modal="true"
       aria-labelledby="parent-child-level-up-title"
-      onClick={closeModal}
+      onClick={dismissModal}
     >
       {/**
         * 최대 높이를 화면의 85% 로 묶고 본문만 스크롤합니다.
@@ -301,10 +363,7 @@ export default function ParentChildLevelUpModal() {
               </ul>
               <button
                 type="button"
-                onClick={() => {
-                  closeModal()
-                  openNoticeCenter()
-                }}
+                onClick={closeAllAndOpenNoticeCenter}
                 className="mt-2.5 w-full rounded-xl border border-sky-200 bg-white py-2 text-[11px] font-bold text-[#2563EB] transition active:scale-[0.98]"
               >
                 사용 순서 자세히 알아보기 →
