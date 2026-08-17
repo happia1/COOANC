@@ -6,6 +6,13 @@
   --ink-faint:#8B95A1;
   --paper:#FFFFFF;
   --mist:#F4F8FB;
+  /*
+   * 로고 받침 색.
+   * 로고가 「흰색 입체 글자 + 파랑·보라 음영」이라, 흰 배경 위에서는 글자 면이
+   * 사라지고 테두리만 남아 흐려 보입니다. 로고 음영과 같은 계열의 옅은 판을 깔아
+   * 흰 글자가 떠 보이게 합니다. 미스트(#F4F8FB)는 흰색과 너무 비슷해 효과가 없습니다.
+   */
+  --logo-plate:#E9EDFB;
   --line:#E6EEF3;
   --coral:#FF6E85;
   --coral-deep:#F14F6B;
@@ -191,3 +198,42 @@ h3{ font-size:17px; font-weight:700; }
   width:7px; height:7px; border-radius:50%; border:none; background:rgba(255,255,255,.55); cursor:pointer; padding:0;
 }
 .slider-dots button.active{ background:#fff; width:20px; border-radius:100px; transition:width .25s ease; }
+
+/* ===== 실제 아이콘 이미지 ===== */
+.fi{ display:flex; align-items:center; }
+.fi img{ width:42px; height:42px; object-fit:contain; border-radius:12px; }
+
+/* ===== 로고 (가로형 / 물방울형) ===== */
+/*
+ * 상단바 로고
+ * 로고 안에 불투명한 흰색 면이 섞여 있어, 흰 배경 위에서는 그 부분이 사라져
+ * 글자가 파먹힌 것처럼 흐려 보였습니다.
+ * 옅은 미스트 톤 판을 깔아 흰 면에도 바탕이 생기게 하고, 아주 옅은 그림자로
+ * 가장자리를 잡아 줍니다. (배경·그림자 세기는 여기 한 줄만 고치면 됩니다.)
+ */
+.brand-logo{
+  height:34px; display:block;
+  padding:4px 9px; border-radius:12px;
+  background:var(--logo-plate);
+}
+/* 푸터 로고 — 배경이 미스트라 상단바보다는 낫지만, 흰 면이 묻히지 않게 같은 판을 씁니다 */
+.footer-logo{
+  width:36px; height:36px; display:block; border-radius:22%;
+  background:var(--logo-plate);
+}
+
+/* ===== 레벨 뱃지 ===== */
+.badge-level{
+  position:absolute; top:14px; right:14px; font-size:10.5px; font-weight:700;
+  background:var(--sun-tint); color:#8a5a00; padding:4px 10px; border-radius:100px;
+}
+
+/* ===== 디바이스 목업 (모바일 + 태블릿) ===== */
+.device-group{ display:flex; align-items:flex-end; justify-content:center; gap:18px; flex-wrap:wrap; margin:0 auto; }
+.device{ text-align:center; }
+.device-frame{ overflow:hidden; box-shadow:0 22px 42px -20px rgba(20,30,45,.32); background:var(--ink); }
+.device-frame img{ width:100%; height:100%; object-fit:cover; display:block; }
+.device-phone .device-frame{ width:150px; aspect-ratio:9/19.5; border-radius:22px; border:6px solid var(--ink); }
+.device-tablet .device-frame{ width:230px; aspect-ratio:3/4; border-radius:18px; border:8px solid var(--ink); }
+.device-label{ margin-top:10px; font-size:12px; font-weight:700; color:var(--ink-faint); }
+
