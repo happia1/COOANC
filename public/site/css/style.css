@@ -242,3 +242,53 @@ h3{ font-size:17px; font-weight:700; }
 @media (max-width:420px){ .device-tablet .device-frame{ width:270px; } }
 .device-label{ margin-top:10px; font-size:12px; font-weight:700; color:var(--ink-faint); }
 
+
+/* ===== 큰 일러스트가 들어가는 기능 카드 (거짓말 방지 등) =====
+ * 아이콘(42px)이 아니라 캐릭터 일러스트가 주인공인 카드입니다.
+ * 모바일은 그림이 위, 640px 이상에서는 그림이 왼쪽에 서고 설명이 오른쪽에 붙습니다.
+ */
+.feature-media{ display:flex; flex-direction:column; gap:18px; padding:22px; position:relative; }
+.fm-art{
+  flex:0 0 auto; align-self:center; width:136px; padding:12px 12px 0;
+  background:var(--sun-tint); border-radius:20px;
+  display:flex; align-items:flex-end; justify-content:center;
+}
+.fm-art img{ width:100%; height:auto; }
+.fm-body h3{ margin-bottom:6px; }
+.fm-body > p{ font-size:13.8px; color:var(--ink-soft); }
+.fm-list{ margin-top:12px; display:grid; gap:8px; }
+.fm-list li{ position:relative; padding-left:18px; font-size:13.4px; color:var(--ink-soft); }
+.fm-list li::before{ content:''; position:absolute; left:2px; top:9px; width:6px; height:6px; border-radius:50%; background:var(--coral); }
+.fm-list b{ color:var(--ink); font-weight:700; }
+.fm-note{
+  margin-top:14px; background:var(--mist); border-radius:var(--radius-sm); padding:12px 14px;
+  font-size:13px; color:var(--ink-soft);
+}
+.fm-note b{ color:var(--coral-deep); }
+@media (min-width:640px){
+  .feature-media{ flex-direction:row; align-items:center; gap:26px; padding:26px; }
+  .fm-art{ width:152px; align-self:center; }
+}
+
+/* ===== 레벨 세계관 ===== */
+.stage-grid{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+@media (min-width:860px){ .stage-grid{ grid-template-columns:repeat(4,1fr); } }
+.stage-card{ padding:18px; text-align:center; }
+.stage-card .icon{ font-size:26px; }
+.stage-card .lv{
+  display:inline-block; margin:8px 0 6px; font-size:11px; font-weight:700;
+  color:var(--ink-soft); background:var(--mist); padding:3px 10px; border-radius:100px;
+}
+.stage-card h3{ font-size:16px; }
+.stage-card p{ font-size:12.8px; color:var(--ink-soft); margin-top:4px; }
+.badge-row{
+  display:flex; flex-wrap:wrap; gap:8px; align-items:center; justify-content:center;
+  margin-top:18px; font-size:12.5px; color:var(--ink-soft);
+}
+.badge-row span{ background:var(--paper); border:1px solid var(--line); padding:6px 12px; border-radius:100px; font-weight:700; }
+
+/* ===== 준비 중 기능 목록 ===== */
+.soon-list{ display:grid; gap:10px; margin-top:12px; }
+.soon-list li{ display:flex; gap:10px; align-items:flex-start; font-size:13.4px; color:var(--ink-soft); }
+.soon-list li .em{ flex:0 0 auto; font-size:16px; line-height:1.5; }
+.soon-list li b{ color:var(--ink); font-weight:700; }

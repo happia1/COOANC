@@ -67,8 +67,8 @@
           <p>아이가 오늘 해야 할 일들을 확인하는 공간이에요. 완료하면 보상이 지급되고 자동으로 기록돼요. 오전 미션과 오후 미션은 구분되어 있어 해당 시간에만 수행할 수 있어요.</p>
         </div>
         <div class="card feature-card fade">
-          <div class="fi">🐰</div><h3>캐릭터 영역</h3>
-          <p>캐릭터를 누르면 나오는 팝업에는 다양한 기능이 추가될 예정이에요. 레벨 13 이상이 되면 배경, 러그, 인테리어 소품 등을 크레딧으로 구매하고 배치할 수 있어요.</p>
+          <div class="fi">🐰</div><h3>캐릭터 · 감정 기록</h3>
+          <p>캐릭터를 누르면 오늘 기분을 표정 카드로 골라 기록할 수 있어요. 앞으로 이 팝업에서 방 꾸미기와 그림일기까지 이어질 예정이에요.</p>
         </div>
         <div class="card feature-card fade">
           <div class="fi"><img src="/site/assets/icons/icon-plant.webp" alt="화분"></div><h3>화분</h3>
@@ -77,7 +77,12 @@
         <div class="card feature-card fade">
           <span class="badge-level">Lv.5 오픈</span>
           <div class="fi"><img src="/site/assets/icons/icon-piggy.webp" alt="돼지저금통"></div><h3>돼지저금통</h3>
-          <p>레벨 5가 되면 열리는 특별 기능이에요. 모은 크레딧을 저금하면 시간이 지나며 보너스 크레딧이 자동으로 추가돼요. 아이가 자연스럽게 저축과 이자의 개념을 경험할 수 있도록 준비했어요.</p>
+          <p>레벨 5가 되면 열리는 특별 기능이에요. 크레딧을 저금통에 넣어두면 매일 아침 반짝이는 동전이 생기고, 아이가 직접 탭해서 주우면 저금통 잔액이 늘어나요. "모아두면 불어난다"를 몸으로 배우는 첫 경제 경험이에요.</p>
+        </div>
+        <div class="card feature-card fade">
+          <span class="badge-level">Lv.8 오픈</span>
+          <div class="fi"><img src="/site/assets/icons/icon-chest.webp" alt="보물상자"></div><h3>보물상자</h3>
+          <p>보물상자 이용권으로 골라둔 영상 콘텐츠를 정해진 시간만큼 보거나, 인형뽑기 미니게임을 즐길 수 있어요. 시간이 다 되면 자동으로 멈춰서 다음 할 일로 자연스럽게 이어져요.</p>
         </div>
         <div class="card feature-card fade">
           <div class="fi"><img src="/site/assets/icons/icon-basket.webp" alt="마켓"></div><h3>마켓</h3>
@@ -99,14 +104,18 @@
           <div class="fi"><img src="/site/assets/icons/icon-door.webp" alt="나가기 문"></div><h3>나가기 문</h3>
           <p>아이 화면에서 부모 화면으로 넘어가는 문이에요. 아이가 실수로 부모 화면에 들어가지 않도록 자연스럽게 구분해줘요.</p>
         </div>
-        <div class="card feature-card fade" style="grid-column:1/-1;">
-          <div class="fi">✔️</div><h3>거짓말 방지 기능</h3>
-          <p>부모 화면에서도 아이가 완료한 미션을 확인할 수 있고, 실제로 하지 않은 미션은 '다시하기'로 롤백할 수 있어요. 짧은 시간에 미션을 몰아서 완료하면 "정말 한 게 맞나요?" 확인 팝업이 떠요. 혼내기 위한 기능이 아니라 아이가 스스로 정직함을 연습하도록 돕는 장치예요. 실제로 했는데 늦게 체크한 거라면 '정말이야!' 버튼으로 정상 진행할 수 있어요.</p>
-        </div>
-        <div class="card feature-card fade" style="grid-column:1/-1;">
-          <span class="badge-soon">준비 중</span>
-          <div class="fi">📔</div><h3>그림일기</h3>
-          <p>오늘 기분을 이모지로 고르고, 하루를 손그림이나 사진으로 남기는 기능이에요. 정식 버전에 순차적으로 반영될 예정이에요.</p>
+        <div class="card feature-media fade" style="grid-column:1/-1;">
+          <div class="fm-art"><img src="/site/assets/feature-honesty.webp" alt="정말 한 거 맞아? 하고 묻는 쿠앵크 수달"></div>
+          <div class="fm-body">
+            <h3>거짓말 방지 기능</h3>
+            <p>미션을 손가락으로 몰아서 눌러 버리면, 수달이 나와서 <b>"정말 한 거 맞아?"</b> 하고 한 번 더 물어봐요. 혼내기 위한 장치가 아니라, 아이가 스스로 정직함을 연습하도록 돕는 장치예요.</p>
+            <ul class="fm-list">
+              <li><b>몰아서 누르면 확인 팝업</b> — 짧은 시간에 미션 카드를 연달아 여러 장 누르면 수달이 나와 다시 물어봐요. 정말 했다면 「정말 다 했어! 🙌」, 아니라면 「미안.. 다시 할게 😅」를 고르면 돼요.</li>
+              <li><b>시간을 앞질러 갈 수는 없어요</b> — 오후 미션은 정오 이후에, 잠자리 미션은 부모가 정한 잘 준비 시간 이후에만 완료할 수 있어요.</li>
+              <li><b>부모가 되돌릴 수 있어요</b> — 부모 화면 「오늘 완료 미션」에서 실제로 하지 않은 미션은 탭 한 번으로 다시 하기로 되돌려요.</li>
+            </ul>
+            <p class="fm-note">아이가 정말 했는데 늦게 체크한 거라면 <b>「정말 다 했어!」</b>로 그대로 진행돼요. 기록을 막는 게 아니라, 한 번 더 생각하게 하는 것이 목적이에요.</p>
+          </div>
         </div>
       </div>
     </div>
@@ -132,6 +141,10 @@
           <div class="card fade" style="padding:18px;">
             <h3>오늘의 진행도를 한눈에</h3>
             <p style="font-size:14px; color:var(--ink-soft); margin-top:6px;">오늘의 미션 진행률, 주간 루틴 완료율, 주간 완주율까지 숫자와 그래프로 바로 확인돼요. 아이를 여러 명 등록했다면 좌우로 넘겨 전환할 수 있어요.</p>
+          </div>
+          <div class="card fade" style="padding:18px; margin-top:14px;">
+            <h3>아이의 습관을 읽어주는 리포트</h3>
+            <p style="font-size:14px; color:var(--ink-soft); margin-top:6px;">미션 달성 패턴, 좋아하는 활동, 크레딧을 쓰는 성향을 정리해 「우리 아이 경제 EQ 지수」와 코칭 카드로 보여줘요. 오늘 무엇을 칭찬해주면 좋을지 힌트를 얻을 수 있어요.</p>
           </div>
         </div>
 
@@ -164,6 +177,80 @@
             <p style="font-size:14px; color:var(--ink-soft); margin-top:6px;">오늘 완료한 미션 목록을 확인하고, 실수로 눌렀거나 취소해야 할 미션은 탭 한 번으로 롤백할 수 있어요.</p>
           </div>
         </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 레벨 세계관 ===== -->
+<section class="mist">
+  <div class="wrap">
+    <div class="section-head fade">
+      <span class="eyebrow">레벨로 자라나는 세계관</span>
+      <h2>습관이 자라면, 세계가 넓어져요</h2>
+      <p>레벨이 오를 때마다 새로운 기능이 열리고, 아이는 다음 단계의 이야기로 넘어가요.</p>
+    </div>
+    <div class="stage-grid">
+      <div class="card stage-card fade">
+        <div class="icon">🌱</div><span class="lv">Lv.0~4</span>
+        <h3>정원</h3><p>습관의 씨앗을 심는 시기</p>
+      </div>
+      <div class="card stage-card fade">
+        <div class="icon">🏘️</div><span class="lv">Lv.5~8</span>
+        <h3>마을</h3><p>저축과 계획을 배우는 시기</p>
+      </div>
+      <div class="card stage-card fade">
+        <div class="icon">⚓</div><span class="lv">Lv.9~12</span>
+        <h3>항구</h3><p>스스로 돌리는 시기</p>
+      </div>
+      <div class="card stage-card fade">
+        <div class="icon">⛵</div><span class="lv">Lv.13+</span>
+        <h3>바다</h3><p>습관이 앱보다 앞서가는 시기</p>
+      </div>
+    </div>
+    <div class="badge-row fade">
+      모으는 뱃지 <span>🌱 새싹</span> <span>🐷 저축왕</span> <span>💼 사업가</span> <span>🧭 탐험가</span> <span>⛵ 선장</span>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 준비 중인 기능 ===== -->
+<section>
+  <div class="wrap">
+    <div class="section-head fade">
+      <span class="eyebrow">준비 중</span>
+      <h2>이런 기능이 오고 있어요</h2>
+      <p>아이들의 실제 사용 반응을 반영해 계속 다듬는 중이에요.</p>
+    </div>
+    <div class="feature-grid">
+      <div class="card feature-card fade" style="grid-column:1/-1;">
+        <span class="badge-soon">준비 중</span>
+        <div class="fi">🏠</div><h3>캐릭터 방 꾸미기</h3>
+        <p>벽지, 바닥, 러그를 레벨에 따라 잠금 해제하고 크레딧으로 구매해 나만의 방을 완성해요. 방 안 곳곳에는 특별한 기능을 가진 소품들이 숨어 있어요.</p>
+        <ul class="soon-list">
+          <li><span class="em">🎐</span><span><b>모빌</b> — 탭하면 감정카드가 열려요</span></li>
+          <li><span class="em">✈️</span><span><b>종이비행기</b> — 엄마와 친구에게 쪽지를 보낼 수 있어요</span></li>
+          <li><span class="em">🏆</span><span><b>트로피</b> — 친구들과의 순위를 확인해요</span></li>
+          <li><span class="em">🖼️</span><span><b>액자</b> — 사진을 찍어 액자에 담아요</span></li>
+          <li><span class="em">🖍️</span><span><b>크레용 세트</b> — 일기장에 마음껏 낙서할 수 있어요</span></li>
+          <li><span class="em">🧺</span><span><b>피크닉 바구니</b> — 화분에서 수확한 과일을 모아 구경해요</span></li>
+          <li><span class="em">📚</span><span><b>책꽂이</b> — 이야기를 읽어주는 콘텐츠와 연결될 예정이에요 (기획 중)</span></li>
+        </ul>
+      </div>
+      <div class="card feature-card fade">
+        <span class="badge-soon">준비 중</span>
+        <div class="fi">📔</div><h3>그림일기</h3>
+        <p>오늘 기분을 이모지로 고르고, 하루를 손그림이나 사진으로 남기는 기능이에요. 정식 버전에 순차적으로 반영될 예정이에요.</p>
+      </div>
+      <div class="card feature-card fade">
+        <span class="badge-soon">준비 중</span>
+        <div class="fi">👥</div><h3>친구와 함께</h3>
+        <p>같은 또래 친구들과 순위를 비교하고 선물을 주고받는 소셜 기능을 준비하고 있어요.</p>
+      </div>
+      <div class="card feature-card fade" style="grid-column:1/-1;">
+        <span class="badge-soon">준비 중</span>
+        <div class="fi">⛵</div><h3>항해 모드 <span style="font-size:12.5px; font-weight:600; color:var(--ink-faint);">초등 이후를 위한 다음 여정</span></h3>
+        <p>레벨 15 이후, 배를 타고 여러 나라를 돌아다니며 그동안 모은 과일을 팔고, 번 돈으로 나만의 랜드마크를 세워가는 큰 세계관으로 확장할 예정이에요.</p>
       </div>
     </div>
   </div>
