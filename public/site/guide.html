@@ -10,7 +10,7 @@
   .toc a{ flex:0 0 auto; font-size:13px; font-weight:700; color:var(--ink-soft); background:var(--mist); border:1px solid var(--line); padding:9px 14px; border-radius:100px; white-space:nowrap; }
   .guide-block{ padding:40px 0; border-top:1px solid var(--line); }
   .guide-block:first-of-type{ border-top:none; }
-  .num-badge{ display:inline-flex; align-items:center; justify-content:center; width:26px; height:26px; border-radius:50%; background:var(--coral); color:#fff; font-size:12.5px; font-weight:700; margin-right:8px; }
+  .num-badge{ display:inline-flex; align-items:center; justify-content:center; width:26px; height:26px; border-radius:50%; background:var(--brand); color:#fff; font-size:12.5px; font-weight:700; margin-right:8px; }
 </style>
 </head>
 <body>
@@ -44,8 +44,7 @@
     <div class="toc fade" style="margin-top:26px;">
       <a href="#install">설치</a>
       <a href="#setup">초기 세팅</a>
-      <a href="#child">아이 화면</a>
-      <a href="#parent">부모 화면</a>
+      <a href="#screens">아이 화면 · 부모 화면</a>
       <a href="#growth">성장 단계</a>
       <a href="#faq">FAQ</a>
     </div>
@@ -55,10 +54,69 @@
 <!-- 설치 -->
 <div class="wrap">
 <div class="guide-block" id="install">
-  <div class="card fade" style="padding:26px 22px; background:var(--mist); border:none;">
-    <h2 style="font-size:20px;"><span class="num-badge">1</span>설치하기</h2>
-    <p style="margin-top:10px; color:var(--ink-soft); font-size:14.5px;">쿠앵크는 앱스토어 없이, 웹사이트를 홈 화면에 추가하는 방식으로 설치돼요. 안드로이드는 버튼 클릭 한 번, iOS는 공유 버튼으로 두 단계만 거치면 돼요.</p>
+  <h2 style="font-size:20px;"><span class="num-badge">1</span>설치하기 — 1분 설치 &amp; 200% 활용 가이드</h2>
+
+  <div class="card fade" style="padding:16px 18px; background:var(--sun-tint); border:none; margin-top:16px; display:flex; gap:12px; align-items:flex-start;">
+    <span style="font-size:19px; line-height:1.4;">🚨</span>
+    <div>
+      <p style="font-size:14px; font-weight:700; color:#8a5a00;">현재 버전은 베타(테스트) 버전으로, 아직 앱스토어에 등록되어 있지 않아요</p>
+      <p style="font-size:13.5px; color:var(--ink-soft); margin-top:5px;">앱처럼 쓸 수 있도록 아래 안내에 따라 홈 화면에 바로가기 아이콘을 만들어주세요. 아이 전용 기기가 따로 있다면, 아이 기기에서도 똑같은 방법으로 접속·설치해주세요.</p>
+    </div>
+  </div>
+
+  <div class="card fade" style="padding:26px 22px; background:var(--mist); border:none; margin-top:14px;">
+    <p style="color:var(--ink-soft); font-size:14.5px;">쿠앵크는 앱스토어 없이, 웹사이트를 홈 화면에 추가하는 방식으로 설치돼요. 안드로이드는 버튼 클릭 한 번, iOS는 공유 버튼으로 두 단계만 거치면 돼요.</p>
     <button class="btn btn-primary" data-install style="margin-top:16px;">📲 지금 설치하기</button>
+  </div>
+
+  <h3 class="fade" style="margin-top:32px; font-size:17px;">STEP 1 · 홈 화면에 쿠앵크 장착하기 (1분)</h3>
+  <div class="fade feature-grid" style="margin-top:14px;">
+    <div class="card" style="padding:18px;">
+      <h3>🍏 아이폰 <span style="font-size:12px; font-weight:600; color:var(--ink-faint);">Safari 브라우저 권장</span></h3>
+      <div style="margin-top:12px;">
+        <div class="step"><div class="num">1</div><p><a href="https://cooanc.vercel.app/" target="_blank" rel="noopener" style="text-decoration:underline; font-weight:700;">쿠앵크 접속 링크</a>를 클릭합니다.</p></div>
+        <div class="step"><div class="num">2</div><p>브라우저 하단의 <b>공유(화살표) 버튼</b>을 누릅니다.</p></div>
+        <div class="step"><div class="num">3</div><p>간략히 보기에서 스크롤을 내려 <b>「홈 화면에 추가」</b>를 선택합니다.</p></div>
+      </div>
+    </div>
+    <div class="card" style="padding:18px;">
+      <h3>🤖 갤럭시 <span style="font-size:12px; font-weight:600; color:var(--ink-faint);">크롬 · 삼성인터넷 권장</span></h3>
+      <div style="margin-top:12px;">
+        <div class="step"><div class="num">1</div><p><a href="https://cooanc.vercel.app/" target="_blank" rel="noopener" style="text-decoration:underline; font-weight:700;">쿠앵크 접속 링크</a>를 클릭합니다.</p></div>
+        <div class="step"><div class="num">2</div><p>우측 상단 또는 하단의 <b>메뉴(삼선·삼점) 버튼</b>을 누릅니다.</p></div>
+        <div class="step"><div class="num">3</div><p><b>「앱 설치」</b> 또는 <b>「홈 화면에 추가」</b>를 선택합니다.</p></div>
+      </div>
+    </div>
+  </div>
+
+  <h3 class="fade" style="margin-top:36px; font-size:17px;">STEP 2 · 쿠앵크 효과를 200% 끌어올리는 육아 팁 (1분)</h3>
+  <p class="fade" style="color:var(--ink-soft); font-size:14.5px; margin-top:6px;">앱을 켜기 전, 부모님의 '말의 노동'은 줄이고 아이의 '즐거움'은 극대화하는 핵심 팁 3가지예요. 베타 테스트 기간 동안 아이와 함께 해보세요.</p>
+
+  <div class="fade" style="margin-top:16px; display:flex; flex-direction:column; gap:14px;">
+    <div class="card" style="padding:18px;">
+      <h3>💡 잔소리 대신 '쿠앵크'를 켜세요</h3>
+      <p style="font-size:14px; color:var(--ink-soft); margin-top:6px;">부모님이 직접 "양치해라", "장난감 정리해라"라고 말하면 아이는 잔소리로 받아들여요. 당분간 모든 지시의 주체를 쿠앵크로 넘겨보세요.</p>
+      <p style="font-size:13px; color:var(--ink-soft); margin-top:10px; background:var(--mist); padding:12px 14px; border-radius:12px; line-height:1.8;">
+        "○○아, 오늘은 어떤 미션을 하면 간식을 살 수 있을지 같이 확인해 볼까?"<br>
+        "우와, 미션 성공하니까 크레딧이 생기네! 다음 미션은 뭐지?"<br>
+        "물이랑 하트도 생겼어! 화분에 줘볼까?"
+      </p>
+      <p style="font-size:12.5px; color:var(--brand-deep); font-weight:700; margin-top:10px;">→ 부모와 아이가 하루 일과를 즐거운 게임처럼 함께 즐기게 돼요.</p>
+    </div>
+    <div class="card" style="padding:18px;">
+      <h3>🎯 성취의 순간을 함께 목격해 주세요</h3>
+      <p style="font-size:14px; color:var(--ink-soft); margin-top:6px;">아이가 미션을 완료하고 버튼을 누르는 순간의 표정을 지켜봐 주세요. 성공 연출이 뜰 때 옆에서 "와! 성공했다!" 하고 가볍게 하이파이브 해주시고, 아이가 어떤 미션에 가장 신나하는지 눈여겨봐 주세요.</p>
+    </div>
+    <div class="card" style="padding:18px;">
+      <h3>🚨 알림이 울리지 않아도 당황하지 마세요</h3>
+      <p style="font-size:14px; color:var(--ink-soft); margin-top:6px;">베타 버전은 아직 푸시 알림을 지원하지 않아요. '쿠앵크 하는 시간'을 정해두는 걸 추천해요 — 아침엔 등원 준비 미션, 하원 후엔 오후 미션을 확인하는 식으로요. 홈 화면 첫 페이지에 아이콘을 두면 잊지 않는 데 도움이 돼요.</p>
+    </div>
+  </div>
+
+  <div class="card fade" style="padding:22px; margin-top:22px; background:var(--ink); border:none;">
+    <p style="font-size:12.5px; color:#93A2AF; font-weight:700;">디렉터의 한마디</p>
+    <p style="font-size:14px; color:#fff; margin-top:8px; line-height:1.75;">"이 앱으로 인해 부모님이 매일 하던 '말의 노동'이 조금이라도 줄었는지, 아이가 미션을 수행하며 작은 성취감을 느끼는지 확인하는 것이 이번 테스트의 가장 큰 목적입니다. 일상에서 경험하신 아주 작은 변화라도 좋으니 오픈 커뮤니티 또는 설문을 통해 느끼신 바를 편하게 이야기해 주세요!"</p>
+    <a href="https://open.kakao.com/o/pGwAy7wi" target="_blank" rel="noopener" class="btn btn-primary btn-sm" style="margin-top:14px;">💬 오픈 커뮤니티 바로가기</a>
   </div>
 </div>
 
@@ -74,26 +132,35 @@
       <h3>② 아이 전용 기기에 연결</h3>
       <p style="font-size:14px; color:var(--ink-soft); margin-top:6px;">아이가 쓰는 스마트폰이나 태블릿에도 같은 방법으로 설치해주세요. 로그인 후에는 아이만의 독립된 화면이 열려요. 부모 화면 설정에서 '시작 화면'을 부모용/자녀용 중 선택할 수도 있어요.</p>
     </div>
-    <div class="card" style="padding:18px; background:var(--coral-tint); border:none;">
+    <div class="card" style="padding:18px; background:var(--brand-tint); border:none;">
       <h3>듀얼 인터페이스 구조예요</h3>
       <p style="font-size:14px; color:var(--ink-soft); margin-top:6px;">쿠앵크는 부모님 스마트폰과 아이 전용 기기가 서로 연동되는 [듀얼 인터페이스] 시스템이에요. 부모님 폰 외에 아이가 평소 보는 전용 패드나 공기계가 있다면 더 편하게 쓸 수 있어요.</p>
     </div>
   </div>
 </div>
 
-<!-- 아이 화면 -->
-<div class="guide-block" id="child">
-  <h2 class="fade">아이 화면 (플레이어)</h2>
-  <p class="fade" style="color:var(--ink-soft); font-size:14.5px; margin-top:8px;">캐릭터, 레벨, 크레딧, 하트가 상단에 보이고 하단에는 오늘의 미션이 카드로 나열돼요. 기능별 자세한 설명은 <a href="/site/features.html" style="text-decoration:underline; font-weight:700;">서비스 소개</a> 페이지에서 확인해주세요.</p>
-  <div class="phone fade" style="max-width:320px; margin:20px auto 0;"><img src="/site/assets/child-home.webp" alt="아이 화면"></div>
-</div>
+<!-- 아이 화면 · 부모 화면 나란히 비교 -->
+<div class="guide-block" id="screens">
+  <h2 class="fade">아이 화면과 부모 화면, 나란히 볼게요</h2>
+  <p class="fade" style="color:var(--ink-soft); font-size:14.5px; margin-top:8px;">쿠앵크는 아이가 노는 화면과 부모가 관리하는 화면이 짝을 이뤄요. 아이가 미션을 끝내면 부모 화면에 바로 반영돼요.</p>
 
-<!-- 부모 화면 -->
-<div class="guide-block" id="parent">
-  <h2 class="fade">부모 화면 (관리자)</h2>
-  <p class="fade" style="color:var(--ink-soft); font-size:14.5px; margin-top:8px;">홈 · 루틴 · 승인 3개 탭으로 구성돼요. 각 탭에서 미션을 설정하고, 보상을 지정하고, 진행 현황을 확인해요.</p>
-  <div class="phone fade" style="max-width:320px; margin:20px auto 20px;"><img src="/site/assets/parent-home.webp" alt="부모 화면 홈 탭"></div>
-  <div class="fade" style="display:flex; flex-direction:column; gap:14px;">
+  <div class="compare-grid fade">
+    <div class="compare-divider"></div>
+    <div class="compare-col" id="child">
+      <span class="compare-label">🏠 아이 화면 (플레이어)</span>
+      <div class="phone"><img src="/site/assets/child-home.webp" alt="아이 화면"></div>
+      <p>캐릭터, 레벨, 크레딧, 하트가 상단에 보이고 하단에는 오늘의 미션이 카드로 나열돼요. 미션을 완료하면 크레딧·하트가 쌓이고, 화분·저금통·보물상자 같은 놀이형 성장 기능으로 이어져요.</p>
+    </div>
+    <div class="compare-col" id="parent">
+      <span class="compare-label">⚓ 부모 화면 (관리자)</span>
+      <div class="phone"><img src="/site/assets/parent-home.webp" alt="부모 화면 홈 탭"></div>
+      <p>홈 · 루틴 · 승인 3개 탭으로만 구성돼요. 루틴 탭에서 미션과 보상을 설정하고, 승인 탭에서 구매 요청을 확인하고, 홈 탭에서 오늘의 진행 현황을 한눈에 봐요.</p>
+    </div>
+  </div>
+
+  <p class="fade" style="color:var(--ink-soft); font-size:14.5px; margin-top:8px;">기능별 자세한 설명은 <a href="/site/features.html" style="text-decoration:underline; font-weight:700;">서비스 소개</a> 페이지에서 확인해주세요.</p>
+
+  <div class="fade" style="display:flex; flex-direction:column; gap:14px; margin-top:24px;">
     <div class="card" style="padding:18px;">
       <h3>🔔 알림 · ⏰ 알람 · ⚙️ 설정</h3>
       <p style="font-size:14px; color:var(--ink-soft); margin-top:6px;">상단바 오른쪽에서 루틴 알람, 자녀 프로필, 시작 화면 선택 등을 관리해요. 자녀는 여러 명 등록할 수 있고, 프로필마다 수정·삭제가 가능해요.</p>

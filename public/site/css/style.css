@@ -6,17 +6,11 @@
   --ink-faint:#8B95A1;
   --paper:#FFFFFF;
   --mist:#F4F8FB;
-  /*
-   * 로고 받침 색.
-   * 로고가 「흰색 입체 글자 + 파랑·보라 음영」이라, 흰 배경 위에서는 글자 면이
-   * 사라지고 테두리만 남아 흐려 보입니다. 로고 음영과 같은 계열의 옅은 판을 깔아
-   * 흰 글자가 떠 보이게 합니다. 미스트(#F4F8FB)는 흰색과 너무 비슷해 효과가 없습니다.
-   */
-  --logo-plate:#E9EDFB;
   --line:#E6EEF3;
-  --coral:#FF6E85;
-  --coral-deep:#F14F6B;
-  --coral-tint:#FFF0F3;
+  /* 포인트 컬러 — 로고의 파랑·보라 그러데이션에서 뽑은 색입니다 */
+  --brand:#515CD6;
+  --brand-deep:#2D38BE;
+  --brand-tint:#EAECFA;
   --sun:#FFC94D;
   --sun-tint:#FFF6E2;
   --mint:#2FBE86;
@@ -49,10 +43,10 @@ button{font-family:inherit;}
   border-bottom:1px solid var(--line);
 }
 .nav-inner{ display:flex; align-items:center; justify-content:space-between; height:64px; gap:16px;}
-.brand{ display:flex; align-items:center; gap:6px; font-family:'Jua'; font-size:19px; color:var(--coral-deep); flex-shrink:0;}
+.brand{ display:flex; align-items:center; gap:6px; font-family:'Jua'; font-size:19px; color:var(--brand-deep); flex-shrink:0;}
 .nav-links{ display:none; align-items:center; gap:26px; font-size:14.5px; font-weight:600; color:var(--ink-soft); }
 .nav-links a{ padding:6px 2px; border-bottom:2px solid transparent; }
-.nav-links a:hover, .nav-links a.active{ color:var(--ink); border-color:var(--coral); }
+.nav-links a:hover, .nav-links a.active{ color:var(--ink); border-color:var(--brand); }
 .nav-cta{ display:none; }
 .nav-toggle{
   width:38px; height:38px; border-radius:10px; border:1px solid var(--line); background:var(--paper);
@@ -64,7 +58,7 @@ button{font-family:inherit;}
 }
 .nav-mobile.open{ display:flex; }
 .nav-mobile a{ padding:12px 0; font-weight:600; font-size:15px; border-bottom:1px solid var(--line); color:var(--ink-soft); }
-.nav-mobile a.active{ color:var(--coral-deep); }
+.nav-mobile a.active{ color:var(--brand-deep); }
 .nav-mobile .btn{ margin-top:14px; }
 @media (min-width:860px){
   .nav-links{ display:flex; }
@@ -80,8 +74,8 @@ button{font-family:inherit;}
 }
 .btn:active{ transform:scale(.97); }
 .btn-sm{ padding:10px 18px; font-size:14px; }
-.btn-primary{ background:var(--coral); color:#fff; box-shadow:0 10px 22px -10px rgba(241,79,107,.55); }
-.btn-primary:hover{ background:var(--coral-deep); }
+.btn-primary{ background:var(--brand); color:#fff; box-shadow:0 10px 22px -10px rgba(45,56,190,.55); }
+.btn-primary:hover{ background:var(--brand-deep); }
 .btn-dark{ background:var(--ink); color:#fff; }
 .btn-ghost{ background:var(--paper); color:var(--ink); border:1px solid var(--line); }
 .btn-block{ width:100%; }
@@ -91,7 +85,7 @@ section{ padding:64px 0; }
 section.mist{ background:var(--mist); }
 .eyebrow{
   display:inline-flex; align-items:center; gap:6px; font-size:13px; font-weight:700;
-  color:var(--coral-deep); background:var(--coral-tint); padding:6px 14px; border-radius:100px; margin-bottom:14px;
+  color:var(--brand-deep); background:var(--brand-tint); padding:6px 14px; border-radius:100px; margin-bottom:14px;
 }
 h1{ font-size:34px; line-height:1.32; letter-spacing:-0.01em; }
 h2{ font-size:26px; line-height:1.35; letter-spacing:-0.01em; }
@@ -128,7 +122,7 @@ h3{ font-size:17px; font-weight:700; }
 .journey-strip::before{ content:''; position:absolute; left:24px; right:24px; top:22px; height:2px; background:var(--line); }
 .jstage{ position:relative; z-index:1; display:flex; flex-direction:column; align-items:center; gap:8px; flex:1; }
 .jstage .icon{ width:44px; height:44px; border-radius:50%; background:var(--paper); border:2px solid var(--line); display:flex; align-items:center; justify-content:center; font-size:19px; }
-.jstage:nth-child(1) .icon{ background:var(--coral-tint); border-color:var(--coral); }
+.jstage:nth-child(1) .icon{ background:var(--brand-tint); border-color:var(--brand); }
 .jstage span{ font-size:11.5px; font-weight:700; color:var(--ink-soft); text-align:center; }
 
 /* ===== Tabs (서비스 소개 / 가이드) ===== */
@@ -146,7 +140,7 @@ h3{ font-size:17px; font-weight:700; }
   background:var(--ink); color:#fff; border-radius:28px; padding:36px 26px; text-align:center;
   position:relative; overflow:hidden;
 }
-.install-card::after{ content:''; position:absolute; bottom:-70px; left:-50px; width:220px; height:220px; background:var(--coral); opacity:.35; border-radius:50%; filter:blur(24px); }
+.install-card::after{ content:''; position:absolute; bottom:-70px; left:-50px; width:220px; height:220px; background:var(--brand); opacity:.35; border-radius:50%; filter:blur(24px); }
 .install-card h2{ color:#fff; margin-bottom:10px; position:relative; }
 .install-card p{ color:#C7D2DB; margin-bottom:22px; position:relative; font-size:14.5px; }
 .install-card .btn{ position:relative; }
@@ -158,9 +152,9 @@ h3{ font-size:17px; font-weight:700; }
 .sheet{ background:#fff; width:100%; max-width:520px; border-radius:24px 24px 0 0; padding:24px 22px 30px; animation:slideUp .3s ease; }
 @keyframes slideUp{ from{ transform:translateY(30px); opacity:0;} to{ transform:none; opacity:1;} }
 .step{ display:flex; gap:12px; align-items:flex-start; margin-bottom:14px; }
-.step .num{ width:26px; height:26px; border-radius:50%; background:var(--coral); color:#fff; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700; flex-shrink:0; }
+.step .num{ width:26px; height:26px; border-radius:50%; background:var(--brand); color:#fff; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700; flex-shrink:0; }
 .step p{ font-size:14px; padding-top:2px; }
-.step b{ color:var(--coral-deep); }
+.step b{ color:var(--brand-deep); }
 .sheet-close{ margin-top:16px; width:100%; padding:14px; border-radius:100px; border:1px solid var(--line); background:var(--mist); font-weight:700; font-size:14px; cursor:pointer; }
 
 /* ===== Footer ===== */
@@ -204,23 +198,8 @@ h3{ font-size:17px; font-weight:700; }
 .fi img{ width:42px; height:42px; object-fit:contain; border-radius:12px; }
 
 /* ===== 로고 (가로형 / 물방울형) ===== */
-/*
- * 상단바 로고
- * 로고 안에 불투명한 흰색 면이 섞여 있어, 흰 배경 위에서는 그 부분이 사라져
- * 글자가 파먹힌 것처럼 흐려 보였습니다.
- * 옅은 미스트 톤 판을 깔아 흰 면에도 바탕이 생기게 하고, 아주 옅은 그림자로
- * 가장자리를 잡아 줍니다. (배경·그림자 세기는 여기 한 줄만 고치면 됩니다.)
- */
-.brand-logo{
-  height:34px; display:block;
-  padding:4px 9px; border-radius:12px;
-  background:var(--logo-plate);
-}
-/* 푸터 로고 — 배경이 미스트라 상단바보다는 낫지만, 흰 면이 묻히지 않게 같은 판을 씁니다 */
-.footer-logo{
-  width:36px; height:36px; display:block; border-radius:22%;
-  background:var(--logo-plate);
-}
+.brand-logo{ height:34px; display:block; }
+.footer-logo{ width:36px; height:36px; display:block; }
 
 /* ===== 레벨 뱃지 ===== */
 .badge-level{
@@ -258,13 +237,13 @@ h3{ font-size:17px; font-weight:700; }
 .fm-body > p{ font-size:13.8px; color:var(--ink-soft); }
 .fm-list{ margin-top:12px; display:grid; gap:8px; }
 .fm-list li{ position:relative; padding-left:18px; font-size:13.4px; color:var(--ink-soft); }
-.fm-list li::before{ content:''; position:absolute; left:2px; top:9px; width:6px; height:6px; border-radius:50%; background:var(--coral); }
+.fm-list li::before{ content:''; position:absolute; left:2px; top:9px; width:6px; height:6px; border-radius:50%; background:var(--brand); }
 .fm-list b{ color:var(--ink); font-weight:700; }
 .fm-note{
   margin-top:14px; background:var(--mist); border-radius:var(--radius-sm); padding:12px 14px;
   font-size:13px; color:var(--ink-soft);
 }
-.fm-note b{ color:var(--coral-deep); }
+.fm-note b{ color:var(--brand-deep); }
 @media (min-width:640px){
   .feature-media{ flex-direction:row; align-items:center; gap:26px; padding:26px; }
   .fm-art{ width:152px; align-self:center; }
@@ -292,3 +271,20 @@ h3{ font-size:17px; font-weight:700; }
 .soon-list li{ display:flex; gap:10px; align-items:flex-start; font-size:13.4px; color:var(--ink-soft); }
 .soon-list li .em{ flex:0 0 auto; font-size:16px; line-height:1.5; }
 .soon-list li b{ color:var(--ink); font-weight:700; }
+
+/* ===== 아이 화면 · 부모 화면 나란히 비교 (가이드) ===== */
+.compare-grid{ display:grid; grid-template-columns:1fr; gap:28px; margin-top:24px; position:relative; }
+@media (min-width:760px){ .compare-grid{ grid-template-columns:1fr 1fr; gap:24px; } }
+.compare-col{ display:flex; flex-direction:column; align-items:center; text-align:center; }
+.compare-label{
+  display:inline-flex; align-items:center; gap:6px; font-weight:700; font-size:14.5px;
+  color:var(--brand-deep); background:var(--brand-tint); padding:7px 16px; border-radius:100px; margin-bottom:16px;
+}
+.compare-col .phone{ width:100%; max-width:260px; }
+.compare-col p{ margin-top:14px; text-align:left; font-size:13.8px; color:var(--ink-soft); }
+.compare-divider{
+  display:none; position:relative;
+}
+@media (min-width:760px){
+  .compare-divider{ display:block; position:absolute; left:50%; top:0; bottom:0; width:1px; background:var(--line); transform:translateX(-50%); }
+}
