@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>문의하기 — 쿠앵크(COOANC)</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<header class="nav">
+  <div class="wrap nav-inner">
+    <a href="index.html" class="brand"><img src="assets/logo.png" alt="COOANC"></a>
+    <nav class="nav-links">
+      <a href="features.html">서비스 소개</a>
+      <a href="guide.html">가이드</a>
+      <a href="about.html">소개</a>
+      <a href="contact.html" class="active">문의하기</a>
+    </nav>
+    <a href="index.html#install" class="btn btn-primary btn-sm nav-cta">시작하기</a>
+    <button class="nav-toggle" id="navToggle">☰</button>
+  </div>
+  <div class="nav-mobile" id="navMobile">
+    <a href="features.html">서비스 소개</a>
+    <a href="guide.html">가이드</a>
+    <a href="about.html">소개</a>
+    <a href="contact.html" class="active">문의하기</a>
+    <a href="index.html#install" class="btn btn-primary btn-block">시작하기</a>
+  </div>
+</header>
+
+<section>
+  <div class="wrap-narrow">
+    <span class="eyebrow fade">문의하기</span>
+    <h1 class="fade" style="font-size:30px;">궁금한 점이나<br>협업 제안을 남겨주세요</h1>
+    <p class="lead fade" style="margin-top:14px;">서비스 이용 문의, 오류 제보, 협업·제휴 제안 모두 환영해요.</p>
+
+    <form class="fade" id="contactForm" style="margin-top:32px;">
+      <div class="field">
+        <label>문의 유형</label>
+        <select style="width:100%; padding:13px 14px; border-radius:12px; border:1px solid var(--line); font-size:14.5px; background:#fff;" id="type">
+          <option>서비스 이용 문의</option>
+          <option>오류 제보</option>
+          <option>협업 · 제휴 제안</option>
+          <option>기타</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>이름</label>
+        <input type="text" id="name" placeholder="이름을 입력해주세요" required>
+      </div>
+      <div class="field">
+        <label>이메일</label>
+        <input type="email" id="email" placeholder="답장받을 이메일을 입력해주세요" required>
+      </div>
+      <div class="field">
+        <label>내용</label>
+        <textarea id="message" placeholder="문의 내용을 자유롭게 남겨주세요" required></textarea>
+      </div>
+      <button type="submit" class="btn btn-primary btn-block">문의 보내기</button>
+      <p style="font-size:12px; color:var(--ink-faint); margin-top:10px; text-align:center;">
+        버튼을 누르면 메일 앱으로 연결돼요. ※ 받으실 이메일 주소를 알려주시면 연결해둘게요.
+      </p>
+    </form>
+  </div>
+</section>
+
+<footer class="site-footer">
+  <div class="wrap footer-grid">
+    <div class="footer-brand">
+      <div class="brand">🐰 COOANC</div>
+      <p>잔소리는 줄이고, 웃음은 늘리는 쿠앵크입니다. 아이가 스스로 만드는 하루를 응원해요.</p>
+    </div>
+    <div><h4>바로가기</h4>
+      <a href="features.html">서비스 소개</a>
+      <a href="guide.html">가이드</a>
+      <a href="about.html">소개</a>
+      <a href="contact.html">문의하기</a>
+    </div>
+    <div><h4>연결</h4>
+      <a href="about.html#blog">블로그</a>
+      <a href="contact.html">이메일 문의</a>
+    </div>
+  </div>
+  <div class="wrap copyright">© 2026 COOANC. All rights reserved.</div>
+</footer>
+
+<script src="js/main.js"></script>
+<script>
+  document.getElementById('contactForm').addEventListener('submit', function(e){
+    e.preventDefault();
+    const type = document.getElementById('type').value;
+    const name = document.getElementById('name').value;
+    const email = document.getElementById('email').value;
+    const message = document.getElementById('message').value;
+    // ※ 아래 CONTACT_EMAIL을 실제 수신 이메일로 바꿔주세요.
+    const CONTACT_EMAIL = 'theotter@naver.com';
+    const subject = encodeURIComponent(`[쿠앵크 문의 - ${type}] ${name}`);
+    const body = encodeURIComponent(`이름: ${name}\n이메일: ${email}\n유형: ${type}\n\n${message}`);
+    window.location.href = `mailto:${CONTACT_EMAIL}?subject=${subject}&body=${body}`;
+  });
+</script>
+</body>
+</html>

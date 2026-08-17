@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>사용 가이드 — 쿠앵크(COOANC)</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+  .toc{ display:flex; gap:8px; overflow-x:auto; padding:2px 0 4px; margin-bottom:8px; }
+  .toc a{ flex:0 0 auto; font-size:13px; font-weight:700; color:var(--ink-soft); background:var(--mist); border:1px solid var(--line); padding:9px 14px; border-radius:100px; white-space:nowrap; }
+  .guide-block{ padding:40px 0; border-top:1px solid var(--line); }
+  .guide-block:first-of-type{ border-top:none; }
+  .num-badge{ display:inline-flex; align-items:center; justify-content:center; width:26px; height:26px; border-radius:50%; background:var(--coral); color:#fff; font-size:12.5px; font-weight:700; margin-right:8px; }
+</style>
+</head>
+<body>
+
+<header class="nav">
+  <div class="wrap nav-inner">
+    <a href="index.html" class="brand"><img src="assets/logo.png" alt="COOANC"></a>
+    <nav class="nav-links">
+      <a href="features.html">서비스 소개</a>
+      <a href="guide.html" class="active">가이드</a>
+      <a href="about.html">소개</a>
+      <a href="contact.html">문의하기</a>
+    </nav>
+    <a href="index.html#install" class="btn btn-primary btn-sm nav-cta">시작하기</a>
+    <button class="nav-toggle" id="navToggle">☰</button>
+  </div>
+  <div class="nav-mobile" id="navMobile">
+    <a href="features.html">서비스 소개</a>
+    <a href="guide.html" class="active">가이드</a>
+    <a href="about.html">소개</a>
+    <a href="contact.html">문의하기</a>
+    <a href="index.html#install" class="btn btn-primary btn-block">시작하기</a>
+  </div>
+</header>
+
+<section style="padding-bottom:14px;">
+  <div class="wrap">
+    <span class="eyebrow fade">사용 가이드</span>
+    <h1 class="fade" style="max-width:520px;">3초 만에 시작해서,<br>차근차근 익혀보세요</h1>
+    <p class="lead fade" style="margin-top:12px;">처음 설치할 때 딱 두 가지만 세팅하면 나머지는 자동으로 준비돼요.</p>
+    <div class="toc fade" style="margin-top:26px;">
+      <a href="#install">설치</a>
+      <a href="#setup">초기 세팅</a>
+      <a href="#child">아이 화면</a>
+      <a href="#parent">부모 화면</a>
+      <a href="#growth">성장 단계</a>
+      <a href="#faq">FAQ</a>
+    </div>
+  </div>
+</section>
+
+<!-- 설치 -->
+<div class="wrap">
+<div class="guide-block" id="install">
+  <div class="card fade" style="padding:26px 22px; background:var(--mist); border:none;">
+    <h2 style="font-size:20px;"><span class="num-badge">1</span>설치하기</h2>
+    <p style="margin-top:10px; color:var(--ink-soft); font-size:14.5px;">쿠앵크는 앱스토어 없이, 웹사이트를 홈 화면에 추가하는 방식으로 설치돼요. 안드로이드는 버튼 클릭 한 번, iOS는 공유 버튼으로 두 단계만 거치면 돼요.</p>
+    <button class="btn btn-primary" data-install style="margin-top:16px;">📲 지금 설치하기</button>
+  </div>
+</div>
+
+<!-- 초기 세팅 -->
+<div class="guide-block" id="setup">
+  <h2 class="fade">시작할 때 딱 두 가지만 세팅해요</h2>
+  <div class="fade" style="margin-top:20px; display:flex; flex-direction:column; gap:14px;">
+    <div class="card" style="padding:18px;">
+      <h3>① 회원가입으로 초기 루틴 설정</h3>
+      <p style="font-size:14px; color:var(--ink-soft); margin-top:6px;">회원가입을 진행하면서 로그인부터 초기 루틴 설정까지, 아이가 수행할 미션을 함께 세팅해요. 설정한 내용은 부모 화면에서 언제든 수정·추가·삭제할 수 있어요.</p>
+    </div>
+    <div class="card" style="padding:18px;">
+      <h3>② 아이 전용 기기에 연결</h3>
+      <p style="font-size:14px; color:var(--ink-soft); margin-top:6px;">아이가 쓰는 스마트폰이나 태블릿에도 같은 방법으로 설치해주세요. 로그인 후에는 아이만의 독립된 화면이 열려요. 부모 화면 설정에서 '시작 화면'을 부모용/자녀용 중 선택할 수도 있어요.</p>
+    </div>
+    <div class="card" style="padding:18px; background:var(--coral-tint); border:none;">
+      <h3>듀얼 인터페이스 구조예요</h3>
+      <p style="font-size:14px; color:var(--ink-soft); margin-top:6px;">쿠앵크는 부모님 스마트폰과 아이 전용 기기가 서로 연동되는 [듀얼 인터페이스] 시스템이에요. 부모님 폰 외에 아이가 평소 보는 전용 패드나 공기계가 있다면 더 편하게 쓸 수 있어요.</p>
+    </div>
+  </div>
+</div>
+
+<!-- 아이 화면 -->
+<div class="guide-block" id="child">
+  <h2 class="fade">아이 화면 (플레이어)</h2>
+  <p class="fade" style="color:var(--ink-soft); font-size:14.5px; margin-top:8px;">캐릭터, 레벨, 크레딧, 하트가 상단에 보이고 하단에는 오늘의 미션이 카드로 나열돼요. 기능별 자세한 설명은 <a href="features.html" style="text-decoration:underline; font-weight:700;">서비스 소개</a> 페이지에서 확인해주세요.</p>
+  <div class="phone fade" style="max-width:320px; margin:20px auto 0;"><img src="assets/child-home.png" alt="아이 화면"></div>
+</div>
+
+<!-- 부모 화면 -->
+<div class="guide-block" id="parent">
+  <h2 class="fade">부모 화면 (관리자)</h2>
+  <p class="fade" style="color:var(--ink-soft); font-size:14.5px; margin-top:8px;">홈 · 루틴 · 승인 3개 탭으로 구성돼요. 각 탭에서 미션을 설정하고, 보상을 지정하고, 진행 현황을 확인해요.</p>
+  <div class="phone fade" style="max-width:320px; margin:20px auto 20px;"><img src="assets/parent-home.png" alt="부모 화면 홈 탭"></div>
+  <div class="fade" style="display:flex; flex-direction:column; gap:14px;">
+    <div class="card" style="padding:18px;">
+      <h3>🔔 알림 · ⏰ 알람 · ⚙️ 설정</h3>
+      <p style="font-size:14px; color:var(--ink-soft); margin-top:6px;">상단바 오른쪽에서 루틴 알람, 자녀 프로필, 시작 화면 선택 등을 관리해요. 자녀는 여러 명 등록할 수 있고, 프로필마다 수정·삭제가 가능해요.</p>
+    </div>
+    <div class="card" style="padding:18px;">
+      <h3>📌 현재 버전 안내</h3>
+      <p style="font-size:14px; color:var(--ink-soft); margin-top:6px;">지금은 정식 출시 전 베타 빌드라 푸시 알림이 작동하지 않아요. 테스트 기간에는 약속한 시간에 부모님이 직접 앱을 켜서 미션을 확인해주시는 걸 권장해요.</p>
+    </div>
+  </div>
+</div>
+
+<!-- 성장 단계 -->
+<div class="guide-block" id="growth">
+  <h2 class="fade">단계별 성장 가이드</h2>
+  <p class="fade" style="color:var(--ink-soft); font-size:14.5px; margin-top:8px;">레벨이 오를수록 아이의 '여정'이 진행돼요. 지금은 항구 단계까지 확인할 수 있어요.</p>
+  <div class="journey-strip fade" style="margin-top:28px;">
+    <div class="jstage"><div class="icon">🌱</div><span>새싹</span></div>
+    <div class="jstage"><div class="icon">🏠</div><span>마을</span></div>
+    <div class="jstage"><div class="icon">⚓</div><span>항구</span></div>
+    <div class="jstage"><div class="icon">⛵</div><span>바다</span></div>
+  </div>
+</div>
+
+<!-- FAQ -->
+<div class="guide-block" id="faq">
+  <h2 class="fade">자주 묻는 질문</h2>
+  <div class="fade" style="margin-top:18px; display:flex; flex-direction:column; gap:12px;">
+    <div class="card" style="padding:18px;"><h3>Q. 앱스토어에서 검색해도 되나요?</h3><p style="font-size:14px; color:var(--ink-soft); margin-top:6px;">아직 정식 앱스토어 출시 전이에요. 링크로 접속해 홈 화면에 추가하는 방식으로 이용해주세요.</p></div>
+    <div class="card" style="padding:18px;"><h3>Q. 알림이 안 와요.</h3><p style="font-size:14px; color:var(--ink-soft); margin-top:6px;">베타 버전에서는 푸시 알림이 지원되지 않아요. 정식 버전에서 구현될 예정이에요.</p></div>
+    <div class="card" style="padding:18px;"><h3>Q. 아이 기기가 따로 없어도 되나요?</h3><p style="font-size:14px; color:var(--ink-soft); margin-top:6px;">부모님 폰 하나로도 이용 가능해요. 다만 아이 전용 기기가 있으면 훨씬 편하게 쓸 수 있어요.</p></div>
+  </div>
+</div>
+</div>
+
+<section class="mist">
+  <div class="wrap-narrow">
+    <div class="install-card fade">
+      <h2>이제 시작해볼까요</h2>
+      <p>가이드를 다 보셨다면, 바로 설치하고 초기 루틴을 세팅해보세요.</p>
+      <button class="btn btn-primary btn-block" data-install>📲 쿠앵크 시작하기</button>
+    </div>
+  </div>
+</section>
+
+<footer class="site-footer">
+  <div class="wrap footer-grid">
+    <div class="footer-brand">
+      <div class="brand">🐰 COOANC</div>
+      <p>잔소리는 줄이고, 웃음은 늘리는 쿠앵크입니다. 아이가 스스로 만드는 하루를 응원해요.</p>
+    </div>
+    <div><h4>바로가기</h4>
+      <a href="features.html">서비스 소개</a>
+      <a href="guide.html">가이드</a>
+      <a href="about.html">소개</a>
+      <a href="contact.html">문의하기</a>
+    </div>
+    <div><h4>연결</h4>
+      <a href="about.html#blog">블로그</a>
+      <a href="contact.html">이메일 문의</a>
+    </div>
+  </div>
+  <div class="wrap copyright">© 2026 COOANC. All rights reserved.</div>
+</footer>
+
+<div class="overlay" id="iosOverlay">
+  <div class="sheet">
+    <h3 class="jua" style="font-size:19px; margin-bottom:16px;">📲 홈 화면에 추가하기</h3>
+    <div class="step"><div class="num">1</div><p>화면 아래(또는 위) <b>공유 버튼</b> [⬆️]을 눌러주세요.</p></div>
+    <div class="step"><div class="num">2</div><p>메뉴에서 <b>"홈 화면에 추가"</b>를 선택해주세요.</p></div>
+    <div class="step"><div class="num">3</div><p>오른쪽 위 <b>"추가"</b>를 누르면 앱처럼 아이콘이 생겨요.</p></div>
+    <button class="sheet-close" id="iosClose">확인했어요</button>
+  </div>
+</div>
+
+<script src="js/main.js"></script>
+</body>
+</html>
