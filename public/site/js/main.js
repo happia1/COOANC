@@ -142,7 +142,7 @@ if (slider){
     dots[current].classList.add('active');
   }
   function next(){ goTo((current + 1) % slides.length); }
-  function startAuto(){ timer = setInterval(next, 4200); }
+  function startAuto(){ timer = setInterval(next, 2500); }
   function stopAuto(){ clearInterval(timer); }
   dots.forEach((d,i)=> d.addEventListener('click', ()=>{ goTo(i); stopAuto(); startAuto(); }));
   slider.addEventListener('mouseenter', stopAuto);
