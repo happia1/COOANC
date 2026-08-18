@@ -6,6 +6,21 @@
 <title>쿠앵크(COOANC) — 아이의 습관이 자라는 놀이터</title>
 <meta name="description" content="부모의 계획 노동은 줄이고, 아이의 즐거운 습관은 키우는 쿠앵크.">
 <link rel="stylesheet" href="/site/css/style.css">
+<style>
+  /* 홈 전용 — 섹션 스크롤 스냅 */
+  html{ scroll-snap-type:y proximity; }
+  .snap-section{
+    min-height:calc(100svh - 65px); min-height:calc(100vh - 65px);
+    display:flex; flex-direction:column; justify-content:center;
+    padding:56px 0 96px; position:relative;
+    scroll-snap-align:start; scroll-margin-top:65px;
+  }
+  .snap-cta{
+    position:absolute; left:0; right:0; bottom:24px;
+    display:flex; flex-direction:column; align-items:center; gap:10px; width:100%; padding:0 22px;
+  }
+  @media (max-width:480px){ .snap-section{ padding:44px 0 104px; } }
+</style>
 </head>
 <body>
 
@@ -16,7 +31,8 @@
       <a href="/site/index.html" class="active">홈</a>
       <a href="/site/features.html">서비스 소개</a>
       <a href="/site/guide.html">사용가이드</a>
-      <a href="https://blog.naver.com/theotter" target="_blank" rel="noopener">블로그</a>
+      <a href="/site/blog.html">블로그</a>
+      <a href="/site/faq.html">FAQ</a>
       <a href="/site/contact.html">문의하기</a>
     </nav>
     <button class="nav-toggle" id="navToggle">☰</button>
@@ -25,120 +41,120 @@
     <a href="/site/index.html" class="active">홈</a>
     <a href="/site/features.html">서비스 소개</a>
     <a href="/site/guide.html">사용가이드</a>
-    <a href="https://blog.naver.com/theotter" target="_blank" rel="noopener">블로그</a>
+    <a href="/site/blog.html">블로그</a>
+    <a href="/site/faq.html">FAQ</a>
     <a href="/site/contact.html">문의하기</a>
   </div>
 </header>
 
 <!-- HERO -->
-<section style="padding-top:56px;">
-  <div class="wrap">
-    <span class="eyebrow fade">🐰 5세 아이 엄마가 만든 자기주도 습관 앱</span>
-    <h1 class="fade" style="max-width:560px;">잔소리는 줄이고,<br>아이의 <span class="jua" style="color:var(--brand-deep);">웃음은 늘려요</span></h1>
-    <p class="lead fade" style="max-width:460px; margin-top:16px;">아이가 스스로 만드는 하루, 쿠앵크와 함께 성장해요. 미션을 끝내면 크레딧과 하트가 쌓이고, 아이는 자기 방을 스스로 가꿔가요.</p>
-    <div class="fade" style="display:flex; gap:10px; flex-wrap:wrap; margin-top:26px;">
-      <button class="btn btn-primary" data-install>📲 지금 바로 시작하기</button>
-      <a href="/site/features.html" class="btn btn-ghost">서비스 자세히 보기</a>
-    </div>
-
-    <!-- 여정 스트립 (시그니처) -->
-    <div class="journey-strip fade">
-      <div class="jstage"><div class="icon">🌱</div><span>습관의<br>시작</span></div>
-      <div class="jstage"><div class="icon">🏠</div><span>아이만의<br>놀이 공간</span></div>
-      <div class="jstage"><div class="icon">⚓</div><span>부모의<br>관리 화면</span></div>
-      <div class="jstage"><div class="icon">⛵</div><span>매일 쌓이는<br>습관</span></div>
-    </div>
-
-    <!-- 히어로 배너: 현재 숨김 처리 (필요 시 재사용)
-    <div class="hero-slider fade" id="heroSlider">
-      <div class="slide active"><img src="/site/assets/hero-1.webp" alt="쿠앵크 배너 1"></div>
-      <div class="slide"><img src="/site/assets/hero-2.webp" alt="쿠앵크 배너 2"></div>
-      <div class="slide"><img src="/site/assets/hero-3.webp" alt="쿠앵크 배너 3"></div>
-      <div class="slider-dots">
-        <button class="active" aria-label="1번 배너"></button>
-        <button aria-label="2번 배너"></button>
-        <button aria-label="3번 배너"></button>
+<section class="hero-banner" id="heroSlider">
+  <div class="slide active"><img src="/site/assets/hero-1.jpg" alt="" onerror="this.style.display='none'"></div>
+  <div class="slide"><img src="/site/assets/hero-2.jpg" alt="" onerror="this.style.display='none'"></div>
+  <div class="slide"><img src="/site/assets/hero-3.jpg" alt="" onerror="this.style.display='none'"></div>
+  <div class="hero-overlay"></div>
+  <div class="hero-content">
+    <div class="wrap">
+      <h1 class="fade" style="max-width:560px;">잔소리 대신 <span class="jua">쿠앵크</span>를 켜세요!</h1>
+      <p class="lead fade" style="max-width:460px; margin-top:16px;">아이가 스스로 만드는 하루, 쿠앵크와 함께 성장해요. 미션을 끝내면 크레딧과 하트가 쌓이고, 아이는 자기 방을 스스로 가꿔가요.</p>
+      <div class="fade" style="display:flex; gap:10px; flex-wrap:wrap; margin-top:22px;">
+        <button class="btn btn-primary" data-install>지금 바로 시작하기</button>
+        <a href="/site/features.html" class="btn btn-ghost">서비스 자세히 보기</a>
       </div>
     </div>
-    -->
+  </div>
+  <div class="slider-dots">
+    <button class="active"></button>
+    <button></button>
+    <button></button>
   </div>
 </section>
 
-<!-- 하이라이트 3카드 -->
-<section class="mist">
-  <div class="wrap">
-    <div class="section-head fade">
-      <h2>딱 세 가지로 설명돼요</h2>
-      <p>복잡한 설정 없이, 자기주도 습관형성을 위한 세 가지 축으로만 움직이는 앱이에요.</p>
-    </div>
-    <div class="feature-grid">
-      <div class="card feature-card fade">
-        <div class="fi">🎯</div>
-        <h3>미션 → 보상</h3>
-        <p>세수하기, 가글하기 같은 일상 미션을 아이가 스스로 끝내면 크레딧과 하트를 받아요.</p>
-      </div>
-      <div class="card feature-card fade">
-        <div class="fi">🌱</div>
-        <h3>놀이형 성장</h3>
-        <p>화분을 키우고 저금통에 이자가 붙는 걸 보며, 자기주도 습관이 눈에 보이게 쌓여요.</p>
-      </div>
-      <div class="card feature-card fade">
-        <div class="fi">⚓</div>
-        <h3>부모는 응원만</h3>
-        <p>잔소리 대신 루틴 설정, 일정 관리, 보상 관리 세 화면에서 응원하고 격려해요.</p>
-      </div>
-    </div>
-    <div class="fade" style="margin-top:22px;">
+<!-- 브랜드 임팩트 섹션 -->
+<section class="snap-section mist">
+  <div class="brand-split fade">
+    <div class="brand-split-media img-slot">이미지 준비 중</div>
+    <div class="brand-split-text">
+      <span class="eyebrow">쿠앵크가 특별한 이유</span>
+      <h2>잔소리 대신, 아이 스스로 만드는 하루</h2>
+      <p>복잡한 설정은 필요 없어요. 아이는 미션을 끝내며 크레딧과 하트를 모으고, 화분과 저금통을 스스로 키워가요. 부모님은 옆에서 응원만 하면 돼요.</p>
       <a href="/site/features.html" class="btn btn-dark">기능 전체 보기 →</a>
     </div>
   </div>
 </section>
 
 <!-- 실제 후기 -->
-<section>
+<section class="snap-section">
   <div class="wrap">
-    <div class="section-head fade" style="margin:0 auto 28px; text-align:center; max-width:420px;">
-      <span class="eyebrow">먼저 써본 부모님들</span>
-      <h2>말이 아니라, 아이가 변해요</h2>
+    <div class="section-head fade" style="margin:0 auto 8px; text-align:center; max-width:560px;">
+      <h2 style="white-space:nowrap; font-size:clamp(20px, 4vw, 30px);">쿠앵크와 함께해요!</h2>
     </div>
-    <div class="feature-grid">
-      <div class="card feature-card fade" style="background:linear-gradient(135deg,#FFF6E2,#FFF9F0); border:none;">
-        <div class="fi">🌙</div>
-        <p style="font-size:14.5px; font-weight:600; line-height:1.6;">"아이가 처음으로 '오늘은 일찍 자러 갈래'라고 말했어요."</p>
-        <span style="font-size:12.5px; color:var(--ink-soft); display:block; margin-top:10px;">— 이웃집 어머니</span>
+
+    <div class="fade" data-pv-carousel>
+      <div class="pv-viewport">
+        <div class="pv-track">
+          <div class="pv-slide">
+            <div class="testi-slide">
+              <div class="testi-avatar" style="background:var(--sun-tint);"><img src="/site/assets/testi-1.jpg" alt="" onerror="this.style.display='none'"><span>🌙</span></div>
+              <p class="testi-quote">"아이가 처음으로 '오늘은 일찍 자러 갈래'라고 말했어요."</p>
+              <span class="testi-name">이웃집 어머니</span>
+            </div>
+          </div>
+          <div class="pv-slide">
+            <div class="testi-slide">
+              <div class="testi-avatar" style="background:var(--brand-tint);"><img src="/site/assets/testi-2.jpg" alt="" onerror="this.style.display='none'"><span>🗡️</span></div>
+              <p class="testi-quote">"말 안 들을 때 꺼내는 비장의 무기예요."</p>
+              <span class="testi-name">사랑이 어머니</span>
+            </div>
+          </div>
+          <div class="pv-slide">
+            <div class="testi-slide">
+              <div class="testi-avatar" style="background:var(--mint-tint);"><img src="/site/assets/testi-3.jpg" alt="" onerror="this.style.display='none'"><span>📌</span></div>
+              <p class="testi-quote">"이제는 저희 집 생활 필수템이 됐어요."</p>
+              <span class="testi-name">어느 부모님</span>
+            </div>
+          </div>
+          <div class="pv-slide">
+            <div class="testi-slide">
+              <div class="testi-avatar" style="background:var(--sun-tint);"><img src="/site/assets/testi-4.jpg" alt="" onerror="this.style.display='none'"><span>🐷</span></div>
+              <p class="testi-quote">"화분에 물 주기랑 저금통이 최애예요. 쓰는 것보다 모으는 게 더 재밌다면서, 저축하는 습관이 생겼어요."</p>
+              <span class="testi-name">어느 부모님</span>
+            </div>
+          </div>
+          <div class="pv-slide">
+            <div class="testi-slide">
+              <div class="testi-avatar" style="background:var(--mist);"><img src="/site/assets/testi-5.jpg" alt="" onerror="this.style.display='none'"><span>💼</span></div>
+              <p class="testi-quote">"맞벌이라 아이를 다른 분께 맡겨야 할 때도, 제가 곁에 없는 동안 하루 생활습관을 이 앱이 잡아줘서 마음이 놓여요."</p>
+              <span class="testi-name">맞벌이 부모님</span>
+            </div>
+          </div>
+        </div>
       </div>
-      <div class="card feature-card fade" style="background:linear-gradient(135deg,#FFF0F3,#FFF6F0); border:none;">
-        <div class="fi">🗡️</div>
-        <p style="font-size:14.5px; font-weight:600; line-height:1.6;">"말 안 들을 때 꺼내는 비장의 무기예요."</p>
-        <span style="font-size:12.5px; color:var(--ink-soft); display:block; margin-top:10px;">— 사랑이 어머니</span>
-      </div>
-      <div class="card feature-card fade" style="background:linear-gradient(135deg,#E9FAF2,#F3FBF6); border:none;">
-        <div class="fi">📌</div>
-        <p style="font-size:14.5px; font-weight:600; line-height:1.6;">"이제는 저희 집 생활 필수템이 됐어요."</p>
-        <span style="font-size:12.5px; color:var(--ink-soft); display:block; margin-top:10px;">— 어느 부모님</span>
-      </div>
-      <div class="card feature-card fade" style="background:linear-gradient(135deg,#FFF6E2,#FFF0F3); border:none;">
-        <div class="fi">🐷</div>
-        <p style="font-size:14.5px; font-weight:600; line-height:1.6;">"화분에 물 주기랑 저금통이 최애예요. 쓰는 것보다 모으는 게 더 재밌다면서, 저축하는 습관이 생겼어요."</p>
-        <span style="font-size:12.5px; color:var(--ink-soft); display:block; margin-top:10px;">— 어느 부모님</span>
-      </div>
-      <div class="card feature-card fade" style="background:linear-gradient(135deg,#F4F8FB,#EFF6FB); border:none; grid-column:1/-1;">
-        <div class="fi">💼</div>
-        <p style="font-size:14.5px; font-weight:600; line-height:1.6;">"맞벌이라 아이를 다른 분께 맡겨야 할 때도, 제가 곁에 없는 동안 하루 생활습관을 이 앱이 잡아줘서 마음이 놓여요."</p>
-        <span style="font-size:12.5px; color:var(--ink-soft); display:block; margin-top:10px;">— 맞벌이 부모님</span>
+      <div class="pv-dots">
+        <button class="pv-dot active"></button>
+        <button class="pv-dot"></button>
+        <button class="pv-dot"></button>
+        <button class="pv-dot"></button>
+        <button class="pv-dot"></button>
       </div>
     </div>
+  </div>
+  <div class="snap-cta fade">
+    <button class="btn btn-primary" data-install>무료로 시작하기</button>
   </div>
 </section>
 
 <!-- 설치 CTA -->
-<section id="install">
-  <div class="wrap-narrow">
-    <div class="install-card fade">
-      <h2>지금 바로 시작해요</h2>
-      <p>회원가입과 초기 루틴 설정만 끝내면, 아이 화면은 자동으로 준비돼요.<br>앱스토어 없이 홈 화면에 아이콘 하나로 설치돼요.</p>
-      <button class="btn btn-primary btn-block" data-install>📲 쿠앵크 시작하기</button>
-      <p class="install-note">설치 방법이 궁금하면 <a href="/site/guide.html" style="text-decoration:underline;">가이드 보기</a> · 설치는 무료예요</p>
+<section class="snap-section" id="install">
+  <div class="wrap-narrow plain-cta fade">
+    <div class="badges">
+      <span>🧪 베타 버전</span>
+      <span>무료</span>
+    </div>
+    <h2>지금 바로 시작해요</h2>
+    <div style="margin-top:22px;">
+      <button class="btn btn-primary" data-install>쿠앵크 시작하기</button>
+      <p class="free-note">홈 화면에 아이콘 하나로 설치돼요 · <a href="/site/guide.html" style="text-decoration:underline;">가이드 보기</a></p>
     </div>
   </div>
 </section>
@@ -153,11 +169,12 @@
       <a href="/site/index.html">홈</a>
       <a href="/site/features.html">서비스 소개</a>
       <a href="/site/guide.html">사용가이드</a>
+      <a href="/site/faq.html">FAQ</a>
       <a href="/site/contact.html">문의하기</a>
     </div>
     <div><h4>연결</h4>
       <a href="/site/about.html">제작자 소개</a>
-      <a href="https://blog.naver.com/theotter" target="_blank" rel="noopener">블로그</a>
+      <a href="/site/blog.html">블로그</a>
       <a href="/site/contact.html">이메일 문의</a>
     </div>
   </div>

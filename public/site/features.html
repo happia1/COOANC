@@ -15,7 +15,8 @@
       <a href="/site/index.html">홈</a>
       <a href="/site/features.html" class="active">서비스 소개</a>
       <a href="/site/guide.html">사용가이드</a>
-      <a href="https://blog.naver.com/theotter" target="_blank" rel="noopener">블로그</a>
+      <a href="/site/blog.html">블로그</a>
+      <a href="/site/faq.html">FAQ</a>
       <a href="/site/contact.html">문의하기</a>
     </nav>
     <button class="nav-toggle" id="navToggle">☰</button>
@@ -24,7 +25,8 @@
     <a href="/site/index.html">홈</a>
     <a href="/site/features.html" class="active">서비스 소개</a>
     <a href="/site/guide.html">사용가이드</a>
-    <a href="https://blog.naver.com/theotter" target="_blank" rel="noopener">블로그</a>
+    <a href="/site/blog.html">블로그</a>
+    <a href="/site/faq.html">FAQ</a>
     <a href="/site/contact.html">문의하기</a>
   </div>
 </header>
@@ -33,12 +35,32 @@
   <div class="wrap">
     <span class="eyebrow fade">서비스 소개</span>
     <h1 class="fade" style="max-width:560px;">일상이 즐거워지는 마법</h1>
-    <p class="lead fade" style="max-width:480px; margin-top:14px;">아이의 바른 생활 습관, 재미있게 시작하세요! 아래 탭을 눌러 아이 화면과 부모 화면을 각각 자세히 확인해보세요.</p>
+    <p class="lead fade" style="max-width:480px; margin-top:14px;">아이의 바른 생활 습관, 재미있게 시작하세요! 아이가 노는 화면과 부모가 관리하는 화면이 짝을 이뤄요.</p>
+
+    <div class="compare-grid fade" style="margin-top:32px;">
+      <div class="compare-divider"></div>
+      <div class="compare-col">
+        <span class="compare-label">🏠 아이 화면 (플레이어)</span>
+        <div class="phone"><img src="/site/assets/child-home.webp" alt="아이 화면"></div>
+        <p>레벨·크레딧·하트가 상단에, 오늘의 미션이 하단에 카드로 나열돼요.</p>
+      </div>
+      <div class="compare-col">
+        <span class="compare-label">⚓ 부모 화면 (관리자)</span>
+        <div class="phone"><img src="/site/assets/parent-home.webp" alt="부모 화면 홈 탭"></div>
+        <p>홈 · 루틴 · 승인 3개 탭으로만 구성돼요.</p>
+      </div>
+    </div>
+
+    <div class="card fade" style="padding:22px; background:var(--brand-tint); border:none; margin-top:28px;">
+      <h3>듀얼 인터페이스 구조예요</h3>
+      <p style="font-size:14px; color:var(--ink-soft); margin-top:6px;">쿠앵크는 부모님 스마트폰과 아이 전용 기기가 서로 연동되는 [듀얼 인터페이스] 시스템이에요. 부모님 폰 외에 아이가 평소 보는 전용 패드나 공기계가 있다면 더 편하게 쓸 수 있어요.</p>
+    </div>
   </div>
 </section>
 
 <section style="padding-top:0;">
   <div class="wrap" data-tabgroup>
+    <p class="fade" style="font-size:13.5px; color:var(--ink-faint); margin-bottom:14px;">아래 탭을 눌러 각 화면을 기능별로 자세히 확인해보세요.</p>
     <div class="tabbar fade">
       <button class="tabbtn active" data-tab="pane-child">🏠 아이 화면</button>
       <button class="tabbtn" data-tab="pane-parent">⚓ 부모 화면</button>
@@ -46,136 +68,159 @@
 
     <!-- ===== 아이 화면 ===== -->
     <div class="tabpanel active" id="pane-child">
-      <div class="device-group fade" style="margin-bottom:32px;">
-        <div class="device device-phone">
-          <div class="device-frame"><img src="/site/assets/child-home.webp" alt="쿠앵크 아이 화면 - 모바일"></div>
-          <div class="device-label">모바일</div>
+      <p class="fade" style="font-size:12.5px; color:var(--ink-faint); margin-bottom:20px;">아래는 태블릿 화면 기준이에요 — 모바일에서도 똑같이 보여요.</p>
+
+      <div class="pv fade" data-pv-carousel>
+        <div class="pv-tabs">
+          <button class="pv-tab active">레벨 · 오늘의 미션</button>
+          <button class="pv-tab">화분</button>
+          <button class="pv-tab">돼지저금통</button>
+          <button class="pv-tab">보물상자</button>
+          <button class="pv-tab">스티커판</button>
+          <button class="pv-tab">거짓말 방지</button>
         </div>
-        <div class="device device-tablet">
-          <div class="device-frame"><img src="/site/assets/child-home.webp" alt="쿠앵크 아이 화면 - 태블릿"></div>
-          <div class="device-label">태블릿</div>
+        <div class="pv-nested">
+        <div class="pv-viewport">
+          <div class="pv-track">
+            <div class="pv-slide">
+              <div class="device device-tablet"><div class="device-frame"><img src="/site/assets/child-home.webp" alt="레벨 블록과 오늘의 미션이 보이는 아이 화면"></div></div>
+              <div class="pv-copy">
+                <h3><img class="pv-icon" src="/site/assets/icons/icon-mission.webp" alt="">레벨 블록 · 오늘의 미션</h3>
+                <p>미션을 완료하면 크레딧과 하트가 쌓여요. 아이가 얼마나 성장하고 있는지 한눈에 확인할 수 있어요.</p>
+                <p>오늘 해야 할 일들이 카드로 나열돼요. 완료하면 보상이 지급되고 자동으로 기록돼요. 오전 · 오후 미션은 구분되어 있어 해당 시간에만 수행할 수 있어요.</p>
+              </div>
+            </div>
+            <div class="pv-slide">
+              <div class="device device-tablet"><div class="device-frame"><img src="/site/assets/child-home.webp" alt="화분이 보이는 아이 화면"></div></div>
+              <div class="pv-copy">
+                <h3><img class="pv-icon" src="/site/assets/icons/icon-plant.webp" alt="">화분</h3>
+                <p>하트를 사용해 화분을 성장시킬 수 있어요. 씨앗에서 시작해 점점 자라고 열매를 맺는 과정까지 확인할 수 있어요.</p>
+                <p>아이에게 기다림과 성장의 즐거움을 알려주는 공간이에요.</p>
+              </div>
+            </div>
+            <div class="pv-slide">
+              <div class="device device-tablet"><div class="device-frame"><img src="/site/assets/child-home.webp" alt="돼지저금통이 보이는 아이 화면"></div></div>
+              <div class="pv-copy">
+                <h3><img class="pv-icon" src="/site/assets/icons/icon-piggy.webp" alt="">돼지저금통 <span class="badge-level" style="position:static; display:inline-block; margin-left:4px;">Lv.5 오픈</span></h3>
+                <p>레벨 5가 되면 열리는 특별 기능이에요. 크레딧을 저금통에 넣어두면 매일 아침 반짝이는 동전이 생기고, 아이가 직접 탭해서 주우면 저금통 잔액이 늘어나요.</p>
+                <p>"모아두면 불어난다"를 몸으로 배우는 첫 경제 경험이에요.</p>
+              </div>
+            </div>
+            <div class="pv-slide">
+              <div class="device device-tablet"><div class="device-frame"><img src="/site/assets/child-home.webp" alt="보물상자가 보이는 아이 화면"></div></div>
+              <div class="pv-copy">
+                <h3><img class="pv-icon" src="/site/assets/icons/icon-chest.webp" alt="">보물상자 <span class="badge-level" style="position:static; display:inline-block; margin-left:4px;">Lv.8 오픈</span></h3>
+                <p>보물상자 이용권으로 골라둔 영상 콘텐츠를 정해진 시간만큼 보거나, 인형뽑기 미니게임을 즐길 수 있어요.</p>
+                <p>시간이 다 되면 자동으로 멈춰서 다음 할 일로 자연스럽게 이어져요.</p>
+              </div>
+            </div>
+            <div class="pv-slide">
+              <div class="device device-tablet"><div class="device-frame"><img src="/site/assets/child-home.webp" alt="스티커판이 보이는 아이 화면"></div></div>
+              <div class="pv-copy">
+                <h3><img class="pv-icon" src="/site/assets/icons/icon-gift.webp" alt="">스티커판</h3>
+                <p>칭찬은 고래도 춤추게 하죠! 하루에 10개 이상의 미션을 달성하면 랜덤 스티커를 받아요.</p>
+                <p>20개를 모두 모으면 아이와 상의해서 보상을 정해보세요. 부모 화면 승인 탭에서 직접 스티커를 지급할 수도 있어요.</p>
+              </div>
+            </div>
+            <div class="pv-slide">
+              <div class="fm-art" style="flex:0 0 auto;"><img src="/site/assets/feature-honesty.webp" alt="정말 한 거 맞아? 하고 묻는 쿠앵크 수달"></div>
+              <div class="pv-copy">
+                <h3>거짓말 방지 기능</h3>
+                <p>미션을 손가락으로 몰아서 눌러 버리면, 수달이 나와서 <b>"정말 한 거 맞아?"</b> 하고 한 번 더 물어봐요. 혼내기 위한 장치가 아니라, 아이가 스스로 정직함을 연습하도록 돕는 장치예요.</p>
+                <ul class="fm-list" style="text-align:left;">
+                  <li><b>몰아서 누르면 확인 팝업</b> — 짧은 시간에 미션 카드를 연달아 여러 장 누르면 수달이 나와 다시 물어봐요.</li>
+                  <li><b>시간을 앞질러 갈 수는 없어요</b> — 오후 · 잠자리 미션은 정해진 시간 이후에만 완료할 수 있어요.</li>
+                  <li><b>부모가 되돌릴 수 있어요</b> — 부모 화면에서 실제로 하지 않은 미션은 탭 한 번으로 되돌려요.</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="pv-dots">
+          <button class="pv-dot active"></button>
+          <button class="pv-dot"></button>
+          <button class="pv-dot"></button>
+          <button class="pv-dot"></button>
+          <button class="pv-dot"></button>
+          <button class="pv-dot"></button>
+        </div>
         </div>
       </div>
 
-      <div class="feature-grid">
-        <div class="card feature-card fade">
-          <div class="fi">⭐</div><h3>레벨 블록</h3>
-          <p>미션을 완료하면 크레딧과 하트가 쌓여요. 아이가 얼마나 성장하고 있는지 한눈에 확인할 수 있는 공간이에요.</p>
+      <div class="section-head fade" style="margin-top:44px; margin-bottom:16px;">
+        <h3 style="font-size:15px; color:var(--ink-faint);">그 외에도 이런 기능이 있어요</h3>
+      </div>
+      <div class="mini-feature-grid fade">
+        <div class="mini-feature">
+          <img src="/site/assets/icons/icon-character.webp" alt="캐릭터 · 감정 기록">
+          <div class="mf-text"><h4>캐릭터 · 감정 기록</h4><p>오늘 기분을 표정 카드로 기록해요.</p></div>
         </div>
-        <div class="card feature-card fade">
-          <div class="fi">📋</div><h3>오늘의 미션</h3>
-          <p>아이가 오늘 해야 할 일들을 확인하는 공간이에요. 완료하면 보상이 지급되고 자동으로 기록돼요. 오전 미션과 오후 미션은 구분되어 있어 해당 시간에만 수행할 수 있어요.</p>
+        <div class="mini-feature">
+          <img src="/site/assets/icons/icon-basket.webp" alt="마켓">
+          <div class="mf-text"><h4>마켓</h4><p>모은 크레딧으로 보상을 구매해요.</p></div>
         </div>
-        <div class="card feature-card fade">
-          <div class="fi">🐰</div><h3>캐릭터 · 감정 기록</h3>
-          <p>캐릭터를 누르면 오늘 기분을 표정 카드로 골라 기록할 수 있어요. 앞으로 이 팝업에서 방 꾸미기와 그림일기까지 이어질 예정이에요.</p>
+        <div class="mini-feature">
+          <img src="/site/assets/icons/icon-pomodoro.webp" alt="뽀모도로 타이머">
+          <div class="mf-text"><h4>뽀모도로 타이머</h4><p>집중 시간을 스스로 관리해요.</p></div>
         </div>
-        <div class="card feature-card fade">
-          <div class="fi"><img src="/site/assets/icons/icon-plant.webp" alt="화분"></div><h3>화분</h3>
-          <p>하트를 사용해 화분을 성장시킬 수 있어요. 씨앗에서 시작해 점점 자라고 열매를 맺는 과정까지 확인할 수 있어요. 아이에게 기다림과 성장의 즐거움을 알려주는 공간이에요.</p>
+        <div class="mini-feature">
+          <img src="/site/assets/icons/icon-music.webp" alt="하루를 돕는 음악">
+          <div class="mf-text"><h4>하루를 돕는 음악</h4><p>상황에 맞는 음악으로 생활 리듬을 잡아요.</p></div>
         </div>
-        <div class="card feature-card fade">
-          <span class="badge-level">Lv.5 오픈</span>
-          <div class="fi"><img src="/site/assets/icons/icon-piggy.webp" alt="돼지저금통"></div><h3>돼지저금통</h3>
-          <p>레벨 5가 되면 열리는 특별 기능이에요. 크레딧을 저금통에 넣어두면 매일 아침 반짝이는 동전이 생기고, 아이가 직접 탭해서 주우면 저금통 잔액이 늘어나요. "모아두면 불어난다"를 몸으로 배우는 첫 경제 경험이에요.</p>
-        </div>
-        <div class="card feature-card fade">
-          <span class="badge-level">Lv.8 오픈</span>
-          <div class="fi"><img src="/site/assets/icons/icon-chest.webp" alt="보물상자"></div><h3>보물상자</h3>
-          <p>보물상자 이용권으로 골라둔 영상 콘텐츠를 정해진 시간만큼 보거나, 인형뽑기 미니게임을 즐길 수 있어요. 시간이 다 되면 자동으로 멈춰서 다음 할 일로 자연스럽게 이어져요.</p>
-        </div>
-        <div class="card feature-card fade">
-          <div class="fi"><img src="/site/assets/icons/icon-basket.webp" alt="마켓"></div><h3>마켓</h3>
-          <p>아이가 미션으로 모은 크레딧으로 원하는 보상을 구매하는 공간이에요. 부모 화면에서 마켓에 보여줄 상품을 직접 추가하거나 수정할 수 있어요.</p>
-        </div>
-        <div class="card feature-card fade">
-          <div class="fi"><img src="/site/assets/icons/icon-gift.webp" alt="스티커판"></div><h3>스티커판</h3>
-          <p>칭찬은 고래도 춤추게 하죠! 하루에 10개 이상의 미션을 달성하면 랜덤 스티커를 받아요. 20개를 모두 모으면 아이와 상의해서 보상을 정해보세요. 부모 화면 승인 탭에서 직접 스티커를 지급할 수도 있어요.</p>
-        </div>
-        <div class="card feature-card fade">
-          <div class="fi"><img src="/site/assets/icons/icon-pomodoro.webp" alt="뽀모도로 타이머"></div><h3>뽀모도로 타이머</h3>
-          <p>집중이 필요한 순간에 사용해요. 식사 시간, 공부 시간, 정리 시간처럼 제한된 시간 안에 목표를 달성하는 연습을 도와줘요.</p>
-        </div>
-        <div class="card feature-card fade">
-          <div class="fi"><img src="/site/assets/icons/icon-music.webp" alt="하루를 돕는 음악"></div><h3>하루를 돕는 음악</h3>
-          <p>아침 준비, 식사 시간, 놀이 시간, 정리 시간, 잠자리 준비, 수면 음악까지 — 상황에 맞는 음악을 바로 재생해서 생활 리듬을 만드는 데 도움을 줘요.</p>
-        </div>
-        <div class="card feature-card fade">
-          <div class="fi"><img src="/site/assets/icons/icon-door.webp" alt="나가기 문"></div><h3>나가기 문</h3>
-          <p>아이 화면에서 부모 화면으로 넘어가는 문이에요. 아이가 실수로 부모 화면에 들어가지 않도록 자연스럽게 구분해줘요.</p>
-        </div>
-        <div class="card feature-media fade" style="grid-column:1/-1;">
-          <div class="fm-art"><img src="/site/assets/feature-honesty.webp" alt="정말 한 거 맞아? 하고 묻는 쿠앵크 수달"></div>
-          <div class="fm-body">
-            <h3>거짓말 방지 기능</h3>
-            <p>미션을 손가락으로 몰아서 눌러 버리면, 수달이 나와서 <b>"정말 한 거 맞아?"</b> 하고 한 번 더 물어봐요. 혼내기 위한 장치가 아니라, 아이가 스스로 정직함을 연습하도록 돕는 장치예요.</p>
-            <ul class="fm-list">
-              <li><b>몰아서 누르면 확인 팝업</b> — 짧은 시간에 미션 카드를 연달아 여러 장 누르면 수달이 나와 다시 물어봐요. 정말 했다면 「정말 다 했어! 🙌」, 아니라면 「미안.. 다시 할게 😅」를 고르면 돼요.</li>
-              <li><b>시간을 앞질러 갈 수는 없어요</b> — 오후 미션은 정오 이후에, 잠자리 미션은 부모가 정한 잘 준비 시간 이후에만 완료할 수 있어요.</li>
-              <li><b>부모가 되돌릴 수 있어요</b> — 부모 화면 「오늘 완료 미션」에서 실제로 하지 않은 미션은 탭 한 번으로 다시 하기로 되돌려요.</li>
-            </ul>
-            <p class="fm-note">아이가 정말 했는데 늦게 체크한 거라면 <b>「정말 다 했어!」</b>로 그대로 진행돼요. 기록을 막는 게 아니라, 한 번 더 생각하게 하는 것이 목적이에요.</p>
-          </div>
+        <div class="mini-feature">
+          <img src="/site/assets/icons/icon-door.webp" alt="나가기 문">
+          <div class="mf-text"><h4>나가기 문</h4><p>부모 화면으로 자연스럽게 구분돼요.</p></div>
         </div>
       </div>
     </div>
 
     <!-- ===== 부모 화면 ===== -->
     <div class="tabpanel" id="pane-parent">
-      <div class="fade" style="margin-bottom:22px;">
+      <div class="fade" style="margin-bottom:8px;">
         <p class="lead">부모 화면은 <b>홈 · 루틴 · 승인</b> 3개 탭으로만 구성돼 있어요. 계획을 세우는 일도, 확인하는 일도 이 세 곳에서 끝나요.</p>
       </div>
+      <p class="fade" style="font-size:12.5px; color:var(--ink-faint); margin-bottom:20px;">아래는 태블릿 화면 기준이에요 — 모바일에서도 똑같이 보여요.</p>
 
-      <div data-tabgroup>
-        <div class="tabbar fade">
-          <button class="tabbtn active" data-tab="t-home">홈 대시보드</button>
-          <button class="tabbtn" data-tab="t-routine">루틴 설정</button>
-          <button class="tabbtn" data-tab="t-approve">승인 · 보상 관리</button>
+      <div class="pv fade" data-pv-carousel>
+        <div class="pv-tabs">
+          <button class="pv-tab active">홈 대시보드</button>
+          <button class="pv-tab">루틴 설정</button>
+          <button class="pv-tab">승인 · 보상 관리</button>
         </div>
-
-        <div class="tabpanel active" id="t-home">
-          <div class="device-group fade" style="margin-bottom:18px;">
-            <div class="device device-phone"><div class="device-frame"><img src="/site/assets/parent-home.webp" alt="부모 홈 대시보드 - 모바일"></div><div class="device-label">모바일</div></div>
-            <div class="device device-tablet"><div class="device-frame"><img src="/site/assets/parent-home.webp" alt="부모 홈 대시보드 - 태블릿"></div><div class="device-label">태블릿</div></div>
-          </div>
-          <div class="card fade" style="padding:18px;">
-            <h3>오늘의 진행도를 한눈에</h3>
-            <p style="font-size:14px; color:var(--ink-soft); margin-top:6px;">오늘의 미션 진행률, 주간 루틴 완료율, 주간 완주율까지 숫자와 그래프로 바로 확인돼요. 아이를 여러 명 등록했다면 좌우로 넘겨 전환할 수 있어요.</p>
-          </div>
-          <div class="card fade" style="padding:18px; margin-top:14px;">
-            <h3>아이의 습관을 읽어주는 리포트</h3>
-            <p style="font-size:14px; color:var(--ink-soft); margin-top:6px;">미션 달성 패턴, 좋아하는 활동, 크레딧을 쓰는 성향을 정리해 「우리 아이 경제 EQ 지수」와 코칭 카드로 보여줘요. 오늘 무엇을 칭찬해주면 좋을지 힌트를 얻을 수 있어요.</p>
+        <div class="pv-nested">
+        <div class="pv-viewport">
+          <div class="pv-track">
+            <div class="pv-slide">
+              <div class="device device-tablet"><div class="device-frame"><img src="/site/assets/parent-home.webp" alt="부모 홈 대시보드 화면"></div></div>
+              <div class="pv-copy">
+                <h3>오늘의 진행도를 한눈에</h3>
+                <p>오늘의 미션 진행률, 주간 루틴 완료율, 주간 완주율까지 숫자와 그래프로 바로 확인돼요. 아이를 여러 명 등록했다면 좌우로 넘겨 전환할 수 있어요.</p>
+                <p>미션 달성 패턴, 좋아하는 활동, 크레딧을 쓰는 성향을 정리한 「우리 아이 경제 EQ 지수」와 코칭 카드도 함께 보여줘요.</p>
+              </div>
+            </div>
+            <div class="pv-slide">
+              <div class="device device-tablet"><div class="device-frame"><img src="/site/assets/parent-routine.webp" alt="루틴 설정 화면"></div></div>
+              <div class="pv-copy">
+                <h3>오전 · 오후 루틴을 카드로 관리</h3>
+                <p>세수하기, 가글하기, 숙제하기처럼 하나씩 카드로 등록하고 보상(크레딧·하트)도 카드마다 지정해요. 카드를 길게 눌러 끌면 순서가 바뀌고 자동 저장돼요.</p>
+                <p>기상 · 등원 · 하원 · 잘 준비 · 취침 시간을 등록해두면 주중 · 주말을 나눠서 알람 하나로 자동으로 챙겨줘요.</p>
+              </div>
+            </div>
+            <div class="pv-slide">
+              <div class="device device-tablet"><div class="device-frame"><img src="/site/assets/parent-market.webp" alt="승인·상품 관리 화면"></div></div>
+              <div class="pv-copy">
+                <h3>마켓에 올라갈 상품을 직접 관리</h3>
+                <p>이벤트(안아주기, 책 읽어주기, TV 시청권)와 간식을 등록하고 가격을 정해요. 아이가 크레딧으로 구매를 요청하면 알림이 오고, 승인 버튼 한 번으로 끝나요.</p>
+                <p>오늘 완료한 미션 목록을 확인하고, 실수로 눌렀거나 취소해야 할 미션은 탭 한 번으로 롤백할 수 있어요.</p>
+              </div>
+            </div>
           </div>
         </div>
-
-        <div class="tabpanel" id="t-routine">
-          <div class="device-group fade" style="margin-bottom:18px;">
-            <div class="device device-phone"><div class="device-frame"><img src="/site/assets/parent-routine.webp" alt="루틴 설정 화면 - 모바일"></div><div class="device-label">모바일</div></div>
-            <div class="device device-tablet"><div class="device-frame"><img src="/site/assets/parent-routine.webp" alt="루틴 설정 화면 - 태블릿"></div><div class="device-label">태블릿</div></div>
-          </div>
-          <div class="card fade" style="padding:18px;">
-            <h3>오전 · 오후 루틴을 카드로 관리</h3>
-            <p style="font-size:14px; color:var(--ink-soft); margin-top:6px;">세수하기, 가글하기, 숙제하기처럼 하나씩 카드로 등록하고 보상(크레딧·하트)도 카드마다 지정해요. 카드를 길게 눌러 끌면 순서가 바뀌고 자동 저장돼요.</p>
-          </div>
-          <div class="card fade" style="padding:18px; margin-top:14px;">
-            <h3>기상부터 취침까지, 알람 하나로</h3>
-            <p style="font-size:14px; color:var(--ink-soft); margin-top:6px;">기상 · 등원 · 하원 · 잘 준비 · 취침 시간을 등록해두면 주중 · 주말을 나눠서 자동으로 챙겨줘요.</p>
-          </div>
+        <div class="pv-dots">
+          <button class="pv-dot active" aria-label="홈 대시보드"></button>
+          <button class="pv-dot" aria-label="루틴 설정"></button>
+          <button class="pv-dot" aria-label="승인 · 보상 관리"></button>
         </div>
-
-        <div class="tabpanel" id="t-approve">
-          <div class="device-group fade" style="margin-bottom:18px;">
-            <div class="device device-phone"><div class="device-frame"><img src="/site/assets/parent-market.webp" alt="승인·상품 관리 화면 - 모바일"></div><div class="device-label">모바일</div></div>
-            <div class="device device-tablet"><div class="device-frame"><img src="/site/assets/parent-market.webp" alt="승인·상품 관리 화면 - 태블릿"></div><div class="device-label">태블릿</div></div>
-          </div>
-          <div class="card fade" style="padding:18px;">
-            <h3>마켓에 올라갈 상품을 직접 관리</h3>
-            <p style="font-size:14px; color:var(--ink-soft); margin-top:6px;">이벤트(안아주기, 책 읽어주기, TV 시청권)와 간식을 등록하고 가격을 정해요. 아이가 크레딧으로 구매를 요청하면 알림이 오고, 승인 버튼 한 번으로 끝나요.</p>
-          </div>
-          <div class="card fade" style="padding:18px; margin-top:14px;">
-            <h3>완료 미션도 되돌릴 수 있어요</h3>
-            <p style="font-size:14px; color:var(--ink-soft); margin-top:6px;">오늘 완료한 미션 목록을 확인하고, 실수로 눌렀거나 취소해야 할 미션은 탭 한 번으로 롤백할 수 있어요.</p>
-          </div>
         </div>
       </div>
     </div>
@@ -257,12 +302,16 @@
 </section>
 
 <section class="mist">
-  <div class="wrap-narrow">
-    <div class="install-card fade">
-      <h2>어떤 화면인지 직접 보고 싶다면</h2>
-      <p>지금 바로 설치해서 홈 화면과 아이 화면을 둘러보세요.</p>
-      <button class="btn btn-primary btn-block" data-install>📲 쿠앵크 시작하기</button>
-      <p class="install-note">설치 방법이 궁금하면 <a href="/site/guide.html" style="text-decoration:underline;">가이드 보기</a></p>
+  <div class="wrap-narrow plain-cta fade">
+    <div class="badges">
+      <span>🧪 베타 버전</span>
+      <span>무료</span>
+    </div>
+    <h2>어떤 화면인지 직접 보고 싶다면</h2>
+    <p class="lead" style="margin-top:6px;">지금 바로 설치해서 홈 화면과 아이 화면을 둘러보세요.</p>
+    <div style="margin-top:22px;">
+      <button class="btn btn-primary" data-install>쿠앵크 시작하기</button>
+      <p class="free-note">설치 방법이 궁금하면 <a href="/site/guide.html" style="text-decoration:underline;">가이드 보기</a></p>
     </div>
   </div>
 </section>
@@ -277,11 +326,12 @@
       <a href="/site/index.html">홈</a>
       <a href="/site/features.html">서비스 소개</a>
       <a href="/site/guide.html">사용가이드</a>
+      <a href="/site/faq.html">FAQ</a>
       <a href="/site/contact.html">문의하기</a>
     </div>
     <div><h4>연결</h4>
       <a href="/site/about.html">제작자 소개</a>
-      <a href="https://blog.naver.com/theotter" target="_blank" rel="noopener">블로그</a>
+      <a href="/site/blog.html">블로그</a>
       <a href="/site/contact.html">이메일 문의</a>
     </div>
   </div>
