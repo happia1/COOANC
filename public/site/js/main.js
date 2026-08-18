@@ -11,6 +11,24 @@ const io = new IntersectionObserver((entries)=>{
 }, {threshold:0.12});
 document.querySelectorAll('.fade').forEach(el=>io.observe(el));
 
+// ===== 가이드 목차 스크롤스파이 (현재 위치만 볼드+밑줄) =====
+const tocLinks = document.querySelectorAll('.toc a[href^="#"]');
+if (tocLinks.length){
+  const targets = Array.from(tocLinks)
+    .map(a => document.getElementById(a.getAttribute('href').slice(1)))
+    .filter(Boolean);
+  const spy = new IntersectionObserver((entries)=>{
+    entries.forEach(entry=>{
+      if (!entry.isIntersecting) return;
+      const link = document.querySelector(`.toc a[href="#${entry.target.id}"]`);
+      if (!link) return;
+      tocLinks.forEach(l=>l.classList.remove('active'));
+      link.classList.add('active');
+    });
+  }, { rootMargin: '-20% 0px -70% 0px', threshold: 0 });
+  targets.forEach(t=>spy.observe(t));
+}
+
 // ===== 탭 전환 (data-tabgroup 단위로 여러 그룹 지원) =====
 document.querySelectorAll('.tabbtn').forEach(btn=>{
   btn.addEventListener('click', ()=>{
