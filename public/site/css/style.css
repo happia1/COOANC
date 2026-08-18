@@ -168,6 +168,15 @@ h3{ font-size:17px; font-weight:700; }
 .step b{ color:var(--brand-deep); }
 .sheet-close{ margin-top:16px; width:100%; padding:14px; border-radius:100px; border:1px solid var(--line); background:var(--mist); font-weight:700; font-size:14px; cursor:pointer; }
 
+/* ===== 이미지 확대 보기(라이트박스) ===== */
+.lightbox-overlay{ align-items:center; padding:24px; }
+.lightbox-img{ max-width:100%; max-height:90vh; border-radius:var(--radius-sm); box-shadow:0 20px 60px rgba(0,0,0,.35); }
+.lightbox-close{
+  position:absolute; top:18px; right:18px; width:38px; height:38px; border-radius:50%;
+  border:none; background:rgba(255,255,255,.9); font-size:16px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+
 /* ===== Footer ===== */
 .site-footer{ background:var(--mist); border-top:1px solid var(--line); padding:48px 0 24px; margin-top:40px; }
 .footer-grid{ display:grid; grid-template-columns:1fr; gap:32px; padding-bottom:28px; }
@@ -205,9 +214,9 @@ h3{ font-size:17px; font-weight:700; }
 .hero-banner .slide img{ width:100%; height:100%; object-fit:cover; display:block; }
 .hero-overlay{
   position:absolute; inset:0; z-index:3; pointer-events:none;
-  background:linear-gradient(to top, rgba(10,14,20,.4), rgba(10,14,20,.15) 55%, rgba(10,14,20,0) 100%);
+  background:linear-gradient(to right, rgba(10,14,20,.35), rgba(10,14,20,.15) 45%, rgba(10,14,20,0) 75%);
 }
-.hero-content{ position:absolute; left:0; right:0; bottom:0; z-index:4; padding-bottom:52px; }
+.hero-content{ position:absolute; left:0; right:0; top:50%; transform:translateY(-50%); z-index:4; }
 .hero-content h1, .hero-content .lead{ color:#fff; }
 .hero-content .btn-ghost{ background:rgba(255,255,255,.14); color:#fff; border-color:rgba(255,255,255,.5); backdrop-filter:blur(4px); }
 .slider-dots{ position:absolute; bottom:18px; left:0; right:0; z-index:5; display:flex; justify-content:center; gap:7px; }
@@ -217,7 +226,6 @@ h3{ font-size:17px; font-weight:700; }
 .slider-dots button.active{ background:#fff; width:20px; border-radius:100px; transition:width .25s ease; }
 @media (max-width:640px){
   .hero-banner{ height:420px; }
-  .hero-content{ padding-bottom:36px; }
 }
 
 /* ===== 이미지 자리 표시(플레이스홀더) ===== */

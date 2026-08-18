@@ -150,3 +150,24 @@ if (slider){
   startAuto();
 }
 
+// ===== 이미지 확대 보기(라이트박스) =====
+const lightboxOverlay = document.getElementById('lightboxOverlay');
+if (lightboxOverlay){
+  const lightboxImg = document.getElementById('lightboxImg');
+  const lightboxClose = document.getElementById('lightboxClose');
+  document.querySelectorAll('[data-lightbox]').forEach(img=>{
+    img.addEventListener('click', ()=>{
+      lightboxImg.src = img.currentSrc || img.src;
+      lightboxImg.alt = img.alt || '';
+      lightboxOverlay.classList.add('show');
+    });
+  });
+  lightboxClose.addEventListener('click', ()=> lightboxOverlay.classList.remove('show'));
+  lightboxOverlay.addEventListener('click', (e)=>{
+    if (e.target === lightboxOverlay) lightboxOverlay.classList.remove('show');
+  });
+  document.addEventListener('keydown', (e)=>{
+    if (e.key === 'Escape') lightboxOverlay.classList.remove('show');
+  });
+}
+

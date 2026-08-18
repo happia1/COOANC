@@ -20,11 +20,16 @@
 
   /* 스크린샷을 나중에 넣을 수 있는 빈 자리 */
   .img-slot{
+    position:relative; overflow:hidden;
     margin-top:14px; height:200px; border:1.5px dashed var(--line); border-radius:var(--radius-sm);
     display:flex; align-items:center; justify-content:center; flex-direction:column; gap:4px;
     color:var(--ink-faint); font-size:12.5px; font-weight:600; background:var(--mist);
   }
   .img-slot .em{ font-size:22px; }
+  .img-slot-shot{
+    position:absolute; inset:0; width:100%; height:100%; object-fit:contain; background:var(--paper);
+    cursor:zoom-in;
+  }
 </style>
 </head>
 <body>
@@ -92,8 +97,6 @@
         <div class="step"><div class="num">2</div><p>브라우저 하단의 <b>공유(화살표) 버튼</b>을 누릅니다.</p></div>
         <div class="step"><div class="num">3</div><p>간략히 보기에서 스크롤을 내려 <b>「홈 화면에 추가」</b>를 선택합니다.</p></div>
       </div>
-      <!-- TODO: 아이폰 설치 스크린샷 추가 예정 -->
-      <div class="img-slot"><span class="em">📱</span>아이폰 설치 스크린샷 자리</div>
     </div>
     <div class="card" style="padding:18px;">
       <h3>🤖 갤럭시 <span style="font-size:12px; font-weight:600; color:var(--ink-faint);">크롬 · 삼성인터넷 권장</span></h3>
@@ -102,9 +105,13 @@
         <div class="step"><div class="num">2</div><p>우측 상단 또는 하단의 <b>메뉴(삼선·삼점) 버튼</b>을 누릅니다.</p></div>
         <div class="step"><div class="num">3</div><p><b>「앱 설치」</b> 또는 <b>「홈 화면에 추가」</b>를 선택합니다.</p></div>
       </div>
-      <!-- TODO: 갤럭시 설치 스크린샷 추가 예정 -->
-      <div class="img-slot"><span class="em">📱</span>갤럭시 설치 스크린샷 자리</div>
     </div>
+  </div>
+
+  <!-- 아이폰·갤럭시 공통 설치 스크린샷 (한 장으로 두 기종 모두 설명) -->
+  <div class="fade img-slot" style="margin-top:16px; height:260px;">
+    <span class="em">📱</span>설치 방법 스크린샷 자리 (아이폰·갤럭시 공통)
+    <img src="/site/assets/install-steps.jpg" alt="쿠앵크 홈 화면에 추가하기 — 설치 스크린샷" class="img-slot-shot" data-lightbox onerror="this.remove()">
   </div>
 </div>
 
@@ -200,6 +207,11 @@
     <div class="step"><div class="num">3</div><p>오른쪽 위 <b>"추가"</b>를 누르면 앱처럼 아이콘이 생겨요.</p></div>
     <button class="sheet-close" id="iosClose">확인했어요</button>
   </div>
+</div>
+
+<div class="overlay lightbox-overlay" id="lightboxOverlay">
+  <button class="lightbox-close" id="lightboxClose">✕</button>
+  <img class="lightbox-img" id="lightboxImg" src="" alt="">
 </div>
 
 <script src="/site/js/main.js"></script>
