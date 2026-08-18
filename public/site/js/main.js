@@ -23,6 +23,62 @@ document.querySelectorAll('.tabbtn').forEach(btn=>{
   });
 });
 
+// ===== 탭 + 프리뷰 캐러셀 (한 프레임 안에서 클릭/스와이프로 전환) =====
+document.querySelectorAll('[data-pv-carousel]').forEach(root=>{
+  const tabs = root.querySelectorAll('.pv-tab');
+  const dots = root.querySelectorAll('.pv-dot');
+  const track = root.querySelector('.pv-track');
+  const viewport = root.querySelector('.pv-viewport');
+  const slideCount = root.querySelectorAll('.pv-slide').length;
+  let index = 0;
+
+  function render(){
+    track.style.transform = `translateX(-${index * 100}%)`;
+    tabs.forEach((t,i)=> t.classList.toggle('active', i === index));
+    dots.forEach((d,i)=> d.classList.toggle('active', i === index));
+  }
+  function goTo(i){
+    index = Math.max(0, Math.min(slideCount - 1, i));
+    render();
+  }
+  tabs.forEach((t,i)=> t.addEventListener('click', ()=> goTo(i)));
+  dots.forEach((d,i)=> d.addEventListener('click', ()=> goTo(i)));
+
+  // 스와이프 / 드래그
+  let dragging = false, startX = 0, deltaX = 0, viewportWidth = 0;
+  function dragStart(clientX){
+    dragging = true;
+    startX = clientX;
+    deltaX = 0;
+    viewportWidth = viewport.getBoundingClientRect().width || 1;
+    track.classList.add('dragging');
+  }
+  function dragMove(clientX){
+    if (!dragging) return;
+    deltaX = clientX - startX;
+    const percent = (deltaX / viewportWidth) * 100;
+    track.style.transform = `translateX(calc(-${index * 100}% + ${percent}%))`;
+  }
+  function dragEnd(){
+    if (!dragging) return;
+    dragging = false;
+    track.classList.remove('dragging');
+    const percent = (deltaX / viewportWidth) * 100;
+    if (percent < -12 && index < slideCount - 1) goTo(index + 1);
+    else if (percent > 12 && index > 0) goTo(index - 1);
+    else render();
+  }
+  viewport.addEventListener('touchstart', e=> dragStart(e.touches[0].clientX), {passive:true});
+  viewport.addEventListener('touchmove', e=> dragMove(e.touches[0].clientX), {passive:true});
+  viewport.addEventListener('touchend', dragEnd);
+  viewport.addEventListener('mousedown', e=>{ e.preventDefault(); dragStart(e.clientX); });
+  window.addEventListener('mousemove', e=> dragMove(e.clientX));
+  window.addEventListener('mouseup', dragEnd);
+
+  window.addEventListener('resize', render);
+  render();
+});
+
 // ===== 설치 CTA : 기기 분기 =====
 const APP_URL = 'https://cooanc.vercel.app/';
 const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;

@@ -33,7 +33,7 @@ img{max-width:100%; display:block;}
 ul{list-style:none;}
 button{font-family:inherit;}
 .jua{ font-family:'Jua', sans-serif; font-weight:400; }
-.wrap{max-width:var(--maxw); margin:0 auto; padding:0 22px;}
+.wrap{max-width:var(--maxw); margin:0 auto; padding:0 22px; width:100%; min-width:0;}
 .wrap-narrow{max-width:640px; margin:0 auto; padding:0 22px;}
 
 /* ===== Nav ===== */
@@ -207,19 +207,20 @@ h3{ font-size:17px; font-weight:700; }
   background:var(--sun-tint); color:#8a5a00; padding:4px 10px; border-radius:100px;
 }
 
-/* ===== 디바이스 목업 (모바일 + 태블릿) ===== */
-.device-group{ display:flex; align-items:flex-end; justify-content:center; gap:18px; flex-wrap:wrap; margin:0 auto; }
-.device{ text-align:center; }
-.device-frame{ overflow:hidden; box-shadow:0 22px 42px -20px rgba(20,30,45,.32); background:var(--ink); }
-.device-frame img{ width:100%; height:100%; object-fit:cover; display:block; }
-.device-phone .device-frame{ width:150px; aspect-ratio:9/19.5; border-radius:22px; border:6px solid var(--ink); }
-/*
- * 태블릿은 가로가 긴 형태(landscape)로 둡니다 — 실제 부모 앱이 가로 화면 기준입니다.
- * 세로 스크린샷을 넣으면 좌우가 잘리니, 반드시 가로 캡처를 assets 에 넣어 주세요.
+/* ===== 디바이스 목업 (태블릿 프레임) =====
+ * 실제 보유한 스크린샷은 세로(모바일) 캡처뿐이라, 태블릿용 가로 캡처를 억지로
+ * 흉내내지 않습니다. 프레임을 넓게 잡고 object-fit:contain 으로 스크린샷
+ * 전체를 안 잘리게 보여줍니다(좌우 여백은 기기 테두리와 같은 색이라 실제
+ * 태블릿 베젤처럼 보입니다). 높이를 고정해 캐러셀 슬라이드 전환 시 흔들리지 않습니다.
  */
-.device-tablet .device-frame{ width:320px; aspect-ratio:4/3; border-radius:18px; border:8px solid var(--ink); }
-@media (max-width:420px){ .device-tablet .device-frame{ width:270px; } }
-.device-label{ margin-top:10px; font-size:12px; font-weight:700; color:var(--ink-faint); }
+.device{ text-align:center; }
+.device-frame{
+  overflow:hidden; box-shadow:0 22px 42px -20px rgba(20,30,45,.32); background:var(--ink);
+  display:flex; align-items:center; justify-content:center; height:360px;
+}
+.device-frame img{ width:100%; height:100%; display:block; object-fit:contain; }
+.device-tablet .device-frame{ aspect-ratio:3/4; border-radius:18px; border:8px solid var(--ink); }
+@media (max-width:480px){ .device-frame{ height:300px; } }
 
 
 /* ===== 큰 일러스트가 들어가는 기능 카드 (거짓말 방지 등) =====
@@ -288,3 +289,61 @@ h3{ font-size:17px; font-weight:700; }
 @media (min-width:760px){
   .compare-divider{ display:block; position:absolute; left:50%; top:0; bottom:0; width:1px; background:var(--line); transform:translateX(-50%); }
 }
+
+/* ===== 탭 + 프리뷰 캐러셀 (부모 화면 서브탭, 아이 화면 기능 탭 공용) =====
+ * 키워드 탭을 누르거나 화면을 좌우로 스와이프하면, 같은 프레임 안에서
+ * 스크린샷·설명만 바뀝니다(아코디언처럼 펼치고 접지 않음).
+ */
+.pv-tabs{ display:flex; gap:8px; overflow-x:auto; padding-bottom:2px; margin-bottom:22px; }
+.pv-tab{
+  flex:0 0 auto; padding:11px 18px; border-radius:100px; border:1px solid var(--line);
+  background:var(--paper); font-weight:700; font-size:13.5px; color:var(--ink-soft); cursor:pointer; white-space:nowrap;
+}
+.pv-tab.active{ background:var(--ink); color:#fff; border-color:var(--ink); }
+.pv-viewport{ overflow:hidden; touch-action:pan-y; cursor:grab; user-select:none; }
+.pv-viewport:active{ cursor:grabbing; }
+.pv-track{ display:flex; transition:transform .38s cubic-bezier(.22,.68,0,1); }
+.pv-track.dragging{ transition:none; }
+.pv-slide{ flex:0 0 100%; display:flex; flex-direction:column; align-items:center; gap:22px; padding:2px; text-align:center; }
+.pv-copy{ max-width:440px; }
+.pv-copy h3{ font-size:17px; margin-bottom:8px; }
+.pv-copy p{ font-size:13.8px; color:var(--ink-soft); }
+.pv-copy p + p{ margin-top:10px; }
+.pv-dots{ display:flex; justify-content:center; gap:7px; margin-top:20px; }
+.pv-dots button{ width:7px; height:7px; border-radius:50%; border:none; background:var(--line); cursor:pointer; padding:0; }
+.pv-dots button.active{ background:var(--brand); width:20px; border-radius:100px; transition:width .25s ease; }
+@media (min-width:760px){
+  .pv-slide{ flex-direction:row; justify-content:center; align-items:center; gap:40px; text-align:left; }
+  .pv-copy{ text-align:left; }
+}
+
+/* ===== 후기 캐러셀 (아바타 + 인용문, 스와이프) ===== */
+.testi-slide{ max-width:520px; margin:0 auto; text-align:center; padding:8px 4px; }
+.testi-avatar{
+  width:64px; height:64px; border-radius:50%; margin:0 auto 18px;
+  display:flex; align-items:center; justify-content:center; font-size:28px;
+}
+.testi-quote{ font-size:18px; font-weight:700; line-height:1.55; color:var(--ink); }
+.testi-name{ display:block; margin-top:16px; font-size:13px; color:var(--ink-soft); font-weight:600; }
+
+/* ===== 담백한 CTA 섹션 (어두운 박스 없이) ===== */
+.plain-cta{ text-align:center; }
+.plain-cta .badges{ display:flex; gap:8px; justify-content:center; flex-wrap:wrap; margin-bottom:16px; }
+.plain-cta .badges span{
+  font-size:12px; font-weight:700; padding:5px 12px; border-radius:100px;
+  background:var(--mist); color:var(--ink-soft); border:1px solid var(--line);
+}
+.plain-cta h2{ margin-bottom:8px; }
+.plain-cta .free-note{ margin-top:14px; font-size:13px; color:var(--ink-faint); font-weight:600; }
+
+/* ===== 보조 기능 미니 그리드 (핵심 기능 프리뷰 아래, 나머지 기능들) ===== */
+.mini-feature-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+@media (min-width:640px){ .mini-feature-grid{ grid-template-columns:repeat(3,1fr); } }
+.mini-feature{
+  display:flex; align-items:center; gap:10px; padding:12px 14px;
+  background:var(--paper); border:1px solid var(--line); border-radius:var(--radius-sm);
+}
+.mini-feature img{ width:28px; height:28px; object-fit:contain; border-radius:8px; flex:0 0 auto; }
+.mini-feature .mf-emoji{ width:28px; height:28px; display:flex; align-items:center; justify-content:center; font-size:18px; flex:0 0 auto; }
+.mini-feature .mf-text h4{ font-size:13px; font-weight:700; }
+.mini-feature .mf-text p{ font-size:11.5px; color:var(--ink-soft); margin-top:2px; line-height:1.4; }
