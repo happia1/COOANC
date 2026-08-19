@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>문의하기 — 쿠앵크(COOANC)</title>
+<title>자주 묻는 질문 &amp; 문의하기 — 쿠앵크(COOANC)</title>
 <link rel="stylesheet" href="/site/css/style.css">
 </head>
 <body>
@@ -15,8 +15,7 @@
       <a href="/site/index.html">홈</a>
       <a href="/site/features.html">서비스 소개</a>
       <a href="/site/guide.html">사용가이드</a>
-      <a href="/site/blog.html">블로그</a>
-      <a href="/site/faq.html">FAQ</a>
+      <a href="/site/about.html">소개</a>
       <a href="/site/contact.html" class="active">문의하기</a>
     </nav>
     <button class="nav-toggle" id="navToggle">☰</button>
@@ -25,19 +24,48 @@
     <a href="/site/index.html">홈</a>
     <a href="/site/features.html">서비스 소개</a>
     <a href="/site/guide.html">사용가이드</a>
-    <a href="/site/blog.html">블로그</a>
-    <a href="/site/faq.html">FAQ</a>
+    <a href="/site/about.html">소개</a>
     <a href="/site/contact.html" class="active">문의하기</a>
   </div>
 </header>
 
-<section>
+<section style="padding-bottom:20px;">
   <div class="wrap-narrow">
-    <span class="eyebrow fade">문의하기</span>
-    <h1 class="fade" style="font-size:30px;">궁금한 점이나<br>협업 제안을 남겨주세요</h1>
-    <p class="lead fade" style="margin-top:14px;">서비스 이용 문의, 오류 제보, 협업·제휴 제안 모두 환영해요.</p>
+    <span class="eyebrow fade">자주 묻는 질문 &amp; 문의하기</span>
+    <h1 class="fade" style="font-size:30px;">궁금한 점이 있으신가요?</h1>
+    <p class="lead fade" style="margin-top:14px;">자주 묻는 질문에서 먼저 답을 찾아보시고, 원하는 답이 없다면 아래 문의 폼으로 편하게 남겨주세요.</p>
 
-    <form class="fade" id="contactForm" style="margin-top:32px;">
+    <div class="faq-list fade" style="margin-top:30px;">
+      <details class="faq-item">
+        <summary>앱스토어에서 검색해도 되나요?</summary>
+        <div class="faq-answer">아직 정식 출시 전이에요. <a href="/site/guide.html" style="text-decoration:underline; font-weight:700;">사용가이드</a>의 링크로 접속해 홈 화면에 추가해주세요.</div>
+      </details>
+      <details class="faq-item">
+        <summary>알림이 안 와요.</summary>
+        <div class="faq-answer">베타 버전은 아직 푸시 알림을 지원하지 않아요. 정식 버전에서 지원될 예정이에요.</div>
+      </details>
+      <details class="faq-item">
+        <summary>아이 기기가 따로 없어도 되나요?</summary>
+        <div class="faq-answer">부모님 폰 하나로도 이용 가능해요. 다만 아이 전용 기기가 있으면 훨씬 편하게 쓸 수 있어요.</div>
+      </details>
+      <details class="faq-item">
+        <summary>설치가 무료인가요?</summary>
+        <div class="faq-answer">네, 지금은 베타 테스트 기간이라 무료로 이용할 수 있어요.</div>
+      </details>
+      <details class="faq-item">
+        <summary>아이 화면과 부모 화면은 어떻게 다른가요?</summary>
+        <div class="faq-answer"><a href="/site/features.html" style="text-decoration:underline; font-weight:700;">서비스 소개</a> 페이지에서 두 화면을 나란히 비교하고, 기능별로 자세히 확인할 수 있어요.</div>
+      </details>
+    </div>
+  </div>
+</section>
+
+<section class="mist" id="contact">
+  <div class="wrap-narrow">
+    <h2 class="fade" style="font-size:22px;">찾는 답이 없다면 문의해주세요</h2>
+    <p class="fade" style="font-size:14.5px; color:var(--ink-soft); margin-top:8px;">서비스 이용 문의, 오류 제보, 협업·제휴 제안 모두 환영해요.</p>
+
+    <form class="fade" id="contactForm" style="margin-top:28px;">
       <div class="field">
         <label>문의 유형</label>
         <select style="width:100%; padding:13px 14px; border-radius:12px; border:1px solid var(--line); font-size:14.5px; background:#fff;" id="type">
@@ -77,12 +105,12 @@
       <a href="/site/index.html">홈</a>
       <a href="/site/features.html">서비스 소개</a>
       <a href="/site/guide.html">사용가이드</a>
-      <a href="/site/faq.html">FAQ</a>
+      <a href="/site/about.html">소개</a>
       <a href="/site/contact.html">문의하기</a>
     </div>
     <div><h4>연결</h4>
       <a href="/site/about.html">제작자 소개</a>
-      <a href="/site/blog.html">블로그</a>
+      <a href="/site/about.html#blog">블로그</a>
       <a href="/site/contact.html">이메일 문의</a>
     </div>
   </div>

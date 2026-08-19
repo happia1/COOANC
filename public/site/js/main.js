@@ -41,6 +41,18 @@ document.querySelectorAll('.tabbtn').forEach(btn=>{
   });
 });
 
+// ===== 설치 가이드: 접속 기기에 맞는 탭 기본 선택 =====
+const deviceGuide = document.getElementById('deviceGuide');
+if (deviceGuide){
+  const ua = navigator.userAgent || '';
+  const isIOS = /iPad|iPhone|iPod/.test(ua) || (ua.includes('Mac') && navigator.maxTouchPoints > 1);
+  const target = isIOS ? 'pane-ios' : (/Android/i.test(ua) ? 'pane-android' : null);
+  if (target){
+    deviceGuide.querySelectorAll('.tabbtn').forEach(b=>b.classList.toggle('active', b.dataset.tab === target));
+    deviceGuide.querySelectorAll('.tabpanel').forEach(p=>p.classList.toggle('active', p.id === target));
+  }
+}
+
 // ===== 듀얼 화면 전환 (패드 / 모바일) =====
 document.querySelectorAll('[data-dual-view]').forEach(root=>{
   root.querySelectorAll('.dual-btn').forEach(btn=>{
