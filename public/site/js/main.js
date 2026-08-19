@@ -41,6 +41,18 @@ document.querySelectorAll('.tabbtn').forEach(btn=>{
   });
 });
 
+// ===== 듀얼 화면 전환 (패드 / 모바일) =====
+document.querySelectorAll('[data-dual-view]').forEach(root=>{
+  root.querySelectorAll('.dual-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      root.querySelectorAll('.dual-btn').forEach(b=>b.classList.remove('active'));
+      root.querySelectorAll('.dual-pane').forEach(p=>p.classList.remove('active'));
+      btn.classList.add('active');
+      root.querySelector(`[data-dual-pane="${btn.dataset.dual}"]`).classList.add('active');
+    });
+  });
+});
+
 // ===== 탭 + 프리뷰 캐러셀 (한 프레임 안에서 클릭/스와이프로 전환) =====
 document.querySelectorAll('[data-pv-carousel]').forEach(root=>{
   const tabs = root.querySelectorAll('.pv-tab');

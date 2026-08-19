@@ -37,17 +37,38 @@
     <h1 class="fade" style="max-width:560px;">일상이 즐거워지는 마법</h1>
     <p class="lead fade" style="max-width:540px; margin-top:14px; font-size:17px; font-weight:700; color:var(--ink);">쿠앵크(COOANC)는 아이가 자신의 생활 미션을 스스로 완료하고, 보상을 모아 성장하는 습관을 길러주는 스마트한 생활습관 코칭 앱입니다.</p>
 
-    <div class="compare-grid fade" style="margin-top:32px;">
-      <div class="compare-divider"></div>
-      <div class="compare-col">
-        <span class="compare-label">🏠 아이 화면 (패드)</span>
-        <div class="shot-plain"><img src="/site/assets/child-home.webp" alt="아이 화면"></div>
-        <p>레벨·크레딧·하트가 상단에, 오늘의 미션이 하단에 카드로 나열돼요.</p>
+    <div class="dual-view fade" style="margin-top:32px;" data-dual-view>
+      <div class="dual-switch">
+        <button class="dual-btn active" data-dual="pad">📱 패드로 보기</button>
+        <button class="dual-btn" data-dual="mobile">📲 모바일로 보기</button>
       </div>
-      <div class="compare-col">
-        <span class="compare-label">⚓ 부모 화면 (모바일)</span>
-        <div class="shot-plain"><img src="/site/assets/parent-home.webp" alt="부모 화면 홈 탭"></div>
-        <p>홈 · 루틴 · 승인 3개 탭으로만 구성돼요.</p>
+
+      <div class="compare-grid dual-pane active" data-dual-pane="pad">
+        <div class="compare-divider"></div>
+        <div class="compare-col">
+          <span class="compare-label">🏠 아이 화면</span>
+          <div class="device device-tablet"><div class="device-frame"><img src="/site/assets/child-home.webp" alt="패드에서 보는 아이 화면"></div></div>
+          <p>화면이 큰 패드에서는 캐릭터와 미션 카드가 시원하게 보여요.</p>
+        </div>
+        <div class="compare-col">
+          <span class="compare-label">⚓ 부모 화면</span>
+          <div class="device device-tablet"><div class="device-frame"><img src="/site/assets/parent-home.webp" alt="패드에서 보는 부모 화면"></div></div>
+          <p>패드에서도 홈 · 루틴 · 승인 3개 탭 구성 그대로예요.</p>
+        </div>
+      </div>
+
+      <div class="compare-grid dual-pane" data-dual-pane="mobile">
+        <div class="compare-divider"></div>
+        <div class="compare-col">
+          <span class="compare-label">🏠 아이 화면</span>
+          <div class="device device-phone"><div class="device-frame"><img src="/site/assets/child-home.webp" alt="모바일에서 보는 아이 화면"></div></div>
+          <p>모바일에서도 같은 화면을 그대로 쓸 수 있어요.</p>
+        </div>
+        <div class="compare-col">
+          <span class="compare-label">⚓ 부모 화면</span>
+          <div class="device device-phone"><div class="device-frame"><img src="/site/assets/parent-home.webp" alt="모바일에서 보는 부모 화면"></div></div>
+          <p>부모님은 손에 늘 있는 모바일로 확인하고 승인해요.</p>
+        </div>
       </div>
     </div>
 
@@ -91,7 +112,8 @@
               </div>
             </div>
             <div class="pv-slide">
-              <div class="shot-plain"><img src="/site/assets/child-home.webp" alt="화분이 보이는 아이 화면"></div>
+              <!-- TODO: 화분 화면 스크린샷으로 교체 예정 -->
+              <div class="shot-slot img-slot">🪴 화분 화면 스크린샷 자리</div>
               <div class="pv-copy">
                 <h3><img class="pv-icon" src="/site/assets/icons/ui/icon-plant.webp" alt="">화분</h3>
                 <p>하트를 사용해 화분을 성장시킬 수 있어요. 씨앗에서 시작해 점점 자라고 열매를 맺는 과정까지 눈에 보이게 바뀌어요.</p>
@@ -107,7 +129,8 @@
               </div>
             </div>
             <div class="pv-slide">
-              <div class="shot-plain"><img src="/site/assets/child-home.webp" alt="돼지저금통이 보이는 아이 화면"></div>
+              <!-- TODO: 돼지저금통 화면 스크린샷으로 교체 예정 -->
+              <div class="shot-slot img-slot">🐷 돼지저금통 화면 스크린샷 자리</div>
               <div class="pv-copy">
                 <h3><img class="pv-icon" src="/site/assets/icons/ui/icon-piggy.webp" alt="">돼지저금통 <span class="badge-level" style="position:static; display:inline-block; margin-left:4px;">Lv.5 오픈</span></h3>
                 <p>레벨 5가 되면 열리는 특별 기능이에요. 크레딧을 저금통에 넣어두면 매일 아침 반짝이는 동전이 생기고, 아이가 직접 탭해서 주우면 저금통 잔액이 늘어나요.</p>
@@ -123,7 +146,8 @@
               </div>
             </div>
             <div class="pv-slide">
-              <div class="shot-plain"><img src="/site/assets/child-home.webp" alt="보물상자가 보이는 아이 화면"></div>
+              <!-- TODO: 보물상자 화면 스크린샷으로 교체 예정 -->
+              <div class="shot-slot img-slot">🎁 보물상자 화면 스크린샷 자리</div>
               <div class="pv-copy">
                 <h3><img class="pv-icon" src="/site/assets/icons/ui/icon-chest.webp" alt="">보물상자 <span class="badge-level" style="position:static; display:inline-block; margin-left:4px;">Lv.8 오픈</span></h3>
                 <p>보물상자 이용권으로 골라둔 영상 콘텐츠를 정해진 시간만큼 보거나, 인형뽑기 미니게임을 즐길 수 있어요.</p>
@@ -131,7 +155,8 @@
               </div>
             </div>
             <div class="pv-slide">
-              <div class="shot-plain"><img src="/site/assets/child-home.webp" alt="스티커판이 보이는 아이 화면"></div>
+              <!-- TODO: 스티커판 화면 스크린샷으로 교체 예정 -->
+              <div class="shot-slot img-slot">⭐ 스티커판 화면 스크린샷 자리</div>
               <div class="pv-copy">
                 <h3><img class="pv-icon" src="/site/assets/icons/ui/icon-gift.webp" alt="">스티커판</h3>
                 <p>칭찬은 고래도 춤추게 하죠! 하루에 10개 이상의 미션을 달성하면 랜덤 스티커를 받아요.</p>
@@ -225,6 +250,7 @@
         <div class="pv-viewport">
           <div class="pv-track">
             <div class="pv-slide">
+              <!-- TODO: 홈 대시보드 기능 영역만 확대한 크롭 이미지로 교체 예정 -->
               <div class="shot-plain"><img src="/site/assets/parent-home.webp" alt="부모 홈 대시보드 화면"></div>
               <div class="pv-copy">
                 <h3>오늘의 진행도를 한눈에</h3>
@@ -233,6 +259,7 @@
               </div>
             </div>
             <div class="pv-slide">
+              <!-- TODO: 루틴 설정 기능 영역만 확대한 크롭 이미지로 교체 예정 -->
               <div class="shot-plain"><img src="/site/assets/parent-routine.webp" alt="루틴 설정 화면"></div>
               <div class="pv-copy">
                 <h3>오전 · 오후 루틴을 카드로 관리</h3>
@@ -241,6 +268,7 @@
               </div>
             </div>
             <div class="pv-slide">
+              <!-- TODO: 승인·보상 관리 기능 영역만 확대한 크롭 이미지로 교체 예정 -->
               <div class="shot-plain"><img src="/site/assets/parent-market.webp" alt="승인·상품 관리 화면"></div>
               <div class="pv-copy">
                 <h3>마켓에 올라갈 상품을 직접 관리</h3>
@@ -257,38 +285,6 @@
         </div>
         </div>
       </div>
-    </div>
-  </div>
-</section>
-
-<!-- ===== 레벨 세계관 ===== -->
-<section class="mist">
-  <div class="wrap">
-    <div class="section-head fade">
-      <span class="eyebrow">레벨로 자라나는 세계관</span>
-      <h2>습관이 자라면, 세계가 넓어져요</h2>
-      <p>레벨이 오를 때마다 새로운 기능이 열리고, 아이는 다음 단계의 이야기로 넘어가요.</p>
-    </div>
-    <div class="stage-grid">
-      <div class="card stage-card fade">
-        <div class="icon">🌱</div><span class="lv">Lv.0~4</span>
-        <h3>정원</h3><p>습관의 씨앗을 심는 시기</p>
-      </div>
-      <div class="card stage-card fade">
-        <div class="icon">🏘️</div><span class="lv">Lv.5~8</span>
-        <h3>마을</h3><p>저축과 계획을 배우는 시기</p>
-      </div>
-      <div class="card stage-card fade">
-        <div class="icon">⚓</div><span class="lv">Lv.9~12</span>
-        <h3>항구</h3><p>스스로 돌리는 시기</p>
-      </div>
-      <div class="card stage-card fade">
-        <div class="icon">⛵</div><span class="lv">Lv.13+</span>
-        <h3>바다</h3><p>습관이 앱보다 앞서가는 시기</p>
-      </div>
-    </div>
-    <div class="badge-row fade">
-      모으는 뱃지 <span>🌱 새싹</span> <span>🐷 저축왕</span> <span>💼 사업가</span> <span>🧭 탐험가</span> <span>⛵ 선장</span>
     </div>
   </div>
 </section>
@@ -331,6 +327,46 @@
         <div class="fi">⛵</div><h3>항해 모드 <span style="font-size:12.5px; font-weight:600; color:var(--ink-faint);">초등 이후를 위한 다음 여정</span></h3>
         <p>레벨 15 이후, 배를 타고 여러 나라를 돌아다니며 그동안 모은 과일을 팔고, 번 돈으로 나만의 랜드마크를 세워가는 큰 세계관으로 확장할 예정이에요.</p>
       </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 레벨 세계관 ===== -->
+<section class="mist">
+  <div class="wrap">
+    <div class="section-head fade">
+      <span class="eyebrow">레벨로 자라나는 세계관</span>
+      <h2>습관이 자라면, 세계가 넓어져요</h2>
+      <p>레벨이 오를 때마다 새로운 기능이 열리고, 아이는 다음 단계의 이야기로 넘어가요.</p>
+    </div>
+    <div class="stage-grid">
+      <div class="card stage-card fade">
+        <!-- TODO: 정원 단계 소개 이미지 삽입 예정 -->
+        <div class="stage-media img-slot">🌱 정원 단계 이미지 자리</div>
+        <span class="lv">Lv.0~4</span>
+        <h3>정원</h3><p>습관의 씨앗을 심는 시기</p>
+      </div>
+      <div class="card stage-card fade">
+        <!-- TODO: 마을 단계 소개 이미지 삽입 예정 -->
+        <div class="stage-media img-slot">🏘️ 마을 단계 이미지 자리</div>
+        <span class="lv">Lv.5~8</span>
+        <h3>마을</h3><p>저축과 계획을 배우는 시기</p>
+      </div>
+      <div class="card stage-card fade">
+        <!-- TODO: 항구 단계 소개 이미지 삽입 예정 -->
+        <div class="stage-media img-slot">⚓ 항구 단계 이미지 자리</div>
+        <span class="lv">Lv.9~12</span>
+        <h3>항구</h3><p>스스로 돌리는 시기</p>
+      </div>
+      <div class="card stage-card fade">
+        <!-- TODO: 바다 단계 소개 이미지 삽입 예정 -->
+        <div class="stage-media img-slot">⛵ 바다 단계 이미지 자리</div>
+        <span class="lv">Lv.13+</span>
+        <h3>바다</h3><p>습관이 앱보다 앞서가는 시기</p>
+      </div>
+    </div>
+    <div class="badge-row fade">
+      모으는 뱃지 <span>🌱 새싹</span> <span>🐷 저축왕</span> <span>💼 사업가</span> <span>🧭 탐험가</span> <span>⛵ 선장</span>
     </div>
   </div>
 </section>

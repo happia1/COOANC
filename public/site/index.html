@@ -57,12 +57,9 @@
   <div class="hero-content">
     <div class="wrap">
       <div class="hero-text">
-        <h1 class="fade">잔소리 대신 <span class="jua">쿠앵크</span>를 켜세요!</h1>
-        <p class="lead fade" style="margin-top:16px;">아이가 스스로 하루를 완성해요</p>
-        <div class="fade" style="display:flex; gap:10px; flex-wrap:wrap; margin-top:22px;">
-          <button class="btn btn-primary" data-install>지금 바로 시작하기</button>
-          <a href="/site/features.html" class="btn btn-ghost">서비스 자세히 보기</a>
-        </div>
+        <p class="hero-kicker fade">잔소리 대신</p>
+        <h1 class="fade"><span class="jua">쿠앵크</span>를 켜세요!</h1>
+        <p class="lead fade">아이가 스스로 하루를 완성하는<br>마법같은 일상</p>
       </div>
     </div>
   </div>
@@ -79,12 +76,13 @@
   <div class="wrap-narrow fade" style="text-align:center;">
     <p style="font-size:15.5px; color:var(--ink-soft); line-height:2;">
       "씻자, 자자, 정리하자" — 매일 몇 번씩 반복하는 말들.<br>
-      좋게 말하다가도 결국 목소리가 커지고, 그러고 나면 밀려오는 죄책감.<br>
+      좋게 말하다가도 결국 목소리가 커지고,<br>
+      결국 화를 내고 나서 밀려오는 죄책감.<br>
       아이도 나도 지치는, 매일 반복되는 실랑이.
     </p>
     <div style="width:32px; height:2px; background:var(--line); margin:30px auto;"></div>
     <p class="lead" style="font-weight:700; color:var(--ink); line-height:1.85;">
-      아이에게 스스로 하는 습관을, "나도 할 수 있어"라는<br>자신감을 길러주고 싶은 마음.
+      아이에게 스스로 하는 자기 주도적 습관과<br>자기 효능감을 길러주고 싶은 부모의 마음.
     </p>
     <p style="margin-top:16px; font-size:18px; font-weight:800; color:var(--brand-deep);">그 마음에서 쿠앵크가 태어났습니다.</p>
   </div>
@@ -96,38 +94,59 @@
     <div class="section-head fade" style="text-align:center; margin:0 auto 32px; max-width:480px;">
       <h2>쿠앵크에서 이렇게 성장해요!</h2>
     </div>
-    <div class="growth-flow fade">
-      <div class="growth-step">
-        <div class="growth-icon"><img src="/site/assets/icons/ui/icon-mission.webp" alt="오늘의 미션 완료"></div>
+    <div class="growth-tree fade">
+      <!-- 1단계: 미션 완료 -->
+      <div class="gt-node">
+        <div class="gt-icon"><img src="/site/assets/icons/ui/icon-mission.webp" alt="오늘의 미션 완료"></div>
         <h3>오늘의 미션 완료</h3>
-        <p>미션을 완료해요.</p>
+        <p>씻기, 정리하기 같은 하루 미션을 스스로 끝내요.</p>
       </div>
-      <div class="growth-arrow">→</div>
-      <div class="growth-step">
-        <div class="growth-icon growth-icon--pair">
+      <div class="gt-link"></div>
+
+      <!-- 2단계: 보상 획득 -->
+      <div class="gt-node">
+        <div class="gt-icon gt-icon--pair">
           <img src="/site/assets/icons/rewards/크레딧.png" alt="크레딧">
           <img src="/site/assets/icons/rewards/heart (5).png" alt="하트">
         </div>
-        <h3>크레딧 & 하트 획득</h3>
-        <p>보상을 받아요.</p>
+        <h3>크레딧 &amp; 하트 획득</h3>
+        <p>해낸 만큼 보상이 쌓여요.</p>
       </div>
-      <div class="growth-arrow">→</div>
-      <div class="growth-step">
-        <div class="growth-icon"><img src="/site/assets/icons/ui/icon-piggy.webp" alt="크레딧 저축 또는 사용"></div>
-        <h3>크레딧 저축 또는 사용</h3>
-        <p>저금통에 저축하거나 마켓에서 원하는 선물을 골라요.</p>
+      <div class="gt-link"></div>
+
+      <!-- 3단계: 크레딧/하트가 각각 갈라짐 -->
+      <div class="gt-split">
+        <div class="gt-branch">
+          <span class="gt-branch-label">크레딧으로</span>
+          <div class="gt-node">
+            <div class="gt-icon"><img src="/site/assets/icons/ui/icon-piggy.webp" alt="저금통에 저축"></div>
+            <h3>저금통에 저축</h3>
+            <p>모아둘수록 불어나는 걸 직접 확인해요.</p>
+          </div>
+        </div>
+        <div class="gt-branch">
+          <span class="gt-branch-label">하트로</span>
+          <div class="gt-node">
+            <div class="gt-icon"><img src="/site/assets/icons/plant/5.png" alt="화분 성장"></div>
+            <h3>화분 성장</h3>
+            <p>하트를 주면 화분이 자라 열매를 맺어요.</p>
+          </div>
+        </div>
       </div>
-      <div class="growth-arrow">→</div>
-      <div class="growth-step">
-        <div class="growth-icon"><img src="/site/assets/icons/plant/5.png" alt="하트로 화분 성장"></div>
-        <h3>하트로 화분 성장</h3>
-        <p>모은 하트로 화분이 자라 열매를 맺어요.</p>
+      <div class="gt-link gt-link--merge"></div>
+
+      <!-- 4단계: 마켓에서 보상 교환 -->
+      <div class="gt-node">
+        <div class="gt-icon"><img src="/site/assets/icons/ui/icon-basket.webp" alt="마켓에서 보상 교환"></div>
+        <h3>마켓에서 원하는 보상으로</h3>
+        <p>모은 크레딧으로 갖고 싶던 간식이나 놀이 시간을 직접 골라요.</p>
       </div>
-      <div class="growth-arrow">→</div>
-      <div class="growth-step">
-        <div class="growth-icon"><img src="/site/assets/icons/plant/strawberry.png" alt="열매 수확 후 크레딧 획득"></div>
-        <h3>열매 수확 후 크레딧 획득(예정)</h3>
-        <p>레벨이 오르면 열매를 판매해 크레딧을 얻을 수 있어요.</p>
+      <div class="gt-link"></div>
+
+      <!-- 결과 -->
+      <div class="gt-node gt-node--goal">
+        <h3>"나도 할 수 있어!"</h3>
+        <p>스스로 해내고, 스스로 고른 보상을 받는 경험이 쌓이면서<br>자기주도적인 습관과 자기효능감이 함께 자라요.</p>
       </div>
     </div>
   </div>
@@ -203,19 +222,13 @@
       </div>
     </div>
   </div>
-  <div class="snap-cta fade">
-    <button class="btn btn-primary" data-install>무료로 시작하기</button>
-  </div>
 </section>
 
 <!-- 설치 CTA -->
 <section class="snap-section" id="install">
   <div class="wrap-narrow plain-cta fade">
-    <div class="badges">
-      <span>🧪 베타 버전</span>
-      <span>무료</span>
-    </div>
-    <h2>지금 바로 시작해요</h2>
+    <p class="cta-kicker">우리 아이의 바른 생활 습관 형성의 시작</p>
+    <h2>지금 바로 시작해보세요!</h2>
     <div style="margin-top:22px;">
       <button class="btn btn-primary" data-install>쿠앵크 시작하기</button>
       <p class="free-note">홈 화면에 아이콘 하나로 설치돼요 · <a href="/site/guide.html" style="text-decoration:underline;">가이드 보기</a></p>
