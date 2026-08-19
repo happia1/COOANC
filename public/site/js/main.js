@@ -41,6 +41,17 @@ document.querySelectorAll('.tabbtn').forEach(btn=>{
   });
 });
 
+// ===== 문의하기: 해시(#blog, #faq, #partner)로 서브탭 딥링크 =====
+const inquiryTabs = document.getElementById('inquiryTabs');
+if (inquiryTabs){
+  const hash = location.hash.replace('#', '');
+  const target = ['faq','blog','partner'].includes(hash) ? 'pane-' + hash : null;
+  if (target){
+    inquiryTabs.querySelectorAll('.tabbtn').forEach(b=>b.classList.toggle('active', b.dataset.tab === target));
+    inquiryTabs.querySelectorAll('.tabpanel').forEach(p=>p.classList.toggle('active', p.id === target));
+  }
+}
+
 // ===== 설치 가이드: 접속 기기에 맞는 탭 기본 선택 =====
 const deviceGuide = document.getElementById('deviceGuide');
 if (deviceGuide){
