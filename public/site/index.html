@@ -7,19 +7,40 @@
 <meta name="description" content="부모의 계획 노동은 줄이고, 아이의 즐거운 습관은 키우는 쿠앵크.">
 <link rel="stylesheet" href="/site/css/style.css">
 <style>
-  /* 홈 전용 — 섹션 스크롤 스냅 */
-  html{ scroll-snap-type:y proximity; }
+  /* 홈 전용 — 섹션 스크롤 스냅 (한 섹션씩 확실히 멈추도록 mandatory + scroll-padding으로 헤더 보정) */
+  html{ scroll-snap-type:y mandatory; scroll-padding-top:65px; }
+  /* 히어로도 스냅 포인트로 등록해야 첫 로드 시 브라우저가 히어로를 건너뛰고 다음 섹션으로 튀지 않습니다 */
+  .hero-banner{ scroll-snap-align:start; }
   .snap-section{
-    min-height:calc(100svh - 65px); min-height:calc(100vh - 65px);
+    min-height:100dvh; min-height:100vh;
     display:flex; flex-direction:column; justify-content:center;
     padding:56px 0 96px; position:relative;
-    scroll-snap-align:start; scroll-margin-top:65px;
+    scroll-snap-align:start;
+  }
+  /* 콘텐츠가 뷰포트보다 길어질 수 있는 섹션은 스냅에 갇히지 않도록 예외 처리 */
+  @media (max-width:640px){
+    #section-growth{ scroll-snap-align:none; }
   }
   .snap-cta{
     position:absolute; left:0; right:0; bottom:24px;
     display:flex; flex-direction:column; align-items:center; gap:10px; width:100%; padding:0 22px;
   }
   @media (max-width:480px){ .snap-section{ padding:44px 0 104px; } }
+
+  /* 섹션 위치 인디케이터 — 우측 중앙 세로 도트 */
+  .section-dots{
+    position:fixed; right:18px; top:50%; transform:translateY(-50%); z-index:60;
+    display:flex; flex-direction:column; gap:10px;
+  }
+  .section-dots button{
+    width:8px; height:8px; border-radius:50%; border:none; background:var(--line); cursor:pointer; padding:0;
+    transition:background .2s ease, transform .2s ease;
+  }
+  .section-dots button.active{ background:var(--brand-deep); transform:scale(1.35); }
+  @media (max-width:640px){
+    .section-dots{ right:10px; gap:8px; }
+    .section-dots button{ width:6px; height:6px; }
+  }
 </style>
 </head>
 <body>
@@ -45,30 +66,81 @@
 
 <!-- HERO -->
 <section class="hero-banner" id="heroSlider">
-  <div class="slide active"><img src="/site/assets/hero-1.png" alt="" onerror="this.style.display='none'"></div>
-  <div class="slide"><img src="/site/assets/hero-2.png" alt="" onerror="this.style.display='none'"></div>
-  <div class="slide"><img src="/site/assets/hero-3.png" alt="" onerror="this.style.display='none'"></div>
-  <div class="slide"><img src="/site/assets/banner.png" alt="" onerror="this.style.display='none'"></div>
-  <div class="hero-overlay"></div>
-  <div class="hero-content">
-    <div class="wrap">
-      <div class="hero-text">
-        <p class="hero-kicker fade">잔소리 대신</p>
-        <h1 class="fade"><span class="jua">쿠앵크</span>를 켜세요!</h1>
-        <p class="lead fade">아이가 스스로 하루를 완성하는<br>마법같은 일상</p>
+  <div class="slide active">
+    <img src="/site/assets/banner.png" alt="" onerror="this.style.display='none'">
+    <div class="hero-content">
+      <div class="wrap">
+        <div class="hero-text">
+          <div class="hero-textbg">
+            <p class="hero-kicker">잔소리 대신</p>
+            <h1><span class="jua">쿠앵크</span>를 켜세요!</h1>
+            <p class="lead">아이가 스스로 하루를 완성하는<br>마법같은 일상</p>
+          </div>
+        </div>
       </div>
     </div>
   </div>
+  <a class="slide" href="/site/features.html" aria-label="서비스 소개 페이지로 이동">
+    <img src="/site/assets/hero-2.png" alt="" onerror="this.style.display='none'">
+    <div class="hero-content">
+      <div class="wrap">
+        <div class="hero-text">
+          <div class="hero-textbg">
+            <p class="hero-kicker">서비스 소개</p>
+            <h2>미션부터 보상까지<br>한눈에 보여드려요</h2>
+            <span class="hero-cta">서비스 소개 보기 →</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </a>
+  <a class="slide" href="/site/guide.html" aria-label="사용 가이드 페이지로 이동">
+    <img src="/site/assets/hero-1.png" alt="" onerror="this.style.display='none'">
+    <div class="hero-content">
+      <div class="wrap">
+        <div class="hero-text">
+          <div class="hero-textbg">
+            <p class="hero-kicker">사용 가이드</p>
+            <h2>설치부터 시작까지<br>차근차근 안내해요</h2>
+            <span class="hero-cta">가이드 보기 →</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </a>
+  <a class="slide" href="/site/contact.html" aria-label="문의하기 페이지로 이동">
+    <img src="/site/assets/hero-3.png" alt="" onerror="this.style.display='none'">
+    <div class="hero-content">
+      <div class="wrap">
+        <div class="hero-text">
+          <div class="hero-textbg">
+            <p class="hero-kicker">문의하기</p>
+            <h2>궁금한 점이 있다면<br>언제든 물어보세요</h2>
+            <span class="hero-cta">문의하기 →</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </a>
   <div class="slider-dots">
-    <button class="active"></button>
-    <button></button>
-    <button></button>
-    <button></button>
+    <button class="active" aria-label="1번째 배너로 이동"></button>
+    <button aria-label="2번째 배너로 이동"></button>
+    <button aria-label="3번째 배너로 이동"></button>
+    <button aria-label="4번째 배너로 이동"></button>
   </div>
+  <button class="hero-scrollcue" id="heroScrollCue" aria-label="다음 섹션으로 스크롤">↓</button>
 </section>
 
+<nav class="section-dots" id="sectionDots" aria-label="섹션 이동">
+  <button data-target="#section-empathy" aria-label="2번째 섹션으로 이동"></button>
+  <button data-target="#section-growth" aria-label="3번째 섹션으로 이동"></button>
+  <button data-target="#section-brand" aria-label="4번째 섹션으로 이동"></button>
+  <button data-target="#section-testi" aria-label="5번째 섹션으로 이동"></button>
+  <button data-target="#install" aria-label="6번째 섹션으로 이동"></button>
+</nav>
+
 <!-- 공감 섹션 -->
-<section class="snap-section mist">
+<section class="snap-section mist" id="section-empathy">
   <div class="wrap-narrow fade" style="text-align:center;">
     <p style="font-size:15.5px; color:var(--ink-soft); line-height:2;">
       "씻자, 자자, 정리하자" — 매일 몇 번씩 반복하는 말들.<br>
@@ -85,7 +157,7 @@
 </section>
 
 <!-- 성장 플로우 5단계 -->
-<section class="snap-section">
+<section class="snap-section" id="section-growth">
   <div class="wrap">
     <div class="section-head fade" style="text-align:center; margin:0 auto 32px; max-width:480px;">
       <h2>쿠앵크에서 이렇게 성장해요!</h2>
@@ -142,20 +214,20 @@
       <!-- 결과 -->
       <div class="gt-node gt-node--goal">
         <h3>"나도 할 수 있어!"</h3>
-        <p>스스로 해내고, 스스로 고른 보상을 받는 경험이 쌓이면서<br>자기주도적인 습관과 자기효능감이 함께 자라요.</p>
+        <p>자신이 수행한 미션을 통해 얻은 크레딧과 하트로<br>직접 저축하고 소비하는 과정속에서<br>자기주도적 습관과 자기 효능감이 함께 자라요!</p>
       </div>
     </div>
   </div>
 </section>
 
 <!-- 브랜드 임팩트 섹션 -->
-<section class="snap-section mist">
+<section class="snap-section mist" id="section-brand">
   <div class="brand-split fade">
     <!-- TODO: 오늘의 미션 예시 카드 컴포넌트 삽입 예정 (이불 정리하기/머리 빗기/화장실 다녀오기/세수하고 양치하기/옷 입기 예시 포함) -->
     <div class="brand-split-media img-slot">이미지 준비 중</div>
     <div class="brand-split-text">
       <span class="eyebrow">쿠앵크가 특별한 이유</span>
-      <h2>잔소리 대신, 아이 스스로 만드는 하루</h2>
+      <h2>반복적인 일상을 잔소리 없이<br>아이가 스스로 만들어가요!</h2>
       <p>복잡한 설정은 필요 없어요. 아이는 미션을 끝내며 크레딧과 하트를 모으고, 화분과 저금통을 스스로 키워가요. 부모님은 옆에서 응원만 하면 돼요.</p>
       <a href="/site/features.html" class="btn btn-dark">기능 전체 보기 →</a>
     </div>
@@ -163,7 +235,7 @@
 </section>
 
 <!-- 실제 후기 -->
-<section class="snap-section">
+<section class="snap-section" id="section-testi">
   <div class="wrap">
     <div class="section-head fade" style="margin:0 auto 8px; text-align:center; max-width:560px;">
       <h2 style="white-space:nowrap; font-size:clamp(20px, 4vw, 30px);">쿠앵크와 함께해요!</h2>

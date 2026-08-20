@@ -27,7 +27,10 @@ body{
   background:var(--paper);
   line-height:1.65;
   -webkit-font-smoothing:antialiased;
+  word-break:keep-all;
+  overflow-wrap:break-word;
 }
+p, h1, h2, h3, h4{ text-wrap:pretty; }
 a{color:inherit; text-decoration:none;}
 img{max-width:100%; display:block;}
 ul{list-style:none;}
@@ -221,43 +224,67 @@ h3{ font-size:17px; font-weight:700; }
 .brand img{ height:30px; display:block; }
 
 /* ===== 히어로 자동 슬라이드 배너 =====
- * 배경 사진은 추후 전달 예정이라 지금은 존재하지 않는 경로를 그대로 참조합니다.
+ * 4장 슬라이드, 2~4번은 각 페이지로 이동하는 링크입니다.
  * 이미지가 404여도 구조가 깨지지 않도록 .slide 자체에 배경색 폴백을 깔고,
  * <img> 로딩 실패 시 onerror로 숨겨 폴백 배경만 보이게 합니다.
+ * 높이는 dvh 기준으로 고정해 모바일 주소창 유무에 따라 튀지 않습니다.
  */
 .hero-banner{
-  position:relative; width:100%; height:560px; overflow:hidden;
+  position:relative; width:100%; height:clamp(420px, 58dvh, 560px); overflow:hidden;
   background:linear-gradient(135deg, var(--brand), var(--brand-deep));
 }
 .hero-banner .slide{
   position:absolute; inset:0; opacity:0; transition:opacity 1s ease; z-index:1;
   background:linear-gradient(135deg, var(--brand), var(--brand-deep));
+  display:block; color:inherit;
 }
 .hero-banner .slide.active{ opacity:1; z-index:2; }
-.hero-banner .slide img{ width:100%; height:100%; object-fit:cover; display:block; }
-.hero-overlay{
-  position:absolute; inset:0; z-index:3; pointer-events:none;
-  background:linear-gradient(to right, rgba(10,14,20,.55), rgba(10,14,20,.32) 48%, rgba(10,14,20,0) 78%);
+.hero-banner .slide img{
+  width:100%; height:100%; object-fit:cover; display:block; object-position:center center;
 }
-.hero-content{ position:absolute; left:0; right:0; top:50%; transform:translateY(-50%); z-index:4; }
+.hero-banner a.slide{ cursor:pointer; }
+.hero-banner a.slide:focus-visible{ outline:3px solid var(--brand-deep); outline-offset:-3px; }
+@media (max-width:768px){
+  .hero-banner .slide img{ object-position:right center; }
+}
+.hero-content{ position:absolute; left:0; right:0; top:50%; transform:translateY(-50%); z-index:4; pointer-events:none; }
+.hero-banner a.slide .hero-content{ pointer-events:none; }
 .hero-text{ max-width:55%; }
+.hero-textbg{
+  display:inline-block; background:rgba(255,255,255,.55); backdrop-filter:blur(2px); -webkit-backdrop-filter:blur(2px);
+  border-radius:14px; padding:14px 18px;
+}
 .hero-kicker{
-  color:#fff; font-size:clamp(13px, 1.7vw, 18px); font-weight:700; opacity:.92;
-  margin-bottom:6px; text-shadow:0 1px 8px rgba(0,0,0,.3);
+  color:var(--ink); font-size:clamp(13px, 1.7vw, 18px); font-weight:700; opacity:.85; margin-bottom:6px;
 }
-.hero-content h1{ color:#fff; font-size:clamp(26px, 4.4vw, 48px); line-height:1.25; text-shadow:0 2px 12px rgba(0,0,0,.3); }
-.hero-content .lead{ color:#fff; font-size:clamp(13.5px, 1.6vw, 17px); margin-top:14px; text-shadow:0 1px 8px rgba(0,0,0,.28); }
-.hero-content .btn-ghost{ background:rgba(255,255,255,.14); color:#fff; border-color:rgba(255,255,255,.5); backdrop-filter:blur(4px); }
+.hero-content h1{ color:var(--ink); font-size:clamp(40px, 8vw, 96px); line-height:1.15; font-weight:800; }
+.hero-content h2{ color:var(--ink); font-size:clamp(24px, 3.6vw, 40px); line-height:1.3; font-weight:800; }
+.hero-content .lead{ color:var(--ink); font-size:clamp(14px, 1.8vw, 19px); margin-top:12px; font-weight:600; }
+.hero-cta{
+  display:inline-block; margin-top:14px; color:var(--brand-deep); font-weight:700; font-size:clamp(13.5px, 1.6vw, 16px);
+}
 @media (max-width:640px){
-  .hero-text{ max-width:60%; }
+  .hero-text{ max-width:82%; }
+  .hero-content h1{ font-size:clamp(30px, 9vw, 44px); }
+  .hero-content h2{ font-size:clamp(20px, 6.5vw, 28px); }
 }
-.slider-dots{ position:absolute; bottom:18px; left:0; right:0; z-index:5; display:flex; justify-content:center; gap:7px; }
+.slider-dots{ position:absolute; bottom:18px; left:0; right:0; z-index:5; display:flex; justify-content:center; gap:7px; pointer-events:none; }
 .slider-dots button{
-  width:7px; height:7px; border-radius:50%; border:none; background:rgba(255,255,255,.55); cursor:pointer; padding:0;
+  width:7px; height:7px; border-radius:50%; border:none; background:rgba(20,20,30,.28); cursor:pointer; padding:0; pointer-events:auto;
 }
-.slider-dots button.active{ background:#fff; width:20px; border-radius:100px; transition:width .25s ease; }
-@media (max-width:640px){
-  .hero-banner{ height:420px; }
+.slider-dots button.active{ background:var(--brand-deep); width:20px; border-radius:100px; transition:width .25s ease; }
+
+/* 히어로 스크롤 유도 화살표 — 좌측 하단, 2초 바운스 루프, 첫 스크롤 시 페이드아웃 */
+.hero-scrollcue{
+  position:absolute; left:22px; bottom:18px; z-index:6; width:38px; height:38px; border-radius:50%;
+  border:1.5px solid rgba(20,20,30,.25); background:rgba(255,255,255,.55); backdrop-filter:blur(2px);
+  display:flex; align-items:center; justify-content:center; cursor:pointer; color:var(--ink);
+  animation:heroCueBounce 2s ease-in-out infinite; transition:opacity .4s ease;
+}
+.hero-scrollcue.is-hidden{ opacity:0; pointer-events:none; }
+@keyframes heroCueBounce{ 0%,100%{ transform:translateY(0); } 50%{ transform:translateY(6px); } }
+@media (prefers-reduced-motion:reduce){
+  .hero-scrollcue{ animation:none; }
 }
 
 /* ===== 체크리스트 ===== */
