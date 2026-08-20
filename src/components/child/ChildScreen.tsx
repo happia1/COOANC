@@ -2111,17 +2111,34 @@ export default function ChildScreen({
     setChestTicketQty(initialChestTicketQuantity)
   }, [initialChestTicketQuantity])
 
+  /**
+   * 이용권 잔액을 못 읽었는지 표시합니다.
+   *
+   * 왜 필요한가: 못 읽으면 화면에는 0장으로 보이는데, 보물상자는 0장이면
+   * 곧바로 마켓으로 보내 버립니다. 서버가 느린 동안 아이가 「보물상자 → 마켓 →
+   * 크레딧 없음 → 보물상자」를 끝없이 오가는 상태가 됐습니다.
+   * 「정말 0장」과 「아직 모름」을 구분해야 그 반복을 끊을 수 있습니다.
+   */
+  const [ticketBalanceUnavailable, setTicketBalanceUnavailable] = useState(false)
+
   const refreshContentTicketBalances = useCallback(async () => {
     try {
       const res = await fetch(
         `/api/content/ticket-balances?childId=${encodeURIComponent(childId)}`,
         { credentials: 'same-origin' },
       )
-      if (!res.ok) return
+      if (!res.ok) {
+        setTicketBalanceUnavailable(true)
+        return
+      }
       const json = (await res.json()) as { chestTicketQuantity?: number }
-      if (typeof json.chestTicketQuantity === 'number') setChestTicketQty(json.chestTicketQuantity)
+      if (typeof json.chestTicketQuantity === 'number') {
+        setChestTicketQty(json.chestTicketQuantity)
+        setTicketBalanceUnavailable(false)
+      }
     } catch {
-      /* 네트워크 실패 시 기존 표시 유지 */
+      /* 네트워크 실패 시 기존 표시 유지 — 대신 「모름」으로 표시합니다 */
+      setTicketBalanceUnavailable(true)
     }
   }, [childId])
 
@@ -2160,8 +2177,17 @@ export default function ChildScreen({
     [stats?.current_level, ageYears],
   )
 
-  /** 진행 중 시청 세션이 있으면 콘텐츠존을 자동으로 엽니다 (보물상자 해금 후) */
+  /**
+   * 진행 중 시청 세션이 있으면 콘텐츠존을 **한 번만** 자동으로 엽니다 (보물상자 해금 후).
+   *
+   * 왜 「한 번만」인가: 예전에는 이 조건이 유지되는 한 계속 다시 열려서,
+   * 아이가 닫아도 팝업이 또 뜨는 상태가 반복됐습니다.
+   * (서버가 느려 이용권 잔액을 못 읽으면 0장으로 보여 마켓으로 튕기고,
+   *  돌아오면 이 effect 가 또 열어 무한히 오가는 상태가 됐습니다.)
+   */
+  const autoOpenedContentZoneRef = useRef(false)
   useEffect(() => {
+    if (autoOpenedContentZoneRef.current) return
     if (!features.contentZone) return
     if (!initialActiveContentSession?.playlist_url) return
     const rem =
@@ -2173,9 +2199,10 @@ export default function ChildScreen({
             initialActiveContentSession.duration_minutes,
           )
     if (rem > 0 && toYouTubeContentEmbedUrl(initialActiveContentSession.playlist_url)) {
+      autoOpenedContentZoneRef.current = true
       setContentZoneOpen(true)
     }
-  }, [initialActiveContentSession, openContentZone, features.contentZone])
+  }, [initialActiveContentSession, features.contentZone])
 
   // ── 캐릭터 스프라이트 ─────────────────────────────────────────────────────
 
@@ -3230,6 +3257,7 @@ export default function ChildScreen({
         initialChestTicketQuantity={chestTicketQty}
         initialActiveSession={initialActiveContentSession}
         onOpenMarket={openMarketToContent}
+        ticketBalanceUnavailable={ticketBalanceUnavailable}
         onChestTicketQuantityChange={handleChestTicketQuantityChange}
         onClawGrabPending={onClawGrabPending}
         onClawStatsSynced={onClawStatsSynced}

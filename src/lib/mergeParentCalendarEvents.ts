@@ -361,6 +361,21 @@ export interface CalendarBackfillResult {
   failures: { title: string; reason: string }[]
 }
 
+/**
+ * 연속으로 실패하면 이 횟수부터는 이번 세션 동안 backfill 을 멈춥니다.
+ *
+ * 왜 필요한가: 실패한 건은 일부러 다시 시도하는데, 화면이 15초마다 새로고침하므로
+ * 서버가 아플 때 「실패 → 15초 뒤 재시도」가 끝없이 돌면서 아픈 서버를 계속 두드립니다.
+ * 몇 번 해보고 안 되면 손을 떼고, 새로고침(페이지 재진입) 때 다시 시작합니다.
+ */
+const BACKFILL_MAX_CONSECUTIVE_FAILS = 3
+let backfillConsecutiveFails = 0
+
+/** 이번 세션에서 backfill 을 포기했는지 — 페이지를 새로 열면 초기화됩니다 */
+export function isCalendarBackfillPaused(): boolean {
+  return backfillConsecutiveFails >= BACKFILL_MAX_CONSECUTIVE_FAILS
+}
+
 export async function backfillLocalOnlyCalendarEvents(
   local: LocalCalendarEvent[],
   server: LocalCalendarEvent[],
@@ -371,6 +386,10 @@ export async function backfillLocalOnlyCalendarEvents(
   const failures: { title: string; reason: string }[] = []
   let attempted = 0
   if (typeof window === 'undefined' || local.length === 0) {
+    return { idMap, attempted, uploaded: idMap.size, failures }
+  }
+  if (isCalendarBackfillPaused()) {
+    /** 연속 실패로 멈춘 상태 — 서버를 더 두드리지 않습니다 */
     return { idMap, attempted, uploaded: idMap.size, failures }
   }
 
@@ -433,6 +452,16 @@ export async function backfillLocalOnlyCalendarEvents(
   }
 
   if (doneChanged) writeBackfilledIds(done)
+
+  /**
+   * 이번 회차에 시도했는데 하나도 못 올렸다면 실패로 셉니다.
+   * 한 건이라도 성공하면 카운터를 되돌려, 일시적 오류 뒤에는 정상 동작합니다.
+   */
+  if (attempted > 0) {
+    if (idMap.size === 0) backfillConsecutiveFails += 1
+    else backfillConsecutiveFails = 0
+  }
+
   return { idMap, attempted, uploaded: idMap.size, failures }
 }
 
