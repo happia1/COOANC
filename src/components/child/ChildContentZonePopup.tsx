@@ -40,6 +40,11 @@ type Props = {
   onGoToMissions: () => void
   /** 티켓 0장 상태에서 메뉴를 눌렀을 때 — 팝업을 닫고 마켓 콘텐츠 구역으로 이동 */
   onOpenMarket: () => void
+  /**
+   * 이용권 잔액을 아직 못 읽었으면 true.
+   * 이때는 0장으로 단정해 마켓으로 보내지 않고, 잠시 뒤 다시 눌러 달라고만 안내합니다.
+   */
+  ticketBalanceUnavailable?: boolean
   onChestTicketQuantityChange: (quantity: number) => void
   /** 인형뽑기 그랩 API 요청 중임을 ChildScreen의 pendingStatsWritesRef 카운터에 알림 */
   onClawGrabPending: (pending: boolean) => void
@@ -119,6 +124,7 @@ export default function ChildContentZonePopup({
   initialActiveSession,
   onGoToMissions,
   onOpenMarket,
+  ticketBalanceUnavailable = false,
   onChestTicketQuantityChange,
   onClawGrabPending,
   onClawStatsSynced,
@@ -400,6 +406,15 @@ export default function ChildContentZonePopup({
     }
 
     if (chestTicketQty <= 0) {
+      /**
+       * 잔액을 못 읽은 상태에서는 마켓으로 보내지 않습니다.
+       * 0장으로 단정하면 「보물상자 → 마켓 → 크레딧 없음 → 보물상자」를 끝없이 오가게 됩니다.
+       */
+      if (ticketBalanceUnavailable) {
+        setLockHint('잠시 뒤에 다시 눌러 주세요')
+        window.setTimeout(() => setLockHint(null), 2000)
+        return
+      }
       onClose()
       onOpenMarket()
       return

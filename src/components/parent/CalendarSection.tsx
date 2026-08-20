@@ -382,13 +382,16 @@ export default function CalendarSection({ childId, focusDate = null, focusNonce 
       /**
        * ② 서버 저장이 도입되기 전에 이 기기에만 저장된 예전 일정(예: 여름 돌봄)을 한 번 올려
        * 모든 기기가 같은 DB 를 보도록 정리합니다. 이미 올린 일정은 다시 올리지 않습니다.
+       *
+       * **서버 목록을 제대로 읽었을 때만** 실행합니다(`fetched.ok`).
+       * 읽기에 실패하면 `server` 가 빈 배열로 오는데, 그러면 이 기기의 일정이 전부
+       * 「서버에 없는 것」처럼 보여 **모두 다시 올리려 합니다.**
+       * 화면은 15초마다 새로고침하므로, 서버가 아플 때 이 업로드가 15초마다 반복되며
+       * 아픈 서버를 계속 두드리게 됩니다(실제로 그렇게 동작했습니다).
        */
-      const backfill = await backfillLocalOnlyCalendarEvents(
-        local,
-        server,
-        childId,
-        fetched.linkedChildIds,
-      )
+      const backfill = fetched.ok
+        ? await backfillLocalOnlyCalendarEvents(local, server, childId, fetched.linkedChildIds)
+        : { idMap: new Map<string, string>(), attempted: 0, uploaded: 0, failures: [] }
       if (backfill.failures.length > 0) {
         /**
          * 조용히 실패하면 "동기화가 안 된다"는 것만 보이고 원인을 알 수 없습니다.
