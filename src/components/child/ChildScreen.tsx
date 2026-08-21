@@ -97,7 +97,6 @@ import ChildMusicPopup from '@/components/child/ChildMusicPopup'
 const ChildContentZonePopup = dynamic(() => import('@/components/child/ChildContentZonePopup'), {
   ssr: false,
 })
-import { remainingContentSeconds, toYouTubeContentEmbedUrl } from '@/lib/youtubeContent'
 import { CHILD_CONTENT_TREASURE_ICON_URL } from '@/constants/childContentMenu'
 import PlantPot from '@/components/child/PlantPot'
 import PlantStageCelebrationModal from '@/components/child/PlantStageCelebrationModal'
@@ -2178,31 +2177,23 @@ export default function ChildScreen({
   )
 
   /**
-   * 진행 중 시청 세션이 있으면 콘텐츠존을 **한 번만** 자동으로 엽니다 (보물상자 해금 후).
+   * 보물상자(콘텐츠존)는 **아이가 직접 눌렀을 때만** 엽니다.
    *
-   * 왜 「한 번만」인가: 예전에는 이 조건이 유지되는 한 계속 다시 열려서,
-   * 아이가 닫아도 팝업이 또 뜨는 상태가 반복됐습니다.
-   * (서버가 느려 이용권 잔액을 못 읽으면 0장으로 보여 마켓으로 튕기고,
-   *  돌아오면 이 effect 가 또 열어 무한히 오가는 상태가 됐습니다.)
+   * 비개발자 설명(예전에 있던 문제):
+   *   원래는 "보던 영상이 남아 있으면 자동으로 열어 주기" 기능이 있었는데, 두 가지가 겹쳐
+   *   아무것도 누르지 않아도 팝업이 저절로 뜨는 문제가 있었습니다.
+   *   ① 팝업을 닫아도 시청 세션은 남습니다(남은 시간을 지켜 주려고 일부러 그렇게 둡니다).
+   *      그래서 한 번 영상을 보다 닫으면, 이후 홈에 들어올 때마다 조건이 계속 맞았습니다.
+   *   ② 화면이 새로고침될 때마다(미션 완료 등으로 자주 일어납니다) 이 조건을 다시 확인해서,
+   *      아이가 방금 닫은 팝업이 곧바로 다시 열렸습니다.
+   *
+   *   「이번 접속에서 한 번만 열기」로 ②만 막아 봤지만, ①이 남아 있어 새로 접속할 때마다
+   *   여전히 저절로 열렸습니다. 게다가 이용권 잔액을 못 읽는 순간과 겹치면 0장으로 보여
+   *   마켓으로 튕기고, 돌아오면 다시 열려 무한히 오가는 상태까지 생겼습니다.
+   *
+   *   남은 시간은 영상을 **재생하는 동안에만** 줄어들기 때문에, 자동으로 열어 주지 않아도
+   *   손해가 없습니다. 아이가 보물상자를 직접 누르면 보던 영상이 그대로 이어집니다.
    */
-  const autoOpenedContentZoneRef = useRef(false)
-  useEffect(() => {
-    if (autoOpenedContentZoneRef.current) return
-    if (!features.contentZone) return
-    if (!initialActiveContentSession?.playlist_url) return
-    const rem =
-      initialActiveContentSession.remaining_play_seconds != null &&
-      initialActiveContentSession.remaining_play_seconds > 0
-        ? initialActiveContentSession.remaining_play_seconds
-        : remainingContentSeconds(
-            initialActiveContentSession.started_at,
-            initialActiveContentSession.duration_minutes,
-          )
-    if (rem > 0 && toYouTubeContentEmbedUrl(initialActiveContentSession.playlist_url)) {
-      autoOpenedContentZoneRef.current = true
-      setContentZoneOpen(true)
-    }
-  }, [initialActiveContentSession, features.contentZone])
 
   // ── 캐릭터 스프라이트 ─────────────────────────────────────────────────────
 
