@@ -257,16 +257,14 @@ h3{ font-size:17px; font-weight:700; }
 .hero-kicker{
   color:var(--ink); font-size:clamp(13px, 1.7vw, 18px); font-weight:700; opacity:.85; margin-bottom:6px;
 }
-.hero-content h1{ color:var(--ink); font-size:clamp(40px, 8vw, 96px); line-height:1.15; font-weight:800; }
-.hero-content h2{ color:var(--ink); font-size:clamp(24px, 3.6vw, 40px); line-height:1.3; font-weight:800; }
+.hero-content h1, .hero-content h2{ color:var(--ink); font-size:clamp(26px, 3.8vw, 44px); line-height:1.3; font-weight:800; }
 .hero-content .lead{ color:var(--ink); font-size:clamp(14px, 1.8vw, 19px); margin-top:12px; font-weight:600; }
 .hero-cta{
   display:inline-block; margin-top:14px; color:var(--brand-deep); font-weight:700; font-size:clamp(13.5px, 1.6vw, 16px);
 }
 @media (max-width:640px){
   .hero-text{ max-width:82%; }
-  .hero-content h1{ font-size:clamp(30px, 9vw, 44px); }
-  .hero-content h2{ font-size:clamp(20px, 6.5vw, 28px); }
+  .hero-content h1, .hero-content h2{ font-size:clamp(20px, 6.5vw, 28px); }
 }
 .slider-dots{ position:absolute; bottom:18px; left:0; right:0; z-index:5; display:flex; justify-content:center; gap:7px; pointer-events:none; }
 .slider-dots button{

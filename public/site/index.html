@@ -17,10 +17,6 @@
     padding:56px 0 96px; position:relative;
     scroll-snap-align:start;
   }
-  /* 콘텐츠가 뷰포트보다 길어질 수 있는 섹션은 스냅에 갇히지 않도록 예외 처리 */
-  @media (max-width:640px){
-    #section-growth{ scroll-snap-align:none; }
-  }
   .snap-cta{
     position:absolute; left:0; right:0; bottom:24px;
     display:flex; flex-direction:column; align-items:center; gap:10px; width:100%; padding:0 22px;
