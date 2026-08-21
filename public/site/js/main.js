@@ -5,6 +5,18 @@ if (navToggle && navMobile){
   navToggle.addEventListener('click', ()=> navMobile.classList.toggle('open'));
 }
 
+// ===== 공용 CTA — "쿠앵크 시작하기" 블록 (홈 · 서비스소개 등에서 재사용, 마크업은 여기 한 곳에서만 관리) =====
+document.querySelectorAll('[data-cta-install]').forEach(el=>{
+  el.innerHTML = `
+    <p class="cta-kicker">우리 아이의 바른 생활 습관 형성의 시작</p>
+    <h2>지금 바로 시작해보세요!</h2>
+    <div style="margin-top:22px;">
+      <button class="btn btn-primary" data-install>쿠앵크 시작하기</button>
+      <p class="free-note">홈 화면에 아이콘 하나로 설치돼요 · <a href="/site/guide.html" style="text-decoration:underline;">가이드 보기</a></p>
+    </div>
+  `;
+});
+
 // ===== fade-in on view =====
 const io = new IntersectionObserver((entries)=>{
   entries.forEach(e=>{ if(e.isIntersecting) e.target.classList.add('in'); });
