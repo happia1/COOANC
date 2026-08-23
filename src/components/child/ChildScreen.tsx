@@ -841,6 +841,11 @@ export default function ChildScreen({
     const next = initialStats ? normalizeChildStatsCreditsSplit(initialStats) : null
     setStats((prev) => {
       if (!next) return null
+      /**
+       * 서버에서 온 스냅샷은 **본 순간 시각을 기록해 둡니다**(적용 여부와 무관).
+       * 아래 Realtime 이 「이보다 오래된 알림」을 걸러 내는 기준이 됩니다.
+       */
+      rememberServerStatsAt(next)
       if (!prev) return next
       /**
        * 미션 완료 직후 느린 `/home` 재조회가 아직 커밋 전 옛 값을 내려주면 방금 올린 크레딧이
@@ -860,11 +865,10 @@ export default function ChildScreen({
        *  갇혀 버렸습니다. 그 상태로 마켓에 가면 잔액은 넉넉해 보이는데 결제만 "코인 부족"으로
        *  거절돼 원인을 알 수 없게 됩니다. 그래서 무조건 서버 값으로 되돌아오게 둡니다.)
        *
-       * 단, **서버 스냅샷끼리는 저장 시각(updated_at) 순서를 지킵니다.** 이미 더 최신 서버 값을
-       * 반영한 뒤라면 뒤늦게 도착한 옛 스냅샷은 무시합니다(아래 Realtime 도 동일).
+       * 여기서는 저장 시각으로 스냅샷을 **버리지 않습니다**. 시계가 조금만 어긋나도 갱신된 스냅샷
+       * 전체가 통째로 무시돼 원래 문제보다 나빠지기 때문입니다. 시각 비교는 Realtime 에서
+       * **돈 항목만** 거르는 데에만 씁니다.
        */
-      if (isStaleServerStats(next)) return prev
-      rememberServerStatsAt(next)
       return next
     })
   }, [initialStats])
@@ -1431,7 +1435,18 @@ export default function ChildScreen({
            * (저금통에서 코인을 연달아 옮기면 저장이 여러 번 일어나고, 그 알림이 뒤늦게 도착해
            *  최신 잔액을 옛 값으로 되돌리며 숫자가 왔다갔다 했습니다.)
            */
-          if (withinLocalStatsGuard || isStaleServerStats(row)) {
+          const stale = isStaleServerStats(row)
+          /**
+           * **본 알림은 값을 쓰지 않더라도 시각을 기록합니다.**
+           *
+           * 예전에는 가드 창(미션 완료 직후 6초) 안에서 알림을 버리기만 하고 시각을 남기지 않아,
+           * 기준 시각이 옛날에 멈춰 있었습니다. 그래서 창이 끝난 뒤 뒤늦게 도착한 **더 오래된**
+           * 알림이 「최신」으로 오인돼 크레딧이 과거 값으로 되돌아갔습니다.
+           * (미션 완료 시 DB 트리거가 보상 반영 **전** 크레딧으로 child_stats 를 한 번 더 저장하는데,
+           *  그 알림이 늦게 오면 정확히 이 현상이 납니다 — 카드 탭·보너스 직후 숫자가 오르내림.)
+           */
+          rememberServerStatsAt(row)
+          if (withinLocalStatsGuard || stale) {
             const { credits, credits_piggy, hearts, total_credits_earned, ...rest } = row
             void credits
             void credits_piggy
@@ -1443,7 +1458,6 @@ export default function ChildScreen({
             return
           }
           /** 가드 창 밖에서는 서버 값이 정답 — 화면이 옛 낙관값에 갇히지 않게 그대로 반영합니다. */
-          rememberServerStatsAt(row)
           setStats((prev) =>
             normalizeChildStatsCreditsSplit(mergeChildStatsPatch(prev, row)),
           )
