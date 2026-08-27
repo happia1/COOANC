@@ -1,5 +1,5 @@
 -- ============================================================
--- 135_drop_duplicate_mission_reward_trigger.sql
+-- 137_drop_duplicate_mission_reward_trigger.sql
 -- 미션 보상을 **두 번** 주던 옛 트리거를 제거합니다.
 --
 -- 비개발자 설명:

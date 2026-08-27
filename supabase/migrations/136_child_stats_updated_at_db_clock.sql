@@ -1,5 +1,5 @@
 -- ============================================================
--- 134_child_stats_updated_at_db_clock.sql
+-- 136_child_stats_updated_at_db_clock.sql
 -- child_stats.updated_at 을 **항상 DB 시계(now())** 로 통일합니다.
 --
 -- 왜 필요한가(비개발자 설명):
