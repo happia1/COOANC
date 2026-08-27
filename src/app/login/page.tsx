@@ -86,9 +86,29 @@ export default function LoginPage() {
     })
 
     let cancelled = false
+
+    /**
+     * 자동 로그인 확인이 늦어져도 **로그인 화면이 반드시 나오게** 하는 안전장치.
+     *
+     * 비개발자 설명(신고된 문제):
+     *   이 확인이 끝나기 전까지는 로그인 입력칸이 화면에 아예 그려지지 않습니다.
+     *   그런데 서버가 느릴 때 이 확인 요청에 시간 제한이 없어서, 「확인 중」 화면에 갇힌 채
+     *   로그인을 시도조차 할 수 없었습니다. 이제 아래 시간이 지나면 확인을 포기하고
+     *   로그인 폼을 띄웁니다(로그인 자체는 정상적으로 다시 시도할 수 있습니다).
+     */
+    const AUTO_LOGIN_CHECK_TIMEOUT_MS = 4000
+    const controller = new AbortController()
+    const giveUpTimer = window.setTimeout(() => {
+      controller.abort()
+      if (!cancelled) setAutoLoginGateActive(false)
+    }, AUTO_LOGIN_CHECK_TIMEOUT_MS)
+
     async function redirectWhenAlreadySignedIn() {
       try {
-        const res = await fetch('/api/auth/post-login-redirect', { credentials: 'same-origin' })
+        const res = await fetch('/api/auth/post-login-redirect', {
+          credentials: 'same-origin',
+          signal: controller.signal,
+        })
         const { data, parseError } = await parseJsonFromResponse<PostLoginRedirectPlan>(res)
         if (cancelled || parseError || !data?.authenticated) {
           if (!cancelled) setAutoLoginGateActive(false)
@@ -103,12 +123,17 @@ export default function LoginPage() {
         if (!cancelled) setAutoLoginTransition(presentation)
         window.location.replace(target)
       } catch {
+        /** 시간 초과·네트워크 오류 — 로그인 폼을 보여 주고 직접 로그인하게 합니다 */
         if (!cancelled) setAutoLoginGateActive(false)
+      } finally {
+        window.clearTimeout(giveUpTimer)
       }
     }
     void redirectWhenAlreadySignedIn()
     return () => {
       cancelled = true
+      window.clearTimeout(giveUpTimer)
+      controller.abort()
     }
   }, [autoLoginEnabled, autoLoginPrefsReady])
 

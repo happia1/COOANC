@@ -197,6 +197,20 @@ export default async function ChildHomePage() {
 
   // ── 기본 자녀 정보 ────────────────────────────────────────────────────────
 
+  /**
+   * 핵심 데이터(스탯·프로필) 조회가 **실패**했으면 빈 화면을 그리지 않고 오류 화면으로 보냅니다.
+   *
+   * 비개발자 설명(신고된 문제):
+   *   서버가 느려 요청이 시간 초과되면 `data` 가 비어서 돌아옵니다. 예전에는 그 빈 값으로
+   *   그대로 화면을 그려서, 캐릭터가 기본 토끼로 바뀌고 미션 카드도 사라져 **데이터가 지워진 것처럼**
+   *   보였습니다. (`.maybeSingle()` 은 행이 없을 때 error 없이 data=null 을 주므로,
+   *    여기서 error 가 있다는 건 조회 자체가 실패했다는 뜻입니다.)
+   */
+  if (statsRes.error) {
+    console.error('[child/home] child_stats 조회 실패', statsRes.error.message)
+    throw new Error(`child_stats 조회 실패: ${statsRes.error.message}`)
+  }
+
   const initialStats = (statsRes.data ?? null) as ChildStats | null
   const level = initialStats?.current_level ?? 0
 
