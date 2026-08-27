@@ -7,8 +7,16 @@ import {
 
 export const dynamic = 'force-dynamic'
 
-/** Supabase 가 응답 없이 매우 오래 걸릴 때(네트워크·URL 오류 등) 클라이언트가 수십 초 멈추지 않게 상한을 둡니다. */
-const SIGN_IN_TIMEOUT_MS = 25_000
+/**
+ * 로그인 응답을 기다리는 상한.
+ *
+ * 비개발자 설명: 예전에는 25초였습니다. 그런데 Supabase 가 8초 안에 답하지 못하면
+ * 그 뒤로 기다려 봐야 성공하는 경우가 거의 없고, 아이·부모는 멈춘 화면을 25초나 봐야 했습니다.
+ * (게다가 25초는 배포 환경의 함수 실행 한도에 걸려 우리 안내 문구 대신
+ *  낯선 오류 페이지가 뜰 수 있는 길이입니다.)
+ * 그래서 8초로 줄이고, 대신 "다시 시도해 주세요" 를 빨리 보여 줍니다.
+ */
+const SIGN_IN_TIMEOUT_MS = 8_000
 
 /**
  * 이메일·비밀번호로 세션을 만들고 Supabase 쿠키를 브라우저에 심습니다.
@@ -75,10 +83,17 @@ export async function POST(req: NextRequest) {
   } catch (raceErr) {
     if (timeoutId !== undefined) clearTimeout(timeoutId)
     if (raceErr instanceof Error && raceErr.message === 'SIGN_IN_TIMEOUT') {
+      /**
+       * 기술적인 원인은 서버 로그에만 남깁니다.
+       * 화면에는 부모·아이가 읽을 수 있는 말만 보여 주고, 운영자는 로그에서 확인합니다.
+       */
+      console.error(
+        `[auth/sign-in] Supabase 응답 없음 (${SIGN_IN_TIMEOUT_MS}ms 초과) — NEXT_PUBLIC_SUPABASE_URL·네트워크·Supabase 상태 확인 필요`,
+      )
       return NextResponse.json(
         {
           error:
-            '로그인 서버(Supabase) 응답이 너무 오래 걸렸어요. NEXT_PUBLIC_SUPABASE_URL·네트워크(VPN·방화벽)·Supabase 상태를 확인해 주세요.',
+            '로그인 서버 응답이 늦어요. 잠시 후 다시 시도해 주세요. (계속 안 되면 인터넷 연결을 확인해 주세요.)',
         },
         { status: 504 },
       )

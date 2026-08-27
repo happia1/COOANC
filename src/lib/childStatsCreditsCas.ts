@@ -24,6 +24,10 @@ export type ChildCreditsSnapshot = {
   hearts: number
   /** 레벨도 같이 읽어 둡니다 — 레벨 확인 때문에 따로 한 번 더 조회하지 않으려고 */
   level: number
+  /** 지금까지 모은 크레딧 누적값 — 되돌리기에서 같이 줄여야 해서 함께 읽습니다 */
+  totalEarned: number
+  /** 경험치 — 되돌리기에서 같이 줄여야 해서 함께 읽습니다 */
+  exp: number
 }
 
 export type CreditsCasResult =
@@ -43,14 +47,14 @@ export async function applyChildCreditsCas(
   compute: (
     current: ChildCreditsSnapshot,
   ) =>
-    | { ok: true; credits?: number; piggy?: number; hearts?: number }
+    | { ok: true; credits?: number; piggy?: number; hearts?: number; totalEarned?: number; exp?: number }
     | { ok: false; message: string },
   options?: { extraPatch?: Record<string, unknown> },
 ): Promise<CreditsCasResult> {
   for (let attempt = 0; attempt < CREDITS_CAS_MAX_ATTEMPTS; attempt += 1) {
     const { data: row, error: readErr } = await supabase
       .from('child_stats')
-      .select('credits, credits_piggy, hearts, current_level')
+      .select('credits, credits_piggy, hearts, current_level, total_credits_earned, exp')
       .eq('child_id', childId)
       .maybeSingle()
 
@@ -61,6 +65,8 @@ export async function applyChildCreditsCas(
       piggy: readChildStatInt(row.credits_piggy),
       hearts: readChildStatInt(row.hearts),
       level: readChildStatInt(row.current_level),
+      totalEarned: readChildStatInt(row.total_credits_earned),
+      exp: readChildStatInt(row.exp),
     }
 
     const decided = compute(current)
@@ -77,6 +83,9 @@ export async function applyChildCreditsCas(
       credits_wallet: 0,
       credits_piggy: nextPiggy,
       hearts: nextHearts,
+      /** 되돌리기처럼 누적값·경험치까지 바꾸는 경우에만 실립니다(안 넘기면 건드리지 않음). */
+      ...(decided.totalEarned !== undefined ? { total_credits_earned: decided.totalEarned } : {}),
+      ...(decided.exp !== undefined ? { exp: decided.exp } : {}),
       /** Realtime 이벤트 순서를 화면이 판별할 수 있도록 매번 갱신합니다 */
       updated_at: new Date().toISOString(),
       ...(options?.extraPatch ?? {}),

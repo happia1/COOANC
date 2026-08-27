@@ -5,6 +5,7 @@ import { resolveApiActorChildId } from '@/lib/resolveApiActorChildId'
 import { readChildStatInt } from '@/lib/childCreditsSplit'
 import {
   applySeedPurchaseUpdate,
+  SEED_PURCHASE_CAS_MAX_ATTEMPTS,
   loadChildStatsForSeed,
   logSeedPurchaseSafe,
   readPiggyFromStatsRow,
@@ -98,20 +99,46 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    if (currentCredits < cost) {
-      return NextResponse.json(
-        {
-          error: 'insufficient_credits',
-          required: cost,
-          current: currentCredits,
-        },
-        { status: 400 },
-      )
+    /**
+     * 씨앗값 차감은 **읽은 잔액 그대로일 때만** 저장하고(CAS), 그사이 바뀌었으면
+     * 최신 잔액을 다시 읽어 재시도합니다.
+     *
+     * 비개발자 설명: 아이가 씨앗을 사는 순간에 미션 보상이 같이 들어오면, 예전에는
+     * 씨앗 결제가 옛 잔액으로 덮어써서 그 보상이 사라졌습니다. 이제는 그런 경우
+     * 최신 잔액으로 다시 계산해서 둘 다 반영됩니다.
+     */
+    let liveCredits = currentCredits
+    let newCredits = currentCredits - cost
+    let updated = false
+    let upErr: string | null = null
+
+    for (let attempt = 0; attempt < SEED_PURCHASE_CAS_MAX_ATTEMPTS; attempt += 1) {
+      if (liveCredits < cost) {
+        return NextResponse.json(
+          {
+            error: 'insufficient_credits',
+            required: cost,
+            current: liveCredits,
+          },
+          { status: 400 },
+        )
+      }
+
+      newCredits = liveCredits - cost
+      const res = await applySeedPurchaseUpdate(db, childId, newCredits, treeId, liveCredits)
+      if (res.ok) {
+        updated = true
+        break
+      }
+      upErr = res.error
+      if (!res.conflict) break
+
+      /** 경합 — 최신 잔액을 다시 읽어 재시도 */
+      const { row: fresh } = await loadChildStatsForSeed(db, childId)
+      if (!fresh) break
+      liveCredits = readChildStatInt(fresh.credits)
     }
 
-    const newCredits = currentCredits - cost
-
-    const { ok: updated, error: upErr } = await applySeedPurchaseUpdate(db, childId, newCredits, treeId)
     if (!updated) {
       console.error('[plant-buy-seed] update failed', upErr)
       return NextResponse.json(

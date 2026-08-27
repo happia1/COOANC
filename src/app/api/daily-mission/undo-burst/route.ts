@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { resolveApiActorChildId } from '@/lib/resolveApiActorChildId'
+import { applyChildCreditsCas } from '@/lib/childStatsCreditsCas'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 /**
@@ -145,7 +146,7 @@ async function undoRecentCompletionForChild(
     return { status: 'err', message: '스탯 정보를 찾을 수 없어요' }
   }
 
-  const newExp = Math.max(0, Number(stats.exp) - Number(log.exp_earned))
+  // 크레딧·하트·누적·경험치는 아래 CAS 안에서 최신 값 기준으로 다시 계산합니다.
   const newLevel = Number(stats.current_level)
 
   const { error: dmUpErr } = await supabase
@@ -173,19 +174,25 @@ async function undoRecentCompletionForChild(
     return { status: 'err', message: '미션 로그 되돌리기에 실패했어요' }
   }
 
-  const { error: csErr } = await supabase
-    .from('child_stats')
-    .update({
-      credits: Math.max(0, Number(stats.credits) - Number(log.credit_earned)),
-      hearts: Math.max(0, Number(stats.hearts) - Number(log.heart_earned)),
-      total_credits_earned: Math.max(0, Number(stats.total_credits_earned) - Number(log.credit_earned)),
-      exp: newExp,
-      current_level: newLevel,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('child_id', childId)
+  /**
+   * 크레딧·하트 되돌리기는 **CAS**(읽은 값 그대로일 때만 저장)로 처리합니다.
+   * 예전에는 읽어 둔 잔액으로 통째로 덮어써서, 그사이 들어온 다른 변경(미션 보상·저금통 등)이
+   * 지워졌습니다(잃어버린 갱신).
+   */
+  const applied = await applyChildCreditsCas(
+    supabase,
+    childId,
+    (current) => ({
+      ok: true as const,
+      credits: Math.max(0, current.credits - Number(log.credit_earned)),
+      hearts: Math.max(0, current.hearts - Number(log.heart_earned)),
+      totalEarned: Math.max(0, current.totalEarned - Number(log.credit_earned)),
+      exp: Math.max(0, current.exp - Number(log.exp_earned)),
+    }),
+    { extraPatch: { current_level: newLevel } },
+  )
 
-  if (csErr) {
+  if (applied.ok === false) {
     return { status: 'err', message: '보상(크레딧·XP) 되돌리기에 실패했어요' }
   }
 

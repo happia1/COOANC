@@ -84,7 +84,13 @@ export default function ChildLevelStatsCard({
             className="min-w-0 text-right text-[10px] font-semibold leading-none tabular-nums whitespace-nowrap"
             style={{ color: '#9A7A5A' }}
           >
-            {exp}/{exp_to_next_level}
+            {/**
+              * 예전에는 `3200/48000` 처럼 큰 숫자 두 개를 그대로 보여 줘서
+              * 좁은 카드에서 읽기 어려웠습니다. 아이에게 필요한 정보는
+              * "다음 레벨까지 얼마나 왔는지" 하나뿐이라 퍼센트만 보여 줍니다.
+              * (정확한 수치는 아래 진행 막대의 접근성 값으로 계속 제공됩니다.)
+              */}
+            {progressPct}%
           </span>
         </div>
 

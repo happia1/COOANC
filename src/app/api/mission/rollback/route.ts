@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { applyChildCreditsCas } from '@/lib/childStatsCreditsCas'
 
 /**
  * POST /api/mission/rollback
@@ -107,7 +108,7 @@ export async function POST(req: NextRequest) {
   }
 
   // 지급됐던 만큼만 빼 줍니다(미션 탭 클라이언트 롤백과 동일한 단순 차감).
-  const newExp = Math.max(0, stats.exp - log.exp_earned)
+  // 크레딧·하트·누적·경험치는 아래 CAS 안에서 최신 값 기준으로 다시 계산합니다.
   const newLevel = stats.current_level
 
   const { error: dmUpErr } = await supabase
@@ -135,19 +136,27 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: '미션 로그 되돌리기에 실패했어요' }, { status: 500 })
   }
 
-  const { error: csErr } = await supabase
-    .from('child_stats')
-    .update({
-      credits: Math.max(0, stats.credits - log.credit_earned),
-      hearts: Math.max(0, stats.hearts - log.heart_earned),
-      total_credits_earned: Math.max(0, stats.total_credits_earned - log.credit_earned),
-      exp: newExp,
-      current_level: newLevel,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('child_id', log.child_id)
+  /**
+   * 크레딧·하트 되돌리기는 **CAS**(읽은 값 그대로일 때만 저장)로 처리합니다.
+   *
+   * 비개발자 설명: 예전에는 "지금 잔액을 읽어 → 뺀 값으로 통째로 덮어쓰기" 였습니다.
+   * 그 사이에 아이가 미션을 하나 더 끝내거나 저금통을 옮기면, 그 결과가 옛 계산값에
+   * 지워져 크레딧이 사라졌습니다. 이제는 값이 그사이 바뀌었으면 최신 값으로 다시 계산합니다.
+   */
+  const applied = await applyChildCreditsCas(
+    supabase,
+    log.child_id,
+    (current) => ({
+      ok: true as const,
+      credits: Math.max(0, current.credits - log.credit_earned),
+      hearts: Math.max(0, current.hearts - log.heart_earned),
+      totalEarned: Math.max(0, current.totalEarned - log.credit_earned),
+      exp: Math.max(0, current.exp - log.exp_earned),
+    }),
+    { extraPatch: { current_level: newLevel } },
+  )
 
-  if (csErr) {
+  if (applied.ok === false) {
     return NextResponse.json({ error: '보상(크레딧·XP) 되돌리기에 실패했어요' }, { status: 500 })
   }
 

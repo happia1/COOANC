@@ -1,6 +1,9 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { readChildStatInt } from '@/lib/childCreditsSplit'
 
+/** 잔액이 그사이 바뀌었을 때 다시 읽어 시도하는 최대 횟수 */
+const SEED_REFUND_CAS_MAX_ATTEMPTS = 5
+
 export type PlantSeedPurchaseRow = {
   id: string
   tree_id: string
@@ -54,33 +57,53 @@ export async function refundDuplicatePlantSeedPurchases(
   const refundedCredits = toRemove.reduce((sum, r) => sum + Math.max(0, readChildStatInt(r.credit_cost)), 0)
   const removeIds = toRemove.map((r) => r.id)
 
-  const { data: stats, error: statsErr } = await db
-    .from('child_stats')
-    .select('credits, credits_piggy, credits_wallet')
-    .eq('child_id', childId)
-    .maybeSingle()
+  /**
+   * 환불도 **읽은 잔액 그대로일 때만** 더합니다(CAS). 그사이 값이 바뀌었으면 다시 읽어 재시도합니다.
+   *
+   * 비개발자 설명: 예전에는 "지금 잔액 + 환불액" 을 통째로 덮어썼습니다. 환불이 처리되는 사이에
+   * 미션 보상이 들어오면 그 보상이 지워졌습니다. 이제는 겹쳐도 둘 다 남습니다.
+   *
+   * `credits_piggy` · `credits_wallet` 은 여기서 건드리지 않습니다 — 저금통을 바꾸는 곳은
+   * 옮기기와 이자 정산뿐이어야 합니다.
+   */
+  let newCredits = 0
+  let saved = false
+  let lastErr: string | null = null
 
-  if (statsErr || !stats) {
-    return { ok: false, error: statsErr?.message ?? 'child_stats 를 찾을 수 없어요' }
+  for (let attempt = 0; attempt < SEED_REFUND_CAS_MAX_ATTEMPTS; attempt += 1) {
+    const { data: stats, error: statsErr } = await db
+      .from('child_stats')
+      .select('credits')
+      .eq('child_id', childId)
+      .maybeSingle()
+
+    if (statsErr || !stats) {
+      return { ok: false, error: statsErr?.message ?? 'child_stats 를 찾을 수 없어요' }
+    }
+
+    const observed = readChildStatInt(stats.credits)
+    newCredits = observed + refundedCredits
+
+    const { data: updatedRows, error: upErr } = await db
+      .from('child_stats')
+      .update({ credits: newCredits })
+      .eq('child_id', childId)
+      /** 핵심: 읽은 잔액 그대로일 때만 저장 — 그사이 들어온 보상을 덮어쓰지 않음 */
+      .eq('credits', observed)
+      .select('child_id')
+
+    if (upErr) {
+      return { ok: false, error: upErr.message }
+    }
+    if (updatedRows && updatedRows.length > 0) {
+      saved = true
+      break
+    }
+    lastErr = '크레딧이 그사이 바뀌었어요'
   }
 
-  const newCredits = readChildStatInt(stats.credits) + refundedCredits
-
-  /**
-   * `credits_piggy` · `credits_wallet` 은 **일부러 넣지 않습니다.**
-   * 이 경로는 저금통을 관리하지 않는데도 읽어 둔 값을 다시 저장했습니다.
-   * 아이가 저금통에 크레딧을 옮기는 도중에 이 저장이 끼면
-   * 그 사이 저금이 예전 값으로 덮어써져 사라집니다(잃어버린 갱신).
-   */
-  const { error: upErr } = await db
-    .from('child_stats')
-    .update({
-      credits: newCredits,
-    })
-    .eq('child_id', childId)
-
-  if (upErr) {
-    return { ok: false, error: upErr.message }
+  if (!saved) {
+    return { ok: false, error: lastErr ?? '환불 저장에 실패했어요' }
   }
 
   const { error: delErr } = await db.from('plant_seed_purchases').delete().in('id', removeIds)

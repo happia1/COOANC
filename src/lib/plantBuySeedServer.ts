@@ -47,6 +47,9 @@ export async function loadChildStatsForSeed(
   return { row: null, error: '통계 행을 찾을 수 없어요' }
 }
 
+/** 잔액이 그사이 바뀌었을 때 다시 계산해 시도하는 최대 횟수 */
+export const SEED_PURCHASE_CAS_MAX_ATTEMPTS = 5
+
 type SeedUpdatePatch = Record<string, unknown>
 
 function buildSeedPatches(newCredits: number, treeId: PlantTreeId): SeedUpdatePatch[] {
@@ -91,7 +94,15 @@ export async function applySeedPurchaseUpdate(
   childId: string,
   newCredits: number,
   treeId: PlantTreeId,
-): Promise<{ ok: boolean; error: string | null }> {
+  /**
+   * 씨앗값을 빼기 **직전에 읽었던 크레딧**.
+   *
+   * 비개발자 설명: 이 값이 그대로일 때만 저장합니다(CAS). 읽고 나서 저장하기까지 사이에
+   * 아이가 미션을 끝내 크레딧이 늘었다면, 옛 계산값으로 덮어써서 그 보상이 사라지는 일을 막습니다.
+   * 값이 바뀌어 있으면 저장하지 않고 `conflict` 를 돌려주어, 부르는 쪽이 다시 계산하게 합니다.
+   */
+  observedCredits: number,
+): Promise<{ ok: boolean; error: string | null; conflict?: boolean }> {
   const patches = buildSeedPatches(newCredits, treeId)
 
   for (const patch of patches) {
@@ -99,12 +110,21 @@ export async function applySeedPurchaseUpdate(
       .from('child_stats')
       .update(patch)
       .eq('child_id', childId)
+      /** 핵심: 읽은 잔액 그대로일 때만 차감 — 그사이 들어온 보상을 덮어쓰지 않음 */
+      .eq('credits', observedCredits)
       .select('child_id')
 
     if (!error && data && data.length > 0) {
       return { ok: true, error: null }
     }
-    if (error && !isMissingColumnError(error.code, error.message)) {
+    /**
+     * 컬럼이 없어서 실패한 게 아니라면(= 오류 없이 0행), 잔액이 그사이 바뀐 것입니다.
+     * 다른 패치 모양을 더 시도해 봐야 같은 이유로 0행이므로 바로 알려 줍니다.
+     */
+    if (!error) {
+      return { ok: false, error: '크레딧이 그사이 바뀌었어요', conflict: true }
+    }
+    if (!isMissingColumnError(error.code, error.message)) {
       return { ok: false, error: error.message }
     }
   }

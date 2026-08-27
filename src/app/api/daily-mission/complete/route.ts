@@ -58,13 +58,25 @@ export async function POST(req: NextRequest) {
   }
   const childId = resolved.childId
 
-  const { data: dm } = await supabase
-    .from('daily_missions')
-    .select('id, child_id, mission_template_id, is_completed, date')
-    .eq('id', dailyMissionId)
-    .eq('child_id', childId)
-    .maybeSingle()
+  /**
+   * 서로 필요 없는 조회는 **동시에** 보냅니다.
+   *
+   * 비개발자 설명: 예전에는 카드를 한 번 누를 때마다 데이터베이스에 한 번씩 차례로 물어봤습니다.
+   * 하나에 0.2초라도 줄줄이 더해져서 「저장 중」이 길어졌습니다. 서로 결과를 기다릴 필요가 없는
+   * 질문은 한꺼번에 보내면 가장 느린 하나만큼만 걸립니다.
+   */
+  const [dmRes, actorProfileRes, statsPeek] = await Promise.all([
+    supabase
+      .from('daily_missions')
+      .select('id, child_id, mission_template_id, is_completed, date')
+      .eq('id', dailyMissionId)
+      .eq('child_id', childId)
+      .maybeSingle(),
+    supabase.from('profiles').select('role').eq('id', user.id).maybeSingle(),
+    supabase.from('child_stats').select('*').eq('child_id', childId).maybeSingle(),
+  ])
 
+  const dm = dmRes.data
   if (!dm) {
     return NextResponse.json({ error: '미션을 찾을 수 없어요' }, { status: 404 })
   }
@@ -72,14 +84,28 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: '이미 완료한 미션이에요' }, { status: 409 })
   }
 
-  /** 보너스 배율(028) — 컬럼이 있으면 완료 보상에 곱합니다. */
-  const { data: mission } = await supabase
-    .from('missions')
-    .select(
-      'credit_reward, heart_reward, exp_reward, reward_multiplier, is_active, level_required, title, icon_emoji, block, scheduled_time, repeat_type, difficulty',
-    )
-    .eq('id', dm.mission_template_id)
-    .maybeSingle()
+  /**
+   * 미션 템플릿과 기존 로그도 서로 무관하므로 함께 보냅니다(둘 다 `dm` 이 있어야 알 수 있어서 두 번째 묶음).
+   * 보너스 배율(028) — 컬럼이 있으면 완료 보상에 곱합니다.
+   */
+  const [missionRes, existingLogResult] = await Promise.all([
+    supabase
+      .from('missions')
+      .select(
+        'credit_reward, heart_reward, exp_reward, reward_multiplier, is_active, level_required, title, icon_emoji, block, scheduled_time, repeat_type, difficulty',
+      )
+      .eq('id', dm.mission_template_id)
+      .maybeSingle(),
+    supabase
+      .from('mission_logs')
+      .select('id, is_completed')
+      .eq('child_id', childId)
+      .eq('mission_id', dm.mission_template_id)
+      .eq('assigned_date', dm.date)
+      .maybeSingle(),
+  ])
+
+  const mission = missionRes.data
 
   /**
    * 템플릿 행이 없으면(삭제·FK 불일치 등)만 막습니다.
@@ -112,19 +138,7 @@ export async function POST(req: NextRequest) {
     exp_earned: expEarned,
   }
 
-  /** 읽기만 먼저 병렬로 — `daily_missions` 완료 플래그는 반드시 성공한 뒤에만 로그·스탯을 씁니다(실패 시 DB만 어긋나는 버그 방지). */
-  const [existingLogResult, statsPeek] = await Promise.all([
-    supabase
-      .from('mission_logs')
-      .select('id, is_completed')
-      .eq('child_id', childId)
-      .eq('mission_id', dm.mission_template_id)
-      .eq('assigned_date', assignedDate)
-      .maybeSingle(),
-    supabase.from('child_stats').select('*').eq('child_id', childId).maybeSingle(),
-  ])
-
-  const { data: actorProfile } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle()
+  const actorProfile = actorProfileRes.data
   const peekStats = statsPeek.data
   if (actorProfile?.role === 'child' && mission && peekStats) {
     const seoulNow = getSeoulTimeHHMM()
@@ -195,7 +209,16 @@ export async function POST(req: NextRequest) {
     .eq('date', completionDay)
 
   const totalToday = todayMissions?.length ?? 0
-  const completedToday = (todayMissions?.filter((m) => m.is_completed).length ?? 0) + 1 // +1 낙관적
+  /**
+   * 이 조회는 **위에서 이번 미션을 완료로 저장한 뒤**에 실행됩니다.
+   * 그래서 아래 개수에는 방금 끝낸 미션이 이미 포함되어 있습니다.
+   *
+   * 예전에는 여기에 `+1`(낙관적)을 또 더했습니다. 완료 저장을 나중에 하던 시절의 코드가
+   * 순서가 바뀐 뒤에도 남아 있었던 것으로, 방금 끝낸 미션이 **두 번 세어졌습니다.**
+   * 그 결과 「오늘 90% 이상 완료」 판정이 실제보다 한 개 일찍 켜져서,
+   * 미션이 아직 남았는데도 배가 앞으로 나가는 일이 있었습니다.
+   */
+  const completedToday = todayMissions?.filter((m) => m.is_completed).length ?? 0
   const heartsFullToday = totalToday > 0 && completedToday / totalToday >= 0.9
 
   /**
@@ -236,8 +259,49 @@ export async function POST(req: NextRequest) {
       total_credits_earned: readChildStatInt(r.total_credits_earned),
       boat_advanced: r.boat_advanced === true,
     }
-  } else if (rpcErr) {
-    console.error('[daily-mission/complete] complete_mission_reward RPC 실패 — 레거시 경로 폴백', rpcErr.message)
+  }
+
+  /**
+   * RPC 가 실패했을 때 **무조건 옛 방식으로 다시 계산하면 안 됩니다.**
+   *
+   * 비개발자 설명: RPC 실패에는 두 가지가 섞여 있습니다.
+   *   ① 그 함수가 DB 에 아예 없음(121 마이그레이션 미적용) → 옛 방식으로 처리해야 함
+   *   ② 함수는 돌았는데 **응답만 못 받음**(응답 지연·연결 끊김) → 보상은 이미 들어갔을 수 있음
+   * ② 인데 다시 계산하면 같은 보상을 두 번 손대게 됩니다. 그래서 ① 일 때만 옛 방식으로 가고,
+   * ② 일 때는 **실제로 반영됐는지 다시 읽어 확인**한 뒤에 필요할 때만 처리합니다.
+   */
+  const rpcFunctionMissing =
+    !!rpcErr && (rpcErr.code === '42883' || rpcErr.code === 'PGRST202')
+
+  if (rpcErr && !rpcFunctionMissing) {
+    console.error(
+      '[daily-mission/complete] complete_mission_reward RPC 오류 — 반영 여부 재확인',
+      rpcErr.code,
+      rpcErr.message,
+    )
+    const { data: after } = await supabase
+      .from('child_stats')
+      .select('credits, hearts, exp, current_level, exp_to_next_level, streak_days, total_credits_earned')
+      .eq('child_id', childId)
+      .maybeSingle()
+
+    /** 보상이 이미 들어간 흔적이 있으면(잔액이 기대치 이상) 그대로 확정하고 다시 손대지 않습니다. */
+    if (after && readChildStatInt(after.credits) >= readChildStatInt(stats.credits) + creditEarned) {
+      applied = {
+        credits: readChildStatInt(after.credits),
+        hearts: readChildStatInt(after.hearts),
+        exp: readChildStatInt(after.exp),
+        current_level: readChildStatInt(after.current_level),
+        exp_to_next_level: readChildStatInt(after.exp_to_next_level),
+        streak_days: readChildStatInt(after.streak_days),
+        total_credits_earned: readChildStatInt(after.total_credits_earned),
+        boat_advanced: false,
+      }
+    }
+  } else if (rpcFunctionMissing) {
+    console.error(
+      '[daily-mission/complete] complete_mission_reward 함수가 없습니다(121 마이그레이션 미적용) — 레거시 경로 폴백',
+    )
   }
 
   if (!applied) {
