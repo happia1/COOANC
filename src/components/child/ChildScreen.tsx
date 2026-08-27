@@ -793,7 +793,20 @@ export default function ChildScreen({
     buySeed,
     bumpHeartsForMissionOptimistic,
     rollbackMissionHeartsOptimistic,
-  } = usePlantPot(childId, { onPlantStatsSynced, onWaterPending })
+    applyChildStatsRow: applyPlantChildStatsRow,
+  } = usePlantPot(childId, {
+    onPlantStatsSynced,
+    onWaterPending,
+    /**
+     * 이 화면이 이미 아래에서 `child_stats` 를 실시간으로 듣고 있으므로 화분 쪽 구독은 끕니다.
+     * 같은 행을 두 번 구독하면 알림이 두 번 오고, 서로 다른 두 곳이 각자 하트를 고쳐
+     * 숫자가 오르내릴 수 있습니다. 받은 행은 `applyPlantChildStatsRow` 로 그대로 넘겨 줍니다.
+     */
+    subscribeToChildStats: false,
+  })
+  /** Realtime 구독 effect 가 이 함수 때문에 다시 붙지 않도록 ref 로만 읽습니다. */
+  const applyPlantChildStatsRowRef = useRef(applyPlantChildStatsRow)
+  applyPlantChildStatsRowRef.current = applyPlantChildStatsRow
   /** 완성 후 씨앗 고르기 모달 */
   const { refresh: refreshHarvestInventory } = usePlantHarvest(childId)
   /** 성장 단계 축하 팝업 — 도달한 단계 번호(null 이메 닫힘) */
@@ -1494,6 +1507,17 @@ export default function ChildScreen({
            *  그 알림이 늦게 오면 정확히 이 현상이 납니다 — 카드 탭·보너스 직후 숫자가 오르내림.)
            */
           rememberServerStatsAt(row)
+          /**
+           * 화분(하트·pot_*)에도 같은 행을 넘깁니다.
+           *
+           * 예전에는 `usePlantPot` 이 **같은 테이블·같은 행을 따로 한 번 더 구독**했습니다.
+           * 그래서 크레딧이 한 번 바뀔 때마다 알림이 두 번 오고, 서로 모르는 두 핸들러가
+           * 각각 화면을 고쳐 숫자가 흔들렸습니다(Realtime 부담도 두 배).
+           * 구독은 이 화면 하나로 합치고, 화분에는 여기서 전달합니다.
+           * 아래 돈 관련 가드와 무관하게 넘기는 이유: 화분은 하트·화분 진행도만 보며,
+           * 예전 별도 구독도 이 가드의 영향을 받지 않았기 때문입니다(동작 동일).
+           */
+          applyPlantChildStatsRowRef.current?.(row)
           if (withinLocalStatsGuard || stale) {
             const { credits, credits_piggy, hearts, total_credits_earned, ...rest } = row
             void credits

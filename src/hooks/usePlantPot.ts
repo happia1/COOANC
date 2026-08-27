@@ -115,6 +115,15 @@ export function usePlantPot(
     onPlantStatsSynced?: (patch: Record<string, unknown>) => void
     /** 물주기 API 요청이 진행 중인 동안 true — ChildScreen의 pendingStatsWritesRef 카운터와 연결됩니다. */
     onWaterPending?: (pending: boolean) => void
+    /**
+     * `child_stats` Realtime 을 이 훅이 직접 구독할지 여부(기본 true).
+     *
+     * 비개발자 설명: 자녀 홈 화면은 이미 같은 `child_stats` 를 실시간으로 듣고 있습니다.
+     * 여기서 또 구독하면 **같은 알림을 두 번 받아** 서로 다른 두 곳이 각각 화면 숫자를 고치게 되고,
+     * 어느 쪽이 늦게 도착하느냐에 따라 하트가 오르내릴 수 있습니다(그리고 서버 부담도 2배).
+     * 그래서 홈 화면에서는 이 값을 false 로 끄고, 화면이 받은 알림을 `applyChildStatsRow` 로 넘겨 줍니다.
+     */
+    subscribeToChildStats?: boolean
   },
 ) {
   /**
@@ -395,7 +404,63 @@ export function usePlantPot(
    * Realtime: 미션 완료 등으로 `child_stats` 가 바뀌면 즉시 반영합니다.
    * 비개발자 설명: 새로 받은 하트가 훅 안에 잠시 누락되는 사이 「물 없어요」 가 잘못 뜨던 문제 방지.
    */
+  const applyChildStatsRow = useCallback((payloadRow: Record<string, unknown> | null | undefined) => {
+    const row = payloadRow ?? {}
+    // 각 물주기 UPDATE 이벤트는 뒤에 대기 중인 탭을 아직 포함하지 않습니다.
+    // 큐가 끝난 뒤 마지막 API 응답으로 한 번만 확정해 숫자가 역행하지 않게 합니다.
+    if (pendingWaterCountRef.current > 0) return
+
+    if (Object.prototype.hasOwnProperty.call(row, 'hearts')) {
+      const nextHearts = readChildStatInt(row.hearts)
+      heartsRef.current = nextHearts
+      setHearts(nextHearts)
+    }
+
+    /** pot 진행도도 함께 들어왔으면 같이 갱신 — 부모가 DB 에서 화분을 손봐도 자녀 화면 동기화 */
+    const hasPotField =
+      Object.prototype.hasOwnProperty.call(row, 'pot_stage') ||
+      Object.prototype.hasOwnProperty.call(row, 'pot_hearts_used') ||
+      Object.prototype.hasOwnProperty.call(row, 'pot_completed') ||
+      Object.prototype.hasOwnProperty.call(row, 'pot_tree_id')
+    if (!hasPotField) return
+
+    setPot((prev) => {
+      if (!prev) return prev
+      const treeId = Object.prototype.hasOwnProperty.call(row, 'pot_tree_id')
+        ? readPotTreeIdFromDb(row.pot_tree_id)
+        : prev.treeId
+      const stageRaw = Object.prototype.hasOwnProperty.call(row, 'pot_stage')
+        ? readChildStatInt(row.pot_stage)
+        : prev.stage
+      const stageDb = clampPotStageForTree(treeId, stageRaw)
+      const heartsUsedRaw = Object.prototype.hasOwnProperty.call(row, 'pot_hearts_used')
+        ? readChildStatInt(row.pot_hearts_used)
+        : prev.heartsUsed
+      const completedRaw = Object.prototype.hasOwnProperty.call(row, 'pot_completed')
+        ? Boolean(row.pot_completed)
+        : prev.completed
+      const normalized = normalizePlantPotProgress(stageDb, heartsUsedRaw, completedRaw, treeId)
+      const nextPot = {
+        ...prev,
+        treeId,
+        stage: normalized.stage,
+        heartsUsed: normalized.heartsUsed,
+        heartsNeeded: getHeartsNeededForStage(treeId, normalized.stage),
+        completed: normalized.completed,
+      }
+      potRef.current = nextPot
+      return nextPot
+    })
+  }, [])
+
+  /**
+   * 홈 화면이 이미 `child_stats` 를 듣고 있으면(subscribeToChildStats: false) 여기서는 구독하지 않습니다.
+   * 같은 행을 두 번 구독하면 알림이 두 번 와서 하트가 오르내리고, Realtime 부담도 두 배가 됩니다.
+   */
+  const shouldSubscribeToChildStats = options?.subscribeToChildStats !== false
   useEffect(() => {
+    if (!shouldSubscribeToChildStats) return
+
     const channel = supabase
       .channel(`use-plant-pot-stats-${childId}`)
       .on(
@@ -406,64 +471,14 @@ export function usePlantPot(
           table: 'child_stats',
           filter: `child_id=eq.${childId}`,
         },
-        (payload) => {
-          const row = (payload.new ?? {}) as Record<string, unknown>
-          // 각 물주기 UPDATE 이벤트는 뒤에 대기 중인 탭을 아직 포함하지 않습니다.
-          // 큐가 끝난 뒤 마지막 API 응답으로 한 번만 확정해 숫자가 역행하지 않게 합니다.
-          if (pendingWaterCountRef.current > 0) return
-          if (Object.prototype.hasOwnProperty.call(row, 'hearts')) {
-            const nextHearts = readChildStatInt(row.hearts)
-            heartsRef.current = nextHearts
-            setHearts(nextHearts)
-          }
-          /** pot 진행도도 함께 들어왔으면 같이 갱신 — 부모가 DB 에서 화분을 손봐도 자녀 화면 동기화 */
-          const hasPotField =
-            Object.prototype.hasOwnProperty.call(row, 'pot_stage') ||
-            Object.prototype.hasOwnProperty.call(row, 'pot_hearts_used') ||
-            Object.prototype.hasOwnProperty.call(row, 'pot_completed') ||
-            Object.prototype.hasOwnProperty.call(row, 'pot_tree_id')
-          if (hasPotField) {
-            setPot((prev) => {
-              if (!prev) return prev
-              const treeId = Object.prototype.hasOwnProperty.call(row, 'pot_tree_id')
-                ? readPotTreeIdFromDb(row.pot_tree_id)
-                : prev.treeId
-              const stageRaw = Object.prototype.hasOwnProperty.call(row, 'pot_stage')
-                ? readChildStatInt(row.pot_stage)
-                : prev.stage
-              const stageDb = clampPotStageForTree(treeId, stageRaw)
-              const heartsUsedRaw = Object.prototype.hasOwnProperty.call(row, 'pot_hearts_used')
-                ? readChildStatInt(row.pot_hearts_used)
-                : prev.heartsUsed
-              const completedRaw = Object.prototype.hasOwnProperty.call(row, 'pot_completed')
-                ? Boolean(row.pot_completed)
-                : prev.completed
-              const normalized = normalizePlantPotProgress(
-                stageDb,
-                heartsUsedRaw,
-                completedRaw,
-                treeId,
-              )
-              const nextPot = {
-                ...prev,
-                treeId,
-                stage: normalized.stage,
-                heartsUsed: normalized.heartsUsed,
-                heartsNeeded: getHeartsNeededForStage(treeId, normalized.stage),
-                completed: normalized.completed,
-              }
-              potRef.current = nextPot
-              return nextPot
-            })
-          }
-        },
+        (payload) => applyChildStatsRow(payload.new as Record<string, unknown>),
       )
       .subscribe()
 
     return () => {
       void supabase.removeChannel(channel)
     }
-  }, [childId, supabase])
+  }, [childId, supabase, shouldSubscribeToChildStats, applyChildStatsRow])
 
   const water = useCallback(
     async (displayHearts?: number): Promise<WaterResult> => {
@@ -856,5 +871,7 @@ export function usePlantPot(
     refresh,
     bumpHeartsForMissionOptimistic,
     rollbackMissionHeartsOptimistic,
+    /** 홈 화면이 자기 Realtime 으로 받은 `child_stats` 행을 화분 쪽에도 전달할 때 씁니다. */
+    applyChildStatsRow,
   }
 }
