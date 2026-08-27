@@ -64,6 +64,12 @@ const DEFAULT_TREE: PlantTreeId = 'apple'
 const POT_SELECT = 'hearts, pot_stage, pot_hearts_used, pot_completed, pot_tree_id' as const
 
 /**
+ * 화분 정보를 못 읽었을 때 다시 시도하는 간격(밀리초) — 점점 길게, 합쳐서 약 1분 45초.
+ * 데이터베이스가 잠깐 멈췄다 살아나는 동안 아이가 아무것도 하지 않아도 화분이 돌아오게 합니다.
+ */
+const POT_LOAD_RETRY_DELAYS_MS = [1_500, 4_000, 10_000, 30_000, 60_000] as const
+
+/**
  * 물주기 API 성공 JSON으로 로컬 화분 상태를 만듭니다.
  * `refresh()` 전에 호출해 막대·그림이 바로 바뀌게 합니다(지연·캐시 대비).
  */
@@ -139,6 +145,19 @@ export function usePlantPot(
   const potRef = useRef<PotState | null>(null)
   const heartsRef = useRef(0)
   const [loading, setLoading] = useState(true)
+  /**
+   * 화분 정보를 못 읽었을 때 true.
+   *
+   * 비개발자 설명(신고된 문제 — 「화분이 아예 사라졌어요」):
+   *   화분은 `refresh()` 가 읽어 온 값이 있어야 화면에 그려집니다. 그런데 예전에는
+   *   읽기에 실패하면 **아무 표시 없이 그냥 비워 두고 끝**이었습니다. 그래서 데이터베이스가
+   *   잠깐 멈춘 사이에 홈 화면을 열면 화분이 통째로 사라졌고, 다시 시도하지 않기 때문에
+   *   앱을 껐다 켜기 전까지 영영 보이지 않았습니다.
+   *   이제는 실패를 기억해 두고 잠시 뒤 스스로 다시 시도합니다.
+   */
+  const [potLoadFailed, setPotLoadFailed] = useState(false)
+  /** 다시 시도한 횟수 — 위 간격 배열을 순서대로 씁니다. 성공하면 0 으로 되돌립니다. */
+  const potRetryCountRef = useRef(0)
   /** 물주기 API를 순차 처리하기 위한 큐 — 클릭은 로컬에서 바로 반영하고, 서버 요청은 순서대로 보냅니다. */
   const waterQueueRef = useRef<Promise<WaterResult>>(Promise.resolve<WaterResult>('ok'))
   /** 부모가 넘긴 콜백은 매 렌더마다 바뀔 수 있어 ref 로 최신만 읽습니다(물주기 `water` 의존성 안정화). */
@@ -244,7 +263,9 @@ export function usePlantPot(
           syncHeartsFromDb(payload.hearts, false)
         }
         setLoading(false)
-        return
+        potRetryCountRef.current = 0
+        setPotLoadFailed(false)
+        return true
       }
     } catch (e) {
       console.warn('[usePlantPot] plant-pot-state API fallback', e)
@@ -259,11 +280,13 @@ export function usePlantPot(
     if (error) {
       console.warn('[usePlantPot] fetch error', error.message)
       setLoading(false)
-      return
+      setPotLoadFailed(true)
+      return false
     }
     if (!initialData) {
       setLoading(false)
-      return
+      setPotLoadFailed(true)
+      return false
     }
 
     let data = initialData
@@ -342,6 +365,9 @@ export function usePlantPot(
     })
     syncHeartsFromDb(data.hearts, false)
     setLoading(false)
+    potRetryCountRef.current = 0
+    setPotLoadFailed(false)
+    return true
   }, [childId, supabase, serverRepairPlantNormalize, syncHeartsFromDb])
 
   /**
@@ -367,6 +393,22 @@ export function usePlantPot(
   useEffect(() => {
     void refresh()
   }, [refresh])
+
+  /**
+   * 읽기에 실패했으면 잠시 뒤 스스로 다시 시도합니다(점점 간격을 늘려 5번까지).
+   * 데이터베이스가 잠깐 느리거나 멈춘 것뿐이면 아이가 아무것도 하지 않아도 화분이 돌아옵니다.
+   */
+  useEffect(() => {
+    if (!potLoadFailed) return
+    if (potRetryCountRef.current >= POT_LOAD_RETRY_DELAYS_MS.length) return
+
+    const delay = POT_LOAD_RETRY_DELAYS_MS[potRetryCountRef.current]
+    potRetryCountRef.current += 1
+    const timer = setTimeout(() => {
+      void refresh()
+    }, delay)
+    return () => clearTimeout(timer)
+  }, [potLoadFailed, refresh])
 
   /** 중복 씨앗 구매(연타) 크레딧 — 홈 진입 시 1회 자동 환불 시도 */
   const duplicateRefundRanRef = useRef(false)
