@@ -703,9 +703,43 @@ export default function ChildScreen({
 
   // ── 통계(크레딧/하트) ──────────────────────────────────────────────────────
 
-  const [stats, setStats] = useState<ChildStats | null>(() =>
+  const [stats, setStatsRaw] = useState<ChildStats | null>(() =>
     initialStats ? normalizeChildStatsCreditsSplit(initialStats) : null,
   )
+
+  /**
+   * 크레딧 변화 기록기 — 화면의 크레딧 숫자를 바꾸는 **모든** 경로를 콘솔에 남깁니다.
+   *
+   * 비개발자 설명(왜 만들었나):
+   *   이 화면에서 크레딧 숫자를 고치는 곳이 13군데입니다(실시간 알림, 미션 보상,
+   *   저금통 옮기기, 마켓 결제, 보너스 받기, 씨앗 구매 …). 그런데 **누가 언제 얼마로
+   *   바꿨는지 남는 기록이 없었습니다.** 그래서 「크레딧이 갑자기 20 줄었다 돌아왔다」 같은
+   *   신고가 들어와도 원인을 짐작만 할 수밖에 없었고, 엉뚱한 곳을 여러 번 고쳤습니다.
+   *
+   *   이제 크레딧이나 저금통 숫자가 바뀔 때마다 브라우저 콘솔(F12)에
+   *   「이전값 → 새값」 과 **어느 코드가 바꿨는지**가 한 줄씩 찍힙니다.
+   *   다음에 같은 일이 생기면 그 기록만 보면 범인이 바로 나옵니다.
+   */
+  const setStats = useCallback((updater: React.SetStateAction<ChildStats | null>) => {
+    /** 호출한 위치를 자동으로 알아내기 위해 여기서 미리 스택을 떠 둡니다(업데이터 안은 늦게 실행됨). */
+    const calledFrom = new Error().stack?.split('\n').slice(2, 4).join(' ⟵ ').trim()
+    setStatsRaw((prev) => {
+      const next = typeof updater === 'function' ? updater(prev) : updater
+      const before = readChildStatInt(prev?.credits)
+      const after = readChildStatInt(next?.credits)
+      const piggyBefore = readChildStatInt(prev?.credits_piggy)
+      const piggyAfter = readChildStatInt(next?.credits_piggy)
+      if (before !== after || piggyBefore !== piggyAfter) {
+        console.info(
+          `[크레딧] ${before} → ${after} (${after - before >= 0 ? '+' : ''}${after - before})` +
+            ` | 저금통 ${piggyBefore} → ${piggyAfter}` +
+            ` | 합계 ${before + piggyBefore} → ${after + piggyAfter}`,
+          `\n   ↳ ${calledFrom ?? '(위치 불명)'}`,
+        )
+      }
+      return next
+    })
+  }, [])
 
   /** 아직 받아 가지 않은 저금통 이자 — 저금통 위에 이 수만큼 반짝이는 코인이 뜹니다 */
   const [piggyBonusPending, setPiggyBonusPending] = useState<number>(() =>

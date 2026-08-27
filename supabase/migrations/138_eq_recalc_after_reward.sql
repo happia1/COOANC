@@ -25,6 +25,13 @@
 --   «최근 14일 미션 집계»까지 같이 돌아서 저장이 끝날 때까지 기다려야 했습니다.
 -- ============================================================
 
+-- ── ⓪ 잠금 대기 상한 ────────────────────────────────────────
+-- 아래 `drop trigger` 는 mission_logs 에 «배타 잠금»을 겁니다. 자녀 앱이 켜져 있어
+-- 그 순간 미션을 저장 중이면 서로 기다리다 교착(deadlock)이 날 수 있습니다.
+-- 5초 안에 못 잡으면 그냥 실패하게 두고, 잠시 뒤 다시 실행하는 편이 안전합니다.
+-- (실패해도 아무것도 바뀌지 않으니 그대로 다시 돌리면 됩니다.)
+set local lock_timeout = '5s';
+
 -- ── ① mission_logs 트리거 제거 ──────────────────────────────
 -- 이 트리거가 «보상 전» child_stats 저장을 일으키던 주범입니다.
 drop trigger if exists trg_mission_logs_recalc_eq on public.mission_logs;
@@ -139,12 +146,21 @@ $$;
 -- 트리거가 사라졌으므로, 미션을 되돌린 뒤에는 앱이 직접 이 함수를 부릅니다.
 grant execute on function public.recalculate_eq(uuid) to authenticated, service_role;
 
--- ── ④ 기존 행 일괄 반영 (순서 변경으로 어긋난 값이 있으면 정리) ──
-do $$
-declare
-  r record;
-begin
-  for r in select child_id from child_stats loop
-    perform recalculate_eq(r.child_id);
-  end loop;
-end $$;
+-- ── ④ 기존 행 일괄 재계산은 **일부러 넣지 않습니다** ────────
+--
+-- 처음엔 여기에 「모든 자녀를 돌며 recalculate_eq 실행」 반복문을 넣었는데,
+-- 그게 교착(deadlock)을 일으켰습니다. 이유:
+--   Supabase SQL Editor 는 스크립트 전체를 한 트랜잭션으로 실행합니다.
+--   그래서 위 ① 이 잡은 mission_logs 배타 잠금을 **반복문이 끝날 때까지 계속 쥔 채**
+--   자녀들을 하나씩 돌게 되고, 그사이 자녀 앱이 미션을 저장하려 하면 서로 물립니다.
+--
+-- 그리고 굳이 필요하지도 않습니다. EQ 값은 다음 미션 완료 때 자연히 다시 계산됩니다.
+-- 그래도 지금 당장 전부 맞추고 싶다면, **자녀 앱을 모두 닫은 뒤** 아래를 따로 실행하세요.
+--
+--   do $$
+--   declare r record;
+--   begin
+--     for r in select child_id from child_stats loop
+--       perform recalculate_eq(r.child_id);
+--     end loop;
+--   end $$;
