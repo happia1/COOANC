@@ -1075,6 +1075,54 @@ export default function ChildScreen({
   const missionCompleteRequestQueueRef = useRef<Promise<void>>(Promise.resolve())
 
   /**
+   * 미션 보상 저장이 **밀릴 때만** 「저장 중이에요」를 보여 줍니다.
+   *
+   * 비개발자 설명:
+   *   카드를 누르면 숫자는 바로 오르지만, 서버 저장은 그 뒤에 이어집니다.
+   *   보통은 순식간에 끝나므로 매번 안내가 깜빡이면 오히려 불편합니다.
+   *   그래서 아래 시간을 넘겨 **실제로 지연될 때만** 알려 줍니다.
+   *   (저금통과 같은 기준 — 지연이 없어지면 자연히 뜨지 않습니다.)
+   *
+   *   이 안내가 없던 동안에는 서버가 느려도 화면에 아무 신호가 없어서,
+   *   멈춘 것처럼 보이거나 데이터가 사라진 것으로 오해하기 쉬웠습니다.
+   */
+  const MISSION_SAVE_DELAY_HINT_MS = 3000
+  const [missionSaveDelayed, setMissionSaveDelayed] = useState(false)
+  const missionSavePendingRef = useRef(0)
+  const missionSaveDelayTimerRef = useRef<number | null>(null)
+
+  const beginMissionSaveTracking = useCallback(() => {
+    missionSavePendingRef.current += 1
+    if (missionSavePendingRef.current > 1) return
+    if (missionSaveDelayTimerRef.current != null) return
+    missionSaveDelayTimerRef.current = window.setTimeout(() => {
+      missionSaveDelayTimerRef.current = null
+      /** 타이머가 끝난 시점에도 아직 밀려 있을 때만 표시 */
+      if (missionSavePendingRef.current > 0) setMissionSaveDelayed(true)
+    }, MISSION_SAVE_DELAY_HINT_MS)
+  }, [])
+
+  const endMissionSaveTracking = useCallback(() => {
+    missionSavePendingRef.current = Math.max(0, missionSavePendingRef.current - 1)
+    if (missionSavePendingRef.current > 0) return
+    if (missionSaveDelayTimerRef.current != null) {
+      window.clearTimeout(missionSaveDelayTimerRef.current)
+      missionSaveDelayTimerRef.current = null
+    }
+    setMissionSaveDelayed(false)
+  }, [])
+
+  /** 화면을 떠날 때 타이머 정리 */
+  useEffect(() => {
+    return () => {
+      if (missionSaveDelayTimerRef.current != null) {
+        window.clearTimeout(missionSaveDelayTimerRef.current)
+        missionSaveDelayTimerRef.current = null
+      }
+    }
+  }, [])
+
+  /**
    * 마지막으로 화면에 반영한 **서버 스냅샷의 저장 시각**(child_stats.updated_at, ms).
    *
    * 비개발자 설명:
@@ -1756,6 +1804,7 @@ export default function ChildScreen({
       })
 
       pendingStatsWritesRef.current += 1
+      beginMissionSaveTracking()
       /**
        * 실제 네트워크 요청은 큐에 넣어 이전 완료 요청이 끝난 뒤 순서대로만 나가게 합니다.
        * (낙관적 UI·카운터 증가는 위에서 이미 즉시 처리됨 — 탭 반응성은 그대로 유지됩니다.)
@@ -1851,6 +1900,7 @@ export default function ChildScreen({
           })
         } finally {
           pendingStatsWritesRef.current = Math.max(0, pendingStatsWritesRef.current - 1)
+          endMissionSaveTracking()
         }
       }
       missionCompleteRequestQueueRef.current = missionCompleteRequestQueueRef.current.then(
@@ -2922,11 +2972,26 @@ export default function ChildScreen({
                 </button>
               </div>
               {/**
-                * 「계산 중」은 여기 두지 않습니다.
-                * 저금통 저장 상태를 미션 카드 옆에 띄웠더니, 저금통을 옮기는데
-                * 미션이 새로 불러와지는 것처럼 보여 오히려 혼란스러웠습니다.
-                * 저장 안내는 그 일이 일어나는 자리(저금통 팝업)에서만 보여 줍니다.
+                * 「저장 중이에요」 — **미션 보상 저장이 밀릴 때만** 켜집니다.
+                *
+                * 예전에는 저금통의 저장 상태를 여기에 띄워서, 저금통을 옮기는데 미션이
+                * 새로 불러와지는 것처럼 보여 혼란스러웠습니다. 그래서 뺐는데, 그 뒤로는
+                * 미션 저장이 느려도 화면에 아무 신호가 없어 멈춘 것처럼 보였습니다.
+                * 이제 **미션 자신의 저장 상태**만 보고, 3초 넘게 밀릴 때만 알려 줍니다.
                 */}
+              {missionSaveDelayed ? (
+                <span
+                  role="status"
+                  aria-live="polite"
+                  className="flex shrink-0 items-center gap-1 rounded-full bg-white/25 px-2 py-0.5 text-[10px] font-bold text-white backdrop-blur-sm"
+                >
+                  <span
+                    className="h-1.5 w-1.5 animate-pulse rounded-full bg-white"
+                    aria-hidden
+                  />
+                  저장 중이에요
+                </span>
+              ) : null}
               {visibleMissions.length > 0 ? (
                 <div className="flex shrink-0 items-center gap-1.5">
                   {/**
