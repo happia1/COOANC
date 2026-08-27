@@ -7,7 +7,7 @@ import {
 } from '@/lib/supabase/supabaseSetAllCacheHeaders'
 import { requireSupabaseUrlAndAnonKey } from '@/lib/supabase/requireEnv'
 import {
-  SUPABASE_SERVER_FETCH_TIMEOUT_MS,
+  SUPABASE_MIDDLEWARE_FETCH_TIMEOUT_MS,
   wrapFetchWithTimeout,
 } from '@/lib/supabase/fetchWithTimeout'
 import { resolvePostLoginRedirectForUser } from '@/lib/resolvePostLoginRedirect'
@@ -56,7 +56,12 @@ export async function middleware(request: NextRequest) {
     anonKey,
     {
       global: {
-        fetch: wrapFetchWithTimeout(fetch, SUPABASE_SERVER_FETCH_TIMEOUT_MS),
+        /**
+         * 미들웨어는 짧게(재시도 없이) — Vercel 미들웨어 실행 한도를 넘기지 않게.
+         * 예전에는 12초 × 최대 3회라 30초를 넘겨 504(MIDDLEWARE_INVOCATION_TIMEOUT)로
+         * 사이트 전체가 열리지 않는 일이 있었습니다.
+         */
+        fetch: wrapFetchWithTimeout(fetch, SUPABASE_MIDDLEWARE_FETCH_TIMEOUT_MS, 1),
       },
       cookies: {
         getAll() {
@@ -75,15 +80,32 @@ export async function middleware(request: NextRequest) {
     },
   )
 
-  // 세션 검증·갱신 (만료 시 리프레시). 실패 시 error 로 내려옵니다.
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser()
+  /**
+   * 세션 검증·갱신 (만료 시 리프레시).
+   *
+   * **실패해도 요청을 막지 않습니다(fail open).**
+   * 비개발자 설명: 로그인 확인이 늦거나 실패했다고 해서 화면을 아예 못 열게 하면,
+   * Supabase 가 잠깐 느린 것만으로 사이트 전체가 멈춥니다(504). 확인이 안 되면
+   * 그냥 통과시키고, 각 화면이 자기 방식대로 로그인 여부를 다시 확인하게 둡니다.
+   */
+  let user: Awaited<ReturnType<typeof supabase.auth.getUser>>['data']['user'] = null
+  let authError: unknown = null
+  try {
+    const result = await supabase.auth.getUser()
+    user = result.data.user
+    authError = result.error
+  } catch (err) {
+    console.warn('[middleware] getUser 실패 — 인증 확인을 건너뜁니다:', err)
+    return supabaseResponse
+  }
 
   if (authError && shouldClearAuthCookiesAfterError(authError)) {
     // 응답에 "쿠키 삭제" 지시를 붙여 클라이언트가 다시 로그인할 수 있게 합니다.
-    await supabase.auth.signOut({ scope: 'local' })
+    try {
+      await supabase.auth.signOut({ scope: 'local' })
+    } catch (err) {
+      console.warn('[middleware] signOut 실패:', err)
+    }
   }
 
   /** `/` 에서 SSR 이 쿠키를 못 따라가거나 지연될 때를 대비해, 미들웨어 단계에서 곧바로 분기합니다. */
@@ -138,12 +160,21 @@ export async function middleware(request: NextRequest) {
       return appendRefreshedSession(NextResponse.redirect(new URL('/home', request.url)))
     }
 
-    const plan = await resolvePostLoginRedirectForUser(supabase, effectiveUser)
-    if (!plan.authenticated) {
-      return appendRefreshedSession(NextResponse.redirect(new URL('/login', request.url)))
+    /**
+     * 여기서 한 번 더 DB 를 읽습니다. 느리면 미들웨어 한도를 넘길 수 있는데,
+     * 루트 페이지(`src/app/page.tsx`)가 **같은 규칙으로 다시 분기**하므로
+     * 실패하면 그냥 통과시키고 페이지에 맡깁니다(느려도 사이트가 멈추지 않게).
+     */
+    try {
+      const plan = await resolvePostLoginRedirectForUser(supabase, effectiveUser)
+      if (!plan.authenticated) {
+        return appendRefreshedSession(NextResponse.redirect(new URL('/login', request.url)))
+      }
+      return appendRefreshedSession(NextResponse.redirect(new URL(plan.redirectTo, request.url)))
+    } catch (err) {
+      console.warn('[middleware] 루트 분기 계산 실패 — 페이지에 맡깁니다:', err)
+      return supabaseResponse
     }
-
-    return appendRefreshedSession(NextResponse.redirect(new URL(plan.redirectTo, request.url)))
   }
 
   return supabaseResponse
