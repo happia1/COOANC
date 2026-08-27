@@ -196,5 +196,14 @@ async function undoRecentCompletionForChild(
     return { status: 'err', message: '보상(크레딧·XP) 되돌리기에 실패했어요' }
   }
 
+  /**
+   * EQ 다시 계산 — 138 에서 `mission_logs` 트리거를 없앴으므로(크레딧이 오르내리던 원인)
+   * 되돌리기 경로에서는 직접 부릅니다. 실패해도 되돌리기는 이미 끝났으므로 막지 않습니다.
+   */
+  const { error: eqErr } = await supabase.rpc('recalculate_eq', { p_child_id: childId })
+  if (eqErr) {
+    console.error('[undo-burst] recalculate_eq 실패(무시하고 진행)', eqErr.message)
+  }
+
   return { status: 'undone' }
 }

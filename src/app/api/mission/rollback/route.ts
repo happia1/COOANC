@@ -160,5 +160,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: '보상(크레딧·XP) 되돌리기에 실패했어요' }, { status: 500 })
   }
 
+  /**
+   * EQ(루틴 완주율 등) 다시 계산 — 138 이전에는 `mission_logs` 트리거가 자동으로 했지만,
+   * 그 트리거가 «보상 반영 전» child_stats 를 저장해 크레딧이 화면에서 오르내리게 만들어
+   * 제거했습니다. 되돌리기 경로에서는 여기서 직접 부릅니다.
+   * 실패해도 되돌리기 자체는 이미 끝났으므로 요청을 막지 않습니다.
+   */
+  const { error: eqErr } = await supabase.rpc('recalculate_eq', { p_child_id: log.child_id })
+  if (eqErr) {
+    console.error('[mission/rollback] recalculate_eq 실패(무시하고 진행)', eqErr.message)
+  }
+
   return NextResponse.json({ success: true, dailyMissionId: dm.id })
 }
