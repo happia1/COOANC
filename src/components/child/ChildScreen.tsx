@@ -2600,14 +2600,32 @@ export default function ChildScreen({
   }, [])
 
   /** 저금통 팝업에서 가용·저금통 잔액을 반영합니다. */
-  const patchPiggyFromHome = useCallback((p: { credits: number; credits_piggy: number }) => {
+  /**
+   * 저금통이 알려 준 **변화량(차이)** 을 현재 값에 더합니다.
+   *
+   * 비개발자 설명(확인된 원인):
+   *   예전에는 저금통이 「크레딧은 이제 250개」처럼 **완성된 숫자**를 넘겼고, 여기서 그대로 덮어썼습니다.
+   *   그런데 그 숫자는 저금통이 옮기기를 시작한 시점 기준이라, 그사이 아이가 미션 카드를 눌러 받은
+   *   보상이 들어 있지 않았습니다. 그래서 저금통 응답이 도착하는 순간 **방금 받은 보상이 지워졌습니다.**
+   *   (실제 기록: 「280 → 250 (-30), 합계 1202 → 1172」 — 직전에 받은 미션 보상 3개가 통째로 사라짐)
+   *
+   *   이제는 「50 줄었음」 같은 차이만 받아서 지금 값에 더합니다. 미션 보상과 저금통 옮기기가
+   *   어떤 순서로 겹쳐도 각자 더해지므로 서로를 지우지 않습니다.
+   */
+  const patchPiggyFromHome = useCallback((delta: { creditsDelta: number; piggyDelta: number }) => {
     /**
      * 옮기기 직후 짧은 창 동안은 뒤늦게 도착한 서버 알림이 이 값을 덮어쓰지 않게 합니다.
      * (미션 완료와 같은 보호 — 예전에는 저금통 쪽에만 이 표시가 없어서, 마지막 옮기기가 끝나
      *  대기 카운터가 0이 되는 순간 밀린 옛 알림들이 들어와 숫자가 왔다갔다 했습니다.)
      */
     if (typeof performance !== 'undefined') lastLocalStatsBumpAtRef.current = performance.now()
-    setStats((prev) => (prev ? mergeChildStatsPatch(prev, p) : prev))
+    setStats((prev) => {
+      if (!prev) return prev
+      return mergeChildStatsPatch(prev, {
+        credits: Math.max(0, readChildStatInt(prev.credits) + delta.creditsDelta),
+        credits_piggy: Math.max(0, readChildStatInt(prev.credits_piggy) + delta.piggyDelta),
+      })
+    })
   }, [])
 
   const setPiggyTransferPending = useCallback((pending: boolean) => {
@@ -2870,15 +2888,17 @@ export default function ChildScreen({
                     onPiggyUpdate={patchPiggyFromHome}
                     onPiggyTransferPending={setPiggyTransferPending}
                     bonusPending={piggyBonusPending}
-                    onBonusClaimed={({ pending, credits }) => {
+                    onBonusClaimed={({ pending }) => {
+                      /**
+                       * 서버가 돌려준 `credits`(절대값)는 **일부러 쓰지 않습니다.**
+                       * 그 값은 보너스를 처리하던 시점 기준이라, 그사이 받은 미션 보상이 빠져 있어
+                       * 그대로 덮어쓰면 방금 받은 보상이 사라집니다(저금통 옮기기와 같은 문제).
+                       * 크레딧은 코인을 누른 순간 이미 +1 해 두었으므로 여기서는 개수만 맞춥니다.
+                       */
                       setPiggyBonusPending(pending)
-                      /** 보너스 코인도 같은 보호 창을 엽니다(옛 알림이 덮어쓰지 않도록) */
                       if (typeof performance !== 'undefined') {
                         lastLocalStatsBumpAtRef.current = performance.now()
                       }
-                      setStats((prev) =>
-                        normalizeChildStatsCreditsSplit(mergeChildStatsPatch(prev, { credits })),
-                      )
                     }}
                   />
               </div>

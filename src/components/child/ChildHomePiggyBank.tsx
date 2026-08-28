@@ -101,7 +101,19 @@ type Props = {
    * 코인이 날아갈 목적지로 이 위치를 씁니다(팝업이 닫혀 있어 패널 좌표가 없기 때문).
    */
   levelCreditRef?: React.RefObject<HTMLDivElement | null>
-  onPiggyUpdate: (patch: { credits: number; credits_piggy: number }) => void
+  /**
+   * 크레딧·저금통이 **얼마나 변했는지(차이)** 를 알립니다. 절대값이 아닙니다.
+   *
+   * 비개발자 설명(신고된 문제 — 「미션 보상이 사라졌어요」):
+   *   예전에는 「크레딧은 이제 250개」처럼 **완성된 숫자**를 넘겼습니다. 그런데 이 컴포넌트가
+   *   들고 있는 숫자는 옮기기가 진행되는 동안 바깥 변화를 보지 못합니다. 그래서 옮기는 사이에
+   *   아이가 미션 카드를 눌러 크레딧을 받으면, 옮기기가 끝나는 순간 그 보상이 **통째로 지워졌습니다.**
+   *   (실제 기록: 미션 3개 보상 +30 을 받은 직후 저금통 응답이 도착해 합계가 30 줄었습니다.)
+   *
+   *   이제 「50 줄었음 / 50 늘었음」처럼 차이만 넘깁니다. 차이는 순서가 섞여도 서로 지우지 않고
+   *   그대로 더해지므로, 무엇을 먼저 누르든 합계가 맞습니다.
+   */
+  onPiggyUpdate: (delta: { creditsDelta: number; piggyDelta: number }) => void
   onPiggyTransferPending?: (pending: boolean) => void
   /** 아직 받아 가지 않은 이자 개수 — 저금통 위에 이 수만큼 반짝이는 코인이 뜹니다 */
   bonusPending?: number
@@ -144,7 +156,8 @@ export default function ChildHomePiggyBank({
   const [syncing, setSyncing] = useState(false)
   /** 아주 짧은 저장까지 깜빡이지 않도록, 이 시간 넘게 걸릴 때만 표시합니다 */
   const syncingTimerRef = useRef<number | null>(null)
-  const lastConfirmedBalanceRef = useRef<{ credits: number; credits_piggy: number } | null>(null)
+  /** 마지막에 한 번만 적용할 «어긋난 만큼»의 보정치(절대값이 아니라 차이입니다) */
+  const lastConfirmedBalanceRef = useRef<{ creditsDelta: number; piggyDelta: number } | null>(null)
   const [piggySrc, setPiggySrc] = useState(piggyBankVisualUrlFromSavedCredits(piggyCredits))
   /** 저금통 위에 떠 있는(아직 안 받은) 보너스 코인 개수 — 낙관적으로 먼저 줄입니다 */
   const [bonusCount, setBonusCount] = useState(bonusPending)
@@ -216,14 +229,12 @@ export default function ChildHomePiggyBank({
       if (kind === 'credits_to_piggy') {
         optimisticCreditsRef.current += amount
         optimisticPiggyRef.current = Math.max(0, optimisticPiggyRef.current - amount)
+        onPiggyUpdate({ creditsDelta: amount, piggyDelta: -amount })
       } else {
         optimisticCreditsRef.current = Math.max(0, optimisticCreditsRef.current - amount)
         optimisticPiggyRef.current += amount
+        onPiggyUpdate({ creditsDelta: -amount, piggyDelta: amount })
       }
-      onPiggyUpdate({
-        credits: optimisticCreditsRef.current,
-        credits_piggy: optimisticPiggyRef.current,
-      })
     },
     [onPiggyUpdate],
   )
@@ -244,6 +255,7 @@ export default function ChildHomePiggyBank({
         error?: string
         credits?: number
         credits_piggy?: number
+        moved?: number
       }
       if (
         !res.ok ||
@@ -255,20 +267,33 @@ export default function ChildHomePiggyBank({
         console.warn('[ChildHomePiggyBank] transfer failed', json.error ?? res.status)
         return
       }
-      // 앞선 요청의 응답은 뒤에 대기 중인 탭을 포함하지 않은 값입니다.
-      // 마지막 요청까지 끝났을 때만 서버 확정값을 화면에 반영합니다.
-      lastConfirmedBalanceRef.current = {
-        credits: json.credits,
-        credits_piggy: json.credits_piggy,
+      /**
+       * **서버가 돌려준 잔액을 그대로 화면에 쓰지 않습니다.**
+       *
+       * 비개발자 설명: 그 숫자는 «이 옮기기를 처리하던 순간»의 잔액입니다.
+       * 그 뒤에(또는 그와 동시에) 아이가 미션 카드를 눌러 받은 보상은 들어 있지 않습니다.
+       * 예전에는 이 값을 그대로 덮어써서, 방금 받은 미션 보상이 사라졌습니다.
+       *
+       * 대신 **어긋난 만큼만** 바로잡습니다. 화면은 `optimisticAmount` 만큼 미리 옮겼는데
+       * 서버가 실제로 옮긴 건 `moved` 이므로, 그 차이만 되돌리면 정확해집니다.
+       * (잔액이 모자라 50을 눌렀는데 30만 옮겨진 경우 등)
+       */
+      const moved = typeof json.moved === 'number' ? json.moved : optimisticAmount
+      const overshoot = optimisticAmount - moved
+      if (overshoot !== 0) {
+        lastConfirmedBalanceRef.current = {
+          creditsDelta: kind === 'credits_to_piggy' ? overshoot : -overshoot,
+          piggyDelta: kind === 'credits_to_piggy' ? -overshoot : overshoot,
+        }
       }
     } finally {
       pendingTransferCountRef.current = Math.max(0, pendingTransferCountRef.current - 1)
       if (pendingTransferCountRef.current === 0) {
-        const confirmed = lastConfirmedBalanceRef.current
-        if (confirmed) {
-          optimisticCreditsRef.current = confirmed.credits
-          optimisticPiggyRef.current = confirmed.credits_piggy
-          onPiggyUpdate(confirmed)
+        const correction = lastConfirmedBalanceRef.current
+        if (correction) {
+          optimisticCreditsRef.current = Math.max(0, optimisticCreditsRef.current + correction.creditsDelta)
+          optimisticPiggyRef.current = Math.max(0, optimisticPiggyRef.current + correction.piggyDelta)
+          onPiggyUpdate(correction)
           lastConfirmedBalanceRef.current = null
         }
         onPiggyTransferPending?.(false)
@@ -375,7 +400,7 @@ export default function ChildHomePiggyBank({
 
     const prevFrame = piggyBankVisualFrameIndexFromSavedCredits(prevPiggy)
     const nextFrame = piggyBankVisualFrameIndexFromSavedCredits(nextPiggy)
-    onPiggyUpdate({ credits: nextCredits, credits_piggy: nextPiggy })
+    onPiggyUpdate({ creditsDelta: -amount, piggyDelta: amount })
     if (nextFrame > prevFrame) playPiggyStageUpSound()
     setPiggyBounceKey((k) => k + 1)
 
@@ -397,7 +422,7 @@ export default function ChildHomePiggyBank({
     spawnFlyCoin('piggy_to_credits')
     setTransferHintVisible(false)
     markPiggyTransferHintSeen(childId)
-    onPiggyUpdate({ credits: nextCredits, credits_piggy: nextPiggy })
+    onPiggyUpdate({ creditsDelta: amount, piggyDelta: -amount })
     setCreditsBounceKey((k) => k + 1)
 
     enqueueTransfer('piggy_to_credits', requested, amount)
@@ -417,7 +442,7 @@ export default function ChildHomePiggyBank({
 
       const nextCredits = optimisticCreditsRef.current + 1
       optimisticCreditsRef.current = nextCredits
-      onPiggyUpdate({ credits: nextCredits, credits_piggy: optimisticPiggyRef.current })
+      onPiggyUpdate({ creditsDelta: 1, piggyDelta: 0 })
 
       /**
        * 코인이 날아갈 목적지 —
@@ -447,10 +472,7 @@ export default function ChildHomePiggyBank({
             bonusOptimisticRef.current += 1
             setBonusCount(bonusOptimisticRef.current)
             optimisticCreditsRef.current = Math.max(0, optimisticCreditsRef.current - 1)
-            onPiggyUpdate({
-              credits: optimisticCreditsRef.current,
-              credits_piggy: optimisticPiggyRef.current,
-            })
+            onPiggyUpdate({ creditsDelta: -1, piggyDelta: 0 })
             return
           }
           onBonusClaimed?.({ pending: res.pending, credits: res.credits })
