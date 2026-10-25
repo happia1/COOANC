@@ -470,18 +470,19 @@ export async function POST(req: NextRequest) {
 
         for (const grant of dailyGrants) {
           /**
-           * 하루 1회 게이트를 '선점'합니다. 같은 날 두 번째 호출은 PK 충돌(23505)로 막혀
-           * 스티커가 중복 지급되지 않습니다. RLS 영향을 받지 않도록 service_role 로 삽입합니다.
+           * 하루 1회 게이트를 선점하고 중복은 오류 없이 무시합니다.
+           * RLS 영향을 받지 않도록 service_role 로 삽입합니다.
            */
           const { data: gateRows, error: gateErr } = await svc
             .from('child_trigger_fired')
-            .insert({ child_id: childId, trigger_key: grant.gateKey })
+            .upsert({ child_id: childId, trigger_key: grant.gateKey }, {
+              onConflict: 'child_id,trigger_key',
+              ignoreDuplicates: true,
+            })
             .select('child_id')
           if (gateErr) {
-            if (gateErr.code !== '23505') {
-              console.error('[daily-mission/complete] daily sticker gate error', gateErr.message)
-            }
-            continue // 이미 오늘 지급됐거나(23505) 오류 → 지급 건너뜀
+            console.error('[daily-mission/complete] daily sticker gate error', gateErr.message)
+            continue
           }
           if (!gateRows?.length) continue
 

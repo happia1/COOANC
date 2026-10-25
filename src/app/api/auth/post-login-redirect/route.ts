@@ -1,3 +1,4 @@
+import { getUserForNavigation } from '@/lib/supabase/authSessionErrors'
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { resolvePostLoginRedirectForUser } from '@/lib/resolvePostLoginRedirect'
@@ -12,15 +13,13 @@ export const dynamic = 'force-dynamic'
 export async function GET() {
   try {
     const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    const user = await getUserForNavigation(supabase.auth)
 
     const plan = await resolvePostLoginRedirectForUser(supabase, user)
 
-    return NextResponse.json(plan)
+    return NextResponse.json(plan, { headers: { 'Cache-Control': 'private, no-store' } })
   } catch (error) {
     console.error('[api/auth/post-login-redirect]', error)
-    return NextResponse.json({ authenticated: false }, { status: 200 })
+    return NextResponse.json({ error: '로그인 상태를 확인하지 못했어요. 잠시 후 다시 시도해 주세요.' }, { status: 503, headers: { 'Cache-Control': 'private, no-store' } })
   }
 }

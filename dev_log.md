@@ -602,3 +602,12 @@
 - 메뉴 제어의 가족 전용 상품 추가는 부모·자녀 연결 검증 후 서버 권한으로 저장하게 보완했습니다. 누락된 `store_items` RLS 정책으로 추가가 막히는 문제를 방지합니다.
 - 자녀 앱 새로고침을 오늘의 미션 제목 옆으로 이동하고, 부모 루틴 카드의 보상 배수 저장 요청을 API 규격에 맞는 `PATCH`로 수정했습니다.
 - 이미 생성된 오늘 미션은 일정 수정으로 현재 루틴 풀이 달라져도 화면에서 숨기지 않게 해, 일정 편집 뒤 카드가 사라지는 문제를 막았습니다.
+
+## [2026-10-25] - Auth, mission rewards and market isolation
+
+- Fixed transient auth failures being treated as logout; added remembered email and local-only sign-out.
+- Applied the mission reward text/date fix to COOANC DB; rollback checks preserve user data.
+- Disconnected inactive wishlist reads, UI and game events; retired API returns 410, existing data retained.
+- Game events and daily sticker gates now ignore duplicate records without DB errors.
+- Build/type check and 4 auth tests passed. Live API purchase/quantity/balance/duplicate/insufficient-funds and concurrent event checks passed using a disposable account; all test data removed.
+- Details: docs/triage-2026-10-25.md. Parent approval/delivery and long-running device login were not tested.

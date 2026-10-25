@@ -1,3 +1,4 @@
+import { getUserForNavigation } from '@/lib/supabase/authSessionErrors'
 import { cache } from 'react'
 import { createClient } from '@/lib/supabase/server'
 import type { User } from '@supabase/supabase-js'
@@ -19,9 +20,7 @@ export type CachedParentAuthRow = {
 
 export const getCachedParentAuth = cache(async (): Promise<CachedParentAuthRow | null> => {
   const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const user = await getUserForNavigation(supabase.auth)
 
   if (!user) return null
 

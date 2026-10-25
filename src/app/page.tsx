@@ -1,3 +1,4 @@
+import { getUserForNavigation } from '@/lib/supabase/authSessionErrors'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { resolvePostLoginRedirectForUser } from '@/lib/resolvePostLoginRedirect'
@@ -10,9 +11,7 @@ export const dynamic = 'force-dynamic'
  */
 export default async function RootPage() {
   const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const user = await getUserForNavigation(supabase.auth)
 
   const plan = await resolvePostLoginRedirectForUser(supabase, user)
 

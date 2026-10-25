@@ -17,17 +17,16 @@ export async function fireGameTrigger(
   childId: string,
   key: TriggerKey,
 ): Promise<FireGameTriggerResult> {
-  // 트리거 발동 이력 삽입 (중복 시 무시) — `select` 는 컬럼 문자열만 받도록 타입이 좁혀져 count 옵션은 쓰지 않습니다
+  // 새 이력이 생긴 경우에만 지급하며, 이미 있는 이력은 DB 오류 없이 건너뜁니다.
   const { error: insertErr, data: insertedRows } = await supabase
     .from('child_trigger_fired')
-    .insert({ child_id: childId, trigger_key: key })
+    .upsert({ child_id: childId, trigger_key: key }, {
+      onConflict: 'child_id,trigger_key',
+      ignoreDuplicates: true,
+    })
     .select('child_id')
 
   if (insertErr) {
-    // ON CONFLICT(23505) = 이미 발동됨 → 조용히 무시
-    if (insertErr.code === '23505') {
-      return { fired: false, unlockedItemIndex: null }
-    }
     // 다른 에러는 무시하고 계속 진행 (트리거 실패가 메인 플로우를 막으면 안 됨)
     console.error('[fireGameTrigger] insert error', insertErr)
     return { fired: false, unlockedItemIndex: null }

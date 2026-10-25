@@ -108,6 +108,9 @@ export async function middleware(request: NextRequest) {
     }
   }
 
+  // 일시적인 인증 장애는 페이지에서 재시도하며, 로그인 화면으로 보내지 않습니다.
+  if (authError && !shouldClearAuthCookiesAfterError(authError)) return supabaseResponse
+
   /** `/` 에서 SSR 이 쿠키를 못 따라가거나 지연될 때를 대비해, 미들웨어 단계에서 곧바로 분기합니다. */
   if (pathname === '/') {
     const effectiveUser = authError && shouldClearAuthCookiesAfterError(authError) ? null : user
@@ -131,8 +134,7 @@ export async function middleware(request: NextRequest) {
             ? supabaseResponse.cookies.getAll()
             : []
           for (const c of all) {
-            const { name, value } = c
-            r.cookies.set(name, value)
+            r.cookies.set(c)
           }
           if (all.length > 0) appended = true
         } catch {

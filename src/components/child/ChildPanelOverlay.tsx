@@ -47,7 +47,6 @@ type Props = {
   marketEligibleItems: StoreItem[]
   initialHiddenStoreItemIds: string[]
   marketRequests: PurchaseRequest[]
-  initialWishlistEntries: { storeItemId: string; quantity: number }[]
   /** 총 보유 코인 `child_stats.credits` — 단일 버킷 모드 마켓 잔액에 사용 */
   creditsTotal: number
   level: number
@@ -84,7 +83,6 @@ export default function ChildPanelOverlay({
   marketEligibleItems,
   initialHiddenStoreItemIds,
   marketRequests,
-  initialWishlistEntries,
   creditsTotal,
   level,
   marketInitialScrollSection = null,
@@ -191,7 +189,6 @@ export default function ChildPanelOverlay({
               initialHiddenStoreItemIds={initialHiddenStoreItemIds}
               requests={marketRequests}
               creditsTotal={creditsTotal}
-              initialWishlistEntries={initialWishlistEntries}
               level={level}
               initialScrollSection={marketInitialScrollSection}
               onInitialScrollDone={onMarketInitialScrollDone}

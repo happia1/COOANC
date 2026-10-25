@@ -1,3 +1,5 @@
+import type { SupabaseClient } from '@supabase/supabase-js'
+
 /**
  * Supabase Auth 오류 중, "이 기기에 남은 세션 쿠키를 지워야 할 때"를 구분합니다.
  *
@@ -24,4 +26,24 @@ export function shouldClearAuthCookiesAfterError(error: unknown): boolean {
   if (msg.includes('invalid refresh token')) return true
 
   return false
+}
+
+/** 인증 서버 장애를 로그아웃으로 취급하지 않습니다. 쿠키의 사용자 정보로 인증을 우회하지 않습니다. */
+export async function getUserForNavigation(auth: Pick<SupabaseClient['auth'], 'getUser'>) {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const { data, error } = await auth.getUser()
+    if (!error) return data.user
+    if (error.name === 'AuthRetryableFetchError' || error.status === 429 || error.status >= 500) {
+      if (attempt === 0) {
+        await new Promise(resolve => setTimeout(resolve, 300))
+        continue
+      }
+      throw error
+    }
+    if (error.code === 'refresh_token_already_used') throw error
+    if (error.name === 'AuthSessionMissingError' || shouldClearAuthCookiesAfterError(error) ||
+        error.status === 400 || error.status === 401 || error.status === 403) return null
+    throw error
+  }
+  return null
 }

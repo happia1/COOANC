@@ -11,6 +11,8 @@ import { runSerializedBrowserAuthOp } from '@/lib/supabase/browserAuthQueue'
 import {
   readAutoLoginEnabled,
   writeAutoLoginEnabled,
+  readRememberedLoginId,
+  writeRememberedLoginId,
 } from '@/lib/autoLoginPreference'
 import {
   AUTO_LOGIN_CHECKING_MESSAGE,
@@ -30,6 +32,9 @@ export default function LoginPage() {
   /** localStorage 를 읽기 전에는 로그인 폼을 그리지 않습니다 */
   const [autoLoginPrefsReady, setAutoLoginPrefsReady] = useState(false)
   const [autoLoginEnabled, setAutoLoginEnabled] = useState(true)
+  const [rememberId, setRememberId] = useState(false)
+  const [autoLoginRetry, setAutoLoginRetry] = useState(0)
+  const [autoLoginFailed, setAutoLoginFailed] = useState(false)
   /** 자동 로그인 켜짐 — 세션 확인·이동 동안 로그인 폼 대신 전환 화면만 표시 */
   const [autoLoginGateActive, setAutoLoginGateActive] = useState(false)
   const [autoLoginTransition, setAutoLoginTransition] = useState<AutoLoginTransitionPresentation>({
@@ -68,6 +73,9 @@ export default function LoginPage() {
 
   useEffect(() => {
     setAutoLoginEnabled(readAutoLoginEnabled())
+    const savedId = readRememberedLoginId()
+    setEmail(savedId)
+    setRememberId(Boolean(savedId))
     setAutoLoginPrefsReady(true)
   }, [])
 
@@ -80,6 +88,7 @@ export default function LoginPage() {
     }
 
     setAutoLoginGateActive(true)
+    setAutoLoginFailed(false)
     setAutoLoginTransition({
       message: AUTO_LOGIN_CHECKING_MESSAGE,
       background: 'parent',
@@ -87,30 +96,31 @@ export default function LoginPage() {
 
     let cancelled = false
 
-    /**
-     * 자동 로그인 확인이 늦어져도 **로그인 화면이 반드시 나오게** 하는 안전장치.
-     *
-     * 비개발자 설명(신고된 문제):
-     *   이 확인이 끝나기 전까지는 로그인 입력칸이 화면에 아예 그려지지 않습니다.
-     *   그런데 서버가 느릴 때 이 확인 요청에 시간 제한이 없어서, 「확인 중」 화면에 갇힌 채
-     *   로그인을 시도조차 할 수 없었습니다. 이제 아래 시간이 지나면 확인을 포기하고
-     *   로그인 폼을 띄웁니다(로그인 자체는 정상적으로 다시 시도할 수 있습니다).
-     */
-    const AUTO_LOGIN_CHECK_TIMEOUT_MS = 4000
-    const controller = new AbortController()
+    // 응답을 끊으면 갱신된 세션 쿠키를 못 받을 수 있어, 안내만 바꾸고 요청은 끝까지 받습니다.
     const giveUpTimer = window.setTimeout(() => {
-      controller.abort()
-      if (!cancelled) setAutoLoginGateActive(false)
-    }, AUTO_LOGIN_CHECK_TIMEOUT_MS)
+      if (!cancelled) setAutoLoginTransition({
+        message: '로그인 서버 응답을 기다리고 있어요…',
+        background: 'parent',
+      })
+    }, 4000)
+    const slowResponseTimer = window.setTimeout(() => {
+      if (!cancelled) {
+        cancelled = true
+        setAutoLoginFailed(true)
+        setAutoLoginGateActive(false)
+      }
+    }, 30000)
 
     async function redirectWhenAlreadySignedIn() {
       try {
         const res = await fetch('/api/auth/post-login-redirect', {
           credentials: 'same-origin',
-          signal: controller.signal,
+          cache: 'no-store',
         })
+        if (!res.ok) throw new Error('로그인 상태 확인 실패')
         const { data, parseError } = await parseJsonFromResponse<PostLoginRedirectPlan>(res)
-        if (cancelled || parseError || !data?.authenticated) {
+        if (parseError || !data) throw new Error('로그인 응답 확인 실패')
+        if (cancelled || !data.authenticated) {
           if (!cancelled) setAutoLoginGateActive(false)
           return
         }
@@ -123,19 +133,22 @@ export default function LoginPage() {
         if (!cancelled) setAutoLoginTransition(presentation)
         window.location.replace(target)
       } catch {
-        /** 시간 초과·네트워크 오류 — 로그인 폼을 보여 주고 직접 로그인하게 합니다 */
-        if (!cancelled) setAutoLoginGateActive(false)
+        if (!cancelled) {
+          setAutoLoginFailed(true)
+          setAutoLoginGateActive(false)
+        }
       } finally {
         window.clearTimeout(giveUpTimer)
+        window.clearTimeout(slowResponseTimer)
       }
     }
     void redirectWhenAlreadySignedIn()
     return () => {
       cancelled = true
       window.clearTimeout(giveUpTimer)
-      controller.abort()
+      window.clearTimeout(slowResponseTimer)
     }
-  }, [autoLoginEnabled, autoLoginPrefsReady])
+  }, [autoLoginEnabled, autoLoginPrefsReady, autoLoginRetry])
 
   const showAutoLoginTransition = !autoLoginPrefsReady || autoLoginGateActive
 
@@ -143,6 +156,7 @@ export default function LoginPage() {
     e.preventDefault()
     setError(null)
     setLoading(true)
+    writeRememberedLoginId(email, rememberId)
 
     // 브라우저 Supabase 싱글톤은 켜지는 순간 토큰 저장소(Web Lock)·자동 갱신이 돌아갈 수 있습니다.
     // 같은 탭에서 API 로그인과 겹치면 띅 경쟁·unhandledRejection 이 나기 쉬워, **API 실패 후**에만 만듭니다.
@@ -306,6 +320,28 @@ export default function LoginPage() {
         {error && (
           <p className="text-xs text-red-500 bg-red-50 rounded-lg px-3 py-2">{error}</p>
         )}
+
+        {autoLoginFailed && (
+          <div role="status" className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            로그인 상태 확인이 지연됐어요. 다시 시도하면 기존 로그인으로 연결할 수 있어요.
+            <button type="button" onClick={() => setAutoLoginRetry(n => n + 1)} className="mt-2 block font-bold underline">
+              자동 로그인 다시 시도
+            </button>
+          </div>
+        )}
+
+        <label className="flex items-center gap-2 text-sm text-gray-600">
+          <input
+            type="checkbox"
+            checked={rememberId}
+            onChange={e => {
+              setRememberId(e.target.checked)
+              writeRememberedLoginId(email, e.target.checked)
+            }}
+            className="h-4 w-4 rounded border-gray-300 text-brand-blue focus:ring-brand-blue/40"
+          />
+          ID 기억하기
+        </label>
 
         <label className="flex items-center gap-2 text-sm text-gray-600">
           <input

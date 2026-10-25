@@ -1,3 +1,4 @@
+import { getUserForNavigation } from '@/lib/supabase/authSessionErrors'
 import { cache } from 'react'
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
@@ -24,9 +25,7 @@ export type ActorChildContext = {
 
 export const getActorChildContext = cache(async (): Promise<ActorChildContext> => {
   const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const user = await getUserForNavigation(supabase.auth)
 
   if (!user) {
     redirect('/login')

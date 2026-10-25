@@ -17,9 +17,10 @@ export default function ParentChildEntryPage() {
     ;(async () => {
       try {
         const res = await fetch('/api/auth/post-login-redirect', { credentials: 'same-origin' })
+        if (!res.ok) throw new Error('로그인 상태 확인 실패')
         const { data, parseError } = await parseJsonFromResponse<PostLoginRedirectPlan>(res)
         if (cancelled || parseError || !data) {
-          if (!cancelled) window.location.replace('/login')
+          if (!cancelled) window.location.replace('/')
           return
         }
 
@@ -31,7 +32,7 @@ export default function ParentChildEntryPage() {
 
         if (!cancelled) window.location.replace(target)
       } catch {
-        if (!cancelled) window.location.replace('/login')
+        if (!cancelled) window.location.replace('/')
       }
     })()
 

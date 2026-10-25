@@ -153,7 +153,6 @@ export default async function ChildHomePage() {
     itemUnlocksRes,
     templatesRes,
     hiddenRes,
-    wishRes,
     creditOvRes,
     itemsRes,
     requestsRes,
@@ -174,7 +173,6 @@ export default async function ChildHomePage() {
     supabase.from('child_item_unlocks').select('item_index').eq('child_id', childId),
     templatesQuery,
     supabase.from('child_market_hidden_items').select('store_item_id').eq('child_id', childId),
-    supabase.from('market_wishlist_items').select('store_item_id, quantity').eq('child_id', childId),
     supabase
       .from('child_store_item_credit_overrides')
       .select('store_item_id, credit_price')
@@ -364,13 +362,6 @@ export default async function ChildHomePage() {
   const marketEligibleItems = applyStoreItemCreditOverrides(filtered, creditOverrides)
   const initialHiddenStoreItemIds = Array.from(hiddenIds).sort()
   const marketRequests = (requestsRes.data ?? []) as PurchaseRequest[]
-  const initialWishlistEntries = wishRes.error
-    ? []
-    : (wishRes.data ?? []).map((r: { store_item_id: string; quantity?: number | null }) => ({
-        storeItemId: r.store_item_id,
-        quantity: typeof r.quantity === 'number' && r.quantity > 0 ? r.quantity : 1,
-      }))
-
   // ── exitHref ─────────────────────────────────────────────────────────────
 
   const exitHref = ctx.isParentPreview ? '/api/parent/exit-child-ui' : '/parent/home'
@@ -395,7 +386,6 @@ export default async function ChildHomePage() {
       marketEligibleItems={marketEligibleItems}
       initialHiddenStoreItemIds={initialHiddenStoreItemIds}
       marketRequests={marketRequests}
-      initialWishlistEntries={initialWishlistEntries}
       initialUnlockedItemIndexes={unlockedItemIndexes}
       exitHref={exitHref}
       contentChannels={contentZone.channels}

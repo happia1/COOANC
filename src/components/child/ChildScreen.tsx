@@ -452,7 +452,6 @@ type Props = {
   marketEligibleItems: StoreItem[]
   initialHiddenStoreItemIds: string[]
   marketRequests: PurchaseRequest[]
-  initialWishlistEntries: { storeItemId: string; quantity: number }[]
 
   /** 꾸미기 아이템 해금 인덱스 목록 */
   initialUnlockedItemIndexes: number[]
@@ -608,7 +607,6 @@ export default function ChildScreen({
   marketEligibleItems,
   initialHiddenStoreItemIds,
   marketRequests,
-  initialWishlistEntries,
   initialUnlockedItemIndexes,
   exitHref,
   contentChannels,
@@ -3259,7 +3257,6 @@ export default function ChildScreen({
         marketEligibleItems={marketEligibleItems}
         initialHiddenStoreItemIds={initialHiddenStoreItemIds}
         marketRequests={marketRequests}
-        initialWishlistEntries={initialWishlistEntries}
         creditsTotal={totalCredits}
         level={stats?.current_level ?? 0}
         marketInitialScrollSection={marketInitialScrollSection}
