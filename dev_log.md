@@ -611,3 +611,9 @@
 - Game events and daily sticker gates now ignore duplicate records without DB errors.
 - Build/type check and 4 auth tests passed. Live API purchase/quantity/balance/duplicate/insufficient-funds and concurrent event checks passed using a disposable account; all test data removed.
 - Details: docs/triage-2026-10-25.md. Parent approval/delivery and long-running device login were not tested.
+
+## [2026-10-25] - Review follow-up: auth request ordering and reward history audit
+
+- P2: serialized automatic checks, API sign-in, SDK fallback and post-login navigation through the existing browser auth queue. Explicit manual sign-in cancels pending automatic checks and waits for their termination; stale automatic results cannot navigate afterward.
+- Build/type check and 7 tests passed, including delayed response ordering, failed check recovery and cancellation of a stalled check.
+- P1: analyzed historical fixes and current production DB triggers, constraints and permissions without changing reward logic or DB. Findings and a completion/rollback migration plan are in docs/reward-processing-audit-2026-10-25.md.

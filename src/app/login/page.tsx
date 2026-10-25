@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Image from 'next/image'
 import { AUTH_LOGO_SRC } from '@/constants/branding'
 import { BetaVersionMark } from '@/components/common/BetaVersionMark'
@@ -35,6 +35,8 @@ export default function LoginPage() {
   const [rememberId, setRememberId] = useState(false)
   const [autoLoginRetry, setAutoLoginRetry] = useState(0)
   const [autoLoginFailed, setAutoLoginFailed] = useState(false)
+  const manualLoginStartedRef = useRef(false)
+  const autoLoginRequestsRef = useRef(new Set<AbortController>())
   /** 자동 로그인 켜짐 — 세션 확인·이동 동안 로그인 폼 대신 전환 화면만 표시 */
   const [autoLoginGateActive, setAutoLoginGateActive] = useState(false)
   const [autoLoginTransition, setAutoLoginTransition] = useState<AutoLoginTransitionPresentation>({
@@ -95,8 +97,11 @@ export default function LoginPage() {
     })
 
     let cancelled = false
+    manualLoginStartedRef.current = false
+    const controller = new AbortController()
+    autoLoginRequestsRef.current.add(controller)
 
-    // 응답을 끊으면 갱신된 세션 쿠키를 못 받을 수 있어, 안내만 바꾸고 요청은 끝까지 받습니다.
+    // 단순 시간 초과에는 갱신 쿠키를 받을 수 있게 요청을 유지하고, 수동 로그인 선택 시에만 중단합니다.
     const giveUpTimer = window.setTimeout(() => {
       if (!cancelled) setAutoLoginTransition({
         message: '로그인 서버 응답을 기다리고 있어요…',
@@ -113,14 +118,15 @@ export default function LoginPage() {
 
     async function redirectWhenAlreadySignedIn() {
       try {
-        const res = await fetch('/api/auth/post-login-redirect', {
+        const res = await runSerializedBrowserAuthOp(() => fetch('/api/auth/post-login-redirect', {
           credentials: 'same-origin',
           cache: 'no-store',
-        })
+          signal: controller.signal,
+        }))
         if (!res.ok) throw new Error('로그인 상태 확인 실패')
         const { data, parseError } = await parseJsonFromResponse<PostLoginRedirectPlan>(res)
         if (parseError || !data) throw new Error('로그인 응답 확인 실패')
-        if (cancelled || !data.authenticated) {
+        if (cancelled || manualLoginStartedRef.current || !data.authenticated) {
           if (!cancelled) setAutoLoginGateActive(false)
           return
         }
@@ -138,6 +144,7 @@ export default function LoginPage() {
           setAutoLoginGateActive(false)
         }
       } finally {
+        autoLoginRequestsRef.current.delete(controller)
         window.clearTimeout(giveUpTimer)
         window.clearTimeout(slowResponseTimer)
       }
@@ -154,6 +161,10 @@ export default function LoginPage() {
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
+    if (loading) return
+    manualLoginStartedRef.current = true
+    // 수동 로그인 선택 시에만 오래된 확인 요청을 종료하고, 큐가 종료를 확인한 뒤 로그인합니다.
+    autoLoginRequestsRef.current.forEach(controller => controller.abort())
     setError(null)
     setLoading(true)
     writeRememberedLoginId(email, rememberId)
@@ -163,12 +174,13 @@ export default function LoginPage() {
     // 1) 서버 Route Handler 로 로그인하면 응답에 심긴 세션 쿠키가 브라우저에 들어가기 쉽습니다.
     //    (클라이언트 SDK 만 쓸 때 차단되거나 허용되지 않은 요청 등이 나는 환경을 완화합니다.)
     try {
-      const apiRes = await fetch('/api/auth/sign-in', {
+      // 이전 인증 요청이 종료된 뒤 새 로그인을 시작합니다.
+      const apiRes = await runSerializedBrowserAuthOp(() => fetch('/api/auth/sign-in', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({ email: email.trim(), password }),
-      })
+      }))
       // 네트워크/프록시가 HTML(<!DOCTYPE...)을 돌려주면 res.json() 이 "Unexpected token '<'" 을 냅니다 — text 로만 읽습니다.
       const { data: payload, parseError } = await parseJsonFromResponse<{
         ok?: boolean
@@ -183,7 +195,9 @@ export default function LoginPage() {
         )
       } else if (apiRes.ok && payload.ok !== false) {
         writeAutoLoginEnabled(autoLoginEnabled)
-        const navRes = await fetch('/api/auth/post-login-redirect', { credentials: 'same-origin' })
+        const navRes = await runSerializedBrowserAuthOp(() =>
+          fetch('/api/auth/post-login-redirect', { credentials: 'same-origin' }),
+        )
         const { data: plan, parseError: navParseError } =
           await parseJsonFromResponse<PostLoginRedirectPlan>(navRes)
         const target =
@@ -246,7 +260,9 @@ export default function LoginPage() {
     // 다음 접속 시 같은 선택을 유지하도록 자동 로그인 설정을 저장합니다.
     writeAutoLoginEnabled(autoLoginEnabled)
 
-    const navRes = await fetch('/api/auth/post-login-redirect', { credentials: 'same-origin' })
+    const navRes = await runSerializedBrowserAuthOp(() =>
+      fetch('/api/auth/post-login-redirect', { credentials: 'same-origin' }),
+    )
     const { data: plan, parseError: navParseError } =
       await parseJsonFromResponse<PostLoginRedirectPlan>(navRes)
     const target =
