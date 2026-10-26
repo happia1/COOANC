@@ -1,5 +1,7 @@
 'use client'
 
+import { queueChildAction, fetchReceiptedAction, childActionSequence } from '@/lib/childActionQueue'
+
 /**
  * ChildScreen — 자녀 앱 단일 화면
  *
@@ -437,6 +439,7 @@ type Props = {
   /** 프로필 아바타 URL (캐릭터 종류 결정에 사용) */
   childAvatarUrl: string | null
   /** child_stats 초기값 */
+  initialHasChosenSeed?: boolean
   initialStats: ChildStats | null
   /** 오늘의 daily_missions (missions JOIN 포함) */
   dailyMissions: DailyMissionWithTemplate[]
@@ -600,17 +603,18 @@ export default function ChildScreen({
   ageYears,
   childAvatarUrl,
   initialStats,
+  initialHasChosenSeed,
   dailyMissions,
   today,
   initialPraiseGrants,
   initialPraisePlacements,
-  marketEligibleItems,
-  initialHiddenStoreItemIds,
-  marketRequests,
-  initialUnlockedItemIndexes,
+  marketEligibleItems: initialMarketItems,
+  initialHiddenStoreItemIds: initialHiddenIds,
+  marketRequests: initialMarketRequests,
+  initialUnlockedItemIndexes: initialUnlocks,
   exitHref,
-  contentChannels,
-  contentCategories,
+  contentChannels: initialContentChannels,
+  contentCategories: initialContentCategories,
   initialChestTicketQuantity,
   initialActiveContentSession,
 }: Props) {
@@ -671,6 +675,8 @@ export default function ChildScreen({
    * 서버 props(`today`)가 자정 이후 늦게 갱신되는 틈을 메우기 위해 별도로 유지합니다.
    */
   const [seoulDayKey, setSeoulDayKey] = useState(() => today)
+  const seoulDayRef = useRef(seoulDayKey)
+  seoulDayRef.current = seoulDayKey
 
   /** 자녀 홈 본문 — SSR 직후 바로 보이게 (추가 rAF 대기 없음) */
   const [enterReveal, setEnterReveal] = useState(true)
@@ -821,12 +827,14 @@ export default function ChildScreen({
     loading: plantLoading,
     water,
     stageLocked: plantStageLocked,
+    pendingGrowth: plantPendingGrowth,
     unlockStageTransition,
     buySeed,
     bumpHeartsForMissionOptimistic,
     rollbackMissionHeartsOptimistic,
     applyChildStatsRow: applyPlantChildStatsRow,
   } = usePlantPot(childId, {
+    initialStats, initialHasChosenSeed,
     onPlantStatsSynced,
     onWaterPending,
     /**
@@ -860,10 +868,15 @@ export default function ChildScreen({
     [playUiSound, refreshHarvestInventory],
   )
 
-  const dismissPlantCelebrate = useCallback(() => {
-    setPlantCelebrateStage(null)
-    setPlantHarvestCelebrate(null)
-    unlockStageTransition()
+  useEffect(() => {
+    if (plantPendingGrowth) handlePlantGrowthCelebrate(plantPendingGrowth.newStage, plantPendingGrowth.harvest)
+  }, [plantPendingGrowth, handlePlantGrowthCelebrate])
+
+  const dismissPlantCelebrate = useCallback(async () => {
+    if (await unlockStageTransition()) {
+      setPlantCelebrateStage(null)
+      setPlantHarvestCelebrate(null)
+    }
   }, [unlockStageTransition])
 
   /**
@@ -1039,6 +1052,29 @@ export default function ChildScreen({
       setMissionSyncing(false)
     }
   }, [childId, missionSyncing])
+
+  const refreshTodayRef = useRef(handleChildHomeRefresh)
+  refreshTodayRef.current = handleChildHomeRefresh
+  const [actionNeedsRefresh, setActionNeedsRefresh] = useState(false)
+  useEffect(() => {
+    const failed = (event: Event) => {
+      if ((event as CustomEvent).detail.childId === childId) setActionNeedsRefresh(true)
+    }
+    const idle = (event: Event) => {
+      const detail = (event as CustomEvent).detail
+      if (detail.childId !== childId) return
+      void (async () => {
+        const { data } = await createClient().from('child_stats').select('*').eq('child_id', childId).maybeSingle()
+        if (data && childActionSequence(childId) === detail.sequence && pendingStatsWritesRef.current === 0) {
+          setStats(normalizeChildStatsCreditsSplit(data as ChildStats))
+          applyPlantChildStatsRowRef.current(data)
+        }
+      })()
+    }
+    window.addEventListener('cooanc:child-action-failed', failed)
+    window.addEventListener('cooanc:child-actions-idle', idle)
+    return () => { window.removeEventListener('cooanc:child-action-failed', failed); window.removeEventListener('cooanc:child-actions-idle', idle) }
+  }, [childId])
 
   /** 첫 화면에 카드가 비었으면 아이가 버튼을 누르기 전에 한 번 자동 복구합니다. */
   useEffect(() => {
@@ -1253,7 +1289,7 @@ export default function ChildScreen({
 
     const bumpIfDateChanged = () => {
       const latest = getSeoulDateString()
-      setSeoulDayKey((prev) => (prev === latest ? prev : latest))
+      if (latest !== seoulDayRef.current) void refreshTodayRef.current()
     }
 
     const armNextMidnight = () => {
@@ -1283,15 +1319,6 @@ export default function ChildScreen({
     }
   }, [])
 
-  /**
-   * 서울 날짜 키가 서버 props와 달라지면 다음날 데이터를 즉시 재요청합니다.
-   * 비개발자: "앱 재접속" 없이도 자정 이후 카드가 자동으로 바뀝니다.
-   */
-  useEffect(() => {
-    if (seoulDayKey === today) return
-    router.refresh()
-  }, [router, seoulDayKey, today])
-
   /** 클라이언트에서만 루틴 기상 시각 로드 */
   useEffect(() => {
     const p = readRoutineAlarmPrefs()
@@ -1311,6 +1338,7 @@ export default function ChildScreen({
 
   useEffect(() => {
     /** 서버 배열로 목록을 맞추되, 방금 완료 요청을 보낸 행(`optimisticDailyMissionCompleteIdsRef`)은 서버가 아직 `is_completed=false` 인 한 `done` 에 남깁니다. */
+    if (today !== getSeoulDateString()) return
     setMissionList(dailyMissions)
     setDone(() => {
       const serverDone = new Set(dailyMissions.filter((dm) => dm.is_completed).map((dm) => dm.id))
@@ -1330,7 +1358,7 @@ export default function ChildScreen({
       }
       return merged
     })
-  }, [dailyMissions, seoulDayKey])
+  }, [dailyMissions, today])
 
   /** 날짜(오늘)이 바뀌면 축하 관련 상태를 초기화합니다. */
   useEffect(() => {
@@ -1406,7 +1434,7 @@ export default function ChildScreen({
         if (!snapshot) return prevList
         queueMicrotask(() => finishRollbackUi(dmId, snapshot))
         return prevList.map((m) =>
-          m.id === dmId ? { ...m, is_completed: false, completed_at: null } : m,
+          m.id === dmId ? { ...m, is_completed: false, completed_at: null, completion_version: m.completion_version } : m,
         )
       })
     }
@@ -1418,7 +1446,10 @@ export default function ChildScreen({
       if (!dbValueMeansIncomplete(row.is_completed)) return
       const dmId = String(row.id ?? '')
       if (!dmId) return
+      setMissionList((prev) => prev.map((dm) => dm.id === dmId
+        ? { ...dm, completion_version: Number(payload.new.completion_version ?? dm.completion_version ?? 0) } : dm))
       applyRollbackByDailyMissionId(dmId)
+      void refreshTodayRef.current()
     }
 
     function onMissionLogRemoteUpdate(payload: { new: Record<string, unknown> }) {
@@ -1426,6 +1457,7 @@ export default function ChildScreen({
       const ad = toYyyyMmDdDbValue(row.assigned_date)
       if (ad !== seoulDayKey) return
       if (!dbValueMeansIncomplete(row.is_completed)) return
+      void refreshTodayRef.current()
       const templateId = String(row.mission_id ?? '')
       if (!templateId) return
 
@@ -1438,7 +1470,7 @@ export default function ChildScreen({
         optimisticDailyMissionCompleteIdsRef.current.delete(dmId)
         queueMicrotask(() => finishRollbackUi(dmId, snapshot))
         return prevList.map((m) =>
-          m.id === dmId ? { ...m, is_completed: false, completed_at: null } : m,
+          m.id === dmId ? { ...m, is_completed: false, completed_at: null, completion_version: m.completion_version } : m,
         )
       })
     }
@@ -1865,12 +1897,12 @@ export default function ChildScreen({
        * 실제 네트워크 요청은 큐에 넣어 이전 완료 요청이 끝난 뒤 순서대로만 나가게 합니다.
        * (낙관적 UI·카운터 증가는 위에서 이미 즉시 처리됨 — 탭 반응성은 그대로 유지됩니다.)
        */
+      const requestId = crypto.randomUUID()
       const runMissionCompleteRequest = async () => {
         try {
-          const res = await fetch('/api/daily-mission/complete', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ dailyMissionId: dm.id, today: seoulDayKey, childId }),
+          const res = await fetchReceiptedAction('/api/daily-mission/complete', {
+            dailyMissionId: dm.id, today: seoulDayKey, childId, requestId,
+            completionVersion: dm.completion_version ?? 0,
           })
           const text = await res.text()
           let json: unknown = {}
@@ -1880,6 +1912,8 @@ export default function ChildScreen({
             /* 응답이 JSON이 아니면 stats 동기화 생략 */
           }
           if (res.ok) {
+            setMissionList((prev) => prev.map((row) => row.id === dm.id
+              ? { ...row, is_completed: true, completion_version: dm.completion_version ?? 0 } : row))
             setStats((prev) => {
               const next = tryApplyCompletePayload(prev, json)
               if (!next || !prev) return next ?? prev
@@ -1937,7 +1971,8 @@ export default function ChildScreen({
               return next
             })
           }
-        } catch {
+        } catch (error) {
+          setActionNeedsRefresh(true)
           optimisticDailyMissionCompleteIdsRef.current.delete(dm.id)
           setStats((prev) =>
             prev ? rollbackOptimisticMissionMoneyRewards(prev, creditReward, heartReward) : prev,
@@ -1954,15 +1989,13 @@ export default function ChildScreen({
             next.delete(dm.id)
             return next
           })
+          throw error
         } finally {
           pendingStatsWritesRef.current = Math.max(0, pendingStatsWritesRef.current - 1)
           endMissionSaveTracking()
         }
       }
-      missionCompleteRequestQueueRef.current = missionCompleteRequestQueueRef.current.then(
-        runMissionCompleteRequest,
-        runMissionCompleteRequest,
-      )
+      missionCompleteRequestQueueRef.current = queueChildAction(childId, runMissionCompleteRequest).catch(() => {})
     },
     [
       seoulDayKey,
@@ -1986,8 +2019,8 @@ export default function ChildScreen({
        * 서울 날짜가 이미 넘어갔는데 서버 props가 아직 어제면,
        * 잘못된 날짜(today)로 완료 API를 보내지 않도록 새로고침을 먼저 유도합니다.
        */
-      if (seoulDayKey !== today) {
-        router.refresh()
+      if (seoulDayKey !== getSeoulDateString()) {
+        void refreshTodayRef.current()
         return
       }
       if (done.has(dm.id)) {
@@ -2108,7 +2141,7 @@ export default function ChildScreen({
      */
     setMissionList((prev) =>
       prev.map((m) =>
-        idSet.has(m.id) ? { ...m, is_completed: false, completed_at: null } : m,
+        idSet.has(m.id) ? { ...m, is_completed: false, completed_at: null, completion_version: m.completion_version } : m,
       ),
     )
     setDone((prev) => {
@@ -2125,11 +2158,14 @@ export default function ChildScreen({
 
     void (async () => {
       try {
-        const res = await fetch('/api/daily-mission/undo-burst', {
+        const res = await queueChildAction(childId, () => fetch('/api/daily-mission/undo-burst', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ dailyMissionIds: toUndo, childId }),
-        })
+          body: JSON.stringify({ dailyMissionIds: toUndo, childId,
+            completionVersions: Object.fromEntries(missionList.filter((dm) => toUndo.includes(dm.id)).map((dm) => [dm.id, dm.completion_version ?? 0])),
+            requestIds: Object.fromEntries(toUndo.map((id) => [id, crypto.randomUUID()])),
+          }),
+        }))
         const raw = await res.text()
         let body: { success?: boolean; failed?: { id: string; error: string }[] } = {}
         try {
@@ -2146,6 +2182,7 @@ export default function ChildScreen({
         const apiAllSucceeded = res.ok && body.success === true
 
         if (apiAllSucceeded) {
+          await refreshTodayRef.current()
           return
         }
         router.refresh()
@@ -2153,7 +2190,7 @@ export default function ChildScreen({
         router.refresh()
       }
     })()
-  }, [childId, router])
+  }, [childId, router, missionList])
 
   // ── 스티커 상태 ────────────────────────────────────────────────────────────
 
@@ -2167,7 +2204,7 @@ export default function ChildScreen({
   }, [initialPraiseGrants])
 
   useEffect(() => {
-    setPlacements(initialPraisePlacements)
+    if (initialPraisePlacements.length > 0) setPlacements(initialPraisePlacements)
   }, [initialPraisePlacements])
 
   const refreshStickerPlacements = useCallback(async () => {
@@ -2220,11 +2257,42 @@ export default function ChildScreen({
   // ── 패널 상태 ──────────────────────────────────────────────────────────────
 
   const [activePanel, setActivePanel] = useState<PanelType>(null)
+  const [marketEligibleItems, setMarketItems] = useState(initialMarketItems)
+  const [initialHiddenStoreItemIds, setHiddenIds] = useState(initialHiddenIds)
+  const [marketRequests, setMarketRequests] = useState(initialMarketRequests)
+  const [initialUnlockedItemIndexes, setUnlocks] = useState(initialUnlocks)
+  const [contentChannels, setContentChannels] = useState(initialContentChannels)
+  const [contentCategories, setContentCategories] = useState(initialContentCategories)
+  const [activeContentSession, setActiveContentSession] = useState(initialActiveContentSession)
+  const [loadedPanel, setLoadedPanel] = useState<string | null>(null)
+  const [panelDataLoading, setPanelDataLoading] = useState(false)
+  const [panelDataError, setPanelDataError] = useState<string | null>(null)
+
   const [marketInitialScrollSection, setMarketInitialScrollSection] = useState<
     import('@/lib/parentMarketMenuSections').ParentMarketSectionId | null
   >(null)
   const [contentZoneOpen, setContentZoneOpen] = useState(false)
   const [chestTicketQty, setChestTicketQty] = useState(initialChestTicketQuantity)
+  useEffect(() => {
+    const panel = contentZoneOpen ? 'content' : activePanel
+    if (!panel) { setLoadedPanel(null); return }
+    let cancelled = false
+    setPanelDataLoading(true)
+    setPanelDataError(null)
+    void fetch(`/api/child/panel-data?childId=${encodeURIComponent(childId)}&panel=${panel}`)
+      .then(async (response) => { if (!response.ok) throw new Error('불러오지 못했어요. 다시 열어 주세요.'); return response.json() })
+      .then((data) => {
+        if (cancelled) return
+        if (panel === 'market') { setMarketItems(data.items); setHiddenIds(data.hiddenIds); setMarketRequests(data.requests) }
+        if (panel === 'sticker') { setGrants(data.grants); setPlacements(data.placements) }
+        if (panel === 'dressup') setUnlocks(data.unlocks)
+        if (panel === 'content') { setContentChannels(data.channels); setContentCategories(data.categories); setChestTicketQty(data.chestTicketQuantity); setActiveContentSession(data.activeSession) }
+        setLoadedPanel(panel)
+      }).catch((error) => { if (!cancelled) setPanelDataError(error.message) })
+      .finally(() => { if (!cancelled) setPanelDataLoading(false) })
+    return () => { cancelled = true }
+  }, [childId, activePanel, contentZoneOpen])
+
 
   useEffect(() => {
     setChestTicketQty(initialChestTicketQuantity)
@@ -2940,7 +3008,6 @@ export default function ChildScreen({
                           water: () => water(heartsForHomeUi),
                           onNoHearts: () =>
                             setPlantHint('하트가 부족해요! 미션을 하면 하트를 받을 수 있어요.'),
-                          onGrowthCelebrate: handlePlantGrowthCelebrate,
                         }
                       : undefined
                   }
@@ -3249,8 +3316,16 @@ export default function ChildScreen({
       </div>
 
       {/* ── L5: 패널 오버레이 ─────────────────────────────────────────────── */}
+      {(activePanel || contentZoneOpen) && (loadedPanel !== (contentZoneOpen ? 'content' : activePanel) || panelDataLoading || panelDataError) ? (
+        <div className="fixed inset-0 z-[205] flex items-center justify-center bg-black/30" role="status">
+          <div className="rounded-2xl bg-white p-6 text-center">
+            <p>{panelDataError ?? '불러오는 중이에요…'}</p>
+            {panelDataError ? <button type="button" className="mt-4 rounded-xl bg-gray-100 px-5 py-2" onClick={() => { setActivePanel(null); setContentZoneOpen(false) }}>닫기</button> : null}
+          </div>
+        </div>
+      ) : null}
       <ChildPanelOverlay
-        active={activePanel}
+        active={!panelDataLoading && !panelDataError && loadedPanel === activePanel ? activePanel : null}
         onClose={handlePanelClose}
         childId={childId}
         features={features}
@@ -3290,6 +3365,14 @@ export default function ChildScreen({
         }}
       />
 
+      {actionNeedsRefresh ? (
+        <div className="fixed inset-0 z-[310] flex items-center justify-center bg-black/40 p-5" role="alertdialog" aria-modal="true" aria-label="저장 결과 확인">
+          <div className="max-w-sm rounded-2xl bg-white p-6 text-center">
+            <p>저장 결과를 다시 확인해야 해요. 확인 후 다음 행동을 진행할게요.</p>
+            <button type="button" className="mt-4 rounded-xl bg-green-600 px-5 py-3 font-bold text-white" onClick={() => window.location.reload()}>다시 확인하기</button>
+          </div>
+        </div>
+      ) : null}
       <PlantStageCelebrationModal
         open={plantCelebrateStage !== null}
         stage={plantCelebrateStage}
@@ -3393,14 +3476,14 @@ export default function ChildScreen({
       <ChildAlarmClockPopup open={clockPopupOpen} onClose={() => setClockPopupOpen(false)} />
       <ChildMusicPopup open={musicPopupOpen} onClose={() => setMusicPopupOpen(false)} />
       <ChildContentZonePopup
-        open={contentZoneOpen}
+        open={contentZoneOpen && loadedPanel === 'content' && !panelDataLoading && !panelDataError}
         onClose={() => setContentZoneOpen(false)}
         childId={childId}
         channels={contentChannels}
         categories={contentCategories}
         level={stats?.current_level ?? 0}
         initialChestTicketQuantity={chestTicketQty}
-        initialActiveSession={initialActiveContentSession}
+        initialActiveSession={activeContentSession}
         onOpenMarket={openMarketToContent}
         ticketBalanceUnavailable={ticketBalanceUnavailable}
         onChestTicketQuantityChange={handleChestTicketQuantityChange}

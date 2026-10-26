@@ -1,3 +1,7 @@
+import { assertPublicSupabaseKey } from './src/lib/supabase/publicKeySafety.mjs'
+
+if (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) assertPublicSupabaseKey(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
+
 /**
  * 지갑 PNG 캐시 버스트 버전 — `src/lib/walletStages.ts` 의 WALLET_IMAGE_CACHE_BUST 와 **반드시 동일**해야 합니다.
  * 지갑 그림 파일을 교체했는데도 예전 그림이 보이면 이 숫자(양쪽)를 1 올리세요.

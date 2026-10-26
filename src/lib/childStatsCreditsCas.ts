@@ -1,3 +1,5 @@
+import 'server-only'
+import { createServiceRoleClient } from '@/lib/supabase/admin'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { readChildStatInt } from '@/lib/childCreditsSplit'
 
@@ -51,8 +53,10 @@ export async function applyChildCreditsCas(
     | { ok: false; message: string },
   options?: { extraPatch?: Record<string, unknown> },
 ): Promise<CreditsCasResult> {
+  const writer = createServiceRoleClient()
+  if (!writer) return { ok: false, reason: 'db' }
   for (let attempt = 0; attempt < CREDITS_CAS_MAX_ATTEMPTS; attempt += 1) {
-    const { data: row, error: readErr } = await supabase
+    const { data: row, error: readErr } = await writer
       .from('child_stats')
       .select('credits, credits_piggy, hearts, current_level, total_credits_earned, exp')
       .eq('child_id', childId)
@@ -91,7 +95,7 @@ export async function applyChildCreditsCas(
       ...(options?.extraPatch ?? {}),
     }
 
-    const { data: updated, error: updErr } = await supabase
+    const { data: updated, error: updErr } = await writer
       .from('child_stats')
       .update(patch)
       .eq('child_id', childId)

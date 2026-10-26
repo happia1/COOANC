@@ -1,3 +1,5 @@
+import { resolvePostLoginRedirectForUser } from '@/lib/resolvePostLoginRedirect'
+import { postLoginResponse } from '@/lib/postLoginResponse'
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import {
@@ -121,5 +123,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: msg }, { status: 401 })
   }
 
-  return response
+  try {
+    return postLoginResponse(await resolvePostLoginRedirectForUser(supabase, signInResult.data.user), response)
+  } catch (error) {
+    console.error('[auth/sign-in] destination', error)
+    const failed = NextResponse.json({ error: '로그인했지만 이동할 화면을 확인하지 못했어요. 다시 시도해 주세요.' }, { status: 503 })
+    response.cookies.getAll().forEach((cookie) => failed.cookies.set(cookie))
+    return failed
+  }
 }

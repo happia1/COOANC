@@ -1,3 +1,4 @@
+import { assertPublicSupabaseKey } from './publicKeySafety.mjs'
 /**
  * Supabase 클라이언트 생성 전에 URL·anon 키가 있는지 검사합니다.
  * - 값이 비어 있으면 대시보드 링크와 .env.local 안내가 담긴 오류를 던져, 런타임 원인을 빨리 찾을 수 있게 합니다.
@@ -28,5 +29,6 @@ export function requireSupabaseUrlAndAnonKey(): { url: string; anonKey: string }
     )
   }
 
+  assertPublicSupabaseKey(anonKey)
   return { url, anonKey }
 }

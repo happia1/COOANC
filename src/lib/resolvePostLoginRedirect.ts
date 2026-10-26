@@ -38,7 +38,9 @@ export async function resolvePostLoginRedirectForUser(
     return { authenticated: false }
   }
 
-  const role = user.user_metadata?.role as string | undefined
+  const { data: profile, error: profileError } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle()
+  if (profileError || !profile) throw new Error('사용자 정보를 확인하지 못했어요')
+  const role = profile.role
 
   if (role === 'child') {
     return { authenticated: true, role: 'child', redirectTo: '/home' }

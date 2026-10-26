@@ -34,6 +34,7 @@ function readInt(value: unknown): number {
 export async function fetchChildHomeContentZoneData(
   supabase: SupabaseClient,
   childId: string,
+  strict = false,
 ): Promise<ChildHomeContentZoneData> {
   try {
     const [channelsRes, categoriesRes, ticketRes, sessionRes, familyLinksRes, hiddenRes] = await Promise.all([
@@ -55,6 +56,8 @@ export async function fetchChildHomeContentZoneData(
       supabase.from('family_links').select('id').eq('child_id', childId),
       supabase.from('content_channel_hidden').select('channel_id').eq('child_id', childId),
     ])
+
+    if (strict && [channelsRes, categoriesRes, ticketRes, sessionRes, familyLinksRes, hiddenRes].some((r) => r.error)) throw new Error('content queries failed')
 
     const zoneErr =
       channelsRes.error?.message ?? ticketRes.error?.message ?? sessionRes.error?.message
@@ -116,6 +119,7 @@ export async function fetchChildHomeContentZoneData(
       activeSession,
     }
   } catch (err) {
+    if (strict) throw err
     const msg = err instanceof Error ? err.message : String(err)
     console.warn('[child/home] content zone fetch failed', msg)
     return EMPTY_CHILD_HOME_CONTENT_ZONE

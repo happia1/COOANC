@@ -25,6 +25,7 @@ import {
   type PlantTreeId,
 } from '@/constants/plantTrees'
 import { createClient } from '@/lib/supabase/client'
+import { queueChildAction, fetchReceiptedAction } from '@/lib/childActionQueue'
 import { readChildStatInt } from '@/lib/childCreditsSplit'
 import type { PlantHarvestCelebrate } from '@/lib/plantHarvest'
 import { parseJsonFromResponse } from '@/lib/parseJsonResponse'
@@ -114,6 +115,8 @@ async function loadHasChosenSeed(
 export function usePlantPot(
   childId: string,
   options?: {
+    initialStats?: Record<string, unknown> | null
+    initialHasChosenSeed?: boolean
     /**
      * 물주기 API 가 성공한 뒤 `child_stats` 일부를 돌려줄 때 — 상단 레벨 카드 `stats` 와 동기화합니다.
      * 비개발자: 화분 쪽 숫자만 바뀌고 위 카드 하트는 그대로인 현상을 막습니다.
@@ -139,12 +142,21 @@ export function usePlantPot(
    * - 싱글톤이어도 **호출 자체가 매 프레임 실행**되는 것은 부담이므로 `useMemo`로 한 번만 만듭니다.
    */
   const supabase = useMemo(() => createClient(), [])
-  const [pot, setPot] = useState<PotState | null>(null)
-  const [hearts, setHearts] = useState(0)
+  const initialPot = useMemo(() => {
+    const row = options?.initialStats
+    if (!row || options?.initialHasChosenSeed === undefined) return null
+    const treeId = readPotTreeIdFromDb(row.pot_tree_id)
+    return potStateFromWaterResponse(treeId, row.pot_stage, row.pot_hearts_used, row.pot_completed,
+      options.initialHasChosenSeed || resolveHasChosenSeed(treeId, {
+        stage: readChildStatInt(row.pot_stage) as PlantStage, heartsUsed: readChildStatInt(row.pot_hearts_used), completed: !!row.pot_completed,
+      }))
+  }, [])
+  const [pot, setPot] = useState<PotState | null>(initialPot)
+  const [hearts, setHearts] = useState(readChildStatInt(options?.initialStats?.hearts))
   /** 빠른 연속 탭은 React 재렌더 전에도 들어오므로, 다음 탭이 즉시 최신 숫자를 읽도록 ref를 함께 유지합니다. */
-  const potRef = useRef<PotState | null>(null)
-  const heartsRef = useRef(0)
-  const [loading, setLoading] = useState(true)
+  const potRef = useRef<PotState | null>(initialPot)
+  const heartsRef = useRef(readChildStatInt(options?.initialStats?.hearts))
+  const [loading, setLoading] = useState(!initialPot)
   /**
    * 화분 정보를 못 읽었을 때 true.
    *
@@ -181,6 +193,21 @@ export function usePlantPot(
    */
   const stageTransitionLockRef = useRef(false)
   const [stageLocked, setStageLocked] = useState(false)
+  const [pendingGrowth, setPendingGrowth] = useState<{ requestId: string; newStage: PlantStage; harvest?: PlantHarvestCelebrate } | null>(null)
+  const growthTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => () => { if (growthTimerRef.current) clearTimeout(growthTimerRef.current) }, [])
+  useEffect(() => {
+    let cancelled = false
+    void fetch(`/api/child/plant-celebration?childId=${encodeURIComponent(childId)}`)
+      .then((response) => response.ok ? response.json() : null)
+      .then((event) => {
+        if (cancelled || !event?.requestId) return
+        stageTransitionLockRef.current = true
+        setStageLocked(true)
+        setPendingGrowth(event)
+      }).catch(() => {})
+    return () => { cancelled = true }
+  }, [childId])
   /**
    * 화분 "생애주기" 세대 번호 — 7단계 완성(재심기 대기) 또는 새 씨앗 심기 성공 시 +1.
    * 물주기 호출 시점의 세대를 캡처해 뒀다가, 큐에서 실제 서버 전송 직전 세대가 달라졌으면
@@ -304,37 +331,9 @@ export function usePlantPot(
       normalized.completed !== completedDb
 
     if (needsDbRepair) {
-      const { error: fixErr } = await supabase
-        .from('child_stats')
-        .update({
-          pot_stage: normalized.stage,
-          pot_hearts_used: normalized.heartsUsed,
-          pot_completed: normalized.completed,
-        })
-        .eq('child_id', childId)
-      if (fixErr) {
-        console.warn('[usePlantPot] pot progress repair failed', fixErr.message)
-        /** 브라우저 직접 UPDATE 가 막히면 쿠키 세션 API로 정규화만 다시 시도합니다 */
-        const recovered = await serverRepairPlantNormalize()
-        if (recovered) {
-          const { data: dataAfter, error: refetchErr } = await supabase
-            .from('child_stats')
-            .select(POT_SELECT)
-            .eq('child_id', childId)
-            .maybeSingle()
-          if (!refetchErr && dataAfter) {
-            data = dataAfter
-          }
-        }
-      } else {
-        const { data: dataAfter, error: refetchErr } = await supabase
-          .from('child_stats')
-          .select(POT_SELECT)
-          .eq('child_id', childId)
-          .maybeSingle()
-        if (!refetchErr && dataAfter) {
-          data = dataAfter
-        }
+      if (await serverRepairPlantNormalize()) {
+        const { data: repaired } = await supabase.from('child_stats').select(POT_SELECT).eq('child_id', childId).maybeSingle()
+        if (repaired) data = repaired
       }
     }
 
@@ -391,7 +390,7 @@ export function usePlantPot(
   }, [])
 
   useEffect(() => {
-    void refresh()
+    if (!initialPot) void refresh()
   }, [refresh])
 
   /**
@@ -534,65 +533,26 @@ export function usePlantPot(
       }
 
       const stage7Reset = prevPot.stage === 7
-      const prevHearts = Math.max(heartsRef.current, readChildStatInt(displayHearts))
+      const prevHearts = heartsRef.current
 
       if (!stage7Reset && prevHearts <= 0) {
         return 'no_hearts'
       }
 
-      let immediateGrowthResult: WaterResult | null = null
-      /**
-       * 완성(7단계) 경계에서 잠금을 걸고 서버 응답을 기다리는 상태.
-       * 서버가 'grew' 를 확정하지 못하면(실패·불완전 응답·미성장) 축하 팝업이 열리지 않아
-       * 잠금 해제 경로가 사라지므로, 그런 종료 지점마다 직접 잠금을 풀어야 합니다.
-       */
+      const requestId = crypto.randomUUID()
+      const tappedAt = performance.now()
       let lockedAwaitingServerCelebration = false
       if (!stage7Reset && prevHearts > 0) {
-        const needed = prevPot.heartsNeeded
-        const newHeartsUsed = prevPot.heartsUsed + 1
-        const levelUp = needed > 0 && newHeartsUsed >= needed
-        const newStage = levelUp ? (Math.min(prevPot.stage + 1, 7) as PlantStage) : prevPot.stage
-        const newHeartsUsedAfter = levelUp ? 0 : newHeartsUsed
-        const isCompleted = newStage === 7
-
-        /**
-         * `completed` 는 낙관적으로 켜지 않습니다 — 서버 확정('grew'·7단계 응답) 전에 켜면
-         * `needsPotSeedSelection` 이 true 가 되어 씨앗 심기 팝업이 잘못 뜨고,
-         * 서버가 실패하면 팝업만 남는 오동작이 됩니다. 확정값은 finally 의 confirmed 반영이 처리합니다.
-         */
-        const optimisticPot = {
-          ...prevPot,
-          stage: newStage,
-          heartsUsed: newHeartsUsedAfter,
-          heartsNeeded: getHeartsNeededForStage(prevPot.treeId, newStage),
-          completed: false,
-        }
+        const levelUp = prevPot.heartsNeeded > 0 && prevPot.heartsUsed + 1 >= prevPot.heartsNeeded
+        const newStage = levelUp ? Math.min(prevPot.stage + 1, 7) as PlantStage : prevPot.stage
+        // Refs accept rapid taps; the visible stage changes only on confirmed results.
         heartsRef.current = prevHearts - 1
-        potRef.current = optimisticPot
-        setHearts(prevHearts - 1)
-        setPot(optimisticPot)
-        onPlantStatsSyncedRef.current?.({
-          hearts: prevHearts - 1,
-          pot_stage: newStage,
-          pot_hearts_used: newHeartsUsedAfter,
-          pot_completed: false,
-        })
-
-        /**
-         * 레벨업 경계 — 축하 팝업이 닫힐 때까지 이후 water() 호출을 즉시 'locked'로 막습니다.
-         * 세대(potGeneration) 증가는 서버가 완성을 확정한 뒤(성공 'grew' 7단계 응답)에만 합니다 —
-         * 낙관적으로 올리면 서버 실패 시 큐의 정상 물주기 요청까지 잘못 폐기됩니다.
-         */
+        potRef.current = { ...prevPot, stage: newStage, heartsUsed: levelUp ? 0 : prevPot.heartsUsed + 1,
+          heartsNeeded: getHeartsNeededForStage(prevPot.treeId, newStage), completed: false }
         if (levelUp) {
           stageTransitionLockRef.current = true
+          lockedAwaitingServerCelebration = true
           setStageLocked(true)
-          // 중간 성장 팝업은 서버 왕복을 기다리지 않고 정확한 경계 탭에서 즉시 엽니다.
-          // 최종 수확 단계만 서버가 만드는 수확 결과가 필요해 응답을 기다립니다.
-          if (!isCompleted) {
-            immediateGrowthResult = { type: 'grew', newStage }
-          } else {
-            lockedAwaitingServerCelebration = true
-          }
         }
       }
 
@@ -624,12 +584,7 @@ export function usePlantPot(
           return 'ok'
         }
         try {
-          const res = await fetch('/api/child/plant-water', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ childId }),
-            credentials: 'same-origin',
-          })
+          const res = await fetchReceiptedAction('/api/child/plant-water', { childId, requestId })
           const json = (await res.json().catch(() => ({}))) as {
             ok?: boolean
             code?: string
@@ -668,10 +623,7 @@ export function usePlantPot(
             typeof json.pot_completed === 'boolean'
 
           if (!hasConfirmedPotState) {
-            console.warn('[usePlantPot] plant-water incomplete payload', json)
-            refreshAfterWaterQueueRef.current = true
-            releaseLockIfAwaitingCelebration()
-            return 'ok'
+            throw new Error('물주기 응답을 확인하지 못했어요')
           }
 
           lastConfirmedWaterRef.current = {
@@ -691,11 +643,14 @@ export function usePlantPot(
                */
               potGenerationRef.current += 1
             }
-            return {
-              type: 'grew',
-              newStage: ns,
-              harvest: json.harvest,
-            }
+            stageTransitionLockRef.current = true
+            setStageLocked(true)
+            const event = { requestId, newStage: ns, harvest: json.harvest }
+            // Let the already-started heart reach the pot before covering it with the dialog.
+            const remainingFlight = Math.max(0, 620 - (performance.now() - tappedAt))
+            if (growthTimerRef.current) clearTimeout(growthTimerRef.current)
+            growthTimerRef.current = setTimeout(() => { setPendingGrowth(event) }, remainingFlight)
+            return { type: 'grew', newStage: ns, harvest: json.harvest }
           }
           /** 성장 없음(경계 오판 등) — 완성 대기 잠금이 있었다면 팝업이 안 열리므로 풀어 줍니다 */
           releaseLockIfAwaitingCelebration()
@@ -704,7 +659,7 @@ export function usePlantPot(
           console.warn('[usePlantPot] plant-water fetch', e)
           refreshAfterWaterQueueRef.current = true
           releaseLockIfAwaitingCelebration()
-          return 'ok'
+          throw e
         } finally {
           pendingWaterCountRef.current = Math.max(0, pendingWaterCountRef.current - 1)
           if (pendingWaterCountRef.current === 0) {
@@ -732,28 +687,38 @@ export function usePlantPot(
         }
       }
 
-      waterQueueRef.current = waterQueueRef.current
-        .then(resultPromise)
+      waterQueueRef.current = queueChildAction(childId, resultPromise)
         .catch((err) => {
           console.warn('[usePlantPot] plant-water queue error', err)
           return 'ok'
         })
 
-      return immediateGrowthResult ?? waterQueueRef.current
+      return waterQueueRef.current
     },
     [childId, refresh],
   )
 
   /** 단계 상승 축하 팝업이 닫힐 때 호출 — 다시 연속 물주기를 허용합니다. */
-  const unlockStageTransition = useCallback(() => {
+  const unlockStageTransition = useCallback(async (): Promise<boolean> => {
+    if (pendingGrowth) {
+      try {
+        const response = await fetch('/api/child/plant-celebration', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ childId, requestId: pendingGrowth.requestId }),
+        })
+        if (!response.ok) return false
+      } catch { return false }
+      setPendingGrowth(null)
+    }
     stageTransitionLockRef.current = false
     setStageLocked(false)
-  }, [])
+    return true
+  }, [childId, pendingGrowth])
 
   /**
    * 씨앗 구매 — 크레딧 차감 + 화분·나무 종류 초기화 (`/api/child/plant-buy-seed`)
    */
-  const buySeed = useCallback(async (treeId: PlantTreeId): Promise<BuySeedResult> => {
+  const buySeed = useCallback(async (treeId: PlantTreeId): Promise<BuySeedResult> => queueChildAction(childId, async () => {
     // 미처리 물주기 요청이 남아 있으면 먼저 흘려보낸 뒤 씨앗 심기를 진행합니다(서버 상태 경합 방지).
     if (pendingWaterCountRef.current > 0) {
       await waterQueueRef.current.catch(() => {})
@@ -866,36 +831,14 @@ export function usePlantPot(
         message: '네트워크 오류가 있어요. 연결을 확인한 뒤 다시 시도해 주세요.',
       }
     }
-  }, [childId, refresh])
+  }), [childId, refresh])
 
   /** 크레딧 없이 화분만 초기화(클라이언트 실패 시 API 폴백). 씨앗 모달과 병행 호출하지 않습니다. */
   const resetPot = useCallback(
     async (treeId: PlantTreeId = DEFAULT_TREE) => {
-      const { error } = await supabase
-        .from('child_stats')
-        .update({
-          pot_stage: 0,
-          pot_hearts_used: 0,
-          pot_completed: false,
-          pot_tree_id: treeId,
-        })
-        .eq('child_id', childId)
-      if (error) {
-        console.warn('[usePlantPot] resetPot client update failed', error.message)
-        try {
-          const r = await fetch('/api/child/plant-reset-progress', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ childId }),
-            credentials: 'same-origin',
-          })
-          if (!r.ok) {
-            console.warn('[usePlantPot] resetPot API fallback failed', r.status)
-          }
-        } catch (e) {
-          console.warn('[usePlantPot] resetPot API fallback', e)
-        }
-      }
+      await fetch('/api/child/plant-reset-progress', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ childId }),
+      })
       await refresh()
     },
     [childId, supabase, refresh],
@@ -908,6 +851,7 @@ export function usePlantPot(
     water,
     stageLocked,
     unlockStageTransition,
+    pendingGrowth,
     buySeed,
     resetPot,
     refresh,

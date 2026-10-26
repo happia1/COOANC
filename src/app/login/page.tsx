@@ -185,6 +185,7 @@ export default function LoginPage() {
       const { data: payload, parseError } = await parseJsonFromResponse<{
         ok?: boolean
         error?: string
+        redirectTo?: string
       }>(apiRes)
 
       if (parseError || !payload) {
@@ -195,14 +196,7 @@ export default function LoginPage() {
         )
       } else if (apiRes.ok && payload.ok !== false) {
         writeAutoLoginEnabled(autoLoginEnabled)
-        const navRes = await runSerializedBrowserAuthOp(() =>
-          fetch('/api/auth/post-login-redirect', { credentials: 'same-origin' }),
-        )
-        const { data: plan, parseError: navParseError } =
-          await parseJsonFromResponse<PostLoginRedirectPlan>(navRes)
-        const target =
-          !navParseError && plan?.authenticated ? pickPostLoginNavigationTarget(plan) : null
-        window.location.replace(target ?? '/parent/home')
+        window.location.replace(payload.redirectTo?.startsWith('/') && !payload.redirectTo.startsWith('//') ? payload.redirectTo : '/home')
         return
       } else if (payload.error) {
         setError(payload.error)

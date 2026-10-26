@@ -134,6 +134,7 @@ export type Mission = {
 }
 
 export type DailyMission = {
+  completion_version?: number
   id: string
   child_id: string
   mission_template_id: string

@@ -2,26 +2,22 @@
  * 자녀 앱 단일 화면 — 서버 컴포넌트 (통합 페이지)
  *
  * 기존 home/mission/market 3탭을 ChildScreen 하나로 통합했습니다.
- * 서버 단에서 모든 데이터를 병렬로 가져와 ChildScreen에 props로 전달합니다.
+ * 서버에서 홈의 필수 상태만 준비하고, 닫힌 패널의 데이터는 아이콘을 열 때 조회합니다.
  *
  * 비개발자 설명:
- * - 이 파일은 서버에서 실행되며, 자녀 정보/미션/마켓 데이터를 한 번에 준비합니다.
+ * - 이 파일은 서버에서 실행되며, 자녀 정보와 오늘의 미션, 저장 상태를 준비합니다.
  * - 준비된 데이터는 ChildScreen 컴포넌트에 넘겨져 화면에 표시됩니다.
  * - API 키 등 민감 정보는 서버에서만 접근합니다(클라이언트에 노출 없음).
  */
 
 import { createClient } from '@/lib/supabase/server'
 import { createServiceRoleClient } from '@/lib/supabase/admin'
-import { getCachedProfileRowById, getCachedFamilyLinksForChild } from '@/lib/childAppDataCache'
+import { getCachedProfileRowById } from '@/lib/childAppDataCache'
 import { getActorChildContext } from '@/lib/getActorChildContext'
 import { getMissionTemplatesForChildMissionPage } from '@/lib/missionsTemplateCache'
 import { getSeoulDateString } from '@/lib/koreaDate'
-import { applyStoreItemCreditOverrides } from '@/lib/applyStoreItemCreditOverrides'
-import { readChildStatInt } from '@/lib/childCreditsSplit'
-import { isCategoryExcludedFromMarket } from '@/lib/parentMarketMenuSections'
 import { fetchDailyRoutineOverride, resolveRoutineTypeForDay } from '@/lib/childRoutineCalendar'
-import { fetchChildHomeContentZoneData, EMPTY_CHILD_HOME_CONTENT_ZONE } from '@/lib/fetchChildHomeContentZone'
-import { CONTENT_ZONE_UNLOCK_MIN_LEVEL } from '@/constants/childScreenFeatures'
+import { EMPTY_CHILD_HOME_CONTENT_ZONE } from '@/lib/fetchChildHomeContentZone'
 import {
   templatePoolForMissionDay,
   type MissionDayRoutineType,
@@ -35,7 +31,6 @@ import type {
   PraiseStickerPlacement,
   StoreItem,
   PurchaseRequest,
-  ChildItemUnlock,
 } from '@/types/database'
 
 /** 매 요청 최신 데이터로 렌더링 (SSR) */
@@ -143,54 +138,15 @@ export default async function ChildHomePage() {
    * - child_stats, profile(이름+아바타+나이), family_links, 스티커 grants/placements, 미션 템플릿,
    *   꾸미기 아이템 해금, 마켓 숨김/위시리스트/크레딧 오버라이드 를 한 번에 가져옵니다.
    */
-  const [
-    statsRes,
-    profileRow,
-    ageProfileRes,
-    familyRows,
-    grantsRes,
-    placementsRes,
-    itemUnlocksRes,
-    templatesRes,
-    hiddenRes,
-    creditOvRes,
-    itemsRes,
-    requestsRes,
-    dailyRoutineOverride,
-    dailyMissionsResWithSort,
-  ] = await Promise.all([
+  const [statsRes, profileRow, ageProfileRes, grantsRes, templatesRes,
+    dailyRoutineOverride, dailyMissionsResWithSort, seedRes] = await Promise.all([
     supabase.from('child_stats').select('*').eq('child_id', childId).maybeSingle(),
     getCachedProfileRowById(childId),
-    /** 나이 정보(age, birth_date)는 CachedChildProfileRow에 없어 별도로 조회 */
     supabase.from('profiles').select('age, birth_date').eq('id', childId).maybeSingle(),
-    getCachedFamilyLinksForChild(childId),
-    supabase
-      .from('praise_sticker_grants')
-      .select('*')
-      .eq('child_id', childId)
-      .order('created_at', { ascending: false }),
-    supabase.from('praise_sticker_placements').select('*').eq('child_id', childId),
-    supabase.from('child_item_unlocks').select('item_index').eq('child_id', childId),
-    templatesQuery,
-    supabase.from('child_market_hidden_items').select('store_item_id').eq('child_id', childId),
-    supabase
-      .from('child_store_item_credit_overrides')
-      .select('store_item_id, credit_price')
-      .eq('child_id', childId),
-    supabase
-      .from('store_items')
-      .select('*')
-      .eq('is_active', true)
-      .order('credit_price', { ascending: true }),
-    supabase
-      .from('purchase_requests')
-      .select('*')
-      .eq('child_id', childId)
-      .in('status', ['pending', 'parent_buying', 'approved', 'rejected', 'delivered'])
-      .order('requested_at', { ascending: false })
-      .limit(12),
-    dailyRoutineOverridePromise,
-    dailyMissionsPromise,
+    supabase.from('praise_sticker_grants').select('*').eq('child_id', childId)
+      .is('popup_dismissed_at', null).order('created_at', { ascending: false }),
+    templatesQuery, dailyRoutineOverridePromise, dailyMissionsPromise,
+    supabase.from('plant_seed_purchases').select('id', { count: 'exact', head: true }).eq('child_id', childId),
   ])
 
   // ── 기본 자녀 정보 ────────────────────────────────────────────────────────
@@ -210,7 +166,8 @@ export default async function ChildHomePage() {
   }
 
   const initialStats = (statsRes.data ?? null) as ChildStats | null
-  const level = initialStats?.current_level ?? 0
+  if (!initialStats || !profileRow) throw new Error('자녀의 저장 상태를 불러오지 못했어요')
+  const level = initialStats.current_level
 
   const childName = (profileRow?.name ?? '').trim() || '쿠앵이'
   const childAvatarUrl =
@@ -226,18 +183,9 @@ export default async function ChildHomePage() {
   // ── 스티커 ───────────────────────────────────────────────────────────────
 
   const praiseGrants = (grantsRes.data ?? []) as PraiseStickerGrant[]
-  const praisePlacements = (placementsRes.data ?? []) as PraiseStickerPlacement[]
-  const unlockedItemIndexes = (
-    (itemUnlocksRes.data ?? []) as Pick<ChildItemUnlock, 'item_index'>[]
-  ).map((r) => r.item_index)
-
-  // ── 미션 ─────────────────────────────────────────────────────────────────
-
-  /** 콘텐츠존은 레벨이 필요한 조회라 1단계 통계가 끝난 뒤에만 실행합니다. */
-  const contentZone =
-    level >= CONTENT_ZONE_UNLOCK_MIN_LEVEL
-      ? await fetchChildHomeContentZoneData(supabase, childId)
-      : EMPTY_CONTENT_ZONE
+  const praisePlacements: PraiseStickerPlacement[] = []
+  const unlockedItemIndexes: number[] = []
+  const contentZone = EMPTY_CONTENT_ZONE
   const dailyMissionsRes = isMissingSortOrderColumn(dailyMissionsResWithSort.error?.message)
     ? await missionDb
         .from('daily_missions')
@@ -255,6 +203,7 @@ export default async function ChildHomePage() {
       ? ' — Supabase 연결 실패(DNS/네트워크). 인터넷·VPN 확인 후 새로고침해 주세요.'
       : ''
     console.error('[child/home] missions select', msg + networkHint)
+    throw new Error('오늘의 미션 설정을 불러오지 못했어요')
   }
 
   const pool = templatePoolForMissionDay(
@@ -272,7 +221,7 @@ export default async function ChildHomePage() {
    * - 개선: 오늘 풀(pool)에 있는 템플릿 중, 아직 오늘 `daily_missions`에 없는 것만 보충 삽입합니다.
    */
   let { data: existingRows, error: existingErr } = dailyMissionsRes
-  if (existingErr) console.error('[child/home] daily_missions select', existingErr.message)
+  if (existingErr) throw new Error('오늘의 미션 기록을 불러오지 못했어요')
 
   let existing = (existingRows ?? []) as DailyMissionWithTemplate[]
 
@@ -339,29 +288,9 @@ export default async function ChildHomePage() {
 
   // ── 마켓 ─────────────────────────────────────────────────────────────────
 
-  const familyLinkIds = new Set(familyRows.map((r) => r.id))
-  const hiddenIds = new Set(
-    (hiddenRes.error ? [] : (hiddenRes.data ?? [])).map(
-      (r: { store_item_id: string }) => r.store_item_id,
-    ),
-  )
-
-  const creditOverrides: Record<string, number> = {}
-  if (!creditOvRes.error && creditOvRes.data) {
-    for (const row of creditOvRes.data as { store_item_id: string; credit_price: number }[]) {
-      creditOverrides[row.store_item_id] = row.credit_price
-    }
-  }
-
-  const rawItems = (itemsRes.data ?? []) as StoreItem[]
-  const filtered = rawItems.filter(
-    (item) =>
-      !isCategoryExcludedFromMarket(item.category) &&
-      (item.family_link_id == null || familyLinkIds.has(item.family_link_id)),
-  )
-  const marketEligibleItems = applyStoreItemCreditOverrides(filtered, creditOverrides)
-  const initialHiddenStoreItemIds = Array.from(hiddenIds).sort()
-  const marketRequests = (requestsRes.data ?? []) as PurchaseRequest[]
+  const marketEligibleItems: StoreItem[] = []
+  const initialHiddenStoreItemIds: string[] = []
+  const marketRequests: PurchaseRequest[] = []
   // ── exitHref ─────────────────────────────────────────────────────────────
 
   const exitHref = ctx.isParentPreview ? '/api/parent/exit-child-ui' : '/parent/home'
@@ -379,6 +308,7 @@ export default async function ChildHomePage() {
       ageYears={ageYears}
       childAvatarUrl={childAvatarUrl}
       initialStats={initialStats}
+      initialHasChosenSeed={seedRes.error ? undefined : (seedRes.count ?? 0) > 0}
       dailyMissions={dailyMissions}
       today={today}
       initialPraiseGrants={praiseGrants}

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { applyChildCreditsCas } from '@/lib/childStatsCreditsCas'
+import { undoDailyMission } from '@/lib/undoDailyMission'
 
 /**
  * POST /api/mission/rollback
@@ -17,11 +17,15 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: '인증이 필요해요' }, { status: 401 })
 
   let missionLogId: string
+  let expectedCompletedAt: string
+  let requestId: string
   try {
-    ;({ missionLogId } = await req.json())
+    ;({ missionLogId, expectedCompletedAt, requestId } = await req.json())
   } catch {
     return NextResponse.json({ error: '요청 형식이 올바르지 않아요' }, { status: 400 })
   }
+
+  if (!expectedCompletedAt || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(requestId ?? '')) return NextResponse.json({ error: '작업 정보를 새로 확인해 주세요' }, { status: 400 })
 
   // 부모 계정인지 확인합니다.
   const { data: profile } = await supabase
@@ -37,13 +41,15 @@ export async function POST(req: NextRequest) {
   // 완료 로그 한 줄을 가져옵니다(템플릿·배정일로 daily_missions 행을 찾습니다).
   const { data: log, error: logFetchErr } = await supabase
     .from('mission_logs')
-    .select('id, child_id, mission_id, assigned_date, is_completed, credit_earned, heart_earned, exp_earned')
+    .select('id, child_id, mission_id, assigned_date, completed_at, is_completed, credit_earned, heart_earned, exp_earned')
     .eq('id', missionLogId)
     .maybeSingle()
 
   if (logFetchErr || !log) {
     return NextResponse.json({ error: '미션 로그를 찾을 수 없어요' }, { status: 404 })
   }
+
+  if (log.completed_at !== expectedCompletedAt) return NextResponse.json({ error: '완료 기록이 바뀌었어요. 새로 확인해 주세요.' }, { status: 409 })
 
   if (!log.is_completed) {
     return NextResponse.json({ error: '이미 미완료 상태예요' }, { status: 409 })
@@ -67,7 +73,7 @@ export async function POST(req: NextRequest) {
 
   const { data: dm, error: dmFetchErr } = await supabase
     .from('daily_missions')
-    .select('id')
+    .select('id, completion_version')
     .eq('child_id', log.child_id)
     .eq('mission_template_id', log.mission_id)
     .eq('date', assignedDay)
@@ -107,69 +113,11 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  // 지급됐던 만큼만 빼 줍니다(미션 탭 클라이언트 롤백과 동일한 단순 차감).
-  // 크레딧·하트·누적·경험치는 아래 CAS 안에서 최신 값 기준으로 다시 계산합니다.
-  const newLevel = stats.current_level
-
-  const { error: dmUpErr } = await supabase
-    .from('daily_missions')
-    .update({ is_completed: false, completed_at: null })
-    .eq('id', dm.id)
-    .eq('child_id', log.child_id)
-
-  if (dmUpErr) {
-    return NextResponse.json({ error: '일일 미션 되돌리기에 실패했어요' }, { status: 500 })
+  try {
+    await undoDailyMission(log.child_id, dm.id, dm.completion_version, requestId, false)
+  } catch (error) {
+    console.error('[mission/rollback]', error)
+    return NextResponse.json({ error: '미션을 되돌리지 못했어요. 상태를 새로 확인해 주세요.' }, { status: 409 })
   }
-
-  const { error: mlErr } = await supabase
-    .from('mission_logs')
-    .update({
-      is_completed: false,
-      completed_at: null,
-      credit_earned: 0,
-      heart_earned: 0,
-      exp_earned: 0,
-    })
-    .eq('id', missionLogId)
-
-  if (mlErr) {
-    return NextResponse.json({ error: '미션 로그 되돌리기에 실패했어요' }, { status: 500 })
-  }
-
-  /**
-   * 크레딧·하트 되돌리기는 **CAS**(읽은 값 그대로일 때만 저장)로 처리합니다.
-   *
-   * 비개발자 설명: 예전에는 "지금 잔액을 읽어 → 뺀 값으로 통째로 덮어쓰기" 였습니다.
-   * 그 사이에 아이가 미션을 하나 더 끝내거나 저금통을 옮기면, 그 결과가 옛 계산값에
-   * 지워져 크레딧이 사라졌습니다. 이제는 값이 그사이 바뀌었으면 최신 값으로 다시 계산합니다.
-   */
-  const applied = await applyChildCreditsCas(
-    supabase,
-    log.child_id,
-    (current) => ({
-      ok: true as const,
-      credits: Math.max(0, current.credits - log.credit_earned),
-      hearts: Math.max(0, current.hearts - log.heart_earned),
-      totalEarned: Math.max(0, current.totalEarned - log.credit_earned),
-      exp: Math.max(0, current.exp - log.exp_earned),
-    }),
-    { extraPatch: { current_level: newLevel } },
-  )
-
-  if (applied.ok === false) {
-    return NextResponse.json({ error: '보상(크레딧·XP) 되돌리기에 실패했어요' }, { status: 500 })
-  }
-
-  /**
-   * EQ(루틴 완주율 등) 다시 계산 — 138 이전에는 `mission_logs` 트리거가 자동으로 했지만,
-   * 그 트리거가 «보상 반영 전» child_stats 를 저장해 크레딧이 화면에서 오르내리게 만들어
-   * 제거했습니다. 되돌리기 경로에서는 여기서 직접 부릅니다.
-   * 실패해도 되돌리기 자체는 이미 끝났으므로 요청을 막지 않습니다.
-   */
-  const { error: eqErr } = await supabase.rpc('recalculate_eq', { p_child_id: log.child_id })
-  if (eqErr) {
-    console.error('[mission/rollback] recalculate_eq 실패(무시하고 진행)', eqErr.message)
-  }
-
   return NextResponse.json({ success: true, dailyMissionId: dm.id })
 }

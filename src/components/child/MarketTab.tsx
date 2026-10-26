@@ -1,5 +1,7 @@
 'use client'
 
+import { queueChildAction } from '@/lib/childActionQueue'
+
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { StoreItem, PurchaseRequest } from '@/types/database'
@@ -351,12 +353,11 @@ export default function MarketTab({
     setPurchaseCelebrationOpen(true)
     const pending = pendingPurchaseResultRef.current
     if (pending) {
-      setCurrentCredits(pending.credits)
+      setCurrentCredits(marketSpendable)
       setMyRequests((prev) => [pending.request, ...prev])
-      onMarketCreditsChanged?.(pending.credits)
       pendingPurchaseResultRef.current = null
     }
-  }, [onMarketCreditsChanged])
+  }, [marketSpendable])
 
   /** 다음 배달 연출을 꺼내거나, 대기 줄에 넣습니다 */
   const offerDelivery = useCallback(
@@ -568,6 +569,7 @@ export default function MarketTab({
       ? Math.min(99, Math.max(1, Math.floor(quantity)))
       : 1
     setLoading(item.id)
+    return queueChildAction(childId, async () => {
     try {
       const res = await fetch('/api/market/request', {
         method: 'POST',
@@ -592,9 +594,7 @@ export default function MarketTab({
        * 같은 문구가 구매 확인 팝업 안에도 표시되는데, 토스트가 팝업(z-210)보다 위(z-220)에
        * 겹쳐 떠서 문구가 두 번 보이고 버튼까지 가렸기 때문입니다. 문구는 팝업 안에서만 보여 줍니다.
        */
-      if (parseFailed) {
-        return { ok: false, error: '네트워크 오류가 발생했어요' }
-      }
+      if (parseFailed || res.status >= 500) throw new Error('구매 결과를 확인하지 못했어요')
       if (!res.ok) {
         const msg = json.error ?? '요청에 실패했어요'
         /**
@@ -613,6 +613,8 @@ export default function MarketTab({
         typeof json.credits === 'number'
           ? readChildStatInt(json.credits)
           : currentCredits - item.credit_price * purchaseQty
+      setCurrentCredits(nextCredits)
+      onMarketCreditsChanged?.(nextCredits)
       if (json.request) {
         pendingPurchaseResultRef.current = {
           credits: nextCredits,
@@ -621,12 +623,17 @@ export default function MarketTab({
       }
       /** 축하 오버레이에서 안내하므로 별도 토스트는 띄우지 않음(문구 겹침 방지) */
       return { ok: true }
-    } catch {
-      return { ok: false, error: '네트워크 오류가 발생했어요' }
+    } catch (error) {
+      throw error
     } finally {
       purchaseInFlightRef.current = false
       setLoading(null)
     }
+    }).catch(() => {
+      purchaseInFlightRef.current = false
+      setLoading(null)
+      return { ok: false, error: '저장 결과를 다시 확인해 주세요.' }
+    })
   }
 
   async function completeDeliveryFlow() {

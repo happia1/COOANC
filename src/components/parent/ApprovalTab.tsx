@@ -715,7 +715,7 @@ export default function ApprovalTab({
       const res = await fetch('/api/mission/rollback', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ missionLogId: log.id }),
+        body: JSON.stringify({ missionLogId: log.id, expectedCompletedAt: log.completed_at, requestId: crypto.randomUUID() }),
       })
       const text = await res.text()
       let json: { error?: string; dailyMissionId?: string; code?: string } = {}

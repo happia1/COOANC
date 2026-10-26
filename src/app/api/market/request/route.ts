@@ -1,3 +1,4 @@
+import { createServiceRoleClient } from '@/lib/supabase/admin'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { resolveApiActorChildId } from '@/lib/resolveApiActorChildId'
@@ -32,6 +33,8 @@ async function deductCreditsWithCas(
   price: number,
   firstReadCredits: unknown,
 ): Promise<DeductResult> {
+  const writer = createServiceRoleClient()
+  if (!writer) return { ok: false, reason: 'error' }
   let observed = readChildStatInt(firstReadCredits)
 
   for (let attempt = 0; attempt < CREDIT_CAS_MAX_ATTEMPTS; attempt += 1) {
@@ -40,7 +43,7 @@ async function deductCreditsWithCas(
     }
 
     const next = observed - price
-    const { data, error } = await supabase
+    const { data, error } = await writer
       .from('child_stats')
       .update({
         credits: next,
@@ -61,7 +64,7 @@ async function deductCreditsWithCas(
     }
 
     /** 경합 발생 — 최신 잔액을 다시 읽어 재시도 */
-    const { data: fresh, error: freshErr } = await supabase
+    const { data: fresh, error: freshErr } = await writer
       .from('child_stats')
       .select('credits')
       .eq('child_id', childId)
@@ -85,10 +88,12 @@ async function refundCreditsWithCas(
   price: number,
   knownCredits: number,
 ): Promise<void> {
+  const writer = createServiceRoleClient()
+  if (!writer) throw new Error('Market writer unavailable')
   let observed = knownCredits
 
   for (let attempt = 0; attempt < CREDIT_CAS_MAX_ATTEMPTS; attempt += 1) {
-    const { data, error } = await supabase
+    const { data, error } = await writer
       .from('child_stats')
       .update({ credits: observed + price, credits_wallet: 0, updated_at: new Date().toISOString() })
       .eq('child_id', childId)
@@ -101,7 +106,7 @@ async function refundCreditsWithCas(
     }
     if (data && data.length > 0) return
 
-    const { data: fresh, error: freshErr } = await supabase
+    const { data: fresh, error: freshErr } = await writer
       .from('child_stats')
       .select('credits')
       .eq('child_id', childId)

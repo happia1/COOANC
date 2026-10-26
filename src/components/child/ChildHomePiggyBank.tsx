@@ -1,5 +1,7 @@
 'use client'
 
+import { queueChildAction, childActionSequence } from '@/lib/childActionQueue'
+
 /**
  * 자녀 홈 발 옆 저금통 — 가용 크레딧과 저금통 사이를 1개씩 옮깁니다.
  *
@@ -170,6 +172,9 @@ export default function ChildHomePiggyBank({
     return () => {
       if (syncingTimerRef.current !== null) window.clearTimeout(syncingTimerRef.current)
       if (coalesceTimerRef.current !== null) window.clearTimeout(coalesceTimerRef.current)
+      const batch = pendingCoalesceRef.current
+      pendingCoalesceRef.current = null
+      if (batch) batch.release(batch)
     }
   }, [])
 
@@ -282,8 +287,8 @@ export default function ChildHomePiggyBank({
       const overshoot = optimisticAmount - moved
       if (overshoot !== 0) {
         lastConfirmedBalanceRef.current = {
-          creditsDelta: kind === 'credits_to_piggy' ? overshoot : -overshoot,
-          piggyDelta: kind === 'credits_to_piggy' ? -overshoot : overshoot,
+          creditsDelta: (lastConfirmedBalanceRef.current?.creditsDelta ?? 0) + (kind === 'credits_to_piggy' ? overshoot : -overshoot),
+          piggyDelta: (lastConfirmedBalanceRef.current?.piggyDelta ?? 0) + (kind === 'credits_to_piggy' ? -overshoot : overshoot),
         }
       }
     } finally {
@@ -320,6 +325,8 @@ export default function ChildHomePiggyBank({
     kind: TransferKind
     requested: number
     optimistic: number
+    sequence: number
+    release: (batch: { kind: TransferKind; requested: number; optimistic: number }) => void
   } | null>(null)
   const coalesceTimerRef = useRef<number | null>(null)
 
@@ -332,25 +339,28 @@ export default function ChildHomePiggyBank({
     pendingCoalesceRef.current = null
     if (!batch) return
 
-    apiQueueRef.current = apiQueueRef.current
-      .then(() => syncTransferToServer(batch.kind, batch.requested, batch.optimistic))
-      .catch((err) => {
-        console.warn('[ChildHomePiggyBank] transfer queue failed', err)
-      })
+    batch.release(batch)
   }, [syncTransferToServer])
 
   const enqueueTransfer = useCallback(
     (kind: TransferKind, requested: number, optimisticAmount: number) => {
       /** 방향이 바뀌면 모아 둔 것을 먼저 보냅니다(넣기와 꺼내기를 섞어 더할 수 없으므로) */
-      if (pendingCoalesceRef.current && pendingCoalesceRef.current.kind !== kind) {
+      if (pendingCoalesceRef.current && (pendingCoalesceRef.current.kind !== kind || pendingCoalesceRef.current.sequence !== childActionSequence(childId))) {
         flushTransfer()
       }
 
       const prev = pendingCoalesceRef.current
-      pendingCoalesceRef.current = {
-        kind,
-        requested: (prev?.requested ?? 0) + requested,
-        optimistic: (prev?.optimistic ?? 0) + optimisticAmount,
+      if (prev) {
+        prev.requested += requested
+        prev.optimistic += optimisticAmount
+      } else {
+        let release!: (batch: { kind: TransferKind; requested: number; optimistic: number }) => void
+        const ready = new Promise<{ kind: TransferKind; requested: number; optimistic: number }>((resolve) => { release = resolve })
+        apiQueueRef.current = queueChildAction(childId, async () => {
+          const batch = await ready
+          await syncTransferToServer(batch.kind, batch.requested, batch.optimistic)
+        }).catch((error) => { console.warn('[piggy] queue', error) })
+        pendingCoalesceRef.current = { kind, requested, optimistic: optimisticAmount, release, sequence: childActionSequence(childId) }
       }
 
       if (prev === null) {
@@ -370,7 +380,7 @@ export default function ChildHomePiggyBank({
       if (coalesceTimerRef.current !== null) window.clearTimeout(coalesceTimerRef.current)
       coalesceTimerRef.current = window.setTimeout(flushTransfer, TRANSFER_COALESCE_MS)
     },
-    [flushTransfer, onPiggyTransferPending],
+    [childId, flushTransfer, syncTransferToServer, onPiggyTransferPending],
   )
 
   /**
@@ -464,8 +474,7 @@ export default function ChildHomePiggyBank({
       setCreditsBounceKey((k) => k + 1)
 
       pendingClaimCountRef.current += 1
-      bonusQueueRef.current = bonusQueueRef.current
-        .then(async () => {
+      bonusQueueRef.current = queueChildAction(childId, async () => {
           const res = await claimPiggyBonus(childId, 1)
           if (!res || res.claimed < 1) {
             // 서버가 거절(이미 다 받음 등) — 화면을 되돌립니다.

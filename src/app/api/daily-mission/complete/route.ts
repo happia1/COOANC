@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { addSeoulCalendarDays, getSeoulDateString, getSeoulTimeHHMM } from '@/lib/koreaDate'
+import { getSeoulDateString, getSeoulTimeHHMM } from '@/lib/koreaDate'
 import {
   isAfternoonMissionFields,
   isBedtimeMissionBlockedBeforeSleepReadyWindow,
@@ -25,9 +25,7 @@ import {
  * - 부모 미리보기: childId 필수 — family_links 로 연결된 자녀만 처리
  *
  * 처리 순서:
- *  1. daily_missions 완료 표시
- *  2. mission_logs 반영
- *  3. child_stats (크레딧·EXP·스트릭 등) 갱신
+ * 완료·로그·보상은 동일한 DB 트랜잭션에서 기록하고, 같은 작업은 추가 지급 없이 재확인합니다.
  */
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
@@ -39,16 +37,20 @@ export async function POST(req: NextRequest) {
   let dailyMissionId: string
   let today: string
   let bodyChildId: unknown
+  let requestId: string
+  let completionVersion: number
   try {
     const body = await req.json()
     dailyMissionId = body.dailyMissionId
     today = body.today
     bodyChildId = body.childId
+    requestId = body.requestId
+    completionVersion = body.completionVersion
   } catch {
     return NextResponse.json({ error: '요청 형식이 올바르지 않아요' }, { status: 400 })
   }
 
-  if (!dailyMissionId || !today) {
+  if (!dailyMissionId || !today || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(requestId ?? '') || !Number.isInteger(completionVersion) || completionVersion < 0) {
     return NextResponse.json({ error: '필수 항목이 누락됐어요' }, { status: 400 })
   }
 
@@ -80,30 +82,15 @@ export async function POST(req: NextRequest) {
   if (!dm) {
     return NextResponse.json({ error: '미션을 찾을 수 없어요' }, { status: 404 })
   }
-  if (dm.is_completed) {
-    return NextResponse.json({ error: '이미 완료한 미션이에요' }, { status: 409 })
-  }
+
 
   /**
-   * 미션 템플릿과 기존 로그도 서로 무관하므로 함께 보냅니다(둘 다 `dm` 이 있어야 알 수 있어서 두 번째 묶음).
+   * 시간 제한 검증용 템플릿을 읽습니다. 실제 지급액은 트랜잭션 안에서 다시 계산합니다.
    * 보너스 배율(028) — 컬럼이 있으면 완료 보상에 곱합니다.
    */
-  const [missionRes, existingLogResult] = await Promise.all([
-    supabase
-      .from('missions')
-      .select(
-        'credit_reward, heart_reward, exp_reward, reward_multiplier, is_active, level_required, title, icon_emoji, block, scheduled_time, repeat_type, difficulty',
-      )
-      .eq('id', dm.mission_template_id)
-      .maybeSingle(),
-    supabase
-      .from('mission_logs')
-      .select('id, is_completed')
-      .eq('child_id', childId)
-      .eq('mission_id', dm.mission_template_id)
-      .eq('assigned_date', dm.date)
-      .maybeSingle(),
-  ])
+  const missionRes = await supabase.from('missions').select(
+    'credit_reward, heart_reward, exp_reward, reward_multiplier, is_active, level_required, title, icon_emoji, block, scheduled_time, repeat_type, difficulty',
+  ).eq('id', dm.mission_template_id).maybeSingle()
 
   const mission = missionRes.data
 
@@ -119,24 +106,11 @@ export async function POST(req: NextRequest) {
   const { credit: creditEarned, heart: heartEarned, exp: expEarned, mult: rewardMultiplier } =
     scaledMissionRewards(mission as Mission)
 
-  const completedAt = new Date().toISOString()
-
   /** daily_missions.date 와 동일한 배정일을 써야 승인 탭 「오늘 완료」 필터·부모 목록과 일치합니다 */
   const assignedDate = dm.date
   /** 스트릭·last_mission_date 는 요청 body 의 today 가 아니라 실제 배정일 기준으로 맞춥니다 */
   const completionDay =
     typeof assignedDate === 'string' ? assignedDate.slice(0, 10) : String(assignedDate ?? '').slice(0, 10)
-
-  const logData = {
-    child_id: childId,
-    mission_id: dm.mission_template_id,
-    assigned_date: assignedDate,
-    is_completed: true,
-    completed_at: completedAt,
-    credit_earned: creditEarned,
-    heart_earned: heartEarned,
-    exp_earned: expEarned,
-  }
 
   const actorProfile = actorProfileRes.data
   const peekStats = statsPeek.data
@@ -178,218 +152,18 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const { error: dmCompleteErr } = await supabase
-    .from('daily_missions')
-    .update({ is_completed: true, completed_at: completedAt })
-    .eq('id', dailyMissionId)
-  if (dmCompleteErr) {
-    return NextResponse.json({ error: '미션 완료 상태를 저장하지 못했어요' }, { status: 500 })
-  }
-
-  const existingLog = existingLogResult.data
-  const logWrite = existingLog
-    ? supabase.from('mission_logs').update(logData).eq('id', existingLog.id)
-    : supabase.from('mission_logs').insert(logData)
-
-  const [{ error: logErr }, statsRes] = await Promise.all([logWrite, Promise.resolve(statsPeek)])
-  if (logErr) {
-    return NextResponse.json({ error: '미션 기록을 저장하지 못했어요' }, { status: 500 })
-  }
-
-  const { data: stats } = statsRes
-
-  if (!stats) return NextResponse.json({ error: '스탯 정보를 찾을 수 없어요' }, { status: 404 })
-
-  // ── 배 이동 판정: 오늘 완료율 90% 이상 (실제 이동·하루 1회 게이트는 RPC가 행 잠금 안에서 처리) ──
-  /** `daily_missions` 배정 열은 `date` 입니다(`assigned_date` 는 mission_logs 전용). */
-  const { data: todayMissions } = await supabase
-    .from('daily_missions')
-    .select('id, is_completed')
-    .eq('child_id', childId)
-    .eq('date', completionDay)
-
-  const totalToday = todayMissions?.length ?? 0
-  /**
-   * 이 조회는 **위에서 이번 미션을 완료로 저장한 뒤**에 실행됩니다.
-   * 그래서 아래 개수에는 방금 끝낸 미션이 이미 포함되어 있습니다.
-   *
-   * 예전에는 여기에 `+1`(낙관적)을 또 더했습니다. 완료 저장을 나중에 하던 시절의 코드가
-   * 순서가 바뀐 뒤에도 남아 있었던 것으로, 방금 끝낸 미션이 **두 번 세어졌습니다.**
-   * 그 결과 「오늘 90% 이상 완료」 판정이 실제보다 한 개 일찍 켜져서,
-   * 미션이 아직 남았는데도 배가 앞으로 나가는 일이 있었습니다.
-   */
-  const completedToday = todayMissions?.filter((m) => m.is_completed).length ?? 0
-  const heartsFullToday = totalToday > 0 && completedToday / totalToday >= 0.9
-
-  /**
-   * 보상 반영은 121 RPC(complete_mission_reward)로 원자화합니다.
-   * 행 잠금(FOR UPDATE) 안에서 증가·레벨업·스트릭·배 이동을 계산해,
-   * 카드 연타(동시 요청) 시 같은 잔액을 읽고 서로 덮어쓰던 보상 유실(Lost Update)을 막습니다.
-   */
-  type AppliedReward = {
-    credits: number
-    hearts: number
-    exp: number
-    current_level: number
-    exp_to_next_level: number
-    streak_days: number
-    total_credits_earned: number
-    boat_advanced: boolean
-  }
-  let applied: AppliedReward | null = null
-
-  const { data: rpcData, error: rpcErr } = await supabase.rpc('complete_mission_reward', {
-    p_child_id: childId,
-    p_credit: creditEarned,
-    p_heart: heartEarned,
-    p_exp: expEarned,
-    p_completion_day: completionDay,
-    p_advance_boat: heartsFullToday,
+  const service = createServiceRoleClient()
+  if (!service) return NextResponse.json({ error: '보상 서버 설정을 확인해 주세요' }, { status: 503 })
+  const { data: result, error: actionError } = await service.rpc('apply_daily_mission_action', {
+    p_child_id: childId, p_daily_id: dailyMissionId, p_request_id: requestId,
+    p_version: completionVersion, p_undo: false,
   })
-
-  if (!rpcErr && rpcData && typeof rpcData === 'object') {
-    const r = rpcData as Record<string, unknown>
-    applied = {
-      credits: readChildStatInt(r.credits),
-      hearts: readChildStatInt(r.hearts),
-      exp: readChildStatInt(r.exp),
-      current_level: readChildStatInt(r.current_level),
-      exp_to_next_level: readChildStatInt(r.exp_to_next_level),
-      streak_days: readChildStatInt(r.streak_days),
-      total_credits_earned: readChildStatInt(r.total_credits_earned),
-      boat_advanced: r.boat_advanced === true,
-    }
+  if (actionError || !result?.stats) {
+    console.error('[daily-mission/complete]', actionError)
+    return NextResponse.json({ error: '보상을 확인하지 못했어요. 다시 시도해 주세요.', code: actionError?.message },
+      { status: actionError?.message.includes('STALE_COMPLETION') ? 409 : 503 })
   }
-
-  /**
-   * RPC 가 실패했을 때 **무조건 옛 방식으로 다시 계산하면 안 됩니다.**
-   *
-   * 비개발자 설명: RPC 실패에는 두 가지가 섞여 있습니다.
-   *   ① 그 함수가 DB 에 아예 없음(121 마이그레이션 미적용) → 옛 방식으로 처리해야 함
-   *   ② 함수는 돌았는데 **응답만 못 받음**(응답 지연·연결 끊김) → 보상은 이미 들어갔을 수 있음
-   * ② 인데 다시 계산하면 같은 보상을 두 번 손대게 됩니다. 그래서 ① 일 때만 옛 방식으로 가고,
-   * ② 일 때는 **실제로 반영됐는지 다시 읽어 확인**한 뒤에 필요할 때만 처리합니다.
-   */
-  const rpcFunctionMissing =
-    !!rpcErr && (rpcErr.code === '42883' || rpcErr.code === 'PGRST202')
-
-  if (rpcErr && !rpcFunctionMissing) {
-    console.error(
-      '[daily-mission/complete] complete_mission_reward RPC 오류 — 반영 여부 재확인',
-      rpcErr.code,
-      rpcErr.message,
-    )
-    const { data: after } = await supabase
-      .from('child_stats')
-      .select('credits, hearts, exp, current_level, exp_to_next_level, streak_days, total_credits_earned')
-      .eq('child_id', childId)
-      .maybeSingle()
-
-    /** 보상이 이미 들어간 흔적이 있으면(잔액이 기대치 이상) 그대로 확정하고 다시 손대지 않습니다. */
-    if (after && readChildStatInt(after.credits) >= readChildStatInt(stats.credits) + creditEarned) {
-      applied = {
-        credits: readChildStatInt(after.credits),
-        hearts: readChildStatInt(after.hearts),
-        exp: readChildStatInt(after.exp),
-        current_level: readChildStatInt(after.current_level),
-        exp_to_next_level: readChildStatInt(after.exp_to_next_level),
-        streak_days: readChildStatInt(after.streak_days),
-        total_credits_earned: readChildStatInt(after.total_credits_earned),
-        boat_advanced: false,
-      }
-    }
-  } else if (rpcFunctionMissing) {
-    console.error(
-      '[daily-mission/complete] complete_mission_reward 함수가 없습니다(121 마이그레이션 미적용) — 레거시 경로 폴백',
-    )
-  }
-
-  if (!applied) {
-    // ── 폴백 (121 마이그레이션 미적용 DB): 기존 read-modify-write — 동시 요청 시 보상 유실 가능
-    let newExp = stats.exp + expEarned
-    let newLevel = stats.current_level
-    let newExpToNext = stats.exp_to_next_level
-    while (newExpToNext > 0 && newExp >= newExpToNext) {
-      newExp -= newExpToNext
-      newLevel += 1
-      newExpToNext = Math.max(1, Math.round(newExpToNext * 1.5))
-    }
-
-    const yesterday = addSeoulCalendarDays(completionDay, -1)
-    let newStreak = stats.streak_days
-    if (stats.last_mission_date !== completionDay) {
-      newStreak = stats.last_mission_date === yesterday ? newStreak + 1 : 1
-    }
-
-    const baseCredits = readChildStatInt(stats.credits)
-    const baseHearts = readChildStatInt(stats.hearts)
-    const baseTotalCreditsEarned = readChildStatInt(stats.total_credits_earned)
-    const lastHeartsFullDate = (stats as Record<string, unknown>).last_hearts_full_date as string | null | undefined
-    const boatShouldAdvance = heartsFullToday && lastHeartsFullDate !== completionDay
-
-    const NAV_STEPS_PER_SECTION = 5
-    const NAV_SECTION_COUNT = 4
-    const currentBoatSection = ((stats as Record<string, unknown>).boat_section as number | undefined) ?? 0
-    const currentBoatStep = ((stats as Record<string, unknown>).boat_step as number | undefined) ?? 0
-
-    let newBoatSection = currentBoatSection
-    let newBoatStep = currentBoatStep
-    if (boatShouldAdvance) {
-      newBoatStep = currentBoatStep + 1
-      if (newBoatStep >= NAV_STEPS_PER_SECTION && newBoatSection < NAV_SECTION_COUNT - 1) {
-        newBoatSection = currentBoatSection + 1
-        newBoatStep = 0
-      } else if (newBoatStep >= NAV_STEPS_PER_SECTION) {
-        newBoatStep = NAV_STEPS_PER_SECTION - 1 // 마지막 섹션 마지막 칸에서 고정
-      }
-    }
-
-    const { error: statsUpdateErr } = await supabase
-      .from('child_stats')
-      .update({
-        /**
-         * `credits_piggy` · `credits_wallet` 은 **일부러 건드리지 않습니다.**
-         * 이 경로는 저금통을 관리하지 않는데도 요청 시작 시점에 읽어 둔 값을 다시 저장했습니다.
-         * 아이가 저금통에 크레딧을 옮기는 도중(1개씩 약 2초 간격) 미션 완료가 끼면,
-         * 그 사이에 들어간 저금이 예전 값으로 덮어써져 사라졌습니다(잃어버린 갱신).
-         * 저금통을 바꾸는 곳은 옮기기(CAS)와 이자 정산뿐이어야 합니다.
-         */
-        credits: baseCredits + creditEarned,
-        hearts: baseHearts + heartEarned,
-        total_credits_earned: baseTotalCreditsEarned + creditEarned,
-        exp: newExp,
-        current_level: newLevel,
-        exp_to_next_level: newExpToNext,
-        streak_days: newStreak,
-        longest_streak: Math.max(stats.longest_streak, newStreak),
-        last_mission_date: completionDay,
-        promotion_pending: false,
-        promotion_eligible_at: null,
-        ...(boatShouldAdvance && {
-          boat_section: newBoatSection,
-          boat_step: newBoatStep,
-          last_hearts_full_date: completionDay,
-        }),
-        updated_at: completedAt,
-      })
-      .eq('child_id', childId)
-    if (statsUpdateErr) {
-      console.error('[daily-mission/complete] child_stats update failed', statsUpdateErr.message)
-      return NextResponse.json({ error: '보상 저장에 실패했어요' }, { status: 500 })
-    }
-
-    applied = {
-      credits: baseCredits + creditEarned,
-      hearts: baseHearts + heartEarned,
-      exp: newExp,
-      current_level: newLevel,
-      exp_to_next_level: newExpToNext,
-      streak_days: newStreak,
-      total_credits_earned: baseTotalCreditsEarned + creditEarned,
-      boat_advanced: boatShouldAdvance,
-    }
-  }
-
+  const applied = { ...result.stats, boat_advanced: result.reward?.boat_advanced === true }
   // ── 게임 트리거: 첫 미션 완료 ──
   const triggerResult = await fireGameTrigger(supabase, childId, 'FIRST_MISSION')
 
@@ -502,9 +276,12 @@ export async function POST(req: NextRequest) {
   }
 
   return NextResponse.json({
-    creditReward: creditEarned,
-    heartReward: heartEarned,
-    expReward: expEarned,
+    requestId,
+    completionVersion: result.completionVersion,
+    alreadyCompleted: result.alreadyCompleted === true,
+    creditReward: result.creditReward ?? creditEarned,
+    heartReward: result.heartReward ?? heartEarned,
+    expReward: result.expReward ?? expEarned,
     rewardMultiplier,
     newLevel: applied.current_level,
     newExp: applied.exp,

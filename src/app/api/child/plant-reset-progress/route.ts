@@ -1,3 +1,4 @@
+import { createServiceRoleClient } from '@/lib/supabase/admin'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { resolveApiActorChildId } from '@/lib/resolveApiActorChildId'
@@ -29,8 +30,10 @@ export async function POST(req: NextRequest) {
     const resolved = await resolveApiActorChildId(supabase, user, bodyChildId)
     if (resolved.ok === false) return resolved.response
     const childId = resolved.childId
+    const writer = createServiceRoleClient()
+    if (!writer) return NextResponse.json({ error: '서버 설정을 확인해 주세요' }, { status: 503 })
 
-    const { data: after, error } = await supabase
+    const { data: after, error } = await writer
       .from('child_stats')
       .update({
         pot_stage: 0,

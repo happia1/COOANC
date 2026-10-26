@@ -1,3 +1,4 @@
+import { createServiceRoleClient } from '@/lib/supabase/admin'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { resolveApiActorChildId } from '@/lib/resolveApiActorChildId'
@@ -125,7 +126,7 @@ export async function POST(req: NextRequest) {
    * 자녀 앱이 열릴 때도 같은 정산이 돌기 때문에 여기서 결과를 기다릴 이유가 없고,
    * 기다리면 옮기기 응답이 그만큼 늦어져 「계산 중」이 오래 떠 있었습니다.
    */
-  void supabase.rpc('settle_piggy_bonus', { p_child_id: childId }).then(({ error }) => {
+  void createServiceRoleClient()?.rpc('settle_piggy_bonus', { p_child_id: childId }).then(({ error }) => {
     if (error) console.warn('[credits/transfer] 저금통 이자 정산 실패:', error.message)
   })
 

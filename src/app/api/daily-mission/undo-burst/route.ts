@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { resolveApiActorChildId } from '@/lib/resolveApiActorChildId'
-import { applyChildCreditsCas } from '@/lib/childStatsCreditsCas'
+import { undoDailyMission } from '@/lib/undoDailyMission'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 /**
@@ -26,10 +26,14 @@ export async function POST(req: NextRequest) {
 
   let dailyMissionIds: unknown
   let bodyChildId: unknown
+  let completionVersions: Record<string, number> = {}
+  let requestIds: Record<string, string> = {}
   try {
     const body = await req.json()
     dailyMissionIds = body.dailyMissionIds
     bodyChildId = body.childId
+    completionVersions = body.completionVersions ?? {}
+    requestIds = body.requestIds ?? {}
   } catch {
     return NextResponse.json({ error: '요청 형식이 올바르지 않아요' }, { status: 400 })
   }
@@ -61,7 +65,7 @@ export async function POST(req: NextRequest) {
   const failed: { id: string; error: string }[] = []
 
   for (const id of ids) {
-    const r = await undoRecentCompletionForChild(supabase, childId, id)
+    const r = await undoRecentCompletionForChild(supabase, childId, id, completionVersions[id], requestIds[id])
     if (r.status === 'undone') {
       undone.push(id)
     } else if (r.status === 'skip') {
@@ -92,10 +96,13 @@ async function undoRecentCompletionForChild(
   supabase: SupabaseClient,
   childId: string,
   dailyMissionId: string,
+  version: number,
+  requestId: string,
 ): Promise<UndoResult> {
+  if (!Number.isInteger(version) || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(requestId ?? '')) return { status: 'err', message: '작업 정보를 새로 확인해 주세요' }
   const { data: dm, error: dmErr } = await supabase
     .from('daily_missions')
-    .select('id, child_id, mission_template_id, date, is_completed, completed_at')
+    .select('id, child_id, mission_template_id, date, is_completed, completed_at, completion_version')
     .eq('id', dailyMissionId)
     .eq('child_id', childId)
     .maybeSingle()
@@ -118,92 +125,11 @@ async function undoRecentCompletionForChild(
     return { status: 'err', message: '최근에 끝낸 미션만 취소할 수 있어요' }
   }
 
-  const assignedDate = (dm as { date: string | null }).date
-
-  const { data: log, error: logErr } = await supabase
-    .from('mission_logs')
-    .select('id, is_completed, credit_earned, heart_earned, exp_earned')
-    .eq('child_id', childId)
-    .eq('mission_id', dm.mission_template_id)
-    .eq('assigned_date', assignedDate)
-    .maybeSingle()
-
-  if (logErr || !log) {
-    return { status: 'err', message: '미션 기록을 찾을 수 없어요' }
+  try {
+    await undoDailyMission(childId, dm.id, version, requestId, true)
+    return { status: 'undone' }
+  } catch (error) {
+    console.error('[undo-burst]', error)
+    return { status: 'err', message: '미션을 되돌리지 못했어요. 상태를 새로 확인해 주세요.' }
   }
-
-  if (!log.is_completed) {
-    return { status: 'err', message: '이미 취소된 기록이에요' }
-  }
-
-  const { data: stats, error: statsErr } = await supabase
-    .from('child_stats')
-    .select('credits, hearts, exp, current_level, exp_to_next_level, total_credits_earned')
-    .eq('child_id', childId)
-    .maybeSingle()
-
-  if (statsErr || !stats) {
-    return { status: 'err', message: '스탯 정보를 찾을 수 없어요' }
-  }
-
-  // 크레딧·하트·누적·경험치는 아래 CAS 안에서 최신 값 기준으로 다시 계산합니다.
-  const newLevel = Number(stats.current_level)
-
-  const { error: dmUpErr } = await supabase
-    .from('daily_missions')
-    .update({ is_completed: false, completed_at: null })
-    .eq('id', dm.id)
-    .eq('child_id', childId)
-
-  if (dmUpErr) {
-    return { status: 'err', message: '일일 미션 되돌리기에 실패했어요' }
-  }
-
-  const { error: mlErr } = await supabase
-    .from('mission_logs')
-    .update({
-      is_completed: false,
-      completed_at: null,
-      credit_earned: 0,
-      heart_earned: 0,
-      exp_earned: 0,
-    })
-    .eq('id', log.id)
-
-  if (mlErr) {
-    return { status: 'err', message: '미션 로그 되돌리기에 실패했어요' }
-  }
-
-  /**
-   * 크레딧·하트 되돌리기는 **CAS**(읽은 값 그대로일 때만 저장)로 처리합니다.
-   * 예전에는 읽어 둔 잔액으로 통째로 덮어써서, 그사이 들어온 다른 변경(미션 보상·저금통 등)이
-   * 지워졌습니다(잃어버린 갱신).
-   */
-  const applied = await applyChildCreditsCas(
-    supabase,
-    childId,
-    (current) => ({
-      ok: true as const,
-      credits: Math.max(0, current.credits - Number(log.credit_earned)),
-      hearts: Math.max(0, current.hearts - Number(log.heart_earned)),
-      totalEarned: Math.max(0, current.totalEarned - Number(log.credit_earned)),
-      exp: Math.max(0, current.exp - Number(log.exp_earned)),
-    }),
-    { extraPatch: { current_level: newLevel } },
-  )
-
-  if (applied.ok === false) {
-    return { status: 'err', message: '보상(크레딧·XP) 되돌리기에 실패했어요' }
-  }
-
-  /**
-   * EQ 다시 계산 — 138 에서 `mission_logs` 트리거를 없앴으므로(크레딧이 오르내리던 원인)
-   * 되돌리기 경로에서는 직접 부릅니다. 실패해도 되돌리기는 이미 끝났으므로 막지 않습니다.
-   */
-  const { error: eqErr } = await supabase.rpc('recalculate_eq', { p_child_id: childId })
-  if (eqErr) {
-    console.error('[undo-burst] recalculate_eq 실패(무시하고 진행)', eqErr.message)
-  }
-
-  return { status: 'undone' }
 }
