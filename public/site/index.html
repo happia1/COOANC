@@ -68,7 +68,28 @@
       <div class="screen-pair">
         <article class="screen-story child-story">
           <div class="screen-copy"><h3>아이는 오늘 할 일을 확인해요.</h3><p>미션을 끝내고 크레딧과 하트를 모아요. <br>저금통과 화분에서 성장을 눈으로 확인해요.</p></div>
-          <figure class="home-screen-detail"><a href="/site/assets/child-home.webp" target="_blank" rel="noopener" aria-label="아이의 오늘 미션 카드 전체 이미지 보기, 새 탭"><img src="/site/assets/app/mission-detail.jpg" alt="아이의 오늘 미션 카드" loading="lazy" decoding="async" width="800" height="640"></a><figcaption>아이 화면 일부 · <a href="/site/assets/child-home.webp" target="_blank" rel="noopener">전체 화면 보기 ↗</a></figcaption></figure>
+          <div class="mission-demo" data-mission-demo>
+            <div class="demo-heading"><h4>오늘의 미션</h4><span data-demo-count>0 / 2 완료</span></div>
+            <progress class="demo-progress" max="2" value="0" aria-label="체험 미션 완료 수"></progress>
+            <div class="demo-wallet" aria-label="체험 보상"><span>🪙 크레딧 <b data-demo-credit>0</b></span><span>💗 하트 <b data-demo-heart>0</b></span></div>
+            <div class="demo-cards">
+              <button class="demo-mission" type="button" data-mission="가글하기" aria-label="가글하기 완료하기, 크레딧 10과 하트 1 받기">
+                <img class="demo-mission-art" src="/site/assets/app/gargle.png" alt="" width="384" height="384" loading="lazy">
+                <strong>가글하기</strong><span class="demo-reward"><span>🪙 10</span><span>💗 1</span></span>
+                <span class="demo-tap">눌러서 완료하기</span>
+              </button>
+              <button class="demo-mission" type="button" data-mission="머리 빗기" aria-label="머리 빗기 완료하기, 크레딧 10과 하트 1 받기">
+                <img class="demo-mission-art" src="/site/assets/app/comb-hair.png" alt="" width="384" height="384" loading="lazy">
+                <strong>머리 빗기</strong><span class="demo-reward"><span>🪙 10</span><span>💗 1</span></span>
+                <span class="demo-tap">눌러서 완료하기</span>
+              </button>
+            </div>
+            <div class="demo-finished" hidden><img src="/site/assets/app/bunny-front.png" alt="" width="80" height="176"><strong>오늘의 미션, 모두 해냈어요!</strong><p>작은 실천이 두 번의 성취가 되었어요.</p></div>
+            <p class="demo-status" role="status" aria-live="polite" aria-atomic="true">미션 카드를 눌러보세요.</p>
+            <button class="demo-reset" type="button">다시 체험하기 ↻</button>
+          </div>
+          <p class="demo-note">미션 완료 체험 · 실제 계정에는 저장되지 않아요.<br><a href="/site/assets/child-home.webp" target="_blank" rel="noopener">실제 앱 전체 화면 보기 ↗</a></p>
+
         </article>
         <article class="screen-story parent-story">
           <div class="screen-copy"><h3>부모는 하루를 살펴보고 응원해요.</h3><p>생활 미션을 설정하고, 아이의 수행 기록과 <br>보상 요청을 부모 화면에서 확인해요.</p></div>
@@ -136,5 +157,6 @@
   <div class="wrap copyright">© 2026 COOANC. All rights reserved.</div>
 </footer>
 <script src="/site/js/main.js" defer></script>
+<script src="/site/js/mission-demo.js" defer></script>
 </body>
 </html>

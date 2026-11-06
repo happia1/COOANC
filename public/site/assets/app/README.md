@@ -13,3 +13,5 @@ These are local copies of existing COOANC assets; no app screenshots were fabric
 - `share-cover.jpg`: cropped `../hero-2.png` (1367×718, offset 0,17).
 
 Screenshots are pre-existing examples, not newly captured production state. Character, plant, piggy bank and shop illustrations are labelled as app artwork on the page. Full captures remain available through ordinary image links.
+
+- `gargle.png`, `comb-hair.png`: resized copies (max 384px) of `public/assets/img/missions/routine/a.m/gargle.png` and `comb_hair.png` for the interactive homepage demo. The demo follows `ChildMissionCard`'s tap-to-remove interaction and uses sample rewards, with no app API or account persistence.
