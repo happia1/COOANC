@@ -75,7 +75,7 @@ test('feature navigation synchronizes explanation, hotspot and parent screen', (
   const panels = ['parent-routine','parent-home','parent-market'].map((screen, i) => element({ parentScreen: screen, parentY: String(50+i), parentHeight: String(30+i), featureName: `기능 ${i}` }))
   const selectors = [0,1,2,0,1,2].map(i => element({ tourSelect: String(i) }))
   const jump = element({ tourJump: '2', tourTarget: 'family-tour' })
-  const nodes = Object.fromEntries(['[data-tour-prev]','[data-tour-next]','[data-parent-preview]','[data-parent-caption]','.parent-hotspot','[data-tour-count]','.tour-announcement'].map(k => [k, element()]))
+  const nodes = Object.fromEntries(['[data-tour-prev]','[data-tour-next]','[data-parent-preview]','[data-parent-caption]','[data-parent-detail-image]','[data-parent-detail-title]','.parent-detail-crop','.parent-hotspot','[data-tour-count]','.tour-announcement'].map(k => [k, element()]))
   const root = { id: 'family-tour', querySelector: k => nodes[k], querySelectorAll: k => k === '[data-tour-panel]' ? panels : selectors, scrollIntoView() {} }
   runInNewContext(source('features'), { document: { querySelectorAll: k => k === '[data-feature-tour]' ? [root] : [jump] }, window: { matchMedia: () => ({ matches: true }) } })
   assert.equal(nodes['[data-tour-prev]'].disabled, true)
@@ -84,8 +84,10 @@ test('feature navigation synchronizes explanation, hotspot and parent screen', (
   assert.equal(panels[1].hidden, false)
   assert.equal(nodes['.parent-hotspot'].style.top, '51%')
   assert.equal(nodes['.parent-hotspot'].style.height, '31%')
+  assert.equal(nodes['[data-parent-detail-image]'].src, nodes['[data-parent-preview]'].src)
+  assert.equal(nodes['.parent-detail-crop'].style.aspectRatio, `828 / ${1793 * 31 / 100}`)
   assert.equal(selectors[4].getAttribute('aria-pressed'), 'true')
-  jump.click()
+  selectors[2].click()
   assert.equal(nodes['[data-parent-preview]'].src, '/site/assets/parent-market.webp')
   assert.equal(nodes['[data-tour-next]'].disabled, true)
   selectors[0].click()
@@ -107,14 +109,14 @@ test('card rail respects boundaries and reduced motion', () => {
   assert.equal(lastScroll.behavior, 'instant')
 })
 
-test('child-only tour does not require a parent screen and ignores another tour jump', () => {
+test('child-only tour selects a feature without a parent screen', () => {
   const panels = [element({featureName:'화분'}), element({featureName:'스티커'})];
   const selectors = [element({tourSelect:'0'}), element({tourSelect:'1'})];
   const nodes = Object.fromEntries(['[data-tour-prev]','[data-tour-next]','[data-tour-count]','.tour-announcement'].map(k=>[k,element()]));
   const own = element({tourJump:'1',tourTarget:'child-tour'}), other = element({tourJump:'0',tourTarget:'family-tour'});
   const root = {id:'child-tour',querySelector:k=>nodes[k],querySelectorAll:k=>k==='[data-tour-panel]'?panels:selectors,scrollIntoView(){}};
   runInNewContext(source('features'),{document:{querySelectorAll:k=>k==='[data-feature-tour]'?[root]:[own,other]},window:{matchMedia:()=>({matches:true})}});
-  own.click(); other.click();
+  selectors[1].click();
   assert.equal(panels[1].hidden,false);
   assert.equal(selectors[1].getAttribute('aria-pressed'),'true');
 });
@@ -151,4 +153,19 @@ test('swiping a core card synchronizes its detail and navigation', () => {
   assert.equal(panels[1].hidden,false);
   assert.equal(cards[1].getAttribute('aria-pressed'),'true');
   assert.equal(nodes['[data-tour-next]'].disabled,true);
+});
+
+ test('selecting a card scrolls only its horizontal rail', () => {
+  const panels=[element({featureName:'화분'}),element({featureName:'스티커'})];
+  const cards=[element({tourSelect:'0'}),element({tourSelect:'1'})];
+  cards.forEach((card,i)=>{card.getBoundingClientRect=()=>({left:20+i*200,width:180});card.scrollIntoView=()=>{throw Error('must not move page vertically')};});
+  const rail=element(); rail.clientWidth=200;rail.scrollLeft=0;rail.children=cards;
+  rail.getBoundingClientRect=()=>({left:10,width:200});
+  let scroll;rail.scrollTo=value=>{scroll=value};
+  const nodes=Object.fromEntries(['[data-tour-prev]','[data-tour-next]','[data-tour-count]','.tour-announcement'].map(k=>[k,element()]));nodes['.core-card-rail']=rail;
+  const root={querySelector:k=>nodes[k],querySelectorAll:k=>k==='[data-tour-panel]'?panels:cards};
+  runInNewContext(source('features'),{document:{querySelectorAll:()=>[root]},window:{matchMedia:()=>({matches:true})}});
+  nodes['[data-tour-next]'].click();
+  assert.equal(scroll.left,200);assert.equal(scroll.behavior,'instant');assert.equal('top' in scroll,false);
+  assert.equal(panels[1].hidden,false);
 });

@@ -20,6 +20,13 @@ document.querySelectorAll('[data-feature-tour]').forEach(root => {
       preview.src = `/site/assets/${panel.dataset.parentScreen}.webp`;
       preview.alt = `부모 앱 ${parentNames[panel.dataset.parentScreen]} 화면`;
       root.querySelector('[data-parent-caption]').textContent = `실제 앱 · ${parentNames[panel.dataset.parentScreen]} 화면`;
+      const detailImage = root.querySelector('[data-parent-detail-image]');
+      detailImage.src = preview.src;
+      detailImage.alt = `${preview.alt}의 ${panel.dataset.featureName} 영역 확대`;
+      root.querySelector('[data-parent-detail-title]').textContent = `부모 화면 · ${panel.dataset.featureName}`;
+      const crop = root.querySelector('.parent-detail-crop');
+      crop.style.aspectRatio = `828 / ${1793 * Number(panel.dataset.parentHeight) / 100}`;
+      detailImage.style.marginTop = `${-1793 / 828 * Number(panel.dataset.parentY)}%`;
       const highlight = root.querySelector('.parent-hotspot');
       highlight.style.top = `${panel.dataset.parentY}%`;
       highlight.style.height = `${panel.dataset.parentHeight}%`;
@@ -27,18 +34,16 @@ document.querySelectorAll('[data-feature-tour]').forEach(root => {
     root.querySelector('[data-tour-count]').textContent = `${String(index + 1).padStart(2, '0')} / ${String(panels.length).padStart(2, '0')}`;
     prev.disabled = index === 0;
     next.disabled = index === panels.length - 1;
-    if (announce && rail) selectors.find(button => Number(button.dataset.tourSelect) === index).scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block: 'nearest', inline: 'center' });
+    if (announce && rail) {
+      const card = rail.children[index];
+      const left = rail.scrollLeft + card.getBoundingClientRect().left - rail.getBoundingClientRect().left - (rail.clientWidth - card.getBoundingClientRect().width) / 2;
+      rail.scrollTo({ left, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' });
+    }
     if (announce) root.querySelector('.tour-announcement').textContent = `${panel.dataset.featureName} 설명. 선택한 기능의 화면을 확인하세요.`;
   }
   prev.addEventListener('click', () => show(index - 1));
   next.addEventListener('click', () => show(index + 1));
   selectors.forEach(button => button.addEventListener('click', () => show(Number(button.dataset.tourSelect))));
-  document.querySelectorAll('[data-tour-jump]').forEach(button => button.addEventListener('click', () => {
-    if (button.dataset.tourTarget !== root.id) return;
-    show(Number(button.dataset.tourJump));
-    root.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block: 'start' });
-    selectors.find(item => Number(item.dataset.tourSelect) === index).focus({ preventScroll: true });
-  }));
   rail?.addEventListener('scrollend', () => {
     const center = rail.getBoundingClientRect().left + rail.clientWidth / 2;
     const cards = [...rail.children];
@@ -47,7 +52,7 @@ document.querySelectorAll('[data-feature-tour]').forEach(root => {
       const distance = Math.abs(box.left + box.width / 2 - center);
       return distance < best.distance ? { index: i, distance } : best;
     }, { index, distance: Infinity });
-    if (nearest.index !== index) show(nearest.index);
+    if (nearest.index !== index) show(nearest.index, false);
   });
   show(0, false);
 });
