@@ -24,3 +24,5 @@ The phone preview displays the top of the original `child-home.webp` via CSS cli
 - `tablet-room.jpg`: resized JPEG of `public/assets/img/layouts/backgrounds/tablet_kidsroom_background_portrait.png`.
 
 The service tour's tablet is an illustrative HTML composition of original app artwork, labelled as an example, not a captured tablet screen. Parent tour screens are the original full captures. Unlock badges follow `src/lib/parentChildLevelUnlocks.ts`: missions/market/plant 0, stickers 1, piggy bank 5, content chest 8, mini-games 10. Unreleased features have no promised unlock level.
+
+- `tablet-room-current.jpg`: resized current child-home background `public/assets/img/layouts/backgrounds/tablet_kidsroom_background_portrait2.png`, as configured in `src/constants/assets.ts`. Replaces the older tour room.

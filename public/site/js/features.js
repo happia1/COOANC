@@ -22,7 +22,7 @@ document.querySelectorAll('[data-feature-tour]').forEach(root => {
     root.querySelector('[data-tour-count]').textContent = `${String(index + 1).padStart(2, '0')} / ${String(panels.length).padStart(2, '0')}`;
     prev.disabled = index === 0;
     next.disabled = index === panels.length - 1;
-    if (announce) root.querySelector('.tour-announcement').textContent = `${panel.dataset.featureName} 설명. 아이와 부모 화면의 표시점을 확인하세요.`;
+    if (announce) root.querySelector('.tour-announcement').textContent = `${panel.dataset.featureName} 설명. 아이와 부모 화면의 강조 영역을 확인하세요.`;
   }
   prev.addEventListener('click', () => show(index - 1));
   next.addEventListener('click', () => show(index + 1));
