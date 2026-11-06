@@ -1,0 +1,139 @@
+/* 쿠앵크 소개 홈페이지. 앱과 다른 소개 페이지의 레이아웃에는 적용하지 않습니다. */
+.site-home { --maxw:1120px; background:#fffefb; }
+.site-home main { overflow:clip; }
+.site-home section { scroll-margin-top:88px; }
+.site-home h1,.site-home h2 { letter-spacing:-.035em; text-wrap:balance; }
+.site-home h2 { font-size:clamp(28px,3.6vw,44px); line-height:1.35; }
+.site-home h3 { letter-spacing:-.025em; }
+.site-home .wrap { padding-inline:32px; }
+.site-home ::selection { background:#e3e5ff; color:#202864; }
+.site-home :focus-visible { outline:3px solid var(--brand-deep); outline-offset:5px; }
+.site-home a { text-underline-offset:5px; }
+.skip-link { position:fixed; top:12px; left:12px; z-index:120; padding:12px 20px; background:white; color:var(--brand-deep); border-radius:8px; transform:translateY(-160%); }
+.skip-link:focus { transform:none; }
+.site-home .nav { background:#fffefb; backdrop-filter:none; }
+.site-home .nav-inner { height:80px; gap:24px; }
+.site-home .brand-logo { width:160px; height:auto; }
+.site-home .nav-links { margin-left:auto; font-size:14px; gap:22px; }
+.site-home .btn { min-height:48px; border-radius:12px; box-shadow:none; gap:16px; }
+.site-home .btn-primary { background:#454fc3; }
+.site-home .btn-sm { min-height:44px; padding:10px 16px; font-size:13px; }
+.site-home .nav-mobile .btn { color:white; border:none; }
+.site-home .nav-toggle { width:44px; height:44px; }
+.home-hero { padding:0; background:#f1f7fa; }
+.hero-grid { display:grid; grid-template-columns:1.05fr 1fr; align-items:center; gap:30px; min-height:620px; }
+.hero-copy { padding:56px 0; }
+.site-home .hero-copy h1 { font-size:clamp(36px,4.4vw,58px); font-weight:800; line-height:1.23; }
+.hero-copy h1 .jua { color:#454fc3; font-size:1.08em; letter-spacing:-.025em; }
+.hero-description { font-size:18px; line-height:1.85; margin-top:24px; color:#46536a; }
+.hero-actions { display:flex; align-items:center; flex-wrap:wrap; gap:24px; margin-top:30px; }
+.text-link { display:inline-flex; align-items:center; gap:12px; min-height:44px; font-size:15px; font-weight:700; color:var(--brand-deep); }
+.hero-note { font-size:13px; color:#536176; margin-top:14px; }
+.hero-art { align-self:center; display:flex; align-items:center; justify-content:center; }
+.hero-art img { width:100%; height:auto; max-height:620px; object-fit:contain; object-position:center; border-radius:16px; }
+.hero-bottom { display:flex; align-items:center; justify-content:space-between; gap:24px; padding-block:24px; border-top:1px solid #d9e6ee; font-size:14px; color:#46536a; }
+.hero-bottom a { font-weight:700; min-height:44px; display:inline-flex; align-items:center; gap:12px; }
+.mobile-break { display:none; }
+.home-section { padding:96px 0; }
+.home-section-head { display:flex; justify-content:space-between; align-items:end; gap:32px; margin-bottom:40px; }
+.home-section-head>p { max-width:36ch; color:var(--ink-soft); font-size:16px; line-height:1.85; }
+.screen-pair { display:grid; grid-template-columns:1fr 1fr; gap:24px; }
+.screen-story { overflow:hidden; padding:36px 28px 0; border-radius:16px; display:flex; align-items:center; flex-direction:column; }
+.child-story { background:#eaf5f5; }
+.parent-story { background:#f7f0e5; }
+.screen-copy { width:100%; margin-bottom:28px; }
+.screen-copy h3 { font-size:21px; }
+.screen-copy p { color:#4c5868; line-height:1.85; font-size:15px; margin-top:12px; }
+.phone-shot { width:min(100%,258px); border:6px solid #293446; border-bottom:0; border-radius:30px 30px 0 0; overflow:hidden; box-shadow:0 14px 35px -20px #1f293755; background:white; }
+.phone-shot img { width:100%; height:auto; }
+.section-link { display:flex; justify-content:center; margin-top:28px; }
+.home-journey { background:#f6f7fb; }
+.journey-list { list-style:none; display:grid; grid-template-columns:1fr 1fr; gap:0 48px; }
+.journey-list li { display:flex; align-items:center; gap:22px; padding:30px 0; border-top:1px solid #dce2ec; }
+.journey-list img { object-fit:contain; flex-shrink:0; }
+.journey-list h3 { font-size:19px; }
+.journey-list p { font-size:15px; color:#505d70; margin-top:8px; line-height:1.85; }
+.journey-close { margin-top:40px; font-family:'Jua',sans-serif; text-align:center; color:#3642ad; font-size:32px; }
+.journey-close span { font-family:inherit; font-size:18px; color:#46536a; }
+.parent-grid { display:grid; grid-template-columns:1fr 1fr; align-items:center; gap:80px; }
+.parent-art { background:#f4f0e9; border-radius:16px; padding:36px 44px 0; max-height:580px; overflow:hidden; }
+.parent-art img { width:100%; height:auto; border-radius:12px 12px 0 0; }
+.parent-copy>p { margin-top:24px; color:var(--ink-soft); font-size:17px; line-height:1.85; }
+.parent-copy ul { margin:24px 0; }
+.parent-copy li { padding:10px 0; border-bottom:1px solid var(--line); font-size:15px; }
+.home-quotes { display:grid; grid-template-columns:1fr 1fr; gap:0 48px; }
+.home-quotes figure { padding:28px 0; border-top:1px solid var(--line); }
+.home-quotes figure:last-child { grid-column:1/-1; }
+.home-quotes blockquote { font-size:19px; font-weight:600; line-height:1.85; max-width:64ch; }
+.home-quotes figcaption { font-size:13px; color:#586476; margin-top:16px; }
+.home-faq { background:#f4f8fb; }
+.faq-grid { display:grid; grid-template-columns:1fr 1.4fr; gap:56px; }
+.faq-grid .text-link { margin-top:20px; }
+.site-home .faq-item { background:transparent; border:0; border-bottom:1px solid #d7e1e9; border-radius:0; }
+.site-home .faq-item summary { min-height:68px; padding:18px 0; font-size:17px; gap:20px; }
+.site-home .faq-answer { padding:0 0 24px; font-size:16px; }
+.site-home .faq-answer a { color:var(--brand-deep); text-decoration:underline; }
+.home-start { text-align:center; background:#eceefc; padding:76px 0; }
+.home-start img { margin:0 auto 20px; }
+.home-start .btn { margin-top:28px; }
+.home-start p { font-size:14px; color:#4a5570; margin-top:20px; }
+.home-start p a { text-decoration:underline; }
+.site-home .site-footer { background:#fffefb; }
+.site-home .site-footer h3 { font-size:14px; margin-bottom:16px; }
+@media (hover:hover) and (pointer:fine) {
+  .site-home .btn-primary:hover { background:#333da7; transform:translateY(-2px); }
+  .site-home .text-link:hover,.hero-bottom a:hover { text-decoration:underline; }
+}
+@media (max-width:1023px) {
+  .site-home .nav-cta { display:none; }
+  .hero-grid { gap:16px; min-height:540px; }
+  .hero-art img { max-height:560px; }
+  .parent-grid { gap:40px; }
+  .home-section { padding:72px 0; }
+  .home-section-head { align-items:start; flex-direction:column; gap:18px; }
+}
+@media (max-width:639px) {
+  .site-home .wrap { padding-inline:22px; }
+  .site-home .nav-inner { height:68px; }
+  .site-home .brand-logo { width:136px; }
+  .hero-grid { grid-template-columns:1fr; gap:0; }
+  .hero-copy { padding:40px 0 28px; }
+  .site-home .hero-copy h1 { font-size:clamp(32px,9vw,39px); }
+  .hero-description { font-size:16px; margin-top:20px; }
+  .hero-actions { gap:12px; margin-top:24px; }
+  .hero-actions .btn { width:100%; }
+  .hero-actions .text-link { justify-content:center; width:100%; }
+  .hero-note { margin-top:6px; text-align:center; }
+  .hero-art { height:350px; margin-inline:-22px; }
+  .hero-art img { height:100%; border-radius:0; }
+  .hero-bottom { align-items:start; flex-direction:column; gap:8px; padding-block:20px; }
+  .home-section { padding:56px 0; }
+  .home-section-head { margin-bottom:28px; }
+  .home-section-head>p { font-size:15px; }
+  .screen-pair { grid-template-columns:1fr; gap:20px; }
+  .screen-story { padding:28px 24px 0; }
+  .screen-copy h3 { font-size:20px; }
+  .screen-copy p br { display:none; }
+  .phone-shot { width:min(100%,250px); }
+  .journey-list { grid-template-columns:1fr; }
+  .journey-list li { padding:24px 0; gap:18px; }
+  .journey-list img { width:60px; height:60px; }
+  .journey-list h3 { font-size:18px; }
+  .journey-close { margin-top:24px; font-size:28px; }
+  .journey-close span { font-size:16px; }
+  .parent-grid { grid-template-columns:1fr; gap:28px; }
+  .parent-copy { grid-row:1; }
+  .parent-copy>p { font-size:16px; }
+  .parent-art { max-height:420px; padding:24px 30px 0; }
+  .home-quotes { grid-template-columns:1fr; }
+  .home-quotes blockquote { font-size:17px; }
+  .faq-grid { grid-template-columns:1fr; gap:24px; }
+  .site-home .faq-item summary { font-size:16px; }
+  .home-start { padding:56px 0; }
+  .home-start .btn { width:100%; }
+  .site-home .footer-grid { gap:28px; }
+}
+@media (prefers-reduced-motion:reduce) {
+  html:has(.site-home) { scroll-behavior:auto; }
+  .site-home *, .site-home *::before, .site-home *::after { animation:none; transition:none; }
+}

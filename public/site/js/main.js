@@ -2,7 +2,21 @@
 const navToggle = document.getElementById('navToggle');
 const navMobile = document.getElementById('navMobile');
 if (navToggle && navMobile){
-  navToggle.addEventListener('click', ()=> navMobile.classList.toggle('open'));
+  navToggle.setAttribute('aria-controls', 'navMobile');
+  function setNavOpen(open){
+    navMobile.classList.toggle('open', open);
+    navToggle.setAttribute('aria-expanded', String(open));
+    navToggle.setAttribute('aria-label', open ? '메뉴 닫기' : '메뉴 열기');
+  }
+  setNavOpen(false);
+  navToggle.addEventListener('click', ()=> setNavOpen(!navMobile.classList.contains('open')));
+  navMobile.addEventListener('click', e=>{ if(e.target.closest('a')) setNavOpen(false); });
+  document.addEventListener('keydown', e=>{
+    if(e.key === 'Escape' && navMobile.classList.contains('open')){
+      setNavOpen(false);
+      navToggle.focus();
+    }
+  });
 }
 
 // ===== 공용 CTA — "쿠앵크 시작하기" 블록 (홈 · 서비스소개 등에서 재사용, 마크업은 여기 한 곳에서만 관리) =====
@@ -11,8 +25,8 @@ document.querySelectorAll('[data-cta-install]').forEach(el=>{
     <p class="cta-kicker">우리 아이의 바른 생활 습관 형성의 시작</p>
     <h2>지금 바로 시작해보세요!</h2>
     <div style="margin-top:22px;">
-      <button class="btn btn-primary" data-install>쿠앵크 시작하기</button>
-      <p class="free-note">홈 화면에 아이콘 하나로 설치돼요 · <a href="/site/guide.html" style="text-decoration:underline;">가이드 보기</a></p>
+      <a class="btn btn-primary" href="https://cooanc.vercel.app/">쿠앵크 시작하기</a>
+      <p class="free-note">홈 화면에 추가하는 방법 · <a href="/site/guide.html" style="text-decoration:underline;">가이드 보기</a></p>
     </div>
   `;
 });
@@ -172,65 +186,6 @@ document.querySelectorAll('[data-install]').forEach(btn=>{
 const iosClose = document.getElementById('iosClose');
 if (iosClose){
   iosClose.addEventListener('click', ()=> document.getElementById('iosOverlay').classList.remove('show'));
-}
-
-// ===== 히어로 슬라이드 배너 =====
-const slider = document.getElementById('heroSlider');
-if (slider){
-  const slides = slider.querySelectorAll('.slide');
-  const dots = slider.querySelectorAll('.slider-dots button');
-  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  let current = 0;
-  let timer;
-  function goTo(i){
-    slides[current].classList.remove('active');
-    dots[current].classList.remove('active');
-    current = i;
-    slides[current].classList.add('active');
-    dots[current].classList.add('active');
-  }
-  function next(){ goTo((current + 1) % slides.length); }
-  function startAuto(){ if (reduceMotion) return; timer = setInterval(next, 5500); }
-  function stopAuto(){ clearInterval(timer); }
-  dots.forEach((d,i)=> d.addEventListener('click', ()=>{ goTo(i); stopAuto(); startAuto(); }));
-  slider.addEventListener('mouseenter', stopAuto);
-  slider.addEventListener('mouseleave', startAuto);
-  slider.addEventListener('focusin', stopAuto);
-  slider.addEventListener('focusout', startAuto);
-  startAuto();
-}
-
-// ===== 히어로 스크롤 유도 화살표 =====
-const heroCue = document.getElementById('heroScrollCue');
-if (heroCue){
-  heroCue.addEventListener('click', ()=>{
-    const next = document.getElementById('section-empathy');
-    if (next) next.scrollIntoView({ behavior:'smooth' });
-  });
-  let cueHidden = false;
-  window.addEventListener('scroll', ()=>{
-    if (!cueHidden && window.scrollY > 40){
-      heroCue.classList.add('is-hidden');
-      cueHidden = true;
-    }
-  }, { passive:true });
-}
-
-// ===== 섹션 위치 인디케이터(도트) =====
-const sectionDots = document.getElementById('sectionDots');
-if (sectionDots){
-  const dotButtons = [...sectionDots.querySelectorAll('button')];
-  const targets = dotButtons.map(b => document.querySelector(b.dataset.target)).filter(Boolean);
-  dotButtons.forEach((b,i)=> b.addEventListener('click', ()=> targets[i].scrollIntoView({ behavior:'smooth' })));
-  const dotObserver = new IntersectionObserver((entries)=>{
-    entries.forEach(entry=>{
-      if (!entry.isIntersecting) return;
-      const idx = targets.indexOf(entry.target);
-      if (idx === -1) return;
-      dotButtons.forEach((b,i)=> b.classList.toggle('active', i === idx));
-    });
-  }, { threshold:0.5 });
-  targets.forEach(t => dotObserver.observe(t));
 }
 
 // ===== 이미지 확대 보기(라이트박스) =====
