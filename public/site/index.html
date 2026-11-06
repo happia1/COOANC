@@ -66,34 +66,29 @@
     <div class="wrap">
       <div class="home-section-head"><h2 id="screens-title">아이에게는 놀이터,<br>부모에게는 하루의 기록.</h2><p>같은 하루를, 각자에게 맞는 화면으로.<br>아이의 실천과 부모의 응원이 이어져요.</p></div>
       <div class="screen-pair">
-        <article class="screen-story child-story">
+        <article class="screen-story child-story" data-mission-demo>
           <div class="screen-copy"><h3>아이는 오늘 할 일을 확인해요.</h3><p>미션을 끝내고 크레딧과 하트를 모아요. <br>저금통과 화분에서 성장을 눈으로 확인해요.</p></div>
-          <div class="mission-demo" data-mission-demo>
-            <div class="demo-heading"><h4>오늘의 미션</h4><span data-demo-count>0 / 2 완료</span></div>
-            <progress class="demo-progress" max="2" value="0" aria-label="체험 미션 완료 수"></progress>
-            <div class="demo-wallet" aria-label="체험 보상"><span>🪙 크레딧 <b data-demo-credit>0</b></span><span>💗 하트 <b data-demo-heart>0</b></span></div>
-            <div class="demo-cards">
-              <button class="demo-mission" type="button" data-mission="가글하기" aria-label="가글하기 완료하기, 크레딧 10과 하트 1 받기">
-                <img class="demo-mission-art" src="/site/assets/app/gargle.png" alt="" width="384" height="384" loading="lazy">
-                <strong>가글하기</strong><span class="demo-reward"><span>🪙 10</span><span>💗 1</span></span>
-                <span class="demo-tap">눌러서 완료하기</span>
-              </button>
-              <button class="demo-mission" type="button" data-mission="머리 빗기" aria-label="머리 빗기 완료하기, 크레딧 10과 하트 1 받기">
-                <img class="demo-mission-art" src="/site/assets/app/comb-hair.png" alt="" width="384" height="384" loading="lazy">
-                <strong>머리 빗기</strong><span class="demo-reward"><span>🪙 10</span><span>💗 1</span></span>
-                <span class="demo-tap">눌러서 완료하기</span>
-              </button>
+          <div class="home-phone child-phone">
+            <div class="child-phone-scene">
+              <img src="/site/assets/child-home.webp" alt="자녀 앱의 캐릭터와 화분, 저금통" width="828" height="1793" loading="lazy">
+              <div class="demo-level" aria-label="체험 화면의 레벨과 보상"><strong>Lv.10</strong><span class="demo-level-bar" aria-hidden="true"></span><span><img src="/site/assets/app/coin.png" alt="" width="22" height="22"><b data-demo-credit>10</b></span><span><img src="/site/assets/app/heart.png" alt="" width="22" height="22"><b data-demo-heart>1</b></span></div>
             </div>
-            <div class="demo-finished" hidden><img src="/site/assets/app/bunny-front.png" alt="" width="80" height="176"><strong>오늘의 미션, 모두 해냈어요!</strong><p>작은 실천이 두 번의 성취가 되었어요.</p></div>
-            <p class="demo-status" role="status" aria-live="polite" aria-atomic="true">미션 카드를 눌러보세요.</p>
-            <button class="demo-reset" type="button">다시 체험하기 ↻</button>
+            <div class="mission-demo" data-card-rail>
+              <div class="demo-heading"><h4>오늘의 미션</h4><span data-demo-count>0 / 5 완료</span></div>
+              <progress class="demo-progress" max="5" value="0" aria-label="체험 미션 완료 수"></progress>
+              <div class="demo-cards" data-rail-track tabindex="0" aria-label="오늘의 미션 카드, 좌우로 넘겨보세요"><button class="demo-mission" type="button" data-mission="일어나기" aria-label="일어나기 완료하기, 크레딧 10과 하트 1 받기"><img class="demo-mission-art" src="/site/assets/app/wake.png" alt="" width="384" height="384" loading="lazy"><strong>일어나기</strong><span class="demo-reward"><span><img src="/site/assets/app/coin.png" alt="" width="22" height="22">10</span><span><img src="/site/assets/app/heart.png" alt="" width="22" height="22">1</span></span></button><button class="demo-mission" type="button" data-mission="아침 먹기" aria-label="아침 먹기 완료하기, 크레딧 10과 하트 1 받기"><img class="demo-mission-art" src="/site/assets/app/breakfast.png" alt="" width="384" height="384" loading="lazy"><strong>아침 먹기</strong><span class="demo-reward"><span><img src="/site/assets/app/coin.png" alt="" width="22" height="22">10</span><span><img src="/site/assets/app/heart.png" alt="" width="22" height="22">1</span></span></button><button class="demo-mission" type="button" data-mission="가글하기" aria-label="가글하기 완료하기, 크레딧 10과 하트 1 받기"><img class="demo-mission-art" src="/site/assets/app/gargle.png" alt="" width="384" height="384" loading="lazy"><strong>가글하기</strong><span class="demo-reward"><span><img src="/site/assets/app/coin.png" alt="" width="22" height="22">10</span><span><img src="/site/assets/app/heart.png" alt="" width="22" height="22">1</span></span></button><button class="demo-mission" type="button" data-mission="머리 빗기" aria-label="머리 빗기 완료하기, 크레딧 10과 하트 1 받기"><img class="demo-mission-art" src="/site/assets/app/comb-hair.png" alt="" width="384" height="384" loading="lazy"><strong>머리 빗기</strong><span class="demo-reward"><span><img src="/site/assets/app/coin.png" alt="" width="22" height="22">10</span><span><img src="/site/assets/app/heart.png" alt="" width="22" height="22">1</span></span></button><button class="demo-mission" type="button" data-mission="세수하기" aria-label="세수하기 완료하기, 크레딧 10과 하트 1 받기"><img class="demo-mission-art" src="/site/assets/app/wash-face.png" alt="" width="384" height="384" loading="lazy"><strong>세수하기</strong><span class="demo-reward"><span><img src="/site/assets/app/coin.png" alt="" width="22" height="22">10</span><span><img src="/site/assets/app/heart.png" alt="" width="22" height="22">1</span></span></button></div>
+              <div class="demo-finished" hidden><span class="demo-done-star" aria-hidden="true">✦</span><strong>오늘의 미션, 모두 해냈어요!</strong><button class="demo-reset" type="button">다시 체험하기 ↻</button></div>
+              <div class="rail-controls demo-rail-controls"><button type="button" data-rail-prev aria-label="이전 미션 카드">←</button><span>카드를 누르거나 좌우로 넘겨보세요</span><button type="button" data-rail-next aria-label="다음 미션 카드">→</button></div>
+            </div>
+            <div class="demo-sparkles" aria-hidden="true"></div>
           </div>
+          <p class="demo-status" role="status" aria-live="polite" aria-atomic="true">미션을 누르면 위쪽 크레딧과 하트가 올라가요.</p>
           <p class="demo-note">미션 완료 체험 · 실제 계정에는 저장되지 않아요.<br><a href="/site/assets/child-home.webp" target="_blank" rel="noopener">실제 앱 전체 화면 보기 ↗</a></p>
 
         </article>
         <article class="screen-story parent-story">
           <div class="screen-copy"><h3>부모는 하루를 살펴보고 응원해요.</h3><p>생활 미션을 설정하고, 아이의 수행 기록과 <br>보상 요청을 부모 화면에서 확인해요.</p></div>
-          <figure class="home-screen-detail"><a href="/site/assets/parent-home.webp" target="_blank" rel="noopener" aria-label="부모가 확인하는 미션 진행률 전체 이미지 보기, 새 탭"><img src="/site/assets/app/progress-detail.jpg" alt="부모가 확인하는 미션 진행률" loading="lazy" decoding="async" width="760" height="320"></a><figcaption>부모 화면 일부 · <a href="/site/assets/parent-home.webp" target="_blank" rel="noopener">전체 화면 보기 ↗</a></figcaption></figure>
+          <figure class="home-screen-detail"><a class="home-phone" href="/site/assets/parent-home.webp" target="_blank" rel="noopener" aria-label="부모 앱 전체 화면 크게 보기, 새 탭"><img src="/site/assets/parent-home.webp" alt="부모 앱 전체 화면: 자녀 프로필, 크레딧과 하트, 미션 진행률, 생활 안내와 하단 메뉴" loading="lazy" decoding="async" width="828" height="1793"></a><figcaption>실제 부모 앱 화면 · <a href="/site/assets/parent-home.webp" target="_blank" rel="noopener">크게 보기 ↗</a></figcaption></figure>
         </article>
       </div>
       <a class="text-link section-link" href="/site/features.html">기능 전체 보기 <span aria-hidden="true">→</span></a>
@@ -115,8 +110,15 @@
 
   <section class="home-section home-parent" aria-labelledby="parent-title">
     <div class="wrap parent-grid">
-      <div class="parent-art"><img src="/site/assets/parent-routine.webp" alt="부모가 아이의 생활 미션을 설정하는 화면" width="828" height="1793" loading="lazy" decoding="async"></div>
-      <div class="parent-copy"><h2 id="parent-title">매일 반복하던 말,<br>미션으로 함께 정해요.</h2><p>“씻자, 자자, 정리하자.”<br>아이도 부모도 지치던 실랑이 대신,<br>오늘 해야 할 일을 함께 정해보세요.</p><ul><li>아이의 생활에 맞게 하루 미션 설정</li><li>미션 수행과 보상 요청 확인</li><li>작은 성취를 함께 살펴보고 응원</li></ul><a class="text-link" href="/site/guide.html">사용가이드 보기 <span aria-hidden="true">→</span></a></div>
+      <div class="routine-demo" data-routine-demo>
+        <div class="routine-heading"><h3>일상 미션</h3><button type="button" class="routine-edit" aria-expanded="false" aria-controls="routine-keywords">미션 수정하기</button></div>
+        <p class="routine-period">주중 · 오전</p>
+        <div id="routine-keywords" class="routine-keywords" hidden><h4>우리 아이의 하루를 골라주세요</h4><p>한 번 누르면 설정, 다시 누르면 해제돼요.</p><div class="routine-chips"><button type="button" data-routine="일어나기" aria-pressed="true">일어나기<span aria-hidden="true"></span></button><button type="button" data-routine="아침 먹기" aria-pressed="true">아침 먹기<span aria-hidden="true"></span></button><button type="button" data-routine="가글하기" aria-pressed="false">가글하기<span aria-hidden="true"></span></button><button type="button" data-routine="머리 빗기" aria-pressed="false">머리 빗기<span aria-hidden="true"></span></button><button type="button" data-routine="세수하기" aria-pressed="false">세수하기<span aria-hidden="true"></span></button><button type="button" data-routine="양치하기" aria-pressed="false">양치하기<span aria-hidden="true"></span></button><button type="button" data-routine="이불 정리" aria-pressed="false">이불 정리<span aria-hidden="true"></span></button><button type="button" data-routine="물 마시기" aria-pressed="false">물 마시기<span aria-hidden="true"></span></button></div></div>
+        <div class="routine-list" aria-label="선택한 일상 미션"></div>
+        <p class="routine-status" role="status" aria-live="polite">미션 수정하기를 눌러 키워드를 골라보세요.</p>
+        <p class="routine-demo-note">키워드 설정 체험 · 실제 계정에는 저장되지 않아요.</p>
+      </div>
+      <div class="parent-copy"><h2 id="parent-title">매일 반복하던 말,<br>미션으로 함께 정해요.</h2><p>“씻자, 자자, 정리하자.”<br>아이도 부모도 지치던 실랑이 대신,<br>오늘 해야 할 일을 함께 정해보세요.</p><ul><li>키워드를 누르면 미션 설정</li><li>다시 누르면 간단하게 해제</li><li>우리 아이에게 필요한 일상만 선택</li></ul><a class="text-link" href="/site/guide.html">사용가이드 보기 <span aria-hidden="true">→</span></a></div>
     </div>
   </section>
 
@@ -158,5 +160,7 @@
 </footer>
 <script src="/site/js/main.js" defer></script>
 <script src="/site/js/mission-demo.js" defer></script>
+<script src="/site/js/routine-demo.js" defer></script>
+<script src="/site/js/card-rail.js" defer></script>
 </body>
 </html>
