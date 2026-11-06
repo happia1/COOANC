@@ -24,7 +24,7 @@ test('site menu exposes its state, closes on Escape and after choosing a link', 
       querySelectorAll: () => [],
       addEventListener: (event, fn) => handlers.set('document:' + event, fn),
     },
-    window: { addEventListener() {} }, navigator: { userAgent: '' },
+    window: { matchMedia: () => ({ addEventListener: (event, fn) => handlers.set('desktop:' + event, fn) }), addEventListener() {} }, navigator: { userAgent: '' },
     IntersectionObserver: class { observe() {} },
   })
   assert.equal(attrs.get('aria-expanded'), 'false')
@@ -39,4 +39,27 @@ test('site menu exposes its state, closes on Escape and after choosing a link', 
   handlers.get('nav:click')({ target: { closest: () => ({}) } })
   assert.equal(classes.has('open'), false)
   assert.equal(attrs.get('aria-label'), '메뉴 열기')
+  handlers.get('toggle:click')()
+  handlers.get('desktop:change')({ matches: true })
+  assert.equal(classes.has('open'), false)
+  assert.equal(attrs.get('aria-expanded'), 'false')
 })
+
+for (const succeeds of [true, false]) {
+  test(`email copy reports ${succeeds ? 'success' : 'failure'}`, async () => {
+    let click, copied
+    const status = { textContent: '' }
+    const button = { dataset: { copyEmail: 'theotter@naver.com' }, addEventListener: (_, fn) => { click = fn } }
+    runInNewContext(readFileSync(new URL('../public/site/js/main.js', import.meta.url), 'utf8'), {
+      document: {
+        getElementById: id => id === 'emailCopyStatus' ? status : null,
+        querySelectorAll: selector => selector === '[data-copy-email]' ? [button] : [],
+      },
+      navigator: { clipboard: { writeText: async value => { if (!succeeds) throw Error('denied'); copied = value } } },
+      IntersectionObserver: class { observe() {} },
+    })
+    await click()
+    if (succeeds) assert.equal(copied, 'theotter@naver.com')
+    assert.match(status.textContent, succeeds ? /복사했어요/ : /직접 선택/)
+  })
+}

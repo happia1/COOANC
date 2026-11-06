@@ -38,14 +38,12 @@
 .home-section-head { display:flex; justify-content:space-between; align-items:end; gap:32px; margin-bottom:40px; }
 .home-section-head>p { max-width:36ch; color:var(--ink-soft); font-size:16px; line-height:1.85; }
 .screen-pair { display:grid; grid-template-columns:1fr 1fr; gap:24px; }
-.screen-story { overflow:hidden; padding:36px 28px 0; border-radius:16px; display:flex; align-items:center; flex-direction:column; }
+.screen-story { overflow:hidden; padding:36px 28px 28px; border-radius:16px; display:flex; align-items:center; flex-direction:column; }
 .child-story { background:#eaf5f5; }
 .parent-story { background:#f7f0e5; }
 .screen-copy { width:100%; margin-bottom:28px; }
 .screen-copy h3 { font-size:21px; }
 .screen-copy p { color:#4c5868; line-height:1.85; font-size:15px; margin-top:12px; }
-.phone-shot { width:min(100%,258px); border:6px solid #293446; border-bottom:0; border-radius:30px 30px 0 0; overflow:hidden; box-shadow:0 14px 35px -20px #1f293755; background:white; }
-.phone-shot img { width:100%; height:auto; }
 .section-link { display:flex; justify-content:center; margin-top:28px; }
 .home-journey { background:#f6f7fb; }
 .journey-list { list-style:none; display:grid; grid-template-columns:1fr 1fr; gap:0 48px; }
@@ -111,11 +109,10 @@
   .home-section-head { margin-bottom:28px; }
   .home-section-head>p { font-size:15px; }
   .screen-pair { grid-template-columns:1fr; gap:20px; }
-  .screen-story { padding:28px 24px 0; }
+  .screen-story { padding:28px 24px 24px; }
   .screen-copy h3 { font-size:20px; }
   .screen-copy p br { display:none; }
-  .phone-shot { width:min(100%,250px); }
-  .journey-list { grid-template-columns:1fr; }
+    .journey-list { grid-template-columns:1fr; }
   .journey-list li { padding:24px 0; gap:18px; }
   .journey-list img { width:60px; height:60px; }
   .journey-list h3 { font-size:18px; }
@@ -137,3 +134,8 @@
   html:has(.site-home) { scroll-behavior:auto; }
   .site-home *, .site-home *::before, .site-home *::after { animation:none; transition:none; }
 }
+
+.home-screen-detail { width:100%; margin:0; }
+.home-screen-detail img { width:100%; height:auto; border-radius:12px; }
+.home-screen-detail figcaption { margin-top:12px; font-size:12px; color:#4c5868; }
+.home-screen-detail figcaption a { text-decoration:underline; }

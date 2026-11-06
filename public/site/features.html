@@ -4,6 +4,19 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>서비스 소개 — 쿠앵크(COOANC)</title>
+<meta name="description" content="실제 쿠앵크 앱 화면과 캐릭터·아이콘으로 살펴보는 미션, 보상, 화분, 저금통과 부모 화면.">
+<link rel="canonical" href="https://cooanc.vercel.app/site/features.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="쿠앵크 COOANC">
+<meta property="og:title" content="서비스 소개 — 쿠앵크(COOANC)">
+<meta property="og:description" content="실제 쿠앵크 앱 화면과 캐릭터·아이콘으로 살펴보는 미션, 보상, 화분, 저금통과 부모 화면.">
+<meta property="og:url" content="https://cooanc.vercel.app/site/features.html">
+<meta property="og:image" content="https://cooanc.vercel.app/site/assets/app/share-cover.jpg">
+<meta property="og:image:alt" content="쿠앵크 토끼 캐릭터와 저금통, 화분">
+<meta property="og:image:width" content="1367">
+<meta property="og:image:height" content="718">
+<meta name="twitter:card" content="summary_large_image">
+
 <link rel="stylesheet" href="/site/css/style.css">
 </head>
 <body>
@@ -34,9 +47,7 @@
     <p class="lead fade" style="max-width:540px; margin-top:14px; font-size:17px; font-weight:700; color:var(--ink);">쿠앵크(COOANC)는 아이가 자신의 생활 미션을 스스로 완료하고, 보상을 모아 성장하는 습관을 길러주는 스마트한 생활습관 코칭 앱입니다.</p>
 
     <div class="fade" style="margin-top:32px;">
-      <!-- TODO: 듀얼 인터페이스 단일 이미지 — 부모 화면과 아이 화면이 하나의 이미지 안에 함께 담긴 형태(합성 목업)
-           권장 사이즈: 가로형, 2:1 비율(예: 1600×800px) 또는 16:9 비율 -->
-      <div class="img-slot" style="width:100%; aspect-ratio:2/1; border-radius:var(--radius);">🔗 듀얼 인터페이스 단일 이미지 자리</div>
+      <div class="app-screen-pair"><figure class="feature-preview"><a href="/site/assets/child-home.webp" target="_blank" rel="noopener" aria-label="아이의 오늘 미션 카드 전체 이미지 보기, 새 탭"><img src="/site/assets/app/mission-detail.jpg" alt="아이의 오늘 미션 카드" loading="lazy" decoding="async" width="800" height="640"></a><figcaption>아이 화면 일부 · <a href="/site/assets/child-home.webp" target="_blank" rel="noopener">전체 화면 보기 ↗</a></figcaption></figure><figure class="feature-preview"><a href="/site/assets/parent-home.webp" target="_blank" rel="noopener" aria-label="부모가 확인하는 미션 진행률 전체 이미지 보기, 새 탭"><img src="/site/assets/app/progress-detail.jpg" alt="부모가 확인하는 미션 진행률" loading="lazy" decoding="async" width="760" height="320"></a><figcaption>부모 화면 일부 · <a href="/site/assets/parent-home.webp" target="_blank" rel="noopener">전체 화면 보기 ↗</a></figcaption></figure></div>
     </div>
 
     <div class="card fade" style="padding:22px; background:var(--brand-tint); border:none; margin-top:20px;">
@@ -56,14 +67,12 @@
 
     <!-- ===== 아이 화면 ===== -->
     <div class="tabpanel active" id="pane-child">
-      <p class="fade" style="font-size:12.5px; color:var(--ink-faint); margin-bottom:20px;">아래는 아이 전용 패드 화면 기준이에요.</p>
+      <p class="fade" style="font-size:12.5px; color:var(--ink-faint); margin-bottom:20px;">아래 이미지는 실제 앱의 모바일 캡처와 앱에서 사용하는 캐릭터·아이콘이에요. 화면 배치는 기기에 따라 달라져요.</p>
 
       <!-- ① 레벨 블록 · 오늘의 미션 — 각각 독립 설명 -->
       <div class="fx-solo-list">
         <div class="pv-slide fade">
-          <!-- TODO: 레벨 블록 전용 이미지 (전체 스크린샷 아님, 레벨 블록 영역만 크롭)
-               권장 사이즈: 세로형, 3:4 비율 -->
-          <div class="shot-slot img-slot">🏅 레벨 블록 전용 이미지 자리</div>
+          <figure class="feature-preview"><a href="/site/assets/child-home.webp" target="_blank" rel="noopener" aria-label="레벨과 크레딧, 하트를 확인하는 앱 영역 전체 이미지 보기, 새 탭"><img src="/site/assets/level_block.png" alt="레벨과 크레딧, 하트를 확인하는 앱 영역" loading="lazy" decoding="async" width="212" height="215"></a><figcaption>실제 앱 화면 일부 · <a href="/site/assets/child-home.webp" target="_blank" rel="noopener">전체 화면 보기 ↗</a></figcaption></figure>
           <div class="pv-copy">
             <h3><img class="pv-icon" src="/site/assets/icons/rewards/gold_and_crown.png" alt="">레벨 블록</h3>
             <p>미션을 완료하면 크레딧과 하트가 쌓이고, 레벨 블록이 채워져요. 아이가 얼마나 성장하고 있는지 한눈에 확인할 수 있어요.</p>
@@ -71,9 +80,7 @@
           </div>
         </div>
         <div class="pv-slide fade">
-          <!-- TODO: 오늘의 미션 전용 이미지 (전체 스크린샷 아님, 미션 카드 영역만 크롭)
-               권장 사이즈: 세로형, 3:4 비율 -->
-          <div class="shot-slot img-slot">📋 오늘의 미션 전용 이미지 자리</div>
+          <figure class="feature-preview"><a href="/site/assets/child-home.webp" target="_blank" rel="noopener" aria-label="가글하기와 머리 빗기 미션 카드 전체 이미지 보기, 새 탭"><img src="/site/assets/app/mission-detail.jpg" alt="가글하기와 머리 빗기 미션 카드" loading="lazy" decoding="async" width="800" height="640"></a><figcaption>실제 앱 화면 일부 · <a href="/site/assets/child-home.webp" target="_blank" rel="noopener">전체 화면 보기 ↗</a></figcaption></figure>
           <div class="pv-copy">
             <h3><img class="pv-icon" src="/site/assets/icons/ui/icon-mission.webp" alt="">오늘의 미션</h3>
             <p>오늘 해야 할 일들이 카드로 나열돼요. 완료하면 보상이 지급되고 자동으로 기록돼요.</p>
@@ -88,17 +95,15 @@
       </div>
       <div class="fx-solo-list">
         <div class="pv-slide fade">
-          <!-- TODO: 캐릭터 화면 스크린샷으로 교체 예정 -->
-          <div class="shot-slot img-slot">🦦 캐릭터 화면 스크린샷 자리</div>
+          <figure class="feature-preview feature-art"><img class="character-main" src="/site/assets/app/bunny-front.png" alt="앱의 토끼 캐릭터" loading="lazy" width="243" height="537"><div class="character-friends"><img src="/site/assets/app/otter.png" alt="수달 캐릭터" loading="lazy" width="273" height="298"><img src="/site/assets/app/bear.png" alt="곰 캐릭터" loading="lazy" width="93" height="109"><img src="/site/assets/app/hamster.png" alt="햄스터 캐릭터" loading="lazy" width="101" height="101"><img src="/site/assets/app/chick.png" alt="병아리 캐릭터" loading="lazy" width="84" height="111"></div><figcaption>앱에서 사용하는 캐릭터 이미지</figcaption></figure>
           <div class="pv-copy">
             <h3><img class="pv-icon" src="/site/assets/icons/ui/icon-character.webp" alt="">캐릭터</h3>
             <p>아이가 고른 캐릭터가 하루 내내 함께해요. 미션을 완료할 때마다 캐릭터가 반응하고, 레벨이 오르면 새로운 모습으로 성장해요.</p>
-            <p>오늘 기분을 표정 카드로 골라 기록하면, 부모님 화면에서도 아이의 감정 흐름을 함께 확인할 수 있어요. 말로 표현하기 어려운 마음도 캐릭터를 통해 자연스럽게 나눠요.</p>
+            <p>토끼, 수달, 곰, 햄스터, 병아리처럼 앱에서 만나는 친구들을 아이와 함께 살펴보세요. 감정카드 등 준비 중인 기능은 아래에서 따로 안내해요.</p>
           </div>
         </div>
         <div class="pv-slide fade">
-          <!-- TODO: 마켓 화면 스크린샷으로 교체 예정 -->
-          <div class="shot-slot img-slot">🛒 마켓 화면 스크린샷 자리</div>
+          <figure class="feature-preview feature-art"><img class="art-main" src="/site/assets/icons/ui/icon-basket.webp" alt="앱의 마켓 아이콘" loading="lazy" width="160" height="160"><div class="art-items"><img src="/site/assets/app/stringcheese.png" alt="스트링치즈 보상 이미지" loading="lazy" width="275" height="554"><img src="/site/assets/icons/treats/vitamine.png" alt="비타민 보상 이미지" loading="lazy" width="345" height="329"></div><figcaption>앱의 마켓 아이콘과 보상 이미지</figcaption></figure>
           <div class="pv-copy">
             <h3><img class="pv-icon" src="/site/assets/icons/ui/icon-basket.webp" alt="">마켓</h3>
             <p>미션으로 모은 크레딧은 마켓에서 원하는 보상으로 바꿀 수 있어요. 부모님이 등록한 이벤트(안아주기, 책 읽어주기 등)와 간식이 상품으로 올라와요.</p>
@@ -106,8 +111,7 @@
           </div>
         </div>
         <div class="pv-slide fade">
-          <!-- TODO: 화분 화면 스크린샷으로 교체 예정 -->
-          <div class="shot-slot img-slot">🪴 화분 화면 스크린샷 자리</div>
+          <figure class="feature-preview feature-art"><div class="art-stages"><img src="/site/assets/icons/plant/1.png" alt="씨앗 단계" loading="lazy" width="280" height="208"><img src="/site/assets/icons/plant/4.png" alt="자라는 화분" loading="lazy" width="337" height="465"><img src="/site/assets/icons/plant/7.png" alt="열매를 맺은 화분" loading="lazy" width="321" height="511"></div><figcaption>앱에서 사용하는 화분 성장 단계 이미지</figcaption></figure>
           <div class="pv-copy">
             <h3><img class="pv-icon" src="/site/assets/icons/ui/icon-plant.webp" alt="">화분</h3>
             <p>하트를 사용해 화분을 성장시킬 수 있어요. 씨앗에서 시작해 점점 자라고 열매를 맺는 과정까지 눈에 보이게 바뀌어요.</p>
@@ -123,8 +127,7 @@
           </div>
         </div>
         <div class="pv-slide fade">
-          <!-- TODO: 돼지저금통 화면 스크린샷으로 교체 예정 -->
-          <div class="shot-slot img-slot">🐷 돼지저금통 화면 스크린샷 자리</div>
+          <figure class="feature-preview feature-art"><div class="art-stages"><img src="/site/assets/icons/rewards/piggy_bank2.png" alt="저축 초기 저금통" loading="lazy" width="86" height="83"><img src="/site/assets/icons/rewards/piggy_bank14.png" alt="성장한 황금 저금통" loading="lazy" width="141" height="149"></div><figcaption>앱에서 사용하는 저금통 이미지</figcaption></figure>
           <div class="pv-copy">
             <h3><img class="pv-icon" src="/site/assets/icons/ui/icon-piggy.webp" alt="">저금통 <span class="badge-level" style="position:static; display:inline-block; margin-left:4px;">Lv.5 오픈</span></h3>
             <p>레벨 5가 되면 열리는 특별 기능이에요. 크레딧을 저금통에 넣어두면 매일 아침 반짝이는 동전이 생기고, 아이가 직접 탭해서 주우면 저금통 잔액이 늘어나요.</p>
@@ -257,8 +260,7 @@
         <div class="pv-viewport">
           <div class="pv-track">
             <div class="pv-slide">
-              <!-- TODO: 홈 대시보드 기능 영역만 확대한 크롭 이미지로 교체 예정 -->
-              <div class="shot-plain"><img src="/site/assets/parent-home.webp" alt="부모 홈 대시보드 화면"></div>
+              <figure class="feature-preview"><a href="/site/assets/parent-home.webp" target="_blank" rel="noopener" aria-label="부모 홈 대시보드 전체 이미지 보기, 새 탭"><img src="/site/assets/app/progress-detail.jpg" alt="부모 홈 대시보드" loading="lazy" decoding="async" width="760" height="320"></a><figcaption>실제 앱 화면 일부 · <a href="/site/assets/parent-home.webp" target="_blank" rel="noopener">전체 화면 보기 ↗</a></figcaption></figure>
               <div class="pv-copy">
                 <h3>오늘의 진행도를 한눈에</h3>
                 <p>오늘의 미션 진행률, 주간 루틴 완료율, 주간 완주율까지 숫자와 그래프로 바로 확인돼요. 아이를 여러 명 등록했다면 좌우로 넘겨 전환할 수 있어요.</p>
@@ -266,8 +268,7 @@
               </div>
             </div>
             <div class="pv-slide">
-              <!-- TODO: 루틴 설정 기능 영역만 확대한 크롭 이미지로 교체 예정 -->
-              <div class="shot-plain"><img src="/site/assets/parent-routine.webp" alt="루틴 설정 화면"></div>
+              <figure class="feature-preview"><a href="/site/assets/parent-routine.webp" target="_blank" rel="noopener" aria-label="부모 루틴 설정 전체 이미지 보기, 새 탭"><img src="/site/assets/app/routine-detail.jpg" alt="부모 루틴 설정" loading="lazy" decoding="async" width="800" height="640"></a><figcaption>실제 앱 화면 일부 · <a href="/site/assets/parent-routine.webp" target="_blank" rel="noopener">전체 화면 보기 ↗</a></figcaption></figure>
               <div class="pv-copy">
                 <h3>오전 · 오후 루틴을 카드로 관리</h3>
                 <p>세수하기, 가글하기, 숙제하기처럼 하나씩 카드로 등록하고 보상(크레딧·하트)도 카드마다 지정해요. 카드를 길게 눌러 끌면 순서가 바뀌고 자동 저장돼요.</p>
@@ -275,8 +276,7 @@
               </div>
             </div>
             <div class="pv-slide">
-              <!-- TODO: 승인·보상 관리 기능 영역만 확대한 크롭 이미지로 교체 예정 -->
-              <div class="shot-plain"><img src="/site/assets/parent-market.webp" alt="승인·상품 관리 화면"></div>
+              <figure class="feature-preview"><a href="/site/assets/parent-market.webp" target="_blank" rel="noopener" aria-label="부모 상품 관리 전체 이미지 보기, 새 탭"><img src="/site/assets/app/market-detail.jpg" alt="부모 상품 관리" loading="lazy" decoding="async" width="800" height="700"></a><figcaption>실제 앱 화면 일부 · <a href="/site/assets/parent-market.webp" target="_blank" rel="noopener">전체 화면 보기 ↗</a></figcaption></figure>
               <div class="pv-copy">
                 <h3>마켓에 올라갈 상품을 직접 관리</h3>
                 <p>이벤트(안아주기, 책 읽어주기, TV 시청권)와 간식을 등록하고 가격을 정해요. 아이가 크레딧으로 구매를 요청하면 알림이 오고, 승인 버튼 한 번으로 끝나요.</p>
@@ -304,10 +304,7 @@
       <h2>단계가 오를수록<br>아이와 쿠앵크가 함께 자라요</h2>
       <p>레벨이 오를 때마다 새로운 기능이 열리고, 정원에서 시작한 이야기는 마을 · 항구를 지나 바다로, 그리고 그 너머 항해로 이어져요.</p>
     </div>
-
-    <!-- TODO: 레벨 성장 지도 이미지 (지도 위에 정원 → 마을 → 항구 → 바다 순서로 배치된 형태)
-         권장 사이즈: 가로형, 2:1 비율(예: 1600×800px) -->
-    <div class="img-slot" style="width:100%; aspect-ratio:2/1; border-radius:var(--radius); margin-bottom:20px;">🗺️ 레벨 성장 지도 이미지 자리 (정원 → 마을 → 항구 → 바다)</div>
+    <figure class="growth-assets"><img src="/site/assets/app/map.png" alt="앱의 성장 지도 아이콘" width="163" height="147" loading="lazy"><div><h3>정원에서 바다까지, 차곡차곡</h3><p>아래 단계는 앱의 레벨 구간을 소개해요.<br>지도와 저금통, 화분은 앱에서 쓰는 이미지예요.</p></div><img src="/site/assets/icons/plant/4.png" alt="앱의 화분" loading="lazy" width="337" height="465"><img src="/site/assets/icons/rewards/piggy_bank14.png" alt="앱의 황금 저금통" loading="lazy" width="141" height="149"></figure>
 
     <div class="stage-grid">
       <div class="card stage-card fade">
@@ -365,16 +362,6 @@
   </div>
   <div class="wrap copyright">© 2026 COOANC. All rights reserved.</div>
 </footer>
-
-<div class="overlay" id="iosOverlay">
-  <div class="sheet">
-    <h3 class="jua" style="font-size:19px; margin-bottom:16px;">📲 홈 화면에 추가하기</h3>
-    <div class="step"><div class="num">1</div><p>화면 아래(또는 위) <b>공유 버튼</b> [⬆️]을 눌러주세요.</p></div>
-    <div class="step"><div class="num">2</div><p>메뉴에서 <b>"홈 화면에 추가"</b>를 선택해주세요.</p></div>
-    <div class="step"><div class="num">3</div><p>오른쪽 위 <b>"추가"</b>를 누르면 앱처럼 아이콘이 생겨요.</p></div>
-    <button class="sheet-close" id="iosClose">확인했어요</button>
-  </div>
-</div>
 
 <script src="/site/js/main.js"></script>
 </body>

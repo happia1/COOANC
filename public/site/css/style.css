@@ -604,3 +604,42 @@ img.pv-icon{ width:22px; height:22px; object-fit:contain; vertical-align:-5px; m
 }
 .hcard-body{ padding:18px 20px 20px; }
 .hcard-body .fi{ font-size:22px; margin-bottom:8px; }
+
+/* 실제 앱 캡처와 원본 아트 */
+:focus-visible{ outline:3px solid var(--brand-deep); outline-offset:4px; }
+.feature-preview{ width:100%; max-width:380px; margin:0; flex-shrink:0; }
+.feature-preview>a{ display:block; }
+.feature-preview>a>img{ width:100%; height:auto; border-radius:12px; }
+.feature-preview figcaption,.install-capture figcaption{ margin-top:12px; color:var(--ink-soft); font-size:12px; line-height:1.7; text-align:center; }
+.feature-preview figcaption a,.install-capture figcaption a{ text-decoration:underline; text-underline-offset:3px; }
+.feature-art{ padding:24px 16px 16px; border-radius:16px; background:#f3f7f8; }
+.feature-art .character-main{ width:108px; height:238px; object-fit:contain; margin:0 auto 16px; }
+.character-friends,.art-items,.art-stages{ display:flex; justify-content:center; align-items:center; gap:16px; }
+.character-friends img{ width:56px; height:56px; object-fit:contain; }
+.feature-art .art-main{ width:112px; height:112px; object-fit:contain; margin:0 auto 16px; }
+.art-items img{ width:88px; height:88px; object-fit:contain; }
+.art-stages{ min-height:210px; gap:8px; }
+.art-stages img{ width:30%; height:160px; object-fit:contain; }
+.app-screen-pair{ display:grid; grid-template-columns:1fr 1fr; align-items:start; gap:28px; margin-top:28px; }
+.app-screen-pair .feature-preview{ max-width:none; }
+.growth-assets{ display:flex; align-items:center; justify-content:center; gap:24px; padding:28px; background:#f3f7f8; border-radius:16px; margin:24px 0; }
+.growth-assets>img{ width:88px; height:100px; object-fit:contain; }
+.growth-assets p{ margin-top:10px; color:var(--ink-soft); font-size:14px; }
+.install-capture{ margin:0 0 20px; }
+.install-capture img{ width:100%; height:auto; border-radius:12px; }
+.install-entry{ display:flex; align-items:center; gap:24px; padding:24px; margin-bottom:24px; background:var(--mist); border-radius:16px; }
+.install-entry>img{ flex-shrink:0; }
+.install-entry p{ margin:12px 0; color:var(--ink-soft); }
+.contact-fallback{ margin-top:28px; padding-top:24px; border-top:1px solid var(--line); text-align:center; font-size:14px; }
+.contact-fallback>a{ display:block; margin:12px 0; text-decoration:underline; }
+.contact-fallback [role=status]{ min-height:48px; margin-top:12px; color:var(--ink-soft); }
+.nav-toggle{ min-width:44px; min-height:44px; }
+@media (min-width:860px){ .nav-mobile.open{ display:none; } }
+@media (min-width:760px){ .pv-slide .feature-preview{ width:40%; } }
+@media (max-width:639px){
+  .app-screen-pair{ grid-template-columns:1fr; }
+  .growth-assets{ flex-wrap:wrap; gap:16px; padding:24px 16px; }
+  .growth-assets>div{ order:2; width:100%; text-align:center; }
+  .growth-assets>img{ width:64px; height:80px; }
+  .install-entry{ flex-direction:column; align-items:start; }
+}

@@ -4,6 +4,19 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>자주 묻는 질문 &amp; 문의하기 — 쿠앵크(COOANC)</title>
+<meta name="description" content="쿠앵크의 자주 묻는 질문, 사용 문의와 오류 제보 방법을 확인하세요.">
+<link rel="canonical" href="https://cooanc.vercel.app/site/contact.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="쿠앵크 COOANC">
+<meta property="og:title" content="자주 묻는 질문 &amp; 문의하기 — 쿠앵크(COOANC)">
+<meta property="og:description" content="쿠앵크의 자주 묻는 질문, 사용 문의와 오류 제보 방법을 확인하세요.">
+<meta property="og:url" content="https://cooanc.vercel.app/site/contact.html">
+<meta property="og:image" content="https://cooanc.vercel.app/site/assets/app/share-cover.jpg">
+<meta property="og:image:alt" content="쿠앵크 토끼 캐릭터와 저금통, 화분">
+<meta property="og:image:width" content="1367">
+<meta property="og:image:height" content="718">
+<meta name="twitter:card" content="summary_large_image">
+
 <link rel="stylesheet" href="/site/css/style.css">
 <style>
   /* 문의하기 목차 — 클릭하면 스크롤 이동, 현재 위치만 볼드+밑줄(가이드 페이지와 동일 패턴) */
@@ -121,7 +134,7 @@
 
       <form class="fade" id="contactForm" style="margin-top:20px;">
         <div class="field">
-          <label>문의 유형</label>
+          <label for="type">문의 유형</label>
           <select style="width:100%; padding:13px 14px; border-radius:12px; border:1px solid var(--line); font-size:14.5px; background:#fff;" id="type">
             <option>서비스 이용 문의</option>
             <option>오류 제보</option>
@@ -130,22 +143,23 @@
           </select>
         </div>
         <div class="field">
-          <label>이름</label>
+          <label for="name">이름</label>
           <input type="text" id="name" placeholder="이름을 입력해주세요" required>
         </div>
         <div class="field">
-          <label>이메일</label>
+          <label for="email">이메일</label>
           <input type="email" id="email" placeholder="답장받을 이메일을 입력해주세요" required>
         </div>
         <div class="field">
-          <label>내용</label>
+          <label for="message">내용</label>
           <textarea id="message" placeholder="문의 내용을 자유롭게 남겨주세요" required></textarea>
         </div>
-        <button type="submit" class="btn btn-primary btn-block">문의 보내기</button>
+        <button type="submit" class="btn btn-primary btn-block">메일 앱에서 문의하기</button>
         <p style="font-size:12px; color:var(--ink-faint); margin-top:10px; text-align:center;">
-          버튼을 누르면 메일 앱으로 연결돼요. ※ 받으실 이메일 주소를 알려주시면 연결해둘게요.
+          메일 초안이 열리면 내용을 확인한 뒤 메일 앱에서 직접 보내주세요. 이 페이지에서는 바로 전송되지 않아요.
         </p>
       </form>
+      <div class="contact-fallback"><p>메일 앱이 없다면 아래 주소로 직접 보내주세요.</p><a href="mailto:theotter@naver.com">theotter@naver.com</a><button type="button" class="btn btn-ghost btn-sm" data-copy-email="theotter@naver.com">이메일 주소 복사</button><p role="status" id="emailCopyStatus" aria-live="polite"></p></div>
     </div>
   </div>
 </section>
@@ -180,7 +194,6 @@
     const name = document.getElementById('name').value;
     const email = document.getElementById('email').value;
     const message = document.getElementById('message').value;
-    // ※ 아래 CONTACT_EMAIL을 실제 수신 이메일로 바꿔주세요.
     const CONTACT_EMAIL = 'theotter@naver.com';
     const subject = encodeURIComponent(`[쿠앵크 문의 - ${type}] ${name}`);
     const body = encodeURIComponent(`이름: ${name}\n이메일: ${email}\n유형: ${type}\n\n${message}`);

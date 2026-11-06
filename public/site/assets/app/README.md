@@ -1,0 +1,15 @@
+# Homepage image sources
+
+These are local copies of existing COOANC assets; no app screenshots were fabricated.
+
+- `mission-detail.jpg`: cropped `../child-home.webp` (800×640, offset 14,1120).
+- `progress-detail.jpg`: cropped `../parent-home.webp` (760×320, offset 34,800).
+- `routine-detail.jpg`: cropped `../parent-routine.webp` (800×640, offset 14,950).
+- `market-detail.jpg`: cropped `../parent-market.webp` (800×700, offset 14,980); parent goods management, not the child's shop.
+- `bunny-front.png`: front frame of `public/assets/img/characters/base/bunny.png`, using `bunny.json` (243×537, offset 1,546).
+- `otter.png`, `bear.png`, `hamster.png`, `chick.png`: respective `_profile.png` in the same app character directory.
+- `map.png`: `public/assets/img/common/ui/map.png`.
+- `stringcheese.png`: `public/assets/img/items/shop/items/건강간식/stringcheese.png`.
+- `share-cover.jpg`: cropped `../hero-2.png` (1367×718, offset 0,17).
+
+Screenshots are pre-existing examples, not newly captured production state. Character, plant, piggy bank and shop illustrations are labelled as app artwork on the page. Full captures remain available through ordinary image links.

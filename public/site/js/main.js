@@ -8,6 +8,8 @@ if (navToggle && navMobile){
     navToggle.setAttribute('aria-expanded', String(open));
     navToggle.setAttribute('aria-label', open ? '메뉴 닫기' : '메뉴 열기');
   }
+  const desktop = window.matchMedia('(min-width: 860px)');
+  desktop.addEventListener('change', e=>{ if(e.matches) setNavOpen(false); });
   setNavOpen(false);
   navToggle.addEventListener('click', ()=> setNavOpen(!navMobile.classList.contains('open')));
   navMobile.addEventListener('click', e=>{ if(e.target.closest('a')) setNavOpen(false); });
@@ -158,54 +160,15 @@ document.querySelectorAll('[data-pv-carousel]').forEach(root=>{
   render();
 });
 
-// ===== 설치 CTA : 기기 분기 =====
-const APP_URL = 'https://cooanc.vercel.app/';
-const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-let deferredPrompt = null;
-
-window.addEventListener('beforeinstallprompt', (e)=>{
-  e.preventDefault();
-  deferredPrompt = e;
+// ===== 이메일 주소 복사 =====
+document.querySelectorAll('[data-copy-email]').forEach(button=>{
+  button.addEventListener('click', async ()=>{
+    const status = document.getElementById('emailCopyStatus');
+    try {
+      await navigator.clipboard.writeText(button.dataset.copyEmail);
+      status.textContent = '이메일 주소를 복사했어요.';
+    } catch {
+      status.textContent = '복사하지 못했어요. 위 이메일 주소를 직접 선택해 복사해주세요.';
+    }
+  });
 });
-
-function handleInstall(){
-  if (deferredPrompt){
-    deferredPrompt.prompt();
-    deferredPrompt.userChoice.finally(()=>{ deferredPrompt = null; });
-  } else if (isIOS){
-    const overlay = document.getElementById('iosOverlay');
-    if(overlay) overlay.classList.add('show');
-    else window.open(APP_URL, '_blank');
-  } else {
-    window.open(APP_URL, '_blank');
-  }
-}
-document.querySelectorAll('[data-install]').forEach(btn=>{
-  btn.addEventListener('click', handleInstall);
-});
-const iosClose = document.getElementById('iosClose');
-if (iosClose){
-  iosClose.addEventListener('click', ()=> document.getElementById('iosOverlay').classList.remove('show'));
-}
-
-// ===== 이미지 확대 보기(라이트박스) =====
-const lightboxOverlay = document.getElementById('lightboxOverlay');
-if (lightboxOverlay){
-  const lightboxImg = document.getElementById('lightboxImg');
-  const lightboxClose = document.getElementById('lightboxClose');
-  document.querySelectorAll('[data-lightbox]').forEach(img=>{
-    img.addEventListener('click', ()=>{
-      lightboxImg.src = img.currentSrc || img.src;
-      lightboxImg.alt = img.alt || '';
-      lightboxOverlay.classList.add('show');
-    });
-  });
-  lightboxClose.addEventListener('click', ()=> lightboxOverlay.classList.remove('show'));
-  lightboxOverlay.addEventListener('click', (e)=>{
-    if (e.target === lightboxOverlay) lightboxOverlay.classList.remove('show');
-  });
-  document.addEventListener('keydown', (e)=>{
-    if (e.key === 'Escape') lightboxOverlay.classList.remove('show');
-  });
-}
-
