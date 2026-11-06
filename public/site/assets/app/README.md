@@ -26,3 +26,7 @@ The phone preview displays the top of the original `child-home.webp` via CSS cli
 The service tour's tablet is an illustrative HTML composition of original app artwork, labelled as an example, not a captured tablet screen. Parent tour screens are the original full captures. Unlock badges follow `src/lib/parentChildLevelUnlocks.ts`: missions/market/plant 0, stickers 1, piggy bank 5, content chest 8, mini-games 10. Unreleased features have no promised unlock level.
 
 - `tablet-room-current.jpg`: resized current child-home background `public/assets/img/layouts/backgrounds/tablet_kidsroom_background_portrait2.png`, as configured in `src/constants/assets.ts`. Replaces the older tour room.
+
+- `video-ticket.png`, `game-ticket.png`: original app `items/shop/items/콘텐츠/contents.png` and `minigame.png`, resized for the child feature preview. The 20-slot board uses the existing site sticker-board illustration.
+
+Core feature artwork: `apple-stage-{0,1,4,7}.png` all come from the same `plant/apple` folder. `{tree}-grown.png` uses each tree’s `7.png` (blueberry maps to the app folder `bluberry`). `piggy-stage-{1,5,10,14}.png` are original piggybank frames; ranges follow `src/lib/piggyBankHomeStage.ts` (14 intervals over 1000 credits). `pomodoro.png` and `music.png` use app common/ui artwork. Video examples follow the initial channel list in migration 096; only claw machine is implemented in ChildContentZonePopup, other learning games are explicitly proposals.

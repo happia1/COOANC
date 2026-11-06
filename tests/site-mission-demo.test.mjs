@@ -12,7 +12,7 @@ function element(dataset = {}) {
     setAttribute: (k, v) => attrs.set(k, v), getAttribute: k => attrs.get(k),
     append(...children) { this.children.push(...children) }, replaceChildren() { this.children = [] },
     getBoundingClientRect: () => ({ left: 0, top: 0, width: 100, height: 100 }),
-    focus() {}, dispatchEvent() {}, scrollIntoView() {}, remove() {},
+    focus() {}, dispatchEvent(event) { events.get(event.type)?.() }, scrollIntoView() {}, remove() {},
   }
 }
 const source = name => readFileSync(new URL(`../public/site/js/${name}.js`, import.meta.url), 'utf8')
@@ -72,16 +72,18 @@ test('routine keywords toggle the selected list and empty state', () => {
 })
 
 test('feature navigation synchronizes explanation, hotspot and parent screen', () => {
-  const panels = ['parent-routine','parent-home','parent-market'].map((screen, i) => element({ parentScreen: screen, parentY: String(50+i), featureName: `기능 ${i}` }))
+  const panels = ['parent-routine','parent-home','parent-market'].map((screen, i) => element({ parentScreen: screen, parentY: String(50+i), parentHeight: String(30+i), featureName: `기능 ${i}` }))
   const selectors = [0,1,2,0,1,2].map(i => element({ tourSelect: String(i) }))
-  const jump = element({ tourJump: '2' })
+  const jump = element({ tourJump: '2', tourTarget: 'family-tour' })
   const nodes = Object.fromEntries(['[data-tour-prev]','[data-tour-next]','[data-parent-preview]','[data-parent-caption]','.parent-hotspot','[data-tour-count]','.tour-announcement'].map(k => [k, element()]))
-  const root = { querySelector: k => nodes[k], querySelectorAll: k => k === '[data-tour-panel]' ? panels : selectors, scrollIntoView() {} }
+  const root = { id: 'family-tour', querySelector: k => nodes[k], querySelectorAll: k => k === '[data-tour-panel]' ? panels : selectors, scrollIntoView() {} }
   runInNewContext(source('features'), { document: { querySelectorAll: k => k === '[data-feature-tour]' ? [root] : [jump] }, window: { matchMedia: () => ({ matches: true }) } })
   assert.equal(nodes['[data-tour-prev]'].disabled, true)
   nodes['[data-tour-next]'].click()
   assert.equal(nodes['[data-parent-preview]'].src, '/site/assets/parent-home.webp')
   assert.equal(panels[1].hidden, false)
+  assert.equal(nodes['.parent-hotspot'].style.top, '51%')
+  assert.equal(nodes['.parent-hotspot'].style.height, '31%')
   assert.equal(selectors[4].getAttribute('aria-pressed'), 'true')
   jump.click()
   assert.equal(nodes['[data-parent-preview]'].src, '/site/assets/parent-market.webp')
@@ -104,3 +106,49 @@ test('card rail respects boundaries and reduced motion', () => {
   assert.equal(lastScroll.left, 240)
   assert.equal(lastScroll.behavior, 'instant')
 })
+
+test('child-only tour does not require a parent screen and ignores another tour jump', () => {
+  const panels = [element({featureName:'화분'}), element({featureName:'스티커'})];
+  const selectors = [element({tourSelect:'0'}), element({tourSelect:'1'})];
+  const nodes = Object.fromEntries(['[data-tour-prev]','[data-tour-next]','[data-tour-count]','.tour-announcement'].map(k=>[k,element()]));
+  const own = element({tourJump:'1',tourTarget:'child-tour'}), other = element({tourJump:'0',tourTarget:'family-tour'});
+  const root = {id:'child-tour',querySelector:k=>nodes[k],querySelectorAll:k=>k==='[data-tour-panel]'?panels:selectors,scrollIntoView(){}};
+  runInNewContext(source('features'),{document:{querySelectorAll:k=>k==='[data-feature-tour]'?[root]:[own,other]},window:{matchMedia:()=>({matches:true})}});
+  own.click(); other.click();
+  assert.equal(panels[1].hidden,false);
+  assert.equal(selectors[1].getAttribute('aria-pressed'),'true');
+});
+
+test('only shared features map to parents; core cards and growth art match their details', () => {
+  const html = readFileSync(new URL('../public/site/features.html',import.meta.url),'utf8');
+  const family = html.split('id="family-tour"')[1].split('id="child-features"')[0];
+  const core = html.split('id="child-tour"')[1].split('class="upcoming-section"')[0];
+  assert.equal((family.match(/data-parent-screen=/g)||[]).length,3);
+  assert.equal(core.includes('data-parent-screen'),false);
+  assert.equal(core.includes('부모 화면에서는'),false);
+  assert.equal(core.includes('tablet-shell'),false);
+  assert.equal((core.match(/data-tour-panel/g)||[]).length,6);
+  assert.equal((core.match(/class="core-card"/g)||[]).length,6);
+  for(const stage of [0,1,4,7]) assert.ok(core.includes('apple-stage-'+stage+'.png'));
+  for(const tree of ['apple','strawberry','lemon','cherry','blueberry','sunflower']) assert.ok(core.includes(tree+'-grown.png'));
+  assert.ok(core.includes('929 이상'));
+  assert.ok(core.includes('현재 이용 가능 · 인형뽑기'));
+  assert.ok(core.includes('추가 구상 · 아직 이용할 수 없어요'));
+});
+
+test('swiping a core card synchronizes its detail and navigation', () => {
+  const panels=[element({featureName:'화분'}),element({featureName:'스티커'})];
+  const cards=[element({tourSelect:'0'}),element({tourSelect:'1'})];
+  cards[0].getBoundingClientRect=()=>({left:-100,width:100});
+  cards[1].getBoundingClientRect=()=>({left:0,width:100});
+  const rail=element(); rail.clientWidth=100; rail.children=cards;
+  rail.getBoundingClientRect=()=>({left:0,width:100});
+  const nodes=Object.fromEntries(['[data-tour-prev]','[data-tour-next]','[data-tour-count]','.tour-announcement'].map(k=>[k,element()]));
+  nodes['.core-card-rail']=rail;
+  const root={id:'child-tour',querySelector:k=>nodes[k],querySelectorAll:k=>k==='[data-tour-panel]'?panels:cards};
+  runInNewContext(source('features'),{document:{querySelectorAll:k=>k==='[data-feature-tour]'?[root]:[]},window:{matchMedia:()=>({matches:true})}});
+  rail.dispatchEvent({type:'scrollend'});
+  assert.equal(panels[1].hidden,false);
+  assert.equal(cards[1].getAttribute('aria-pressed'),'true');
+  assert.equal(nodes['[data-tour-next]'].disabled,true);
+});
