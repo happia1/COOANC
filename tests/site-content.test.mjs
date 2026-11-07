@@ -21,3 +21,19 @@ test('install instructions open the app, not the guide shortcut', () => {
   assert.match(html, /href="https:\/\/cooanc.vercel.app\/"[^>]*>앱 열고 설치하기/)
   assert.match(html, /앱을 연 뒤/)
 })
+
+test('home research links and moved experiences remain connected', () => {
+  const home = readFileSync(`${root}/site/index.html`, 'utf8');
+  const features = readFileSync(`${root}/site/features.html`, 'utf8');
+  assert.ok(!home.includes('data-mission-demo'));
+  assert.ok(features.includes('data-mission-demo') && features.includes('data-routine-demo'));
+  assert.match(home, /youtube-nocookie.com\/embed\/N8JO8S6UJCE/);
+  assert.ok(!home.includes('autoplay=1'));
+  for (const id of ['18298272', '23397904', '39102255', '10589297']) assert.ok(home.includes(id));
+  for (const html of [home, features]) {
+    for (const [, path, hash] of html.matchAll(/href="(\/site\/[^"#]+\.html)#([^"#]+)"/g)) {
+      assert.ok(readFileSync(resolve(root, '.' + path), 'utf8').includes(`id="${hash}"`), `missing anchor ${path}#${hash}`);
+    }
+  }
+  assert.ok(features.includes('id="try-missions"'));
+});
