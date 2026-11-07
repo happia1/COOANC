@@ -196,7 +196,6 @@
 .how-copy>.text-link { margin-top:8px; }
 .review-section { padding:40px 0 0; border-top:1px solid #dce2ed; margin-top:40px; text-align:center; }
 .review-section>p { margin-top:10px; color:#647086; }
-.review-pause { display:inline-flex; gap:8px; align-items:center; min-height:44px; font-size:12px; color:#647086; cursor:pointer; }
 .review-window { overflow:hidden; margin-top:12px; container-type:inline-size; }
 .review-track { display:flex; width:max-content; animation:review-flow 38s linear infinite; }
 .review-group { display:flex; min-width:100cqw; justify-content:space-around; gap:20px; padding-right:20px; }
@@ -204,7 +203,7 @@
 .review-group blockquote { font-size:16px; line-height:1.85; }
 .review-group figcaption { font-size:12px; color:#647086; margin-top:18px; }
 .review-id-note { display:block; margin-top:6px; color:#647086; font-size:11px; }
-.review-window:hover .review-track,.review-section:has(input:checked) .review-track,.review-section:focus-within .review-track { animation-play-state:paused; }
+.review-window:hover .review-track,.review-section:focus-within .review-track { animation-play-state:paused; }
 @keyframes review-flow { to { transform:translateX(-50%); } }
 @media(max-width:639px) {
  .story-controls { left:-12px; right:-12px; }
@@ -216,5 +215,4 @@
  .review-track { animation:none; }
  .review-window { overflow-x:auto; }
  .review-group[aria-hidden] { display:none; }
- .review-pause { display:none; }
-}
+ }

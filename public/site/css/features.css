@@ -250,7 +250,6 @@
 .fruit-gallery img { height:64px; }
 .seed-list { padding:12px; }
 .diary-preview { display:block; max-width:100%; width:300px; max-height:360px; object-fit:contain; margin:20px auto; }
-.future-pause { display:inline-flex; align-items:center; gap:8px; min-height:44px; color:#647086; font-size:12px; cursor:pointer; }
 .future-window { overflow-x:auto; scrollbar-width:thin; padding:12px 0 20px; }
 .future-track { display:flex; width:max-content; animation:future-flow 55s linear infinite; }
 .future-group { display:flex; gap:20px; padding-right:20px; }
@@ -260,7 +259,7 @@
 .future-card h3 { margin:8px 0; font-size:20px; }
 .future-card p { font-size:14px; line-height:1.8; color:#536176; }
 .upcoming-section .future-note { font-size:12px; }
-.future-window:hover .future-track,.future-window:focus .future-track,.upcoming-section:has(input:checked) .future-track { animation-play-state:paused; }
+.future-window:hover .future-track,.future-window:focus .future-track { animation-play-state:paused; }
 @keyframes future-flow { to { transform:translateX(-50%); } }
 @media(max-width:959px) {
  #family-tour .tour-copy { display:block; }
@@ -287,5 +286,16 @@
 @media(prefers-reduced-motion:reduce) {
  .future-track { animation:none; }
  .future-group[aria-hidden] { display:none; }
- .future-pause { display:none; }
+ }
+
+/* Match the home hero's mobile rhythm, leaving the scene below the copy. */
+@media(max-width:639px) {
+ .tour-intro.page-scene { min-height:660px; padding:36px 0 0; background:#eef5f6; overflow:hidden; }
+ .tour-intro.page-scene::before { inset:auto 0 0; height:380px; background-size:auto 100%; background-position:right bottom; }
+ .tour-intro.page-scene::after { background:linear-gradient(180deg,#eef5f6 0%,#eef5f6f5 28%,#eef5f6bd 45%,#eef5f600 66%); }
+ .tour-intro h1 { font-size:clamp(27px,7.5vw,32px); }
+ .tour-intro p { margin-top:16px; }
+ .intro-actions { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:20px; }
+ .intro-actions a { justify-content:center; padding:12px 8px; font-size:14px; background:#ffffffb8; }
 }
+.site-features .tour-panel h2.tour-feature-name { font-size:21px; font-weight:800; color:#27334a; margin:0 0 12px; line-height:1.4; }

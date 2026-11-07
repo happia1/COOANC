@@ -80,3 +80,18 @@
  .demo-mission-art { height:80px; }
  .experience-section { padding:48px 0; }
 }
+
+.screen-label { display:block; color:#454fc3; font-size:13px; font-weight:800; margin-bottom:10px; }
+.parent-phone { background:#fff; }
+.parent-app-scroll { aspect-ratio:828 / 1658; overflow-y:auto; overscroll-behavior:contain; scrollbar-width:thin; }
+.parent-phone-scene { aspect-ratio:828 / 950; overflow:hidden; }
+.parent-phone-scene img { display:block; width:100%; height:auto; }
+.parent-phone .routine-demo { padding:8px 12px 16px; border:0; border-radius:0; box-shadow:none; }
+.parent-phone .routine-heading h3 { font-size:15px; }
+.parent-phone .routine-edit { padding:6px 8px; font-size:12px; }
+.parent-phone .routine-keywords h4 { font-size:14px; }
+.parent-phone .routine-chips { gap:6px; }
+.parent-phone .routine-chips button { padding:6px 10px; font-size:12px; }
+.parent-phone .routine-status { font-size:12px; }
+.parent-phone-nav { aspect-ratio:828 / 135; overflow:hidden; }
+.parent-phone-nav img { display:block; width:100%; height:auto; margin-top:-200.24%; }
