@@ -290,9 +290,9 @@
 
 /* Match the home hero's mobile rhythm, leaving the scene below the copy. */
 @media(max-width:639px) {
- .tour-intro.page-scene { min-height:660px; padding:36px 0 0; background:#eef5f6; overflow:hidden; }
+ .tour-intro.page-scene { min-height:660px; padding:36px 0 0; background:#f9ecde; overflow:hidden; }
  .tour-intro.page-scene::before { inset:auto 0 0; height:380px; background-size:auto 100%; background-position:right bottom; }
- .tour-intro.page-scene::after { background:linear-gradient(180deg,#eef5f6 0%,#eef5f6f5 28%,#eef5f6bd 45%,#eef5f600 66%); }
+ .tour-intro.page-scene::after { background:linear-gradient(180deg,#f9ecde 0%,#f9ecde 43%,#f9ecdebd 54%,#f9ecde00 72%); }
  .tour-intro h1 { font-size:clamp(27px,7.5vw,32px); }
  .tour-intro p { margin-top:16px; }
  .intro-actions { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:20px; }

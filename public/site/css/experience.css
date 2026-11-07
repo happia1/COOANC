@@ -95,3 +95,8 @@
 .parent-phone .routine-status { font-size:12px; }
 .parent-phone-nav { aspect-ratio:828 / 135; overflow:hidden; }
 .parent-phone-nav img { display:block; width:100%; height:auto; margin-top:-200.24%; }
+
+.demo-card-slider { position:relative; }
+.demo-card-slider .demo-rail-controls { position:absolute; top:50%; left:-8px; right:-8px; transform:translateY(-50%); margin:0; pointer-events:none; z-index:2; }
+.demo-card-slider .demo-rail-controls button { display:grid; place-items:center; pointer-events:auto; background:#fffffff0; box-shadow:0 3px 10px #493d3420; }
+.demo-card-slider .demo-rail-controls button:disabled { visibility:hidden; }
