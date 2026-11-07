@@ -188,7 +188,7 @@
 .evidence-icon { display:block; width:56px; height:56px; object-fit:contain; margin-bottom:16px; }
 .story-carousel,.how-copy { position:relative; }
 .story-controls { position:absolute; top:50%; left:-16px; right:-16px; transform:translateY(-50%); pointer-events:none; margin:0; z-index:2; }
-.story-controls button { pointer-events:auto; font-size:24px; background:#fffffff0; box-shadow:0 3px 12px #26334b18; }
+.story-controls button { display:grid; place-items:center; pointer-events:auto; background:#fffffff0; box-shadow:0 3px 12px #26334b18; }
 .story-controls button:disabled { visibility:hidden; }
 .site-home .how-grid { grid-template-columns:minmax(0,1fr); gap:30px; max-width:860px; margin-inline:auto; }
 .how-copy .story-track>li { flex-basis:90%; }
