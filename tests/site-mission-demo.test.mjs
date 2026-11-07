@@ -129,8 +129,8 @@ test('only shared features map to parents; core cards and growth art match their
   assert.equal(core.includes('data-parent-screen'),false);
   assert.equal(core.includes('부모 화면에서는'),false);
   assert.equal(core.includes('tablet-shell'),false);
-  assert.equal((core.match(/data-tour-panel/g)||[]).length,6);
-  assert.equal((core.match(/class="core-card"/g)||[]).length,6);
+  assert.equal((core.match(/data-tour-panel/g)||[]).length,7);
+  assert.equal((core.match(/class="core-card"/g)||[]).length,7);
   for(const stage of [0,1,4,7]) assert.ok(core.includes('apple-stage-'+stage+'.png'));
   for(const tree of ['apple','strawberry','lemon','cherry','blueberry','sunflower']) assert.ok(core.includes(tree+'-grown.png'));
   assert.ok(core.includes('929 이상'));
@@ -169,3 +169,14 @@ test('swiping a core card synchronizes its detail and navigation', () => {
   assert.equal(scroll.left,200);assert.equal(scroll.behavior,'instant');assert.equal('top' in scroll,false);
   assert.equal(panels[1].hidden,false);
 });
+
+ test('feature selectors work without duplicate arrows and counters', () => {
+  const panels=[element({featureName:'미션'}),element({featureName:'성장'})];
+  const selectors=[0,1].map(i=>element({tourSelect:String(i)}));
+  const status=element();
+  const root={querySelector:k=>k==='.tour-announcement'?status:null,querySelectorAll:k=>k==='[data-tour-panel]'?panels:selectors};
+  runInNewContext(source('features'),{document:{querySelectorAll:()=>[root]},window:{matchMedia:()=>({matches:true})}});
+  selectors[1].click();
+  assert.equal(panels[1].hidden,false);
+  assert.equal(panels[0].hidden,true);
+ });

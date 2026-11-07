@@ -31,9 +31,10 @@ document.querySelectorAll('[data-feature-tour]').forEach(root => {
       highlight.style.top = `${panel.dataset.parentY}%`;
       highlight.style.height = `${panel.dataset.parentHeight}%`;
     }
-    root.querySelector('[data-tour-count]').textContent = `${String(index + 1).padStart(2, '0')} / ${String(panels.length).padStart(2, '0')}`;
-    prev.disabled = index === 0;
-    next.disabled = index === panels.length - 1;
+    const count = root.querySelector('[data-tour-count]');
+    if (count) count.textContent = `${String(index + 1).padStart(2, '0')} / ${String(panels.length).padStart(2, '0')}`;
+    if (prev) prev.disabled = index === 0;
+    if (next) next.disabled = index === panels.length - 1;
     if (announce && rail) {
       const card = rail.children[index];
       const left = rail.scrollLeft + card.getBoundingClientRect().left - rail.getBoundingClientRect().left - (rail.clientWidth - card.getBoundingClientRect().width) / 2;
@@ -41,8 +42,8 @@ document.querySelectorAll('[data-feature-tour]').forEach(root => {
     }
     if (announce) root.querySelector('.tour-announcement').textContent = `${panel.dataset.featureName} 설명. 선택한 기능의 화면을 확인하세요.`;
   }
-  prev.addEventListener('click', () => show(index - 1));
-  next.addEventListener('click', () => show(index + 1));
+  prev?.addEventListener('click', () => show(index - 1));
+  next?.addEventListener('click', () => show(index + 1));
   selectors.forEach(button => button.addEventListener('click', () => show(Number(button.dataset.tourSelect))));
   rail?.addEventListener('scrollend', () => {
     const center = rail.getBoundingClientRect().left + rail.clientWidth / 2;

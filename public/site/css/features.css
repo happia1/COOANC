@@ -224,3 +224,68 @@
  .sticker-detail .sticker-board { max-height:360px; }
  .tour-hotspot { min-width:32px; min-height:32px; }
 }
+
+.tour-intro.page-scene { padding:64px 0; }
+.dual-explanation { margin:0 0 24px; padding:0; border:0; }
+.dual-explanation h2 { font-size:clamp(26px,3.2vw,36px); line-height:1.4; }
+#family-tour>.tour-selectors { justify-content:flex-start; gap:10px; margin:0 0 24px; }
+#family-tour>.tour-selectors button { padding:8px 16px; border:1px solid #d9dfe9; border-radius:24px; color:#536176; }
+#family-tour>.tour-selectors button.is-active { background:#454fc3; color:white; border-color:#454fc3; text-decoration:none; }
+#family-tour .tour-panel { min-height:0; padding-top:0; }
+#family-tour .tour-hotspot { width:44px; height:44px; min-width:44px; min-height:44px; border:0; background:transparent; box-shadow:none; display:grid; place-items:center; transform:translate(30%,-30%); }
+#family-tour .tour-hotspot span { width:18px; height:18px; border:3px solid white; border-radius:50%; background:#a5ace8; box-shadow:0 0 0 1px #454fc366; }
+#family-tour .tour-hotspot.is-active span { background:#454fc3; }
+.parent-detail summary { cursor:pointer; padding:8px 0; font-size:13px; color:#454fc3; }
+.parent-detail[open] summary { margin-bottom:12px; }
+.core-card-browser { position:sticky; top:100px; min-width:0; }
+.core-card-rail { position:static; }
+.core-card-browser .tour-nav { position:absolute; inset:0 -10px; margin:0; pointer-events:none; }
+.core-card-browser .tour-nav button { display:grid; place-items:center; pointer-events:auto; background:#fffffff0; box-shadow:0 3px 12px #26334b18; }
+.core-card-browser .tour-nav button:disabled { visibility:hidden; }
+.child-feature-detail { background:#fffefb; border:1px solid #e0e5df; border-radius:24px; padding:28px; }
+.core-section .tour-panel { padding:0; min-height:620px; }
+.child-feature-detail .tour-panel>p { margin-top:12px; }
+.plant-growth { margin:20px 0; }
+.fruit-gallery { grid-template-columns:repeat(6,minmax(0,1fr)); }
+.fruit-gallery img { height:64px; }
+.seed-list { padding:12px; }
+.diary-preview { display:block; max-width:100%; width:300px; max-height:360px; object-fit:contain; margin:20px auto; }
+.future-pause { display:inline-flex; align-items:center; gap:8px; min-height:44px; color:#647086; font-size:12px; cursor:pointer; }
+.future-window { overflow-x:auto; scrollbar-width:thin; padding:12px 0 20px; }
+.future-track { display:flex; width:max-content; animation:future-flow 55s linear infinite; }
+.future-group { display:flex; gap:20px; padding-right:20px; }
+.future-card { width:260px; padding:24px; border:1px solid #d6d8ea; border-radius:20px; background:#fffefb; box-shadow:0 5px 0 #d9dbea; }
+.future-card img { display:block; height:120px; width:100%; object-fit:contain; margin-bottom:18px; }
+.future-card>span { font-size:11px; color:#647086; }
+.future-card h3 { margin:8px 0; font-size:20px; }
+.future-card p { font-size:14px; line-height:1.8; color:#536176; }
+.upcoming-section .future-note { font-size:12px; }
+.future-window:hover .future-track,.future-window:focus .future-track,.upcoming-section:has(input:checked) .future-track { animation-play-state:paused; }
+@keyframes future-flow { to { transform:translateX(-50%); } }
+@media(max-width:959px) {
+ #family-tour .tour-copy { display:block; }
+ #family-tour .tour-devices { grid-row:1; }
+ .core-layout { grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr); gap:20px; }
+ .child-feature-detail { padding:20px; }
+}
+@media(max-width:639px) {
+ .tour-intro.page-scene { padding:36px 0 150px; }
+ .tour-section { padding-top:36px; }
+ #family-tour>.tour-selectors { gap:6px; }
+ #family-tour>.tour-selectors button { font-size:12px; padding:8px 12px; }
+ .tour-devices figcaption span { display:none; }
+ .tour-parent-copy { margin-top:12px; }
+ .parent-detail { padding:10px 16px; }
+ .core-layout { grid-template-columns:1fr; gap:16px; }
+ .core-card-browser { position:relative; top:auto; }
+ .core-card-browser .tour-nav { inset:0 -8px; }
+ .core-section .tour-panel { min-height:0; }
+ .fruit-gallery { grid-template-columns:repeat(3,minmax(0,1fr)); }
+ .fruit-gallery img { height:64px; }
+ .future-card { width:240px; }
+}
+@media(prefers-reduced-motion:reduce) {
+ .future-track { animation:none; }
+ .future-group[aria-hidden] { display:none; }
+ .future-pause { display:none; }
+}

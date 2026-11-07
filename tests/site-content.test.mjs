@@ -10,7 +10,7 @@ for (const page of ['index', 'features', 'guide', 'contact', 'about']) {
     assert.match(html, /name="twitter:card" content="summary_large_image"/)
     assert.doesNotMatch(html, /이미지 자리|data-install[\s=>]|id="iosOverlay"/)
     for (const [, url] of html.matchAll(/(?:src|href)="(\/site\/[^"#]+)(?:#[^"]*)?"/g)) {
-      assert.ok(existsSync(resolve(root, '.' + url)), `missing ${url}`)
+      assert.ok(existsSync(resolve(root, '.' + url.split('?')[0])), `missing ${url}`)
     }
     const ids = [...html.matchAll(/\bid="([^"]+)"/g)].map(m => m[1])
     assert.equal(ids.length, new Set(ids).size, 'duplicate ids')
