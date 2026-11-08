@@ -30,3 +30,5 @@ The service tour's tablet is an illustrative HTML composition of original app ar
 - `video-ticket.png`, `game-ticket.png`: original app `items/shop/items/콘텐츠/contents.png` and `minigame.png`, resized for the child feature preview. The 20-slot board uses the existing site sticker-board illustration.
 
 Core feature artwork: `apple-stage-{0,1,4,7}.png` all come from the same `plant/apple` folder. `{tree}-grown.png` uses each tree’s `7.png` (blueberry maps to the app folder `bluberry`). `piggy-stage-{1,5,10,14}.png` are original piggybank frames; ranges follow `src/lib/piggyBankHomeStage.ts` (14 intervals over 1000 credits). `pomodoro.png` and `music.png` use app common/ui artwork. Video examples follow the initial channel list in migration 096; only claw machine is implemented in ChildContentZonePopup, other learning games are explicitly proposals.
+
+Guide habit tips: `meal-finished.png`, `clear-dishes.png`, and `say-hello.png` are unchanged copies of app mission artwork `routine/special/clean_up_all.png`, `put_away_dishes.png`, and `say_hello.png`.
