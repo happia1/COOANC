@@ -56,3 +56,12 @@
  .site-guide .scene-guide::after{background:linear-gradient(180deg,#faecde 0%,#faecde 43%,#faecdebd 54%,#faecde00 72%);}
  .site-contact .scene-contact{min-height:340px;padding:40px 0;}
 }
+
+.habit-carousel{position:relative;max-width:760px;margin:28px auto 0;}
+.site-guide .habit-grid{display:flex;gap:20px;overflow-x:auto;scroll-snap-type:x mandatory;padding:4px 0 16px;align-items:stretch;scrollbar-width:thin;}
+.site-guide .habit-grid>.habit-card{flex:0 0 90%;min-width:0;scroll-snap-align:start;padding:28px;border:1px solid #dce2ed;border-radius:24px;background:#fff;}
+.site-guide .habit-grid>.habit-reward{background:#fff3df;}
+.habit-controls{position:absolute;left:-12px;right:-12px;top:50%;transform:translateY(-50%);display:flex;justify-content:space-between;pointer-events:none;}
+.habit-controls button{display:grid;place-items:center;width:44px;height:44px;border-radius:50%;border:1px solid #ccd4e1;background:#fffefbf2;color:#454fc3;pointer-events:auto;box-shadow:0 3px 12px #29344612;cursor:pointer;}
+.habit-controls button:disabled{visibility:hidden;}
+@media(max-width:639px){.site-guide .habit-grid{gap:14px;}.site-guide .habit-grid>.habit-card{flex-basis:92%;padding:22px;}}
