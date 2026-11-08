@@ -1,0 +1,17 @@
+/* Shared desktop hero proportions, based on the guide. */
+@media(min-width:640px){
+ .home-hero>.wrap,.tour-intro.page-scene>.wrap,.scene-guide>.wrap{max-width:1080px;}
+ .hero-grid,.tour-intro.page-scene,.scene-guide{min-height:390px;}
+ .tour-intro.page-scene,.scene-guide{display:flex;align-items:center;padding:48px 0;}
+ .hero-copy{padding-block:35px;}
+ .hero-art img{object-fit:contain;object-position:right center;}
+ .home-hero h1,.tour-intro.page-scene h1,.scene-guide h1{font-size:40px;line-height:1.28;}
+ .hero-copy{max-width:650px;}
+}
+@media(max-width:639px){
+ .scene-guide{min-height:660px;padding:36px 0 0;overflow:hidden;background:#f9ecde;}
+ .scene-guide::before{inset:auto 0 0;height:360px;background-size:auto 100%;background-position:right bottom;}
+ .scene-guide::after{background:linear-gradient(180deg,#f9ecde 0%,#f9ecde 43%,#f9ecdebd 54%,#f9ecde00 72%);}
+ .scene-guide h1{font-size:clamp(27px,7.5vw,32px);}
+ .scene-guide p{font-size:15px;}
+}

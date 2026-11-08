@@ -67,7 +67,24 @@
   .habit-detail p{margin-top:12px;max-width:760px;}
   .habit-detail a{text-decoration:underline;}
   @media(max-width:639px){.habit-grid{grid-template-columns:1fr;}.habit-card{padding:22px;}.habit-card h3{font-size:19px;}.habit-scenes{gap:10px;}.habit-scenes img{height:115px;}}
+  .research-credit{text-align:left;font-size:13px!important;}
+  .guide-block{scroll-margin-top:84px;}
+  .setup-caption{font-size:12px;color:var(--ink-soft);margin-bottom:12px;}
+  .setup-rail{display:flex;gap:16px;overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:16px;}
+  .setup-step{flex:0 0 calc((100% - 48px)/4);min-width:0;scroll-snap-align:start;}
+  .setup-step h3{font-size:18px;margin-bottom:14px;}
+  .setup-step>p{font-size:14px;color:var(--ink-soft);margin-top:14px;}
+  .setup-screen{display:flex;flex-direction:column;gap:10px;background:#f4f8ff;border:1px solid var(--line);border-radius:20px;padding:18px;min-height:340px;font-size:12px;}
+  .setup-screen strong{font-size:14px;color:var(--brand);}
+  .sample-field{background:white;border:1px solid var(--line);border-radius:8px;padding:8px;color:var(--ink-soft);display:flex;justify-content:space-between;}
+  .sample-action{background:var(--brand);color:white;border-radius:10px;padding:9px;text-align:center;margin-top:auto;}
+  .sample-chips{display:flex;flex-wrap:wrap;gap:6px;}.sample-chips span{border:1px solid #bbc5ee;background:#eaf0ff;border-radius:9px;padding:5px;}
+  .sample-characters{display:flex;gap:8px;}.sample-characters img{width:calc((100% - 16px)/3);object-fit:contain;}
+  .install-capture{max-width:600px;}
+  @media(max-width:959px){.setup-step{flex-basis:70%;}}
+  @media(max-width:639px){.setup-step{flex-basis:86%;}}
 </style>
+<link rel="stylesheet" href="/site/css/hero-layout.css?v=20261108">
 </head>
 <body>
 
@@ -93,8 +110,8 @@
 <section class="page-scene scene-guide">
   <div class="wrap">
     <span class="eyebrow fade">사용 가이드</span>
-    <h1 class="fade" style="max-width:520px;">설치하기 →<br>초기세팅</h1>
-    <p class="lead fade" style="margin-top:12px;">두 단계만 순서대로 따라오면 돼요</p>
+    <h1 class="fade" style="max-width:520px;">처음 설정은 간단하게,<br>매일의 지시는 적게.</h1>
+    <p class="lead fade" style="margin-top:12px;">부모가 일과를 정하면, 아이는 미션을 보고 시작해요.</p>
     <div class="toc fade" style="margin-top:26px;">
       <a href="#install">1 설치</a>
       <a href="#setup">2 초기 세팅</a>
@@ -106,20 +123,11 @@
 <!-- 설치 -->
 <div class="wrap">
 <div class="guide-block" id="install">
-  <h2><span class="num-badge">1</span>설치하기 (1분)</h2>
+  <h2><span class="num-badge">1</span>홈 화면에 추가하기</h2>
 
-  <div class="card fade" style="padding:16px 18px; background:var(--sun-tint); border:none; margin-top:16px; display:flex; gap:12px; align-items:flex-start;">
-    <span style="font-size:19px; line-height:1.4;">🚨</span>
-    <div>
-      <p style="font-size:14px; font-weight:700; color:#8a5a00;">현재 버전은 베타(테스트) 버전으로, 아직 앱스토어에 등록되어 있지 않아요</p>
-      <p style="font-size:13.5px; color:var(--ink-soft); margin-top:5px;">앱처럼 쓸 수 있도록 아래 안내에 따라 홈 화면에 바로가기 아이콘을 만들어주세요. 아이 전용 기기가 따로 있다면, 아이 기기에서도 똑같은 방법으로 접속·설치해주세요.</p>
-    </div>
-  </div>
-
-  <div class="card fade" style="padding:26px 22px; background:var(--mist); border:none; margin-top:14px;">
-    <p style="color:var(--ink-soft); font-size:14.5px;">쿠앵크는 앱스토어 없이, 웹사이트를 홈 화면에 추가하는 방식으로 설치돼요. 먼저 아래 버튼으로 앱을 연 다음, 열린 앱 화면에서 브라우저 메뉴를 이용해주세요. 이 가이드 페이지를 홈 화면에 추가하지 않도록 주의해주세요.</p>
-    <a class="btn btn-primary" href="https://cooanc.vercel.app/" target="_blank" rel="noopener" style="margin-top:16px;">앱 열고 설치하기 ↗</a>
-  </div>
+  <p class="habit-intro">앱스토어 없이 브라우저에서 바로 시작해요. 앱을 연 뒤 홈 화면에 추가해주세요.</p>
+  <a class="btn btn-primary" href="https://cooanc.vercel.app/" target="_blank" rel="noopener">앱 열고 설치하기 ↗</a>
+  <details class="habit-detail"><summary>아이 기기에도 설치하나요?</summary><p>아이 전용 기기에서도 앱을 열어 홈 화면에 추가해주세요. 지금 보고 있는 안내 페이지 대신, 위 버튼으로 연 앱 화면에서 추가하면 돼요.</p></details>
 
   <!-- 기기별 설치 절차 — 탭으로 전환 (접속 기기를 감지해 기본 선택) -->
   <div class="fade" style="margin-top:24px;" data-tabgroup id="deviceGuide">
@@ -153,27 +161,16 @@
 <!-- 초기 세팅 -->
 <div class="guide-block" id="setup">
   <h2><span class="num-badge">2</span>초기 세팅</h2>
-  <div class="fade" style="margin-top:20px; display:flex; flex-direction:column; gap:14px;">
-    <div class="card" style="padding:18px;">
-      <h3><span class="sub-num">1</span>회원가입으로 초기 루틴 설정</h3>
-      <p style="font-size:14px; color:var(--ink-soft); margin-top:6px;">회원가입을 진행하면서 로그인부터 초기 루틴 설정까지, 부모가 아이의 하루 일과에 맞는 미션을 세팅해요. 설정한 내용은 부모 화면에서 언제든 수정·추가·삭제할 수 있어요.</p>
-    </div>
-    <div class="card" style="padding:18px;">
-      <h3><span class="sub-num">2</span>아이 전용 기기에 연결</h3>
-      <p style="font-size:14px; color:var(--ink-soft); margin-top:6px;">아이가 쓰는 스마트폰·태블릿에도 같은 방법으로 설치해주세요. 로그인 후 아이만의 독립된 화면이 열리고, 부모 화면에서 시작 화면을 부모용/자녀용으로 바꿀 수 있어요.</p>
-    </div>
-    <div class="card" style="padding:18px;">
-      <h3><span class="sub-num">3</span>부모 앱에서 루틴 수정하기</h3>
-      <p style="font-size:14px; color:var(--ink-soft); margin-top:6px;">부모 앱에서는 아이의 나이와 생활 패턴에 맞게 미션을 추가하거나 수정할 수 있어요.</p>
-      <ul class="check-list">
-        <li>미션 추가 또는 삭제</li>
-        <li>미션별 크레딧 & 하트 보상 설정</li>
-        <li>미션 순서 변경 및 시간대 설정(예: 아침, 저녁)</li>
-      </ul>
-      <figure class="feature-preview"><a href="/site/assets/parent-routine.webp" target="_blank" rel="noopener" aria-label="부모 화면에서 미션과 보상을 수정하는 영역 전체 이미지 보기, 새 탭"><img src="/site/assets/app/routine-detail.jpg" alt="부모 화면에서 미션과 보상을 수정하는 영역" loading="lazy" decoding="async" width="800" height="640"></a><figcaption>실제 앱 화면 일부 · <a href="/site/assets/parent-routine.webp" target="_blank" rel="noopener">전체 화면 보기 ↗</a></figcaption></figure>
-    </div>
+  <p class="habit-intro">아이의 일과를 아는 부모라면, 필요한 항목만 고르면 돼요.</p>
+  <p class="setup-caption">실제 앱의 설정 순서를 간추린 화면 예시</p>
+  <div class="setup-rail" tabindex="0" role="region" aria-label="초기 설정 네 단계, 좌우로 스크롤">
+    <article class="setup-step"><span class="habit-label">01 · 부모 계정</span><h3>계정을 만들어요</h3><div class="setup-screen"><strong>부모 계정 만들기</strong><span>이름</span><div class="sample-field">부모님 이름</div><span>이메일</span><div class="sample-field">example@email.com</div><span>비밀번호</span><div class="sample-field">••••••••</div><div class="sample-action">시작하기</div></div><p>이름·이메일·비밀번호로 부모 계정을 만들어요.</p></article>
+    <article class="setup-step"><span class="habit-label">02 · 자녀 프로필</span><h3>아이의 화면을 준비해요</h3><div class="setup-screen"><strong>첫 번째 자녀를 등록해요</strong><span>자녀 이름 (닉네임)</span><div class="sample-field">예: 민준이</div><span>생년월일</span><div class="sample-field">연도 / 월 / 일</div><span>캐릭터</span><div class="sample-characters"><img src="/site/assets/icons/characters/bunny_profile.png" alt="토끼 캐릭터" loading="lazy"><img src="/site/assets/icons/characters/bear_profile.png" alt="곰 캐릭터" loading="lazy"><img src="/site/assets/icons/characters/otter_profile.png" alt="수달 캐릭터" loading="lazy"></div></div><p>자녀 정보와 캐릭터로 아이만의 프로필을 준비해요.</p></article>
+    <article class="setup-step"><span class="habit-label">03 · 생활 시간</span><h3>하루의 시간을 맞춰요</h3><div class="setup-screen"><strong>초기 루틴 설정</strong><span>연령대 · 보육 형태</span><div class="sample-chips"><span>미취학</span><span>유치원</span></div><div class="sample-field">기상 <b>07:30</b></div><div class="sample-field">등원 <b>09:00</b></div><div class="sample-field">하원 <b>16:00</b></div><div class="sample-field">잘 시간 <b>21:00</b></div><small>시간은 예시예요</small></div><p>기상·등원·취침 등 아이의 생활에 맞는 시간과 알람을 설정해요.</p></article>
+    <article class="setup-step"><span class="habit-label">04 · 일상 미션</span><h3>키워드로 루틴을 골라요</h3><div class="setup-screen"><strong>평일 루틴</strong><span>오전</span><div class="sample-chips"><span>일어나기</span><span>아침 먹기</span><span>세수하기</span></div><span>오후·저녁</span><div class="sample-chips"><span>정리하기</span><span>잘 준비</span></div><strong>휴일 루틴</strong><div class="sample-chips"><span>평일과 같아요</span><span>휴일은 달라요</span></div><div class="sample-action">루틴 시작하기</div></div><p>평일 미션을 고르고, 휴일은 그대로 쓰거나 따로 정해요.</p></article>
   </div>
-  <p class="fade" style="font-size:13.5px; color:var(--ink-faint); margin-top:14px;">쿠앵크는 부모·자녀 화면이 연동되는 듀얼 인터페이스 구조예요. 자세한 설명은 <a href="/site/features.html" style="text-decoration:underline; font-weight:700;">서비스 소개</a>에서 확인해주세요.</p>
+  <details class="habit-detail"><summary>설정한 미션과 보상을 바꾸고 싶다면?</summary><p>부모 앱의 루틴 화면에서 미션 추가·삭제, 크레딧과 하트 보상, 순서와 시간대를 조정할 수 있어요.</p><figure class="feature-preview"><img src="/site/assets/app/routine-detail.jpg" alt="부모 앱의 미션과 보상 수정 화면" loading="lazy" width="800" height="640"><figcaption>실제 앱 화면 일부</figcaption></figure></details>
+  <details class="habit-detail"><summary>아이 기기에서는 어떻게 시작하나요?</summary><p>아이 기기에서 로그인한 뒤 자녀 화면으로 연결해주세요. 부모 화면에서 시작 화면을 부모용 또는 자녀용으로 바꿀 수 있어요.</p></details>
 </div>
 
 <!-- 활용 팁 -->
@@ -191,7 +188,7 @@
       <p>반복해서 지시하기보다 미션카드를 보고 시작할 여유를 주세요. 순서를 바꿔도 되는 일은 무엇부터 할지 아이가 선택하게 해주세요.</p>
       <div class="habit-scenes">
         <figure><img src="/site/assets/app/meal-finished.png" alt="식사를 마치고 빈 그릇을 든 아이" loading="lazy" width="508" height="458"><figcaption>내가 해냈어요</figcaption></figure>
-        <figure><img src="/site/assets/app/clear-dishes.png" alt="먹은 그릇을 정리하는 아이" loading="lazy" width="126" height="126"><figcaption>마무리도 스스로</figcaption></figure>
+        <figure><img src="/site/assets/app/set-cutlery.png" alt="식사 준비를 위해 수저를 놓는 아이" loading="lazy"><figcaption>준비도 스스로</figcaption></figure>
       </div>
       <p>‘시키니까’가 아니라 ‘내가 시작해서 해냈다’는 경험을 쌓도록 도와주세요.</p>
     </article>
@@ -212,8 +209,8 @@
   <div class="habit-card" style="margin-top:18px;background:var(--mist);">
     <h3>🔁 익숙해질수록, 부모의 말은 조금씩 줄여요</h3>
     <p>식사 후 정리처럼 같은 상황에 같은 행동을 이어가 보세요. 처음엔 카드를 함께 확인하고, 익숙해지면 먼저 지켜봐 주세요. 부모도 아이도 덜 힘들이며 건강한 일상을 이어가는 것이 목표예요.</p>
-    <details class="habit-detail"><summary>습관이 자리 잡는 데 66일이 걸리나요?</summary><p>자주 인용되는 ‘66일’은 성인 참가자의 일상 행동을 조사한 연구에서, 습관의 자동성이 충분히 높아지는 데 걸리는 시간을 추정한 중앙값이에요. 개인·행동에 따라 18~254일로 차이가 컸어요. 어린이에게 적용되는 기한이나 쿠앵크의 효과를 검증한 수치는 아니에요.</p><p>날짜를 채우기보다 생활 속에서 반복할 기회를 만들어주세요. 하루 빠졌다고 처음부터 다시 시작할 필요는 없어요. <a href="https://www.surrey.ac.uk/news/does-it-really-take-66-days-form-habit-we-asked-expert-dr-pippa-lally" target="_blank" rel="noopener">연구자 Pippa Lally의 설명 ↗</a></p></details>
-    <details class="habit-detail"><summary>칭찬에 관한 연구도 살펴보기</summary><p>어린 시절의 과정 중심 칭찬과 이후 성장에 대한 믿음 사이의 관련성을 관찰한 연구가 있어요. ‘넌 원래 잘해’보다 아이가 실제로 한 행동과 노력을 짚어주는 방향을 참고했어요. 관찰 연구이며, 앱의 효과를 입증하는 자료는 아니에요. <a href="https://pubmed.ncbi.nlm.nih.gov/23397904/" target="_blank" rel="noopener">Gunderson 외, 2013 ↗</a></p></details>
+    <details class="habit-detail"><summary>습관이 자리잡는데 걸리는 시간!</summary><p>자주 인용되는 ‘66일’은 성인 참가자의 일상 행동을 조사한 연구에서, 습관의 자동성이 충분히 높아지는 데 걸리는 시간을 추정한 중앙값이에요. 개인·행동에 따라 18~254일로 차이가 컸어요. 어린이에게 동일하게 적용되는 기한은 아니에요.</p><p>날짜를 채우기보다 생활 속에서 반복할 기회를 만들어주세요. 하루 빠졌다고 처음부터 다시 시작할 필요는 없어요.</p><p class="research-credit">- 연구자 <a href="https://www.surrey.ac.uk/news/does-it-really-take-66-days-form-habit-we-asked-expert-dr-pippa-lally" target="_blank" rel="noopener">Pippa Lally</a></p></details>
+    <details class="habit-detail"><summary>칭찬이 아이에게 전하는 힘!</summary><p>어린 시절의 과정 중심 칭찬과 이후 성장에 대한 믿음 사이의 관련성을 관찰한 연구가 있어요. ‘넌 원래 잘해’보다 아이가 실제로 한 행동과 노력을 짚어주는 방향을 참고했어요. 관찰 연구에서 확인된 관련성이에요.</p><p class="research-credit">- 연구자 <a href="https://pubmed.ncbi.nlm.nih.gov/23397904/" target="_blank" rel="noopener">Elizabeth A. Gunderson 외 (2013)</a></p></details>
   </div>
   <div style="margin-top:22px;text-align:center;"><a href="/site/contact.html#open-community" class="btn btn-ghost">🐞 오류 제보 및 기능 요청</a></div>
 </div>
