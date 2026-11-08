@@ -85,8 +85,9 @@
   @media(max-width:639px){.setup-step{flex-basis:86%;}}
 </style>
 <link rel="stylesheet" href="/site/css/hero-layout.css?v=20261108">
+<link rel="stylesheet" href="/site/css/guide.css?v=20261108-style">
 </head>
-<body>
+<body class="site-guide">
 
 <header class="nav">
   <div class="wrap nav-inner">
@@ -123,7 +124,7 @@
 <!-- 설치 -->
 <div class="wrap">
 <div class="guide-block" id="install">
-  <h2><span class="num-badge">1</span>홈 화면에 추가하기</h2>
+  <span class="eyebrow">01 · 시작하기</span><h2>홈 화면에 추가하기</h2>
 
   <p class="habit-intro">앱스토어 없이 브라우저에서 바로 시작해요. 앱을 연 뒤 홈 화면에 추가해주세요.</p>
   <a class="btn btn-primary" href="https://cooanc.vercel.app/" target="_blank" rel="noopener">앱 열고 설치하기 ↗</a>
@@ -160,22 +161,23 @@
 
 <!-- 초기 세팅 -->
 <div class="guide-block" id="setup">
-  <h2><span class="num-badge">2</span>초기 세팅</h2>
+  <span class="eyebrow">02 · 초기 설정</span><h2>아이의 하루를 준비해요.</h2>
   <p class="habit-intro">아이의 일과를 아는 부모라면, 필요한 항목만 고르면 돼요.</p>
   <p class="setup-caption">실제 앱의 설정 순서를 간추린 화면 예시</p>
-  <div class="setup-rail" tabindex="0" role="region" aria-label="초기 설정 네 단계, 좌우로 스크롤">
+  <div class="setup-carousel" data-card-rail><div class="setup-rail" data-rail-track tabindex="0" role="region" aria-label="초기 설정 네 단계, 좌우로 스크롤">
     <article class="setup-step"><span class="habit-label">01 · 부모 계정</span><h3>계정을 만들어요</h3><div class="setup-screen"><strong>부모 계정 만들기</strong><span>이름</span><div class="sample-field">부모님 이름</div><span>이메일</span><div class="sample-field">example@email.com</div><span>비밀번호</span><div class="sample-field">••••••••</div><div class="sample-action">시작하기</div></div><p>이름·이메일·비밀번호로 부모 계정을 만들어요.</p></article>
     <article class="setup-step"><span class="habit-label">02 · 자녀 프로필</span><h3>아이의 화면을 준비해요</h3><div class="setup-screen"><strong>첫 번째 자녀를 등록해요</strong><span>자녀 이름 (닉네임)</span><div class="sample-field">예: 민준이</div><span>생년월일</span><div class="sample-field">연도 / 월 / 일</div><span>캐릭터</span><div class="sample-characters"><img src="/site/assets/icons/characters/bunny_profile.png" alt="토끼 캐릭터" loading="lazy"><img src="/site/assets/icons/characters/bear_profile.png" alt="곰 캐릭터" loading="lazy"><img src="/site/assets/icons/characters/otter_profile.png" alt="수달 캐릭터" loading="lazy"></div></div><p>자녀 정보와 캐릭터로 아이만의 프로필을 준비해요.</p></article>
     <article class="setup-step"><span class="habit-label">03 · 생활 시간</span><h3>하루의 시간을 맞춰요</h3><div class="setup-screen"><strong>초기 루틴 설정</strong><span>연령대 · 보육 형태</span><div class="sample-chips"><span>미취학</span><span>유치원</span></div><div class="sample-field">기상 <b>07:30</b></div><div class="sample-field">등원 <b>09:00</b></div><div class="sample-field">하원 <b>16:00</b></div><div class="sample-field">잘 시간 <b>21:00</b></div><small>시간은 예시예요</small></div><p>기상·등원·취침 등 아이의 생활에 맞는 시간과 알람을 설정해요.</p></article>
     <article class="setup-step"><span class="habit-label">04 · 일상 미션</span><h3>키워드로 루틴을 골라요</h3><div class="setup-screen"><strong>평일 루틴</strong><span>오전</span><div class="sample-chips"><span>일어나기</span><span>아침 먹기</span><span>세수하기</span></div><span>오후·저녁</span><div class="sample-chips"><span>정리하기</span><span>잘 준비</span></div><strong>휴일 루틴</strong><div class="sample-chips"><span>평일과 같아요</span><span>휴일은 달라요</span></div><div class="sample-action">루틴 시작하기</div></div><p>평일 미션을 고르고, 휴일은 그대로 쓰거나 따로 정해요.</p></article>
   </div>
+<div class="setup-controls"><button type="button" data-rail-prev aria-label="이전 설정 단계"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 5 8 12 15 19"/></svg></button><button type="button" data-rail-next aria-label="다음 설정 단계"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 5 16 12 9 19"/></svg></button></div></div>
   <details class="habit-detail"><summary>설정한 미션과 보상을 바꾸고 싶다면?</summary><p>부모 앱의 루틴 화면에서 미션 추가·삭제, 크레딧과 하트 보상, 순서와 시간대를 조정할 수 있어요.</p><figure class="feature-preview"><img src="/site/assets/app/routine-detail.jpg" alt="부모 앱의 미션과 보상 수정 화면" loading="lazy" width="800" height="640"><figcaption>실제 앱 화면 일부</figcaption></figure></details>
   <details class="habit-detail"><summary>아이 기기에서는 어떻게 시작하나요?</summary><p>아이 기기에서 로그인한 뒤 자녀 화면으로 연결해주세요. 부모 화면에서 시작 화면을 부모용 또는 자녀용으로 바꿀 수 있어요.</p></details>
 </div>
 
 <!-- 활용 팁 -->
 <div class="guide-block" id="tips">
-  <h2>말해주는 하루에서, 스스로 하는 하루로</h2>
+  <span class="eyebrow">일상 속 활용팁</span><h2>말해주는 하루에서,<br>스스로 하는 하루로.</h2>
   <p class="habit-intro">부모는 일과를 설정하고, 아이는 미션을 보고 실천해요.<br>쿠앵크는 일상을 안내하고, 부모는 해낸 순간을 응원해주세요.</p>
   <div class="habit-grid">
     <article class="habit-card">
@@ -249,5 +251,6 @@
 </footer>
 
 <script src="/site/js/main.js"></script>
+<script src="/site/js/card-rail.js"></script>
 </body>
 </html>
