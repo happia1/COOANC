@@ -302,3 +302,11 @@
 .site-features .tour-panel h2.tour-feature-name { font-size:21px; font-weight:800; color:#27334a; margin:0 0 12px; line-height:1.4; }
 
 @media(min-width:640px) and (max-width:959px) { .tour-intro.page-scene { min-height:580px; } }
+
+/* Clip the supplied screenshots to the popup; retain the original pixels. */
+.utility-with-capture{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);padding:16px;gap:24px;align-items:center;}
+.utility-capture{margin:0;min-width:0;}
+.popup-crop{position:relative;aspect-ratio:1029 / 1680;overflow:hidden;border-radius:7% / 4.3%;background:white;box-shadow:0 6px 24px #29344612;}
+.utility-preview .popup-crop img{position:absolute;top:0;left:-4.665%;width:109.33%;max-width:none;height:auto;transform:translateY(-18.2266%);}
+.utility-capture figcaption{font-size:11px;color:#647086;text-align:center;margin-top:10px;}
+@media(max-width:959px){.utility-with-capture{grid-template-columns:1fr;}.utility-capture{width:100%;max-width:310px;margin:auto;}}

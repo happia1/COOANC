@@ -100,3 +100,10 @@
 .demo-card-slider .demo-rail-controls { position:absolute; top:50%; left:-8px; right:-8px; transform:translateY(-50%); margin:0; pointer-events:none; z-index:2; }
 .demo-card-slider .demo-rail-controls button { display:grid; place-items:center; pointer-events:auto; background:#fffffff0; box-shadow:0 3px 10px #493d3420; }
 .demo-card-slider .demo-rail-controls button:disabled { visibility:hidden; }
+
+.demo-tap-hint{position:absolute;top:8px;left:22%;transform:translateX(-50%);z-index:3;display:flex;flex-direction:column;align-items:center;pointer-events:none;color:#454fc3;opacity:1;transition:opacity .25s ease;}
+.demo-tap-hint span{padding:7px 12px;border-radius:20px;background:#fff;box-shadow:0 3px 12px #29344626;font-size:13px;font-weight:800;white-space:nowrap;}
+.demo-tap-hint svg{filter:drop-shadow(0 1px 1px white);}
+.demo-card-slider:has(.demo-mission:disabled) .demo-tap-hint{opacity:0;}
+.demo-status{position:absolute;width:1px;height:1px;min-height:0;padding:0;margin:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap;}
+@media(prefers-reduced-motion:reduce){.demo-tap-hint{transition:none;}}

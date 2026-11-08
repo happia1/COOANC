@@ -34,3 +34,5 @@ Core feature artwork: `apple-stage-{0,1,4,7}.png` all come from the same `plant/
 Guide habit tips: `meal-finished.png`, `clear-dishes.png`, and `say-hello.png` are unchanged copies of app mission artwork `routine/special/clean_up_all.png`, `put_away_dishes.png`, and `say_hello.png`.
 
 `set-cutlery.png`: unchanged app mission `routine/special/put_cutrary.png`. Guide setup panels are simplified HTML illustrations based on signup, onboarding, and RoutineOnboarding components, not screenshots.
+
+`pomodoro-popup.png` and `music-popup.png`: user-supplied actual app screenshots IMG_9629.PNG and IMG_9632.PNG, unchanged. CSS clips to the popup bounds (approximately x48, y444, 1029×1680) and masks its rounded corners. Used only in core feature details.
