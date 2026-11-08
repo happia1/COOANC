@@ -225,10 +225,11 @@
  .tour-hotspot { min-width:32px; min-height:32px; }
 }
 
-.tour-intro.page-scene { padding:64px 0; }
-.dual-explanation { margin:0 0 24px; padding:0; border:0; }
+.tour-intro.page-scene { min-height:610px; display:flex; align-items:center; padding:64px 0; }
+.tour-intro.page-scene>.wrap { width:100%; }
+.dual-explanation { margin:0 0 24px; padding:0; border:0; text-align:center; }
 .dual-explanation h2 { font-size:clamp(26px,3.2vw,36px); line-height:1.4; }
-#family-tour>.tour-selectors { justify-content:flex-start; gap:10px; margin:0 0 24px; }
+#family-tour>.tour-selectors { justify-content:center; gap:10px; margin:0 0 24px; }
 #family-tour>.tour-selectors button { padding:8px 16px; border:1px solid #d9dfe9; border-radius:24px; color:#536176; }
 #family-tour>.tour-selectors button.is-active { background:#454fc3; color:white; border-color:#454fc3; text-decoration:none; }
 #family-tour .tour-panel { min-height:0; padding-top:0; }
@@ -290,7 +291,7 @@
 
 /* Match the home hero's mobile rhythm, leaving the scene below the copy. */
 @media(max-width:639px) {
- .tour-intro.page-scene { min-height:660px; padding:36px 0 0; background:#f9ecde; overflow:hidden; }
+ .tour-intro.page-scene { min-height:660px; align-items:flex-start; padding:36px 0 0; background:#f9ecde; overflow:hidden; }
  .tour-intro.page-scene::before { inset:auto 0 0; height:380px; background-size:auto 100%; background-position:right bottom; }
  .tour-intro.page-scene::after { background:linear-gradient(180deg,#f9ecde 0%,#f9ecde 43%,#f9ecdebd 54%,#f9ecde00 72%); }
  .tour-intro h1 { font-size:clamp(27px,7.5vw,32px); }
@@ -299,3 +300,5 @@
  .intro-actions a { justify-content:center; padding:12px 8px; font-size:14px; background:#ffffffb8; }
 }
 .site-features .tour-panel h2.tour-feature-name { font-size:21px; font-weight:800; color:#27334a; margin:0 0 12px; line-height:1.4; }
+
+@media(min-width:640px) and (max-width:959px) { .tour-intro.page-scene { min-height:580px; } }
