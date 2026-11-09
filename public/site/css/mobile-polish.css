@@ -1,0 +1,25 @@
+/* Mobile-first polish: preserve the COOANC artwork, palette and interactions. */
+.nav .nav-inner{height:68px;max-width:1080px;padding-inline:22px;gap:16px;}
+.nav .brand-logo{width:136px;height:auto;}
+.nav .nav-toggle{width:44px;height:44px;}
+.site-guide .habit-grid{align-items:flex-start;}
+.site-guide .habit-grid>.habit-card{height:auto;}
+.habit-carousel .habit-controls{top:175px;}
+@media(max-width:639px){
+ .site-home .story-section,.child-feature-section{padding-block:48px;}
+ .site-guide .guide-block{padding-block:36px;}
+ .site-guide .habit-intro{margin:16px 0 20px;}
+ .site-guide .habit-grid>.habit-card{padding:20px;}
+ .site-guide .habit-card p,.site-guide .habit-detail p,.site-guide .setup-step>p{font-size:16px;line-height:1.75;}
+ .site-guide .habit-card h3{font-size:19px;line-height:1.5;}
+ .site-guide .habit-scenes{padding:14px;margin:18px 0;}
+ .site-guide .setup-screen{height:auto;min-height:350px;}
+ .site-guide .sample-field{min-height:40px;align-items:center;}
+ .site-guide .habit-detail summary{font-size:15px;}
+ .hero-actions{grid-template-columns:1fr;}
+ .site-home .hero-actions .btn{width:100%;}
+ .site-features .tour-panel>p,.utility-steps li span{font-size:15px;line-height:1.8;}
+ .utility-with-capture{padding:0;gap:20px;}
+ .utility-capture{max-width:340px;}
+}
+@media(min-width:640px){.nav .nav-inner{height:76px;padding-inline:28px;}.nav .brand-logo{width:150px;}}

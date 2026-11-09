@@ -33,15 +33,9 @@ document.querySelectorAll('[data-cta-install]').forEach(el=>{
   `;
 });
 
-// ===== fade-in on view =====
-const io = new IntersectionObserver((entries)=>{
-  entries.forEach(e=>{ if(e.isIntersecting) e.target.classList.add('in'); });
-}, {threshold:0.12});
-document.querySelectorAll('.fade').forEach(el=>io.observe(el));
-
 // ===== 가이드 목차 스크롤스파이 (현재 위치만 볼드+밑줄) =====
 const tocLinks = document.querySelectorAll('.toc a[href^="#"]');
-if (tocLinks.length){
+if (tocLinks.length && typeof IntersectionObserver !== 'undefined'){
   const targets = Array.from(tocLinks)
     .map(a => document.getElementById(a.getAttribute('href').slice(1)))
     .filter(Boolean);

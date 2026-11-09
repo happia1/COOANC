@@ -99,7 +99,7 @@ h3{ font-size:17px; font-weight:700; }
 @media (min-width:860px){ h1{font-size:46px;} h2{font-size:32px;} }
 
 /* fade-in */
-.fade{ opacity:0; transform:translateY(14px); transition:opacity .55s ease, transform .55s ease; }
+.fade{ opacity:1; transform:none; }
 .fade.in{ opacity:1; transform:none; }
 @media (prefers-reduced-motion: reduce){ .fade{ opacity:1; transform:none; transition:none; } }
 

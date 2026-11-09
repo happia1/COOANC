@@ -36,3 +36,5 @@ Guide habit tips: `meal-finished.png`, `clear-dishes.png`, and `say-hello.png` a
 `set-cutlery.png`: unchanged app mission `routine/special/put_cutrary.png`. Guide setup panels are simplified HTML illustrations based on signup, onboarding, and RoutineOnboarding components, not screenshots.
 
 `pomodoro-popup.png` and `music-popup.png`: user-supplied actual app screenshots IMG_9629.PNG and IMG_9632.PNG, unchanged. CSS clips to the popup bounds (approximately x48, y444, 1029×1680) and masks its rounded corners. Used only in core feature details.
+
+Popup screenshots are served as quality-82 JPEG encodings to reduce mobile transfer size; original PNGs are retained. CSS clipping and original image dimensions are unchanged.
