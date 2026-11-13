@@ -1,0 +1,15 @@
+# 쿠앵크(COOANC) — 소개 사이트(/site/)는 검색 허용, 로그인 뒤 앱 화면은 수집 제외
+User-agent: *
+Allow: /site/
+Disallow: /api/
+Disallow: /auth/
+Disallow: /admin
+Disallow: /parent
+Disallow: /home
+Disallow: /approval
+Disallow: /routine
+Disallow: /sticker
+Disallow: /settings
+Disallow: /onboarding
+
+Sitemap: https://cooanc.vercel.app/sitemap.xml
