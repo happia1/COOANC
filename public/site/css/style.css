@@ -648,9 +648,9 @@ img.pv-icon{ width:22px; height:22px; object-fit:contain; vertical-align:-5px; m
 .page-scene { position:relative; isolation:isolate; padding:64px 0; background:#f7f0e7; }
 .page-scene::before { content:''; position:absolute; inset:0; z-index:-2; background:var(--page-art) right center / auto 100% no-repeat; }
 .page-scene::after { content:''; position:absolute; inset:0; z-index:-1; background:linear-gradient(90deg,#fffefbf5 0%,#fffefbe8 32%,#fffefb80 57%,transparent 78%); }
-.scene-features { --page-art:url('/site/assets/hero-1.webp'); }
-.scene-guide { --page-art:url('/site/assets/hero-1.webp'); }
-.scene-contact { --page-art:url('/site/assets/hero-3.webp'); }
+.scene-features { --page-art:url('/site/assets/hero-1-scene.webp'); }
+.scene-guide { --page-art:url('/site/assets/hero-1-scene.webp'); }
+.scene-contact { --page-art:url('/site/assets/hero-3-scene.webp'); }
 .page-scene h1 { max-width:650px; }
 .page-scene p { max-width:520px; }
 .page-scene .toc { justify-content:flex-start; }

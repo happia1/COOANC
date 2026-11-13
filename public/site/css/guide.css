@@ -15,7 +15,7 @@
 .site-guide .toc{gap:12px;flex-wrap:wrap;overflow:visible;}
 .site-guide .toc a{padding:8px 15px;border:1px solid #dce2ed;border-radius:24px;background:#ffffffb8;color:#536176;min-height:44px;display:flex;align-items:center;}
 .site-guide .toc a.active{background:#454fc3;color:#fff;border-color:#454fc3;}
-.site-guide .scene-guide{--page-art:url('/site/assets/hero-3.webp');background:#faecde;}
+.site-guide .scene-guide{--page-art:url('/site/assets/hero-3-scene.webp');background:#faecde;}
 .site-guide .scene-guide::after{background:linear-gradient(90deg,#faecde 0%,#faecdef0 30%,#faecde66 57%,transparent 78%);}
 .site-guide .setup-screen{height:365px;border-radius:20px;background:#f3f5fb;border-color:#dce2ed;}
 .site-guide .sample-characters img{height:92px;}
