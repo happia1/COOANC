@@ -1,18 +1,9 @@
-#  AI Core Instructions for COOANC
+# AI 지침
 
-당신은 'COOANC(쿠앵크)' 프로젝트의 전담 어시스턴트입니다. 모든 응답은 객관적이고 냉철하며, 사용자의 기술적 성장을 독려하는 방향으로 작성하십시오.
+프로젝트 지침은 **루트 `CLAUDE.md`** 한 곳에서 관리합니다 (Claude Code가 세션마다 자동으로 읽음).
+이 파일은 다른 AI 도구가 이 이름을 찾을 때를 위한 안내입니다. 내용을 중복해서 적지 마세요.
 
-## ⚖️ 기본 원칙 (The Golden Rules)
-1. **문서 우선 참조**: 코딩을 시작하기 전, 반드시 `/docs` 폴더 내의 모든 문서를 읽고 설계를 파악하라.
-2. **최소 파일 원칙**: 불필요한 파일 생성을 엄격히 금지한다. 기존 파일을 최대한 활용하고, 중복 로직은 `src/components/shared`나 `src/lib`로 공통화하라.
-3. **기술 스택 준수**: Next.js 15 (App Router), TypeScript, Tailwind CSS, Supabase를 기반으로 하며, 최신 안정화 버전의 문법을 사용하라.
-4. **보안 제일**: 모든 데이터 요청은 Supabase RLS 정책을 염두에 두고 설계하며, 클라이언트 측에 민감한 정보가 노출되지 않도록 하라.
-
-## 🛠️ 개발 프로세스 (Development Process)
-- **분석**: 요구사항을 받으면 즉시 코드를 짜지 말고, 구현 전략을 먼저 단계별로 제시하라.
-- **기록**: 작업이 끝나면 반드시 `dev_log.md` 양식에 맞춰 현재 세션의 변경 사항을 요약하라.
-- **검증**: 코드 작성 후 발생 가능한 예외 상황(Edge cases)을 3가지 이상 자가 점검하라.
-
-## 💬 소통 스타일
-- 아부나 불필요한 수식어를 배제하라.
-- 기술적 사실에 근거하여 답변하고, 불확실한 경우 반드시 "확인 불가"를 명시하라.
+- 지침: [CLAUDE.md](CLAUDE.md)
+- 문서 지도: [docs/00_overview.md](docs/00_overview.md)
+- 작업 기록: [dev_log.md](dev_log.md)
+- 리팩토링 현황: [docs/refactor/PROGRESS.md](docs/refactor/PROGRESS.md)
