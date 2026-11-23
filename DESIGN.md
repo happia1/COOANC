@@ -3,7 +3,6 @@ name: COOANC 소개 사이트
 description: 아이는 스스로, 부모는 한결 편안하게. 작은 정원의 성장 일지처럼 자라는 습관을 보여주는 쿠앵크 소개 사이트.
 colors:
   brand-indigo: "#454fc3"
-  brand-indigo-light: "#515CD6"
   brand-indigo-deep: "#2D38BE"
   brand-tint: "#EAECFA"
   ink: "#1F2937"
@@ -18,6 +17,17 @@ colors:
   line: "#E6EEF3"
   lavender-edge: "#d6d8ea"
   lavender-shadow: "#d9dbea"
+  line-strong: "#ccd2e5"
+  sand: "#f7f0e4"
+  sand-line: "#d7cdbb"
+  sand-ink: "#4d4a45"
+  gold-ink: "#5f4a1e"
+  pm-amber: "#7a5400"
+  pm-edge: "#ecd9a8"
+  popup-violet: "#6a5af0"
+  popup-blue: "#2f6fc4"
+  popup-ink: "#111827"
+  popup-slate: "#4b5563"
   peach-hero: "#f9ecde"
   oat-scene: "#f7f1e9"
   sun: "#FFC94D"
@@ -26,30 +36,30 @@ colors:
   mint-tint: "#E9FAF2"
 typography:
   display:
-    fontFamily: "Pretendard, -apple-system, BlinkMacSystemFont, sans-serif"
+    fontFamily: "Pretendard Variable, Pretendard, -apple-system, BlinkMacSystemFont, sans-serif"
     fontSize: "clamp(34px, 4.3vw, 56px)"
     fontWeight: 700
     lineHeight: 1.28
     letterSpacing: "-0.045em"
   headline:
-    fontFamily: "Pretendard, -apple-system, BlinkMacSystemFont, sans-serif"
+    fontFamily: "Pretendard Variable, Pretendard, -apple-system, BlinkMacSystemFont, sans-serif"
     fontSize: "clamp(28px, 3.4vw, 42px)"
     fontWeight: 700
     lineHeight: 1.35
     letterSpacing: "-0.045em"
   title:
-    fontFamily: "Pretendard, -apple-system, BlinkMacSystemFont, sans-serif"
+    fontFamily: "Pretendard Variable, Pretendard, -apple-system, BlinkMacSystemFont, sans-serif"
     fontSize: "20px"
     fontWeight: 700
     lineHeight: 1.4
     letterSpacing: "-0.025em"
   body:
-    fontFamily: "Pretendard, -apple-system, BlinkMacSystemFont, sans-serif"
+    fontFamily: "Pretendard Variable, Pretendard, -apple-system, BlinkMacSystemFont, sans-serif"
     fontSize: "17px"
     fontWeight: 400
     lineHeight: 1.85
   label:
-    fontFamily: "Pretendard, -apple-system, BlinkMacSystemFont, sans-serif"
+    fontFamily: "Pretendard Variable, Pretendard, -apple-system, BlinkMacSystemFont, sans-serif"
     fontSize: "13px"
     fontWeight: 700
     lineHeight: 1.4
@@ -61,9 +71,12 @@ typography:
 rounded:
   sm: "10px"
   md: "12px"
+  card: "16px"
+  tile: "18px"
   lg: "20px"
-  xl: "24px"
+  popup: "24px"
   panel: "28px"
+  device: "32px"
   pill: "100px"
 spacing:
   xs: "8px"
@@ -100,11 +113,20 @@ components:
     textColor: "{colors.ink-navy}"
     rounded: "22px"
     padding: "24px"
-  eyebrow-chip:
-    backgroundColor: "{colors.brand-tint}"
-    textColor: "{colors.brand-indigo-deep}"
-    rounded: "{rounded.pill}"
-    padding: "6px 14px"
+  demo-card:
+    backgroundColor: "{colors.white}"
+    textColor: "{colors.ink}"
+    rounded: "{rounded.tile}"
+    padding: "14px 8px 12px"
+  honesty-dialog:
+    backgroundColor: "{colors.white}"
+    textColor: "{colors.popup-ink}"
+    rounded: "{rounded.popup}"
+    padding: "32px 24px 24px"
+  page-head:
+    backgroundColor: "{colors.sky-wash}"
+    textColor: "{colors.ink}"
+    padding: "56px 0 52px"
 ---
 
 # Design System: COOANC 소개 사이트
@@ -131,8 +153,7 @@ components:
 크림과 파스텔 바닥 위에 인디고 하나가 방향을 알려주고, 따뜻한 중성색이 분위기를 잡는 팔레트입니다.
 
 ### Primary
-- **쿠앵크 인디고** (#454fc3): 홈 페이지의 주 행동 색. CTA 버튼, 링크, 강조 문구, 포커스 링에 씁니다. 로고의 파랑·보라에서 왔습니다.
-- **인디고 라이트** (#515CD6): `style.css`의 `--brand` 토큰. 홈에서는 #454fc3으로 덮어쓰이는 값이라 정리 대상입니다.
+- **쿠앵크 인디고** (#454fc3): 모든 페이지의 주 행동 색. CTA 버튼, 링크, 강조 문구, 포커스 링에 씁니다. 로고의 파랑·보라에서 왔고 `style.css`의 `--brand` 토큰과 같은 값입니다(흰 글자 대비 6.65:1).
 - **인디고 딥** (#2D38BE): 호버, 눌림, 칩 위 글자 색.
 - **인디고 틴트** (#EAECFA): 아이브로 칩과 선택된 단계의 바탕.
 
@@ -144,9 +165,15 @@ components:
 - **크림 페이지** (#fffefb): 홈, 서비스 소개, 가이드의 기본 바탕. 순백보다 따뜻합니다.
 - **하늘 안개** (#eef5f6): 홈 히어로 바탕.
 - **복숭아 장면** (#f9ecde)과 **귀리 장면** (#f7f1e9): 일상 장면 일러스트를 담는 따뜻한 바닥.
+- **샌드** (#f7f0e4, 선 #d7cdbb, 글자 #4d4a45 / #5f4a1e): 금융 역량 근거 섹션 전용의 따뜻한 바닥. 황금 저금통과 어울립니다.
+- **라인 스트롱** (#ccd2e5): 정직 확인 섹션 같은 연보라 바닥 위의 구분선.
 - **잉크** (#1F2937)와 **네이비 잉크** (#293446): 제목, 본문.
 - **슬레이트** (#536176 / #647086 / #8B95A1): 보조 문장, 설명, 비활성.
 - **라인** (#E6EEF3)과 **라벤더 엣지** (#d6d8ea): 테두리. 라벤더 엣지는 게임 카드의 테두리 전용.
+
+### 팝업 색
+- **팝업 바이올렛** (#6a5af0)과 **팝업 블루** (#2f6fc4): 앱의 정직 확인 팝업 버튼을 옮긴 색. 앱 원색보다 살짝 어둡게 해 흰 글자 대비 4.5:1 이상을 맞췄습니다. 팝업 안 글자는 #111827과 #4b5563입니다.
+- **오후 앰버** (#7a5400, 테두리 #ecd9a8): 오후 미션 배지와 카드.
 
 ### Named Rules
 **The One Voice Rule.** 인디고는 행동(누를 것, 갈 곳)에만 쓴다. 장식에 쓰지 않는다. 노랑과 민트는 보상과 상태에만 쓴다.
@@ -157,14 +184,14 @@ components:
 **Display/Body Font:** Pretendard (fallback: -apple-system, BlinkMacSystemFont, sans-serif)
 **Brand Voice Font:** Jua (Google Fonts), 로고 옆 워드마크와 일부 포인트 문구
 
-**Character:** 단정한 산세리프가 정보를 맡고, 둥근 손글씨 Jua가 쿠앵크 특유의 친근함을 맡습니다. **주의:** Pretendard는 `font-family`에만 지정되어 있고 로드하는 코드(@font-face, link)가 없어, 설치되지 않은 기기에서는 시스템 폰트로 대체됩니다.
+**Character:** 단정한 산세리프가 정보를 맡고, 둥근 손글씨 Jua가 쿠앵크 특유의 친근함을 맡습니다. Pretendard Variable은 jsDelivr의 동적 서브셋 CSS로 로드합니다(모든 페이지의 `<head>`).
 
 ### Hierarchy
 - **Display** (700, clamp(34px, 4.3vw, 56px), 1.28, -0.045em): 홈 히어로 한 줄.
 - **Headline** (700, clamp(28px, 3.4vw, 42px), 1.35, -0.045em): 섹션 제목.
 - **Title** (700, 20px, -0.025em): 카드 제목.
 - **Body** (400, 17px 리드 / 15~16px 본문, 줄간격 1.85): 설명. 한글은 `word-break: keep-all`.
-- **Label** (700, 13px): 아이브로, 탭, 칩.
+- **Label** (700, 13px): 탭, 칩, 근거 수준 배지. 제목 위에 얹는 라벨(아이브로)은 쓰지 않습니다.
 
 ### Named Rules
 **The Keep-All Rule.** 한글 줄바꿈은 어절 단위(`keep-all`)로 하고 제목은 `text-wrap: balance`를 쓴다.
@@ -176,21 +203,21 @@ components:
 
 ## Elevation & Depth
 
-두 가지 깊이 언어가 공존합니다.
+두 가지 깊이 언어가 공존합니다. 하드 섀도는 의도된 정체성입니다(감지기의 hard-offset-shadow 경고는 이 의도로 인한 것).
 - **부드러운 퍼짐**: 폰 프레임과 떠 있는 요소 (`0 22px 42px -20px rgba(20,30,45,.3)`, `0 6px 24px #29344612`). 주변광처럼 조용합니다.
 - **하드 섀도**: 게임 카드를 아래로 누르는 촉감 (`0 6px 0 #d9dbea`, 활성 시 `0 6px 0 #9ea5e5`). 누를 수 있는 카드의 시그니처입니다.
 
 ### Named Rules
-**The Press-Down Rule.** 하드 섀도는 누를 수 있는 카드(코어 기능, 미래 기능)에만 쓴다. 정보용 카드는 1px 라인으로 충분하다.
+**The Press-Down Rule.** 하드 섀도는 누를 수 있는 카드(미션 체험 카드, 코어 기능, 미래 기능)에만 쓴다. 정보용 카드는 1px 라인으로 충분하다.
 
 ## Shapes
 
-형태 언어는 둥글고 단단합니다. 버튼은 12px(홈), 카드는 20~24px, 큰 패널과 히어로 이미지는 28px, 칩과 탭은 100px 알약, 폰 프레임은 26px에 7px 두께의 어두운 테두리입니다. **주의:** 홈은 버튼을 12px로 덮어쓰지만 `style.css`의 기본은 100px 알약이라 페이지마다 버튼 모양이 다릅니다.
+형태 언어는 둥글고 단단합니다. 버튼은 12px, 카드는 16~24px, 큰 패널과 히어로 이미지는 28px, 칩과 탭은 100px 알약, 폰 프레임은 26px에 7px 두께의 어두운 테두리입니다. 버튼은 모든 페이지에서 12px로 통일했습니다.
 
 ## Components
 
 ### Buttons
-- **Shape:** 12px 모서리, 높이 48px (홈 기준). 기본 스타일시트는 100px 알약.
+- **Shape:** 12px 모서리, 높이 48px. 모든 페이지 공통.
 - **Primary:** 인디고(#454fc3) 바탕에 흰 글자, 그림자 없음. 호버는 인디고 딥.
 - **Secondary:** 흰 바탕, 1px 라인 테두리, 잉크 글자.
 - **Hover / Focus:** 포커스는 3px 인디고 아웃라인에 4px 오프셋. 눌림은 `scale(.97)`.
@@ -205,8 +232,8 @@ components:
 - **Scene card:** 귀리색(#f7f1e9) 바탕 위 100px 일러스트.
 
 ### Chips
-- **Eyebrow:** 인디고 틴트 바탕, 인디고 딥 글자, 알약, 13px 700.
 - **준비 중 배지:** 민트 틴트 바탕, 짙은 초록 글자.
+- **근거 수준 배지:** 샌드 위 크림 알약(#fffaf2), 글자 #5f4a1e, 13px 700.
 
 ### Navigation
 - 76px 높이의 크림 바탕, 하단 라인. 링크 호버/활성은 하단 2px 인디고. 모바일은 햄버거(44px)와 펼침 메뉴. 건너뛰기 링크 제공.
@@ -215,7 +242,14 @@ components:
 - 앱 캡처를 감싸는 7px 잉크 테두리의 26px 둥근 프레임과 큰 부드러운 그림자. 사이트의 가장 강한 증거 요소.
 
 ### Mission Demo (시그니처)
-- 사용자가 미션 카드를 직접 눌러 크레딧과 하트가 오르는 체험 데모. 반짝임과 사라짐 애니메이션, 탭 힌트 펄스.
+- 홈의 `#try`에서 아이의 미션 카드를 직접 눌러 크레딧과 하트가 오르는 체험. 모바일은 기기 프레임 없이 2열 평면 카드(화면 속 화면을 만들지 않음), 900px 이상에서만 태블릿 프레임(32px)을 씁니다.
+- 카드는 16~18px 모서리, 2px 라벤더 엣지, 하드 섀도(0 5px 0)이며 누르면 3px 내려갑니다. 완료 카드는 흐려지고 민트 체크가 붙습니다. 오후 카드는 앰버 틴트와 "오후" 배지가 붙습니다.
+
+### Honesty Dialog (시그니처)
+- 앱의 정직 확인 팝업을 그대로 옮긴 네이티브 `<dialog>`. "거짓말은 안 돼!"(오전에 오후 미션)와 "정말 한 거 맞아?"(3초 안에 5개 연속)를 수달 캐릭터(`dont.png`, `dont_lie.png`)와 함께 보여줍니다. 24px 모서리, 320px 폭, 뒤 배경 60% 어둡게. 정직 확인 섹션의 버튼으로도 열 수 있습니다.
+
+### Page Head
+- 홈을 제외한 모든 탭의 상단 띠. 하늘 안개 바탕, 제목 40px 안팎, 한 줄 설명, 선택적 버튼과 데스크톱 전용 토끼 일러스트(170px). 모바일에서는 일러스트를 숨겨 첫 화면을 내용에 씁니다.
 
 ## Do's and Don'ts
 
@@ -225,10 +259,13 @@ components:
 - **Do** 한글에 `keep-all`과 넉넉한 줄간격(1.85)을 쓴다.
 - **Do** 모든 터치 대상은 44px 이상으로 하고 `prefers-reduced-motion`을 존중한다.
 - **Do** 누르는 카드에만 하드 섀도를 쓴다.
+- **Do** 앱이 못 하는 일(수행 확인, 자산 보장)은 13px 이상, 대비 4.5:1 이상으로 눈에 보이게 쓴다.
+- **Do** 연구를 인용할 때 근거 수준(관찰연구, 메타분석, 문헌 종합)을 함께 적는다.
 
 ### Don't:
 - **Don't** 원색이 폭발하는 유아 색상으로 가지 않는다. 바탕은 크림과 파스텔 중성색이다.
 - **Don't** 일반적인 SaaS 랜딩(그라데이션 히어로, 똑같은 3열 카드, 추상 아이콘 나열)을 쓰지 않는다.
 - **Don't** 근거 없는 수치, 후기, 효과 보장 문구를 디자인 요소(배지, 카운터)로 만들지 않는다.
-- **Don't** 같은 역할의 버튼을 페이지마다 다른 모서리 반경(12px와 100px)으로 만들지 않는다.
-- **Don't** 로드되지 않는 폰트에 의존하지 않는다. Pretendard는 반드시 로드하거나 대체 스택을 의도적으로 정한다.
+- **Don't** 제목 위에 라벨 칩(아이브로)이나 섹션 번호를 얹지 않는다.
+- **Don't** 이모지를 아이콘 대신 쓰지 않는다. 일러스트나 SVG를 쓴다.
+- **Don't** 연구가 "증명"한다고 쓰지 않는다. 연관과 시사의 수준으로만 쓴다.

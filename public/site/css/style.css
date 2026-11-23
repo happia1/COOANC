@@ -674,7 +674,7 @@ img.pv-icon{ width:22px; height:22px; object-fit:contain; vertical-align:-5px; m
 .page-head p{ margin-top:14px; font-size:17px; line-height:1.75; color:#536176; max-width:52ch; }
 .page-head-actions{ display:flex; flex-wrap:wrap; gap:12px; margin-top:24px; }
 .page-head .toc{ margin-top:22px; }
-.page-head-art{ display:none; height:170px; width:auto; flex:0 0 auto; }
+.page-head-art{ display:none; width:450px; height:170px; object-fit:cover; object-position:right center; border-radius:20px; flex:0 0 auto; }
 @media (min-width:900px){ .page-head{ padding:56px 0 52px; } .page-head-art{ display:block; } }
 @media (max-width:639px){ .page-head{ padding:32px 0 28px; } .page-head p{ font-size:16px; } .page-head-actions{ display:grid; grid-template-columns:1fr 1fr; gap:10px; } .page-head-actions .btn{ padding-inline:10px; } }
 .about-section{ padding:64px 0; }
@@ -709,3 +709,11 @@ img.pv-icon{ width:22px; height:22px; object-fit:contain; vertical-align:-5px; m
 @media (min-width:900px){ .about-grid{ grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr); gap:56px; } .parent-voices{ grid-template-columns:1fr 1fr; } .about-section{ padding:80px 0; } }
 .nav .nav-cta{ display:none; }
 @media (min-width:1024px){ .nav .nav-cta{ display:inline-flex; } }
+.nav-mobile .btn{ color:#fff; border-bottom:0; margin-top:14px; justify-content:center; }
+.nav-mobile .btn:hover{ color:#fff; }
+/* 터치 영역 44px */
+.brand{ min-height:44px; }
+.nav-links a{ display:inline-flex; align-items:center; min-height:44px; padding-block:0; }
+.nav-mobile a:not(.btn){ display:flex; align-items:center; min-height:48px; padding-block:0; }
+.footer-grid a{ display:flex; align-items:center; min-height:44px; padding-block:0; }
+.toc a{ display:inline-flex; align-items:center; min-height:44px; }

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-11-23T15:00:27.908419Z",
+  "generatedAt": "2026-11-23T15:28:10.743836Z",
   "title": "Design System: COOANC 소개 사이트",
   "extensions": {
     "colorMeta": {
@@ -180,14 +180,6 @@
       "css": ".ds-tabbar{display:inline-flex;gap:2px;padding:4px;background:#F4F8FB;border:1px solid #E6EEF3;border-radius:100px}.ds-tab{padding:9px 20px;border:none;border-radius:100px;background:transparent;font-weight:700;font-size:13.5px;color:#5B6472;cursor:pointer}.ds-tab-active{background:#fff;color:#1F2937;box-shadow:0 1px 5px rgba(20,30,45,.14)}"
     },
     {
-      "name": "Eyebrow Chip",
-      "kind": "chip",
-      "refersTo": "eyebrow-chip",
-      "description": "섹션 위 작은 라벨.",
-      "html": "<span class=\"ds-eyebrow\">스스로 하는 하루의 시작</span>",
-      "css": ".ds-eyebrow{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:700;color:#2D38BE;background:#EAECFA;padding:6px 14px;border-radius:100px}"
-    },
-    {
       "name": "Core Card",
       "kind": "card",
       "refersTo": "core-card",
@@ -202,6 +194,22 @@
       "description": "앱 캡처를 감싸는 시그니처 프레임.",
       "html": "<div class=\"ds-phone\"><div class=\"ds-phone-screen\">앱 화면</div></div>",
       "css": ".ds-phone{width:150px;border-radius:26px;overflow:hidden;border:7px solid #1F2937;box-shadow:0 22px 42px -20px rgba(20,30,45,.3)}.ds-phone-screen{height:240px;background:#eef5f6;display:grid;place-items:center;font-size:13px;color:#536176}"
+    },
+    {
+      "name": "Mission Card",
+      "kind": "card",
+      "refersTo": "demo-card",
+      "description": "홈 미션 체험의 누르는 카드. 누르면 3px 내려가는 하드 섀도.",
+      "html": "<button class=\"ds-mission\"><strong>일어나기</strong><span>크레딧 10 · 하트 1</span></button>",
+      "css": ".ds-mission{display:grid;justify-items:center;gap:4px;padding:14px 18px 12px;background:#fff;border:2px solid #d6d8ea;border-radius:18px;box-shadow:0 5px 0 #d9dbea;color:#1F2937;cursor:pointer;font:inherit}.ds-mission:hover{border-color:#5964d4}.ds-mission:active{transform:translateY(3px);box-shadow:0 2px 0 #d9dbea}.ds-mission:focus-visible{outline:3px solid #454fc3;outline-offset:3px}.ds-mission strong{font-size:16px}.ds-mission span{font-size:14px;color:#536176}"
+    },
+    {
+      "name": "Honesty Dialog",
+      "kind": "custom",
+      "refersTo": "honesty-dialog",
+      "description": "앱 정직 확인 팝업을 옮긴 안내.",
+      "html": "<div class=\"ds-dialog\"><p class=\"ds-dlg-title\">거짓말은 안 돼!</p><p class=\"ds-dlg-detail\">오후 미션은 정오(12시) 이후에 할 수 있어요.</p><button class=\"ds-dlg-btn\">알겠어요</button></div>",
+      "css": ".ds-dialog{width:288px;padding:32px 24px 24px;border-radius:24px;background:#fff;text-align:center;box-shadow:0 24px 60px -12px rgba(0,0,0,.5)}.ds-dlg-title{font-size:24px;font-weight:900;color:#111827}.ds-dlg-detail{margin:4px 0 24px;font-size:14px;font-weight:600;color:#4b5563}.ds-dlg-btn{width:100%;min-height:52px;border:0;border-radius:16px;background:#6a5af0;color:#fff;font:inherit;font-size:16px;font-weight:800;cursor:pointer}"
     }
   ],
   "narrative": {
@@ -245,14 +253,17 @@
       "Do 인디고는 눌러야 할 곳에만 쓰고, 노랑과 민트는 보상과 상태 신호로만 쓴다.",
       "Do 한글에 keep-all과 넉넉한 줄간격(1.85)을 쓴다.",
       "Do 모든 터치 대상은 44px 이상으로 하고 prefers-reduced-motion을 존중한다.",
-      "Do 누르는 카드에만 하드 섀도를 쓴다."
+      "Do 누르는 카드에만 하드 섀도를 쓴다.",
+      "Do 앱이 못 하는 일은 13px 이상, 대비 4.5:1 이상으로 눈에 보이게 쓴다.",
+      "Do 연구를 인용할 때 근거 수준을 함께 적는다."
     ],
     "donts": [
       "Don't 원색이 폭발하는 유아 색상으로 가지 않는다.",
       "Don't 일반적인 SaaS 랜딩 템플릿을 쓰지 않는다.",
       "Don't 근거 없는 수치, 후기, 효과 보장 문구를 디자인 요소로 만들지 않는다.",
-      "Don't 같은 역할의 버튼을 페이지마다 다른 모서리 반경으로 만들지 않는다.",
-      "Don't 로드되지 않는 폰트에 의존하지 않는다."
+      "Don't 제목 위에 라벨 칩이나 섹션 번호를 얹지 않는다.",
+      "Don't 이모지를 아이콘 대신 쓰지 않는다.",
+      "Don't 연구가 증명한다고 쓰지 않는다."
     ]
   }
 }
