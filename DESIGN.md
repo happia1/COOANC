@@ -83,8 +83,12 @@ spacing:
   sm: "14px"
   md: "20px"
   lg: "28px"
-  section: "80px"
-  section-mobile: "64px"
+  section-focal: "96px"
+  section: "72px"
+  section-tail: "56px"
+  section-focal-mobile: "60px"
+  section-mobile: "52px"
+  section-tail-mobile: "44px"
 components:
   button-primary:
     backgroundColor: "{colors.brand-indigo}"
@@ -199,7 +203,7 @@ components:
 
 ## Layout
 
-최대 너비 1080~1160px의 중앙 컨테이너에 좌우 패딩 22px(모바일)~28px(데스크톱). 섹션은 위아래 64px(모바일)~80px. 히어로는 2열(텍스트 1.15 : 이미지 1)이며 640px 이하에서 1열로 접힙니다. 내비게이션은 860px에서 가로 메뉴로 바뀝니다. 터치 영역은 44px 이상(`min-height: 44~48px`)을 지킵니다. 소개 페이지마다 `--maxw`를 달리해(홈 1120, 서비스 소개 1160) 약간의 리듬 차이를 줍니다.
+최대 너비 1080~1160px의 중앙 컨테이너에 좌우 패딩 22px(모바일)~28px(데스크톱). 섹션 간격은 역할에 따라 세 단계입니다. 초점(홈의 미션 체험) 96px, 일반 72px, 꼬리(FAQ, CTA) 56px이고 모바일에서는 각각 60/52/44px입니다. 히어로는 상하 48px로 낮게 잡아 데스크톱 첫 화면에 체험 기기가 걸치게 합니다. 제목은 초점 섹션만 44px, 나머지는 36px입니다. 히어로는 2열(텍스트 1.15 : 이미지 1)이며 640px 이하에서 1열로 접힙니다. 내비게이션은 860px에서 가로 메뉴로 바뀝니다. 터치 영역은 44px 이상(`min-height: 44~48px`)을 지킵니다. 소개 페이지마다 `--maxw`를 달리해(홈 1120, 서비스 소개 1160) 약간의 리듬 차이를 줍니다.
 
 ## Elevation & Depth
 
