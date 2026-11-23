@@ -37,6 +37,7 @@
 <link rel="stylesheet" href="/site/css/mobile-polish.css?v=20261109">
 </head>
 <body class="site-contact">
+<a class="skip-link" href="#main">본문 바로가기</a>
 
 <header class="nav">
   <div class="wrap nav-inner">
@@ -61,60 +62,18 @@
   </nav>
 </header>
 
-<section class="page-scene scene-contact">
-  <div class="wrap">
-    <span class="eyebrow fade">문의하기</span>
-    <h1 class="fade" style="font-size:30px;">궁금한 점이 있으신가요?</h1>
-    <p class="lead fade" style="margin-top:14px;">블로그에서 더 많은 이야기를 만나보시고, FAQ에서 빠르게 답을 찾아보세요. 원하는 답이 없다면 문의 폼으로 편하게 남겨주세요.</p>
+<main id="main" tabindex="-1">
 
-    <div class="toc fade" style="margin-top:22px;">
-      <a href="#blog">블로그</a>
-      <a href="#faq">FAQ</a>
-      <a href="#partner">협업 · 문의</a>
-    </div>
-
-  </div>
-</section>
+<section class="page-head"><div class="wrap"><div><h1>궁금한 점이 있으신가요?</h1><p>자주 묻는 질문에서 빠르게 답을 찾아보세요. 원하는 답이 없다면 문의 폼으로 편하게 남겨주세요.</p><div class="toc"><a href="#faq">FAQ</a><a href="#inquiry">협업 · 문의</a></div></div><img class="page-head-art" src="/site/assets/hero-2.webp" alt="" width="320" height="170"></div></section>
 <section><div class="wrap-narrow">
-    <!-- ===== 블로그 ===== -->
-    <div class="guide-block" id="blog">
-      <h2>블로그</h2>
-      <div class="fade" style="margin-top:14px;">
-        <p style="font-size:15px; color:var(--ink-soft); line-height:1.8;">쿠앵크를 만들면서 겪은 시행착오, 아이와 함께 테스트하며 얻은 인사이트, 서비스 업데이트 소식을 네이버 블로그에 기록하고 있어요.</p>
-
-        <div style="margin-top:18px; display:grid; gap:12px;">
-          <div class="card" style="padding:18px;">
-            <h3>🛠️ 개발 일지</h3>
-            <p style="font-size:14px; color:var(--ink-soft); margin-top:6px;">기능을 왜, 어떻게 만들었는지에 대한 뒷이야기를 기록해요.</p>
-          </div>
-          <div class="card" style="padding:18px;">
-            <h3>👶 육아 관찰기</h3>
-            <p style="font-size:14px; color:var(--ink-soft); margin-top:6px;">제 아이와 베타 버전을 직접 써보며 느낀 변화와 시행착오를 나눠요.</p>
-          </div>
-          <div class="card" style="padding:18px;">
-            <h3>📣 업데이트 소식</h3>
-            <p style="font-size:14px; color:var(--ink-soft); margin-top:6px;">새로 열린 기능, 개선된 부분을 가장 먼저 소개해요.</p>
-          </div>
-        </div>
-
-        <div style="margin-top:22px;">
-          <a href="https://m.blog.naver.com/theotter" target="_blank" rel="noopener" class="btn btn-primary">블로그 바로가기 →</a>
-          <p style="font-size:12.5px; color:var(--ink-faint); margin-top:10px;">네이버 블로그로 새 탭이 열려요</p>
-        </div>
-      </div>
-
-      <!-- ===== 오픈 커뮤니티 (사용가이드 페이지에서 이동) ===== -->
-      <div class="card fade" id="open-community" style="padding:22px; margin-top:22px; background:var(--ink); border:none; scroll-margin-top:80px;">
-        <p style="font-size:12.5px; color:#93A2AF; font-weight:700;">디렉터의 한마디</p>
-        <p style="font-size:14px; color:#fff; margin-top:8px; line-height:1.75;">"이 앱으로 부모님의 '말의 노동'이 조금이라도 줄었는지, 아이가 작은 성취감을 느끼는지가 이번 테스트의 목적입니다. 느끼신 바를 오픈 커뮤니티에서 편하게 나눠주세요!"</p>
-        <a href="https://open.kakao.com/o/pGwAy7wi" target="_blank" rel="noopener" class="btn btn-primary btn-sm" style="margin-top:14px;">오픈 커뮤니티 바로가기</a>
-      </div>
-    </div>
-
     <!-- ===== FAQ ===== -->
     <div class="guide-block" id="faq">
       <h2>FAQ</h2>
       <div class="faq-list fade" style="margin-top:14px;">
+        <details class="faq-item">
+          <summary>아이가 하지 않은 일을 했다고 눌러도 되나요?</summary>
+          <div class="faq-answer">앱이 실제 수행 여부를 모두 확인할 수는 없어요. 대신 오전에 오후 미션을 누르면 “거짓말은 안 돼!”라고 알려주고, 짧은 시간에 연달아 누르면 “정말 한 거 맞아?”라고 다시 물어요. <a href="/site/index.html#honesty" style="text-decoration:underline; font-weight:700;">홈에서 직접 눌러 보기</a></div>
+        </details>
         <details class="faq-item">
           <summary>앱스토어에서 검색해도 되나요?</summary>
           <div class="faq-answer">아직 정식 출시 전이에요. <a href="/site/guide.html" style="text-decoration:underline; font-weight:700;">사용가이드</a>의 링크로 접속해 홈 화면에 추가해주세요.</div>
@@ -139,7 +98,7 @@
     </div>
 
     <!-- ===== 협업 문의 ===== -->
-    <div class="guide-block" id="partner">
+    <div class="guide-block" id="inquiry"><span id="partner"></span>
       <h2>협업 · 문의</h2>
       <p class="fade" style="font-size:14.5px; color:var(--ink-soft); margin-top:10px;">서비스 이용 문의, 오류 제보, 협업·제휴 제안 모두 환영해요.</p>
 
@@ -175,6 +134,7 @@
   </div>
 </section>
 
+</main>
 <footer class="site-footer">
   <div class="wrap footer-grid">
     <div class="footer-brand"><img src="/site/assets/logo-icon.webp" class="footer-logo" alt="COOANC" width="52" height="52" loading="lazy"><p>잔소리는 줄이고, 웃음은 늘리는 쿠앵크입니다.<br>아이가 스스로 만드는 하루를 응원해요.</p></div>

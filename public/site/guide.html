@@ -86,11 +86,11 @@
   @media(max-width:959px){.setup-step{flex-basis:70%;}}
   @media(max-width:639px){.setup-step{flex-basis:86%;}}
 </style>
-<link rel="stylesheet" href="/site/css/hero-layout.css?v=20261108">
 <link rel="stylesheet" href="/site/css/guide.css?v=20261108-tips-rail">
 <link rel="stylesheet" href="/site/css/mobile-polish.css?v=20261109">
 </head>
 <body class="site-guide">
+<a class="skip-link" href="#main">본문 바로가기</a>
 
 <header class="nav">
   <div class="wrap nav-inner">
@@ -115,23 +115,14 @@
   </nav>
 </header>
 
-<section class="page-scene scene-guide">
-  <div class="wrap">
-    <span class="eyebrow fade">사용 가이드</span>
-    <h1 class="fade" style="max-width:520px;">처음 설정은 간단하게,<br>매일의 지시는 적게.</h1>
-    <p class="lead fade" style="margin-top:12px;">부모가 일과를 정하면, 아이는 미션을 보고 시작해요.</p>
-    <div class="toc fade" style="margin-top:26px;">
-      <a href="#install">1 설치</a>
-      <a href="#setup">2 초기 세팅</a>
-      <a href="#tips">활용 팁</a>
-    </div>
-  </div>
-</section>
+<main id="main" tabindex="-1">
+
+<section class="page-head"><div class="wrap"><div><h1>처음 설정은 간단하게,<br>매일의 지시는 적게.</h1><p>부모가 일과를 정하면, 아이는 미션을 보고 시작해요. 앱스토어 없이 브라우저에서 바로 시작해요.</p><div class="toc"><a href="#install">1 설치</a><a href="#setup">2 초기 세팅</a><a href="#tips">활용 팁</a></div></div><img class="page-head-art" src="/site/assets/hero-3.webp" alt="" width="320" height="170"></div></section>
 
 <!-- 설치 -->
 <div class="wrap">
 <div class="guide-block" id="install">
-  <span class="eyebrow">01 · 시작하기</span><h2>홈 화면에 추가하기</h2>
+  <h2>홈 화면에 추가하기</h2>
 
   <p class="habit-intro">앱스토어 없이 브라우저에서 바로 시작해요. 앱을 연 뒤 홈 화면에 추가해주세요.</p>
   <a class="btn btn-primary" href="https://cooanc.vercel.app/" target="_blank" rel="noopener">앱 열고 설치하기 ↗</a>
@@ -140,8 +131,8 @@
   <!-- 기기별 설치 절차 — 탭으로 전환 (접속 기기를 감지해 기본 선택) -->
   <div class="fade" style="margin-top:24px;" data-tabgroup id="deviceGuide">
     <div class="tabbar">
-      <button class="tabbtn active" data-tab="pane-ios">🍏 iPhone</button>
-      <button class="tabbtn" data-tab="pane-android">🤖 Android (갤럭시)</button>
+      <button class="tabbtn active" data-tab="pane-ios">iPhone</button>
+      <button class="tabbtn" data-tab="pane-android">Android (갤럭시)</button>
     </div>
 
     <div class="tabpanel active" id="pane-ios">
@@ -168,7 +159,7 @@
 
 <!-- 초기 세팅 -->
 <div class="guide-block" id="setup">
-  <span class="eyebrow">02 · 초기 설정</span><h2>아이의 하루를 준비해요.</h2>
+  <h2>아이의 하루를 준비해요.</h2>
   <p class="habit-intro">아이의 일과를 아는 부모라면, 필요한 항목만 고르면 돼요.</p>
   <p class="setup-caption">실제 앱의 설정 순서를 간추린 화면 예시</p>
   <div class="setup-carousel" data-card-rail><div class="setup-rail" data-rail-track tabindex="0" role="region" aria-label="초기 설정 네 단계, 좌우로 스크롤">
@@ -184,16 +175,16 @@
 
 <!-- 활용 팁 -->
 <div class="guide-block" id="tips">
-  <span class="eyebrow">일상 속 활용팁</span><h2>말해주는 하루에서,<br>스스로 하는 하루로.</h2>
+  <h2>말해주는 하루에서,<br>스스로 하는 하루로.</h2>
   <p class="habit-intro">부모는 일과를 설정하고, 아이는 미션을 보고 실천해요.<br>쿠앵크는 일상을 안내하고, 부모는 해낸 순간을 응원해주세요.</p>
   <div class="habit-carousel" data-card-rail><div class="habit-grid" data-rail-track tabindex="0" role="region" aria-label="일상 속 활용팁 네 가지, 좌우로 넘겨보세요">
     <article class="habit-card">
-      <h3>🗓️ 부모는 익숙한 일과를 빠르게 설정해요</h3>
+      <h3>부모는 익숙한 일과를 빠르게 설정해요</h3>
       <p>아이의 하루를 가장 잘 아는 부모가 아침·오후·저녁에 필요한 미션과 보상을 정해주세요. 처음에는 아이가 해낼 수 있는 일부터 시작해요.</p>
       <blockquote><span class="habit-label">설정 예시</span>아침에는 씻기와 식사,<br>저녁에는 정리와 잠자리 준비.</blockquote>
     </article>
     <article class="habit-card">
-      <h3>🙌 시작하는 순간은 아이에게 맡겨요</h3>
+      <h3>시작하는 순간은 아이에게 맡겨요</h3>
       <p>반복해서 지시하기보다 미션카드를 보고 시작할 여유를 주세요. 순서를 바꿔도 되는 일은 무엇부터 할지 아이가 선택하게 해주세요.</p>
       <div class="habit-scenes">
         <figure><img src="/site/assets/app/meal-finished.png" alt="식사를 마치고 빈 그릇을 든 아이" loading="lazy" width="508" height="458"><figcaption>내가 해냈어요</figcaption></figure>
@@ -202,14 +193,14 @@
       <p>‘시키니까’가 아니라 ‘내가 시작해서 해냈다’는 경험을 쌓도록 도와주세요.</p>
     </article>
     <article class="habit-card habit-reward">
-      <h3>💛 칭찬과 보상으로 기쁘게 마무리해요</h3>
+      <h3>칭찬과 보상으로 기쁘게 마무리해요</h3>
       <p>크레딧과 하트는 해낸 일을 눈으로 확인하는 즐거움이에요. 여기에 부모가 알아본 구체적인 행동을 말해주세요. 보상만큼 중요한 것은 <strong>‘내가 한 일을 알아주는구나’</strong> 하는 순간이에요.</p>
       <div class="habit-reward-line"><span>스스로 실천</span><span aria-hidden="true">→</span><span>구체적인 칭찬</span><span aria-hidden="true">＋</span><img src="/site/assets/app/coin.png" alt="크레딧" width="30" height="30"><img src="/site/assets/app/heart.png" alt="하트" width="30" height="30"></div>
       <blockquote><span class="habit-label">이렇게 말해보세요</span>“내가 말하기 전에 그릇을 가져다 놓았네! 덕분에 식탁 정리가 한결 수월해졌어.”</blockquote>
       <details class="habit-detail"><summary>보상을 잘 사용하는 방법</summary><p>보상은 행동을 기분 좋게 마무리하도록 돕는 장치예요. 더 큰 보상으로 재촉하기보다, 아이가 한 선택과 노력을 먼저 알아봐 주세요. 진심으로 놀라고 기뻐하며 하이파이브하는 것도 좋아요.</p><p>익숙해진 일은 보상 이야기를 먼저 꺼내지 않고 지켜보세요. 앱을 확인하지 않고 해낸 날도 같은 마음으로 응원해주세요. 쿠앵크의 목표는 앱을 자주 켜는 것보다 스스로 해내는 일상이 늘어나는 데 있어요.</p></details>
     </article>
     <article class="habit-card">
-      <h3>🌱 생활 속 배려도 작은 실천부터</h3>
+      <h3>생활 속 배려도 작은 실천부터</h3>
       <div class="habit-scenes"><figure><img src="/site/assets/app/say-hello.png" alt="서로 인사하는 두 아이" loading="lazy" width="138" height="125"><figcaption>먼저 인사하기</figcaption></figure><figure><img src="/site/assets/app/clear-dishes.png" alt="자신이 사용한 그릇을 정리하는 아이" loading="lazy" width="126" height="126"><figcaption>내가 쓴 자리 정리하기</figcaption></figure></div>
       <p>부모가 매 순간 말하지 못하는 인사와 뒷정리도 미션으로 떠올릴 수 있어요. 누군가에게 어떤 도움이 됐는지 짧게 이야기하며 배려와 책임감을 연습해주세요.</p>
       <details class="habit-detail"><summary>하지 않은 일을 완료했다고 한다면?</summary><p>바로 다그치기보다 실제로 한 일을 함께 확인해주세요. “아직 안 했다면 지금 해보고 완료하자.” 정직하게 말하고 다시 실천할 기회로 삼아주세요.</p></details>
@@ -217,12 +208,12 @@
   </div>
 <div class="habit-controls"><button type="button" data-rail-prev aria-label="이전 활용팁"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 5 8 12 15 19"/></svg></button><button type="button" data-rail-next aria-label="다음 활용팁"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 5 16 12 9 19"/></svg></button></div></div>
   <div class="habit-card" style="margin-top:18px;background:var(--mist);">
-    <h3>🔁 익숙해질수록, 부모의 말은 조금씩 줄여요</h3>
+    <h3>익숙해질수록, 부모의 말은 조금씩 줄여요</h3>
     <p>식사 후 정리처럼 같은 상황에 같은 행동을 이어가 보세요. 처음엔 카드를 함께 확인하고, 익숙해지면 먼저 지켜봐 주세요. 부모도 아이도 덜 힘들이며 건강한 일상을 이어가는 것이 목표예요.</p>
     <details class="habit-detail"><summary>습관이 자리잡는데 걸리는 시간!</summary><p>자주 인용되는 ‘66일’은 성인 참가자의 일상 행동을 조사한 연구에서, 습관의 자동성이 충분히 높아지는 데 걸리는 시간을 추정한 중앙값이에요. 개인·행동에 따라 18~254일로 차이가 컸어요. 어린이에게 동일하게 적용되는 기한은 아니에요.</p><p>날짜를 채우기보다 생활 속에서 반복할 기회를 만들어주세요. 하루 빠졌다고 처음부터 다시 시작할 필요는 없어요.</p><p class="research-credit">- 연구자 <a href="https://www.surrey.ac.uk/news/does-it-really-take-66-days-form-habit-we-asked-expert-dr-pippa-lally" target="_blank" rel="noopener">Pippa Lally</a></p></details>
     <details class="habit-detail"><summary>칭찬이 아이에게 전하는 힘!</summary><p>어린 시절의 과정 중심 칭찬과 이후 성장에 대한 믿음 사이의 관련성을 관찰한 연구가 있어요. ‘넌 원래 잘해’보다 아이가 실제로 한 행동과 노력을 짚어주는 방향을 참고했어요. 관찰 연구에서 확인된 관련성이에요.</p><p class="research-credit">- 연구자 <a href="https://pubmed.ncbi.nlm.nih.gov/23397904/" target="_blank" rel="noopener">Elizabeth A. Gunderson 외 (2013)</a></p></details>
   </div>
-  <div style="margin-top:22px;text-align:center;"><a href="/site/contact.html#open-community" class="btn btn-ghost">🐞 오류 제보 및 기능 요청</a></div>
+  <div style="margin-top:22px;text-align:center;"><a href="/site/contact.html#open-community" class="btn btn-ghost">오류 제보 및 기능 요청</a></div>
 </div>
 </div>
 
@@ -236,6 +227,7 @@
   </div>
 </section>
 
+</main>
 <footer class="site-footer">
   <div class="wrap footer-grid">
     <div class="footer-brand"><img src="/site/assets/logo-icon.webp" class="footer-logo" alt="COOANC" width="52" height="52" loading="lazy"><p>잔소리는 줄이고, 웃음은 늘리는 쿠앵크입니다.<br>아이가 스스로 만드는 하루를 응원해요.</p></div>

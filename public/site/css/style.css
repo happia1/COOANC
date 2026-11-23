@@ -3,12 +3,12 @@
 :root{
   --ink:#1F2937;
   --ink-soft:#5B6472;
-  --ink-faint:#8B95A1;
+  --ink-faint:#647086;
   --paper:#FFFFFF;
   --mist:#F4F8FB;
   --line:#E6EEF3;
   /* 포인트 컬러 — 로고의 파랑·보라 그러데이션에서 뽑은 색입니다 */
-  --brand:#515CD6;
+  --brand:#454fc3;
   --brand-deep:#2D38BE;
   --brand-tint:#EAECFA;
   --sun:#FFC94D;
@@ -72,7 +72,7 @@ button{font-family:inherit;}
 /* ===== Buttons ===== */
 .btn{
   display:inline-flex; align-items:center; justify-content:center; gap:8px;
-  padding:14px 22px; border-radius:100px; font-weight:700; font-size:15px;
+  padding:14px 22px; border-radius:12px; font-weight:700; font-size:15px;
   border:none; cursor:pointer; transition:transform .15s ease, box-shadow .15s ease;
 }
 .btn:active{ transform:scale(.97); }
@@ -209,7 +209,7 @@ h3{ font-size:17px; font-weight:700; }
 .footer-grid h4{ font-size:13px; color:var(--ink-faint); margin-bottom:10px; }
 .footer-grid a{ display:block; font-size:14px; color:var(--ink-soft); padding:5px 0; }
 .footer-brand p{ font-size:13.5px; color:var(--ink-soft); margin-top:8px; max-width:320px; }
-.copyright{ font-size:12px; color:var(--ink-faint); border-top:1px solid var(--line); padding-top:18px; }
+.copyright{ font-size:13px; color:var(--ink-faint); border-top:1px solid var(--line); padding-top:18px; }
 @media (min-width:640px){ .footer-grid{ grid-template-columns:2fr 1fr 1fr; } }
 
 /* ===== Simple form (contact) ===== */
@@ -661,3 +661,51 @@ img.pv-icon{ width:22px; height:22px; object-fit:contain; vertical-align:-5px; m
  .page-scene h1 { font-size:32px; }
  .page-scene p { font-size:15px; }
 }
+
+
+/* ===== 공통: 건너뛰기 링크, 페이지 헤더(홈 제외 모든 탭), 이야기 페이지 ===== */
+.skip-link{ position:fixed; top:10px; left:12px; z-index:120; padding:12px; background:#fff; border-radius:8px; transform:translateY(-160%); }
+.skip-link:focus{ transform:none; }
+.ico{ width:18px; height:18px; flex:0 0 auto; vertical-align:-3px; }
+:focus-visible{ outline:3px solid #454fc3; outline-offset:3px; }
+.page-head{ background:#eef5f6; padding:44px 0 40px; }
+.page-head .wrap{ display:flex; align-items:center; justify-content:space-between; gap:32px; max-width:1080px; }
+.page-head h1{ font-size:clamp(30px,4vw,44px); line-height:1.25; letter-spacing:-.03em; text-wrap:balance; max-width:20ch; }
+.page-head p{ margin-top:14px; font-size:17px; line-height:1.75; color:#536176; max-width:52ch; }
+.page-head-actions{ display:flex; flex-wrap:wrap; gap:12px; margin-top:24px; }
+.page-head .toc{ margin-top:22px; }
+.page-head-art{ display:none; height:170px; width:auto; flex:0 0 auto; }
+@media (min-width:900px){ .page-head{ padding:56px 0 52px; } .page-head-art{ display:block; } }
+@media (max-width:639px){ .page-head{ padding:32px 0 28px; } .page-head p{ font-size:16px; } .page-head-actions{ display:grid; grid-template-columns:1fr 1fr; gap:10px; } .page-head-actions .btn{ padding-inline:10px; } }
+.about-section{ padding:64px 0; }
+.about-grid{ display:grid; gap:36px; align-items:start; }
+.about-text h2{ font-size:clamp(26px,3vw,34px); line-height:1.35; letter-spacing:-.03em; }
+.about-maker{ margin-top:18px; font-size:15px; color:#536176; }
+.about-maker strong{ color:#1F2937; font-size:17px; }
+.about-text p{ margin-top:16px; font-size:16.5px; line-height:1.85; color:#536176; max-width:56ch; }
+.story-photos{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+.story-photos figure{ margin:0; }
+.story-photos img{ width:100%; height:auto; aspect-ratio:4/5; object-fit:cover; border-radius:16px; }
+.story-photos:not(:has(figure)){ display:none; }
+.about-grid:not(:has(figure)){ grid-template-columns:1fr; }
+.about-voices{ background:#f4f6fa; }
+.about-voices h2{ font-size:clamp(24px,2.8vw,32px); letter-spacing:-.03em; }
+.parent-voices{ display:grid; gap:16px; margin-top:24px; }
+.parent-voices figure{ margin:0; padding:24px; border-radius:16px; background:#fff; }
+.parent-voices blockquote{ font-size:16px; line-height:1.85; font-weight:600; }
+.parent-voices figcaption{ font-size:13px; color:#647086; margin-top:14px; }
+.voices-note{ margin-top:14px; font-size:13px; color:#647086; }
+.about-blog h2{ font-size:clamp(24px,2.8vw,32px); letter-spacing:-.03em; }
+.about-blog .lead{ margin-top:12px; max-width:56ch; }
+.blog-topics{ list-style:none; display:grid; gap:0; margin-top:22px; border-top:1px solid var(--line); }
+.blog-topics li{ padding:16px 0; border-bottom:1px solid var(--line); }
+.blog-topics strong{ display:block; font-size:17px; }
+.blog-topics span{ display:block; margin-top:4px; font-size:15px; color:#536176; }
+.about-blog .btn{ margin-top:22px; }
+.community-card{ margin-top:32px; padding:24px; border-radius:16px; background:#1F2937; color:#fff; scroll-margin-top:84px; }
+.community-card p:first-child{ font-size:13px; color:#b6c2cf; font-weight:700; }
+.community-card p+p{ margin-top:8px; font-size:15px; line-height:1.8; }
+.community-card .btn{ margin-top:16px; }
+@media (min-width:900px){ .about-grid{ grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr); gap:56px; } .parent-voices{ grid-template-columns:1fr 1fr; } .about-section{ padding:80px 0; } }
+.nav .nav-cta{ display:none; }
+@media (min-width:1024px){ .nav .nav-cta{ display:inline-flex; } }

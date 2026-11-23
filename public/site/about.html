@@ -3,12 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>소개 — 쿠앵크(COOANC)</title>
+<title>이야기 — 쿠앵크(COOANC)</title>
 <meta name="description" content="아이와 함께 만드는 생활습관 앱 쿠앵크의 이야기와 제작자를 소개합니다.">
 <link rel="canonical" href="https://cooanc.vercel.app/site/about.html">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="쿠앵크 COOANC">
-<meta property="og:title" content="소개 — 쿠앵크(COOANC)">
+<meta property="og:title" content="이야기 — 쿠앵크(COOANC)">
 <meta property="og:description" content="아이와 함께 만드는 생활습관 앱 쿠앵크의 이야기와 제작자를 소개합니다.">
 <meta property="og:url" content="https://cooanc.vercel.app/site/about.html">
 <meta property="og:image" content="https://cooanc.vercel.app/site/assets/app/share-cover.jpg">
@@ -22,7 +22,9 @@
 <link rel="stylesheet" href="/site/css/style.css">
 <link rel="stylesheet" href="/site/css/mobile-polish.css?v=20261109">
 </head>
-<body>
+<body class="site-about">
+<a class="skip-link" href="#main">본문 바로가기</a>
+
 
 <header class="nav">
   <div class="wrap nav-inner">
@@ -47,37 +49,60 @@
   </nav>
 </header>
 
-<section>
-  <div class="wrap-narrow">
-    <span class="eyebrow fade">만든 사람</span>
-    <h1 class="fade" style="font-size:30px;">쿠앵크는 왜 만들어졌을까요</h1>
+<main id="main" tabindex="-1">
+<section class="page-head"><div class="wrap"><div><h1>잔소리 대신,<br>응원하는 앱을 만들었어요.</h1><p>쿠앵크는 5살 아이를 키우는 엄마가 직접 만들고, 아이와 함께 베타를 테스트하며 자라고 있어요.</p></div><img class="page-head-art" src="/site/assets/hero-2.webp" alt="" width="320" height="170"></div></section>
 
-    <div class="fade" style="margin-top:26px; display:flex; align-items:center; gap:16px;">
-      <div style="width:64px; height:64px; border-radius:50%; background:var(--brand-tint); display:flex; align-items:center; justify-content:center; font-size:28px;">👩‍💻</div>
-      <div>
-        <div style="font-weight:700; font-size:16px;">강수민 <span style="font-weight:600; font-size:13px; color:var(--ink-soft);">Soomin Kang</span></div>
-        <div style="font-size:13.5px; color:var(--ink-soft);">COOANC 대표 · 개발자</div>
-      </div>
+<section class="about-section" id="maker">
+  <div class="wrap about-grid">
+    <div class="about-text">
+      <h2>쿠앵크는 왜 만들어졌을까요</h2>
+      <p class="about-maker"><strong>강수민</strong> Soomin Kang · COOANC 대표 · 개발자</p>
+      <p>5살 아이를 키우는 엄마가 만들었어요. 매일 아침 같은 말을 반복하다 기어코 화를 내고 마는 순간들이 싫었어요. 잔소리하는 엄마 말고, 응원하고 격려하는 엄마이고 싶었거든요.</p>
+      <p>아이의 하루를 즐겁게, 건강한 루틴으로 채워주고 싶다는 마음 하나로 쿠앵크를 만들기 시작했어요. 제 아이와 함께 베타 버전을 직접 테스트하면서, 화분에 물을 주기 시작한 순간처럼 작은 변화들을 하나씩 기능에 담았어요.</p>
+      <p>잔소리는 줄이고 웃음은 늘리는 것. 쿠앵크가 부모와 아이 모두에게 그런 존재가 되길 바라며, 앞으로도 아이가 스스로 만드는 하루를 함께 키워갈게요.</p>
     </div>
-
-    <div class="fade" style="margin-top:24px; font-size:15.5px; color:var(--ink-soft); line-height:1.8;">
-      <p style="margin-bottom:16px;">
-        5살 아이를 키우는 엄마가 만들었어요. 매일 아침 같은 말을 반복하다 기어코 화를 내고 마는 순간들이 싫었어요. 잔소리하는 엄마 말고, 응원하고 격려하는 엄마이고 싶었거든요.
-      </p>
-      <p style="margin-bottom:16px;">
-        아이의 하루를 즐겁게, 건강한 루틴으로 채워주고 싶다는 마음 하나로 쿠앵크를 만들기 시작했어요. 제 아이와 함께 베타 버전을 직접 테스트하면서, 화분에 물을 주기 시작한 순간처럼 작은 변화들을 하나씩 기능에 담았어요.
-      </p>
-      <p>
-        잔소리는 줄이고 웃음은 늘리는 것 — 쿠앵크가 부모와 아이 모두에게 그런 존재가 되길 바라며, 앞으로도 아이가 스스로 만드는 하루를 함께 키워갈게요.
-      </p>
-    </div>
-
-    <div class="fade" style="margin-top:32px;">
-      <a href="/site/contact.html#blog" style="text-decoration:underline; font-weight:700; font-size:14.5px;">블로그에서 더 많은 이야기 보기 →</a>
+    <div class="story-photos" data-story-photos>
+      <!-- 아이 사용 사진: public/site/assets/story/ 에 story-1.webp ~ story-4.webp(4:5 세로, 가로 800px 이상)를 넣고 아래 줄의 주석을 풀어 주세요. 사진이 없으면 이 영역은 자동으로 숨겨져요.
+      <figure><img src="/site/assets/story/story-1.webp" alt="아이가 쿠앵크로 미션을 하는 모습" width="800" height="1000" loading="lazy"></figure>
+      <figure><img src="/site/assets/story/story-2.webp" alt="아이가 쿠앵크로 미션을 하는 모습" width="800" height="1000" loading="lazy"></figure>
+      <figure><img src="/site/assets/story/story-3.webp" alt="아이가 쿠앵크로 미션을 하는 모습" width="800" height="1000" loading="lazy"></figure>
+      <figure><img src="/site/assets/story/story-4.webp" alt="아이가 쿠앵크로 미션을 하는 모습" width="800" height="1000" loading="lazy"></figure>
+      -->
     </div>
   </div>
 </section>
 
+<section class="about-section about-voices" aria-labelledby="voices-title">
+  <div class="wrap">
+    <h2 id="voices-title">“네가 해냈구나!” 이 말을 건네는 순간이 많아지길.</h2>
+    <div class="parent-voices">
+      <figure><blockquote>“아이가 처음으로 ‘오늘은 일찍 자러 갈래’라고 말했어요.”</blockquote><figcaption>쿠앵크를 쓰는 부모님 · 익명 ID coo_7f2a</figcaption></figure>
+      <figure><blockquote>“화분에 물 주기랑 저금통이 최애예요. 쓰는 것보다 모으는 게 더 재밌다면서, 저축하는 습관이 생겼어요.”</blockquote><figcaption>쿠앵크를 쓰는 부모님 · 익명 ID coo_9c4e</figcaption></figure>
+    </div>
+    <p class="voices-note">아이디는 개인정보 보호를 위한 임의의 익명 표기입니다.</p>
+  </div>
+</section>
+
+<section class="about-section about-blog" id="blog" aria-labelledby="blog-title">
+  <div class="wrap-narrow">
+    <h2 id="blog-title">블로그</h2>
+    <p class="lead">쿠앵크를 만들면서 겪은 시행착오, 아이와 함께 테스트하며 얻은 인사이트, 서비스 업데이트 소식을 네이버 블로그에 기록하고 있어요.</p>
+    <ul class="blog-topics">
+      <li><strong>개발 일지</strong><span>기능을 왜, 어떻게 만들었는지에 대한 뒷이야기를 기록해요.</span></li>
+      <li><strong>육아 관찰기</strong><span>제 아이와 베타 버전을 직접 써보며 느낀 변화와 시행착오를 나눠요.</span></li>
+      <li><strong>업데이트 소식</strong><span>새로 열린 기능, 개선된 부분을 가장 먼저 소개해요.</span></li>
+    </ul>
+    <a class="btn btn-primary" href="https://m.blog.naver.com/theotter" target="_blank" rel="noopener">블로그 바로가기 <svg class="ico" aria-hidden="true" viewBox="0 0 24 24"><path d="M7 17 17 7M9 7h8v8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+    <p class="voices-note">네이버 블로그로 새 탭이 열려요.</p>
+
+    <div class="community-card" id="open-community">
+      <p>디렉터의 한마디</p>
+      <p>“이 앱으로 부모님의 ‘말의 노동’이 조금이라도 줄었는지, 아이가 작은 성취감을 느끼는지가 이번 테스트의 목적입니다. 느끼신 바를 오픈 커뮤니티에서 편하게 나눠주세요!”</p>
+      <a class="btn btn-primary btn-sm" href="https://open.kakao.com/o/pGwAy7wi" target="_blank" rel="noopener">오픈 커뮤니티 바로가기</a>
+    </div>
+  </div>
+</section>
+</main>
 <footer class="site-footer">
   <div class="wrap footer-grid">
     <div class="footer-brand"><img src="/site/assets/logo-icon.webp" class="footer-logo" alt="COOANC" width="52" height="52" loading="lazy"><p>잔소리는 줄이고, 웃음은 늘리는 쿠앵크입니다.<br>아이가 스스로 만드는 하루를 응원해요.</p></div>
