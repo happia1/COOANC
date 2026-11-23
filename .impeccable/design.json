@@ -1,0 +1,258 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-23T15:00:27.908419Z",
+  "title": "Design System: COOANC 소개 사이트",
+  "extensions": {
+    "colorMeta": {
+      "brand-indigo": {
+        "role": "primary",
+        "displayName": "쿠앵크 인디고",
+        "canonical": "#454fc3",
+        "tonalRamp": [
+          "#1a1c32",
+          "#23296c",
+          "#323a9a",
+          "#4650c3",
+          "#747cd2",
+          "#a2a7e1",
+          "#cdd0ef",
+          "#eeeff6"
+        ]
+      },
+      "brand-indigo-deep": {
+        "role": "primary",
+        "displayName": "인디고 딥",
+        "canonical": "#2D38BE",
+        "tonalRamp": [
+          "#181a34",
+          "#1b2273",
+          "#2731a5",
+          "#3945d0",
+          "#6b73dc",
+          "#9ca2e8",
+          "#c9ccf2",
+          "#eeeef7"
+        ]
+      },
+      "sun": {
+        "role": "secondary",
+        "displayName": "햇살 노랑",
+        "canonical": "#FFC94D",
+        "tonalRamp": [
+          "#3d2f0f",
+          "#8f6300",
+          "#cc8e00",
+          "#ffb50a",
+          "#ffc747",
+          "#ffda85",
+          "#ffebbd",
+          "#faf5eb"
+        ]
+      },
+      "mint": {
+        "role": "secondary",
+        "displayName": "새싹 민트",
+        "canonical": "#2FBE86",
+        "tonalRamp": [
+          "#183429",
+          "#1c7251",
+          "#28a473",
+          "#3bce95",
+          "#6cdbaf",
+          "#9de7ca",
+          "#caf2e2",
+          "#eef7f3"
+        ]
+      },
+      "cream-page": {
+        "role": "neutral",
+        "displayName": "크림 페이지",
+        "canonical": "#fffefb",
+        "tonalRamp": [
+          "#3d320f",
+          "#8f6b00",
+          "#cc9900",
+          "#ffc20a",
+          "#ffd147",
+          "#ffe085",
+          "#ffeebd",
+          "#faf6eb"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "잉크",
+        "canonical": "#1F2937",
+        "tonalRamp": [
+          "#20252d",
+          "#33445b",
+          "#4a6182",
+          "#627fa7",
+          "#8a9fbd",
+          "#b1bfd3",
+          "#d5dce7",
+          "#f0f2f4"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "홈 히어로 한 줄."
+      },
+      "brand-voice": {
+        "displayName": "Jua 브랜드 보이스",
+        "purpose": "워드마크와 포인트 문구 전용."
+      }
+    },
+    "shadows": [
+      {
+        "name": "phone-soft",
+        "value": "0 22px 42px -20px rgba(20,30,45,.3)",
+        "purpose": "폰 프레임 아래의 조용한 주변광."
+      },
+      {
+        "name": "press-down",
+        "value": "0 6px 0 #d9dbea",
+        "purpose": "누를 수 있는 게임 카드의 하드 섀도."
+      },
+      {
+        "name": "press-down-active",
+        "value": "0 6px 0 #9ea5e5",
+        "purpose": "선택된 카드의 하드 섀도."
+      }
+    ],
+    "motion": [
+      {
+        "name": "press",
+        "value": "transform .15s ease",
+        "purpose": "버튼 눌림 scale(.97)."
+      },
+      {
+        "name": "tab-switch",
+        "value": "background .18s ease, color .18s ease",
+        "purpose": "세그먼트 탭 전환."
+      },
+      {
+        "name": "hotspot-pulse",
+        "value": "1.6s ease-in-out infinite",
+        "purpose": "앱 화면 위 힌트 펄스. reduced-motion에서 정지."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "mobile",
+        "value": "639px"
+      },
+      {
+        "name": "tablet",
+        "value": "860px"
+      },
+      {
+        "name": "desktop",
+        "value": "1024px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "홈의 주 행동 버튼.",
+      "html": "<button class=\"ds-btn-primary\">쿠앵크 시작하기</button>",
+      "css": ".ds-btn-primary{background:#454fc3;color:#fff;border:none;border-radius:12px;min-height:48px;padding:14px 22px;font-weight:700;font-size:15px;cursor:pointer;transition:transform .15s ease}.ds-btn-primary:hover{background:#2D38BE}.ds-btn-primary:active{transform:scale(.97)}.ds-btn-primary:focus-visible{outline:3px solid #454fc3;outline-offset:4px}"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "보조 행동.",
+      "html": "<button class=\"ds-btn-secondary\">미션 체험하기</button>",
+      "css": ".ds-btn-secondary{background:#fff;color:#1F2937;border:1px solid #E6EEF3;border-radius:12px;min-height:48px;padding:14px 22px;font-weight:700;font-size:15px;cursor:pointer}.ds-btn-secondary:hover{border-color:#454fc3}.ds-btn-secondary:focus-visible{outline:3px solid #454fc3;outline-offset:4px}"
+    },
+    {
+      "name": "Segment Tab",
+      "kind": "chip",
+      "refersTo": "tab-segment",
+      "description": "아이 화면 / 부모 화면 같은 대분류 전환.",
+      "html": "<div class=\"ds-tabbar\"><button class=\"ds-tab ds-tab-active\">아이 화면</button><button class=\"ds-tab\">부모 화면</button></div>",
+      "css": ".ds-tabbar{display:inline-flex;gap:2px;padding:4px;background:#F4F8FB;border:1px solid #E6EEF3;border-radius:100px}.ds-tab{padding:9px 20px;border:none;border-radius:100px;background:transparent;font-weight:700;font-size:13.5px;color:#5B6472;cursor:pointer}.ds-tab-active{background:#fff;color:#1F2937;box-shadow:0 1px 5px rgba(20,30,45,.14)}"
+    },
+    {
+      "name": "Eyebrow Chip",
+      "kind": "chip",
+      "refersTo": "eyebrow-chip",
+      "description": "섹션 위 작은 라벨.",
+      "html": "<span class=\"ds-eyebrow\">스스로 하는 하루의 시작</span>",
+      "css": ".ds-eyebrow{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:700;color:#2D38BE;background:#EAECFA;padding:6px 14px;border-radius:100px}"
+    },
+    {
+      "name": "Core Card",
+      "kind": "card",
+      "refersTo": "core-card",
+      "description": "누를 수 있는 핵심 기능 카드 (하드 섀도).",
+      "html": "<div class=\"ds-core-card\"><h3>화분 키우기</h3><p>하트로 돌보는 작은 정원</p></div>",
+      "css": ".ds-core-card{background:#fffef9;border:2px solid #d6d8ea;border-radius:22px;padding:24px;box-shadow:0 6px 0 #d9dbea;color:#27334a;cursor:pointer;max-width:260px}.ds-core-card:hover{border-color:#5964d4;box-shadow:0 6px 0 #9ea5e5}.ds-core-card h3{font-size:20px;font-weight:700;letter-spacing:-.025em}.ds-core-card p{font-size:14px;color:#536176;margin-top:6px}"
+    },
+    {
+      "name": "Phone Frame",
+      "kind": "custom",
+      "refersTo": "",
+      "description": "앱 캡처를 감싸는 시그니처 프레임.",
+      "html": "<div class=\"ds-phone\"><div class=\"ds-phone-screen\">앱 화면</div></div>",
+      "css": ".ds-phone{width:150px;border-radius:26px;overflow:hidden;border:7px solid #1F2937;box-shadow:0 22px 42px -20px rgba(20,30,45,.3)}.ds-phone-screen{height:240px;background:#eef5f6;display:grid;place-items:center;font-size:13px;color:#536176}"
+    }
+  ],
+  "narrative": {
+    "northStar": "작은 정원의 성장 일지",
+    "overview": "아이의 하루가 한 칸씩 자라는 일지처럼 읽히는 사이트. 크림 바탕 위에 인디고가 유일한 행동 색이고, 노랑과 민트는 보상과 성장 신호로만 쓴다. 분위기는 생동감 있는 게임 같은 쪽이며 하드 섀도와 체험 데모가 그 증거다.",
+    "keyCharacteristics": [
+      "크림 바탕 + 인디고 단일 행동 색",
+      "실제 앱 캡처와 캐릭터 일러스트 중심",
+      "누르는 카드의 하드 섀도",
+      "한글 keep-all과 넉넉한 줄간격"
+    ],
+    "rules": [
+      {
+        "name": "The One Voice Rule",
+        "body": "인디고는 행동에만 쓴다. 노랑과 민트는 보상과 상태에만 쓴다.",
+        "section": "colors"
+      },
+      {
+        "name": "The Warm Floor Rule",
+        "body": "큰 바탕은 크림과 파스텔 중성색이다. 원색 면적을 키우지 않는다.",
+        "section": "colors"
+      },
+      {
+        "name": "The Keep-All Rule",
+        "body": "한글 줄바꿈은 어절 단위로 하고 제목은 text-wrap: balance를 쓴다.",
+        "section": "typography"
+      },
+      {
+        "name": "The Jua Accent Rule",
+        "body": "Jua는 워드마크와 한두 줄의 포인트에만 쓴다.",
+        "section": "typography"
+      },
+      {
+        "name": "The Press-Down Rule",
+        "body": "하드 섀도는 누를 수 있는 카드에만 쓴다.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do 앱의 실제 화면과 캐릭터 일러스트를 시각의 중심에 둔다.",
+      "Do 인디고는 눌러야 할 곳에만 쓰고, 노랑과 민트는 보상과 상태 신호로만 쓴다.",
+      "Do 한글에 keep-all과 넉넉한 줄간격(1.85)을 쓴다.",
+      "Do 모든 터치 대상은 44px 이상으로 하고 prefers-reduced-motion을 존중한다.",
+      "Do 누르는 카드에만 하드 섀도를 쓴다."
+    ],
+    "donts": [
+      "Don't 원색이 폭발하는 유아 색상으로 가지 않는다.",
+      "Don't 일반적인 SaaS 랜딩 템플릿을 쓰지 않는다.",
+      "Don't 근거 없는 수치, 후기, 효과 보장 문구를 디자인 요소로 만들지 않는다.",
+      "Don't 같은 역할의 버튼을 페이지마다 다른 모서리 반경으로 만들지 않는다.",
+      "Don't 로드되지 않는 폰트에 의존하지 않는다."
+    ]
+  }
+}
