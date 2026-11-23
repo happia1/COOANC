@@ -191,13 +191,20 @@ components:
 **Character:** 단정한 산세리프가 정보를 맡고, 둥근 손글씨 Jua가 쿠앵크 특유의 친근함을 맡습니다. Pretendard Variable은 jsDelivr의 동적 서브셋 CSS로 로드합니다(모든 페이지의 `<head>`).
 
 ### Hierarchy
-- **Display** (700, clamp(34px, 4.3vw, 56px), 1.28, -0.045em): 홈 히어로 한 줄.
-- **Headline** (700, clamp(28px, 3.4vw, 42px), 1.35, -0.045em): 섹션 제목.
-- **Title** (700, 20px, -0.025em): 카드 제목.
-- **Body** (400, 17px 리드 / 15~16px 본문, 줄간격 1.85): 설명. 한글은 `word-break: keep-all`.
-- **Label** (700, 13px): 탭, 칩, 근거 수준 배지. 제목 위에 얹는 라벨(아이브로)은 쓰지 않습니다.
+모든 크기는 rem이며 `style.css`의 `:root` 토큰을 씁니다. 사용자의 글꼴 크기 설정과 브라우저 확대를 그대로 따릅니다(150%, 200%에서 가로 넘침 없음 확인). 모바일(390px) 기준 값은 괄호 안입니다.
+- **Display** (`--fs-display`, 700, clamp(1.75rem, 1.15rem + 2.9vw, 3.375rem), 1.25, -0.03em) (30px): 홈 히어로 한 줄.
+- **Headline 1** (`--fs-h1`, 700, clamp(1.75rem, 1.3rem + 2.2vw, 2.75rem), 1.3, -0.03em) (29px): 각 탭의 페이지 헤더 제목과 홈의 초점 섹션(미션 체험) 제목.
+- **Headline 2** (`--fs-h2`, 700, clamp(1.5rem, 1.25rem + 1.3vw, 2.25rem), 1.35, -0.03em) (25px): 섹션 제목.
+- **Title** (`--fs-h3`, 700, 1.25rem, 1.45) (20px): 카드 제목. 목록형 소제목은 1.125rem(18px).
+- **Lead** (`--fs-lead`, 1.0625rem, 1.75) (17px): 섹션 도입 문장.
+- **Body** (`--fs-body`, 400, 1rem, 1.75) (16px): 본문. 한글은 `word-break: keep-all`, 읽기 길이는 모바일에서 한 줄 약 20자, 데스크톱에서 `max-width: 52~56ch`.
+- **Small** (`--fs-small`, 0.875rem) (14px): 캡션, 노트, 폼 안내, 근거 설명.
+- **Label** (`--fs-label`, 700, 0.8125rem) (13px): 칩, 배지, 탭. 이보다 작은 글자는 앱 화면 목업(장식) 안에서만 씁니다.
+
+제목은 `text-wrap: balance`, 본문은 `text-wrap: pretty`입니다. 폴백 스택은 Pretendard Variable, Pretendard, Apple SD Gothic Neo, Noto Sans KR, Malgun Gothic 순입니다.
 
 ### Named Rules
+**The Role Scale Rule.** 글자 크기는 위 토큰 역할에서만 고른다. 새 크기가 필요하면 페이지에서 px를 쓰지 말고 역할을 먼저 정한다.
 **The Keep-All Rule.** 한글 줄바꿈은 어절 단위(`keep-all`)로 하고 제목은 `text-wrap: balance`를 쓴다.
 **The Jua Accent Rule.** Jua는 워드마크와 한두 줄의 포인트에만 쓴다. 본문과 정보 문장에 쓰지 않는다.
 

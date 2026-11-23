@@ -24,14 +24,14 @@
   /* 문의하기 목차 — 클릭하면 스크롤 이동, 현재 위치만 볼드+밑줄(가이드 페이지와 동일 패턴) */
   .toc{ display:flex; gap:20px; overflow-x:auto; padding:4px 0 6px; }
   .toc a{
-    flex:0 0 auto; font-size:13.5px; font-weight:600; color:var(--ink-soft);
+    flex:0 0 auto; font-size:0.875rem; font-weight:600; color:var(--ink-soft);
     padding-bottom:3px; border-bottom:2px solid transparent; white-space:nowrap;
   }
   .toc a.active{ font-weight:800; color:var(--ink); border-bottom-color:var(--brand); }
 
   .guide-block{ padding:36px 0; border-top:1px solid var(--line); scroll-margin-top:80px; }
   .guide-block:first-of-type{ border-top:none; }
-  .guide-block > h2{ font-size:22px; }
+  .guide-block > h2{ font-size:var(--fs-h2); }
 </style>
 <link rel="stylesheet" href="/site/css/guide.css?v=20261108-style">
 <link rel="stylesheet" href="/site/css/mobile-polish.css?v=20261109">
@@ -100,12 +100,12 @@
     <!-- ===== 협업 문의 ===== -->
     <div class="guide-block" id="inquiry"><span id="partner"></span>
       <h2>협업 · 문의</h2>
-      <p class="fade" style="font-size:14.5px; color:var(--ink-soft); margin-top:10px;">서비스 이용 문의, 오류 제보, 협업·제휴 제안 모두 환영해요.</p>
+      <p class="fade" style="font-size:0.9375rem; color:var(--ink-soft); margin-top:10px;">서비스 이용 문의, 오류 제보, 협업·제휴 제안 모두 환영해요.</p>
 
       <form class="fade" id="contactForm" style="margin-top:20px;">
         <div class="field">
           <label for="type">문의 유형</label>
-          <select style="width:100%; padding:13px 14px; border-radius:12px; border:1px solid var(--line); font-size:14.5px; background:#fff;" id="type" name="type">
+          <select style="width:100%; padding:13px 14px; border-radius:12px; border:1px solid var(--line); font-size:0.9375rem; background:#fff;" id="type" name="type">
             <option>서비스 이용 문의</option>
             <option>오류 제보</option>
             <option>협업 · 제휴 제안</option>
@@ -127,7 +127,7 @@
         </div>
         <p class="form-status" id="formStatus" role="status" aria-live="polite"></p>
         <button type="submit" class="btn btn-primary btn-block">메일 앱에서 문의하기</button>
-        <p style="font-size:12px; color:var(--ink-faint); margin-top:10px; text-align:center;">
+        <p style="font-size:0.8125rem; color:var(--ink-faint); margin-top:10px; text-align:center;">
           메일 초안이 열리면 내용을 확인한 뒤 메일 앱에서 직접 보내주세요. 이 페이지에서는 바로 전송되지 않아요.
         </p>
       </form>

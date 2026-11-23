@@ -10,15 +10,15 @@
  .site-guide .guide-block{padding-block:36px;}
  .site-guide .habit-intro{margin:16px 0 20px;}
  .site-guide .habit-grid>.habit-card{padding:20px;}
- .site-guide .habit-card p,.site-guide .habit-detail p,.site-guide .setup-step>p{font-size:16px;line-height:1.75;}
- .site-guide .habit-card h3{font-size:19px;line-height:1.5;}
+ .site-guide .habit-card p,.site-guide .habit-detail p,.site-guide .setup-step>p{font-size:1rem;line-height:1.75;}
+ .site-guide .habit-card h3{font-size:1.125rem;line-height:1.5;}
  .site-guide .habit-scenes{padding:14px;margin:18px 0;}
  .site-guide .setup-screen{height:auto;min-height:350px;}
  .site-guide .sample-field{min-height:40px;align-items:center;}
- .site-guide .habit-detail summary{font-size:15px;}
+ .site-guide .habit-detail summary{font-size:0.9375rem;}
  .hero-actions{grid-template-columns:1fr;}
  .site-home .hero-actions .btn{width:100%;}
- .site-features .tour-panel>p,.utility-steps li span{font-size:15px;line-height:1.8;}
+ .site-features .tour-panel>p,.utility-steps li span{font-size:0.9375rem;line-height:1.8;}
  .utility-with-capture{padding:0;gap:20px;}
  .utility-capture{max-width:340px;}
 }
