@@ -3,7 +3,7 @@
   /* ── 타이포 토큰 (rem: 사용자 글꼴 크기 설정과 브라우저 확대를 따릅니다) ──
      제목은 모바일 기준에서 시작해 화면이 커질수록 자랍니다. 본문 역할은 고정입니다. */
   --font-sans:'Pretendard Variable','Pretendard','Apple SD Gothic Neo','Noto Sans KR','Malgun Gothic',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
-  --fs-display:clamp(1.75rem,1.15rem + 2.9vw,3.375rem);
+  --fs-display:clamp(1.75rem,1.15rem + 2.9vw,2.625rem);
   --fs-h1:clamp(1.75rem,1.3rem + 2.2vw,2.75rem);
   --fs-h2:clamp(1.5rem,1.25rem + 1.3vw,2.25rem);
   --fs-h3:1.25rem;
@@ -680,14 +680,16 @@ img.pv-icon{ width:22px; height:22px; object-fit:contain; vertical-align:-5px; m
 .skip-link:focus{ transform:none; }
 .ico{ width:18px; height:18px; flex:0 0 auto; vertical-align:-3px; }
 :focus-visible{ outline:3px solid #454fc3; outline-offset:3px; }
-.page-head{ background:#eef5f6; padding:44px 0 40px; }
-.page-head .wrap{ display:flex; align-items:center; justify-content:space-between; gap:32px; max-width:1080px; }
+.page-head{ background:#eef5f6; padding:36px 0 36px; }
+.page-head .wrap{ display:grid; gap:28px; align-items:center; max-width:1080px; }
 .page-head h1{ font-size:var(--fs-h1); line-height:1.25; letter-spacing:-.03em; text-wrap:balance; max-width:20ch; }
 .page-head p{ margin-top:14px; font-size:1.0625rem; line-height:1.75; color:#536176; max-width:52ch; }
 .page-head-actions{ display:flex; flex-wrap:wrap; gap:12px; margin-top:24px; }
 .page-head .toc{ margin-top:22px; }
-.page-head-art{ display:none; width:450px; height:170px; object-fit:cover; object-position:right center; border-radius:20px; flex:0 0 auto; }
-@media (min-width:900px){ .page-head{ padding:56px 0 52px; } .page-head-art{ display:block; } }
+.page-head-art{ display:block; width:100%; height:auto; border-radius:20px; }
+@media (min-width:480px) and (max-width:719px){ .page-head-art{ max-width:420px; margin-inline:auto; } }
+@media (min-width:720px){ .page-head .wrap{ grid-template-columns:minmax(0,1fr) minmax(0,360px); gap:36px; } }
+@media (min-width:900px){ .page-head{ padding:52px 0; } .page-head .wrap{ grid-template-columns:minmax(0,1fr) minmax(0,480px); gap:48px; } }
 @media (max-width:639px){ .page-head{ padding:32px 0 28px; } .page-head p{ font-size:1rem; } .page-head-actions{ display:grid; grid-template-columns:1fr 1fr; gap:10px; } .page-head-actions .btn{ padding-inline:10px; } }
 .about-section{ padding:64px 0; }
 .about-grid{ display:grid; gap:36px; align-items:start; }

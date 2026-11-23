@@ -33,16 +33,15 @@
 .text-link { display:inline-flex; align-items:center; gap:8px; min-height:44px; font-size:0.9375rem; font-weight:700; color:var(--indigo-deep); text-decoration:underline; }
 
 /* ── 히어로 ── */
-.home-hero { background:#eef5f6; position:relative; isolation:isolate; overflow:hidden; padding:48px 0; }
-.hero-grid { display:flex; align-items:center; min-height:344px; position:relative; }
+.home-hero { background:#eef5f6; padding:48px 0; }
+.hero-grid { display:grid; gap:28px; align-items:center; }
 .hero-copy { max-width:620px; position:relative; }
 .hero-copy em { color:var(--indigo); font-style:normal; }
+.hl { display:block; text-wrap:balance; }
 .hero-copy>p { font-size:1.125rem; color:var(--slate); margin-top:20px; }
 .hero-copy>small { display:block; margin-top:16px; font-size:0.875rem; color:var(--slate); max-width:46ch; line-height:1.6; }
 .hero-actions { display:flex; flex-wrap:wrap; gap:12px; margin-top:28px; }
-.hero-art { position:absolute; inset:0 0 0 42%; z-index:-2; }
-.hero-art img { width:100%; height:100%; object-fit:cover; object-position:70% 50%; }
-.home-hero::after { content:''; position:absolute; inset:0; z-index:-1; background:linear-gradient(90deg,#eef5f6 0%,#eef5f6f5 30%,#eef5f6c8 46%,#eef5f600 72%); }
+.hero-art img { display:block; width:100%; height:auto; border-radius:20px; }
 
 /* ── 미션 체험 ── */
 .demo-section { padding:56px 0 var(--sec-focal); }
@@ -188,6 +187,8 @@
  .how-steps img { aspect-ratio:3/4; }
 }
 @media(min-width:900px) {
+ .hero-grid { gap:48px; }
+ .hero-art img { border-radius:24px; }
  .demo-grid { grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:56px; }
  .demo-device { background:#1F2937; padding:12px; border-radius:32px; box-shadow:0 28px 50px -24px rgba(20,30,45,.4); }
  .demo-device .demo-panel { border-radius:22px; padding:20px; }
@@ -199,13 +200,10 @@
  .story-grid { grid-template-columns:minmax(0,1fr) minmax(0,1.1fr); gap:56px; }
 }
 @media(max-width:1023px) { .site-home .nav-cta { display:none; } }
+@media(min-width:480px) and (max-width:719px) { .hero-art { max-width:420px; margin-inline:auto; } }
+@media(min-width:720px) { .hero-grid { grid-template-columns:minmax(0,1.05fr) minmax(0,.95fr); gap:36px; } }
 @media(max-width:899px) {
- .hero-grid { min-height:0; flex-direction:column; align-items:stretch; }
- .hero-art { position:static; order:2; margin-inline:-22px; height:170px; }
- .hero-art img { object-position:72% 42%; }
- .home-hero::after { display:none; }
- .home-hero { padding:32px 0 0; }
- .hero-copy { padding-bottom:20px; }
+ .home-hero { padding:32px 0 36px; }
 }
 @media(max-width:639px) {
  .site-home .wrap { padding-inline:22px; }
