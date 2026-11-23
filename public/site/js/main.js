@@ -158,11 +158,19 @@ document.querySelectorAll('[data-pv-carousel]').forEach(root=>{
 document.querySelectorAll('[data-copy-email]').forEach(button=>{
   button.addEventListener('click', async ()=>{
     const status = document.getElementById('emailCopyStatus');
+    const text = button.dataset.copyEmail;
     try {
-      await navigator.clipboard.writeText(button.dataset.copyEmail);
+      await navigator.clipboard.writeText(text);
       status.textContent = '이메일 주소를 복사했어요.';
     } catch {
-      status.textContent = '복사하지 못했어요. 위 이메일 주소를 직접 선택해 복사해주세요.';
+      // 클립보드 API를 못 쓰는 환경(비보안 연결, 일부 인앱 브라우저)을 위한 대체 복사
+      const ta = document.createElement('textarea');
+      ta.value = text; ta.setAttribute('readonly', ''); ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0';
+      document.body.appendChild(ta); ta.select();
+      let ok = false;
+      try { ok = document.execCommand('copy'); } catch {}
+      ta.remove();
+      status.textContent = ok ? '이메일 주소를 복사했어요.' : '복사하지 못했어요. 위 이메일 주소를 직접 선택해 복사해주세요.';
     }
   });
 });

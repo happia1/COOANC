@@ -84,6 +84,8 @@
 .demo-note { margin-top:4px; font-size:13px; line-height:1.6; color:var(--slate); }
 
 /* 앱 팝업 재현 — 앱의 MissionHonestyBlockedModal / RapidTapConfirmModal 구조 그대로 */
+.honesty-dialog:not([open]) { display:none; }
+.honesty-dialog[data-fallback] { position:fixed; inset:0; z-index:300; height:fit-content; box-shadow:0 0 0 100vmax rgba(0,0,0,.6); }
 .honesty-dialog { border:0; padding:32px 24px 24px; border-radius:24px; width:min(320px,calc(100% - 32px)); text-align:center; background:#fff; color:#111827; box-shadow:0 24px 60px -12px rgba(0,0,0,.5); margin:auto; }
 .honesty-dialog[open] { display:flex; flex-direction:column; align-items:center; animation:dlg-in .22s cubic-bezier(.22,1,.36,1); }
 .honesty-dialog::backdrop { background:rgba(0,0,0,.6); }
@@ -173,7 +175,7 @@
 .home-start .btn { margin-top:28px; }
 .start-links { display:flex; gap:24px; justify-content:center; flex-wrap:wrap; margin-top:18px; }
 .start-links a { display:inline-flex; min-height:44px; align-items:center; color:var(--indigo-deep); font-size:15px; font-weight:600; text-decoration:underline; }
-.site-home .site-footer h3 { font-size:14px; margin-bottom:16px; }
+.site-home .site-footer .footer-title { font-size:14px; margin-bottom:16px; }
 
 @media(min-width:720px) and (max-width:899px) {
  .demo-device { max-width:560px; margin-inline:auto; width:100%; }

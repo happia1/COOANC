@@ -715,3 +715,13 @@ img.pv-icon{ width:22px; height:22px; object-fit:contain; vertical-align:-5px; m
 .nav-mobile a:not(.btn){ display:flex; align-items:center; min-height:48px; padding-block:0; }
 .footer-grid a{ display:flex; align-items:center; min-height:44px; padding-block:0; }
 .toc a{ display:inline-flex; align-items:center; min-height:44px; }
+
+/* 하드닝: 푸터 제목, 폼 상태, 작은 링크 터치 영역 */
+.footer-title{ font-size:13px; font-weight:700; color:var(--ink-faint); margin-bottom:10px; }
+.field-hint{ margin-top:6px; font-size:13px; color:var(--ink-soft); }
+.form-status{ min-height:24px; margin:4px 0 12px; font-size:14px; line-height:1.6; color:var(--ink-soft); }
+.form-status.is-error{ color:#b3261e; font-weight:600; }
+[aria-invalid="true"]{ border-color:#b3261e !important; outline-color:#b3261e; }
+.contact-fallback>a{ display:flex; align-items:center; justify-content:center; min-height:44px; }
+.free-note a{ display:inline-flex; align-items:center; min-height:44px; padding-inline:4px; }
+.feature-preview figcaption a,.install-capture figcaption a{ display:inline-flex; align-items:center; min-height:44px; }

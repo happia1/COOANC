@@ -9,18 +9,35 @@
   const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   let lastTrigger = null;
 
+  // <dialog>를 못 쓰는 오래된 브라우저(예: Safari 15.4 미만)에서도 팝업이 뜨도록 대체 동작을 둡니다.
+  const supportsModal = typeof HTMLDialogElement === 'function' && dlgPm && typeof dlgPm.showModal === 'function';
+  const isOpen = dlg => !!dlg && dlg.hasAttribute('open');
+  let fallbackOpen = null;
+  function onFallbackKey(e) { if (e.key === 'Escape' && fallbackOpen) closeDialog(fallbackOpen); }
+
   function openDialog(dlg, trigger) {
-    if (!dlg || typeof dlg.showModal !== 'function' || dlg.open) return;
+    if (!dlg || isOpen(dlg)) return;
     lastTrigger = trigger || document.activeElement;
-    dlg.showModal();
+    if (supportsModal) { dlg.showModal(); return; }
+    dlg.setAttribute('open', '');
+    dlg.dataset.fallback = '1';
+    fallbackOpen = dlg;
+    document.addEventListener('keydown', onFallbackKey);
+    const first = dlg.querySelector('button');
+    if (first) first.focus();
   }
   function closeDialog(dlg) {
-    if (dlg && dlg.open) dlg.close();
+    if (!isOpen(dlg)) return;
+    if (supportsModal) { dlg.close(); return; }
+    dlg.removeAttribute('open');
+    fallbackOpen = null;
+    document.removeEventListener('keydown', onFallbackKey);
+    dlg.dispatchEvent(new Event('close'));
   }
   [dlgPm, dlgRapid].forEach(dlg => {
     if (!dlg) return;
     // 바깥(배경) 클릭으로 닫기
-    dlg.addEventListener('click', e => { if (e.target === dlg) dlg.close(); });
+    dlg.addEventListener('click', e => { if (e.target === dlg) closeDialog(dlg); });
     dlg.addEventListener('close', () => {
       if (lastTrigger && document.contains(lastTrigger)) lastTrigger.focus({ preventScroll: true });
     });

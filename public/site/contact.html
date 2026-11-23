@@ -105,7 +105,7 @@
       <form class="fade" id="contactForm" style="margin-top:20px;">
         <div class="field">
           <label for="type">문의 유형</label>
-          <select style="width:100%; padding:13px 14px; border-radius:12px; border:1px solid var(--line); font-size:14.5px; background:#fff;" id="type">
+          <select style="width:100%; padding:13px 14px; border-radius:12px; border:1px solid var(--line); font-size:14.5px; background:#fff;" id="type" name="type">
             <option>서비스 이용 문의</option>
             <option>오류 제보</option>
             <option>협업 · 제휴 제안</option>
@@ -114,16 +114,18 @@
         </div>
         <div class="field">
           <label for="name">이름</label>
-          <input type="text" id="name" placeholder="이름을 입력해주세요" required>
+          <input type="text" id="name" name="name" autocomplete="name" maxlength="60" placeholder="이름을 입력해주세요" required>
         </div>
         <div class="field">
           <label for="email">이메일</label>
-          <input type="email" id="email" placeholder="답장받을 이메일을 입력해주세요" required>
+          <input type="email" id="email" name="email" autocomplete="email" inputmode="email" maxlength="100" placeholder="답장받을 이메일을 입력해주세요" required>
         </div>
         <div class="field">
           <label for="message">내용</label>
-          <textarea id="message" placeholder="문의 내용을 자유롭게 남겨주세요" required></textarea>
+          <textarea id="message" name="message" maxlength="700" aria-describedby="messageHint" placeholder="문의 내용을 자유롭게 남겨주세요" required></textarea>
+          <p class="field-hint" id="messageHint">최대 700자까지 쓸 수 있어요. 300자가 넘으면 메일 앱 대신 복사해서 보내도록 안내해요.</p>
         </div>
+        <p class="form-status" id="formStatus" role="status" aria-live="polite"></p>
         <button type="submit" class="btn btn-primary btn-block">메일 앱에서 문의하기</button>
         <p style="font-size:12px; color:var(--ink-faint); margin-top:10px; text-align:center;">
           메일 초안이 열리면 내용을 확인한 뒤 메일 앱에서 직접 보내주세요. 이 페이지에서는 바로 전송되지 않아요.
@@ -138,25 +140,51 @@
 <footer class="site-footer">
   <div class="wrap footer-grid">
     <div class="footer-brand"><img src="/site/assets/logo-icon.webp" class="footer-logo" alt="COOANC" width="52" height="52" loading="lazy"><p>잔소리는 줄이고, 웃음은 늘리는 쿠앵크입니다.<br>아이가 스스로 만드는 하루를 응원해요.</p></div>
-    <div><h4>바로가기</h4><a href="/site/index.html">홈</a><a href="/site/features.html">서비스 소개</a><a href="/site/guide.html">사용가이드</a><a href="/site/about.html">이야기</a><a href="/site/contact.html">문의하기</a></div>
-    <div><h4>연결</h4><a href="/site/about.html">만든 사람 이야기</a><a href="/site/about.html#blog">블로그</a><a href="/site/contact.html#inquiry">이메일 문의</a></div>
+    <div><p class="footer-title">바로가기</p><a href="/site/index.html">홈</a><a href="/site/features.html">서비스 소개</a><a href="/site/guide.html">사용가이드</a><a href="/site/about.html">이야기</a><a href="/site/contact.html">문의하기</a></div>
+    <div><p class="footer-title">연결</p><a href="/site/about.html">만든 사람 이야기</a><a href="/site/about.html#blog">블로그</a><a href="/site/contact.html#inquiry">이메일 문의</a></div>
   </div>
   <div class="wrap copyright">© 2026 COOANC. All rights reserved.</div>
 </footer>
 
 <script src="/site/js/main.js?v=20261109-visible"></script>
 <script>
-  document.getElementById('contactForm').addEventListener('submit', function(e){
-    e.preventDefault();
-    const type = document.getElementById('type').value;
-    const name = document.getElementById('name').value;
-    const email = document.getElementById('email').value;
-    const message = document.getElementById('message').value;
+  (function () {
+    const form = document.getElementById('contactForm');
+    if (!form) return;
+    const status = document.getElementById('formStatus');
     const CONTACT_EMAIL = 'theotter@naver.com';
-    const subject = encodeURIComponent(`[쿠앵크 문의 - ${type}] ${name}`);
-    const body = encodeURIComponent(`이름: ${name}\n이메일: ${email}\n유형: ${type}\n\n${message}`);
-    window.location.href = `mailto:${CONTACT_EMAIL}?subject=${subject}&body=${body}`;
-  });
+    const MAX_MAILTO = 4000; // 메일 앱마다 mailto 길이 한계가 달라(한글은 글자당 약 9자로 늘어남), 넘으면 복사 안내로 바꿉니다.
+    const say = (msg, error) => { status.textContent = msg; status.classList.toggle('is-error', !!error); };
+    const invalid = (el, msg) => { el.setAttribute('aria-invalid', 'true'); say(msg, true); el.focus(); };
+    form.addEventListener('input', e => { e.target.removeAttribute('aria-invalid'); say(''); });
+    form.addEventListener('submit', async function (e) {
+      e.preventDefault();
+      say('');
+      const type = document.getElementById('type').value;
+      const nameEl = document.getElementById('name');
+      const emailEl = document.getElementById('email');
+      const msgEl = document.getElementById('message');
+      const name = nameEl.value.trim();
+      const email = emailEl.value.trim();
+      const message = msgEl.value.trim();
+      if (!name) return invalid(nameEl, '이름을 입력해주세요.');
+      if (!email || !emailEl.checkValidity()) return invalid(emailEl, '답장받을 이메일 주소를 확인해주세요. 예: name@example.com');
+      if (!message) return invalid(msgEl, '문의 내용을 입력해주세요.');
+      const text = `이름: ${name}\n이메일: ${email}\n유형: ${type}\n\n${message}`;
+      const subject = encodeURIComponent(`[쿠앵크 문의 - ${type}] ${name}`.replace(/[\r\n]+/g, ' '));
+      const url = `mailto:${CONTACT_EMAIL}?subject=${subject}&body=${encodeURIComponent(text)}`;
+      if (url.length > MAX_MAILTO) {
+        let copied = false;
+        try { await navigator.clipboard.writeText(text); copied = true; } catch (err) {}
+        say(copied
+          ? '내용이 길어 메일 앱으로 한 번에 넘기기 어려워요. 내용을 복사해 두었으니 아래 주소로 붙여 넣어 보내주세요.'
+          : '내용이 길어 메일 앱으로 한 번에 넘기기 어려워요. 내용을 줄이거나 아래 주소로 직접 보내주세요.', true);
+        return;
+      }
+      window.location.href = url;
+      say('메일 앱을 열었어요. 열리지 않으면 아래 주소로 직접 보내주세요.');
+    });
+  })();
 </script>
 </body>
 </html>
