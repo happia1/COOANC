@@ -163,4 +163,45 @@
       track.scrollTo({ left: slides[k].offsetLeft - track.offsetLeft, behavior });
     }));
   }
+
+  /* ───────── 금융역량 관련자료: 한 줄로 천천히 흐르는 카드 ─────────
+     마우스를 올리거나 손가락으로 만지거나 키보드로 들어오면 멈추고, 직접 넘겨 볼 수 있습니다.
+     모션 줄이기 설정에서는 흐르지 않고 직접 넘기기만 합니다. */
+  const flow = document.querySelector('[data-flow-track]');
+  if (flow) {
+    const set = flow.querySelector('.flow-set');
+    if (!reduced && set) {
+      const clone = set.cloneNode(true);
+      clone.setAttribute('aria-hidden', 'true');
+      clone.querySelectorAll('a').forEach(a => { a.tabIndex = -1; });
+      flow.appendChild(clone);
+      const gap = parseFloat(getComputedStyle(flow).columnGap) || 12;
+      const SPEED = 22; // px/초
+      let pos = 0, last = 0, held = false, visible = false, resumeTimer = null;
+      const hold = () => { held = true; clearTimeout(resumeTimer); };
+      const release = (delay) => { clearTimeout(resumeTimer); resumeTimer = setTimeout(() => { pos = flow.scrollLeft; held = false; }, delay); };
+      flow.addEventListener('mouseenter', hold);
+      flow.addEventListener('mouseleave', () => release(300));
+      flow.addEventListener('focusin', hold);
+      flow.addEventListener('focusout', () => release(300));
+      flow.addEventListener('touchstart', hold, { passive: true });
+      flow.addEventListener('touchend', () => release(2500), { passive: true });
+      flow.addEventListener('wheel', () => { hold(); release(2500); }, { passive: true });
+      if ('IntersectionObserver' in window) {
+        new IntersectionObserver(es => { visible = es[0].isIntersecting; }).observe(flow);
+      } else { visible = true; }
+      function tick(ts) {
+        const dt = last ? Math.min(0.1, (ts - last) / 1000) : 0;
+        last = ts;
+        if (!held && visible && !document.hidden) {
+          pos += SPEED * dt;
+          const loop = set.offsetWidth + gap;
+          if (pos >= loop) pos -= loop;
+          flow.scrollLeft = pos;
+        }
+        requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+    }
+  }
 })();
