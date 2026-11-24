@@ -343,7 +343,7 @@
 
 /* 공감: 한 줄 말 + 펼치는 부연 설명 */
 .reward-section { background:#fffefb; }
-.video-section { background:#f3f5fb; }
+.video-section { background:#fffefb; }
 
 .empathy-section { padding-bottom:64px; }
 .demo-status:empty { min-height:0; }
@@ -380,3 +380,7 @@
 .flow-more { display:inline-flex; align-items:center; gap:4px; min-height:44px; margin-top:4px; color:var(--indigo-deep); font-size:.875rem; font-weight:600; text-decoration:underline; }
 .flow-more .ico { width:14px; height:14px; }
 @media(max-width:699px) { .flow-section { padding-block:var(--sec-m); } }
+
+.demo-section { background:#fdf1ea; }
+.site-home .home-hero h1 { font-size:clamp(2.375rem,1.7rem + 3.6vw,3.75rem); line-height:1.18; letter-spacing:-.035em; }
+.hero-copy>p { font-weight:600; }
