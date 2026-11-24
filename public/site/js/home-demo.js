@@ -216,6 +216,35 @@
   const ev = document.querySelector('[data-ev-track]');
   if (ev) bindRail(ev, document.querySelector('[data-ev-prev]'), document.querySelector('[data-ev-next]'));
 
+  /* ───────── 홈 요약 플레이어: 장면을 순서대로 보여 줍니다 ───────── */
+  document.querySelectorAll('[data-flow]').forEach(fp => {
+    const scenes = [...fp.querySelectorAll('[data-scene]')];
+    const dots = [...fp.querySelectorAll('[data-flow-dot]')];
+    const cap = fp.querySelector('[data-flow-caption]');
+    const RATE = 2.2, STEP = 4600;
+    let i = 0, timer = null;
+    function show(n) {
+      i = n;
+      scenes.forEach((s, k) => {
+        const on = k === n;
+        s.classList.toggle('is-active', on);
+        s.setAttribute('aria-hidden', String(!on));
+        s.getAnimations({ subtree: true }).forEach(a => {
+          if (on) { a.currentTime = 0; a.playbackRate = RATE; a.play(); } else { a.pause(); }
+        });
+      });
+      dots.forEach((d, k) => d.setAttribute('aria-selected', String(k === n)));
+      if (cap) cap.textContent = scenes[n].dataset.caption || '';
+    }
+    const stop = () => { clearInterval(timer); timer = null; };
+    const start = () => { stop(); if (!reduced) timer = setInterval(() => show((i + 1) % scenes.length), STEP); };
+    dots.forEach((d, k) => d.addEventListener('click', () => { show(k); if (timer) start(); }));
+    show(0);
+    if (!reduced && 'IntersectionObserver' in window) {
+      new IntersectionObserver(es => { if (es[0].isIntersecting && !document.hidden) start(); else stop(); }).observe(fp);
+    } else if (!reduced) { start(); }
+  });
+
   /* ───────── 12시 전 오후 카드 시연: 화면에 보일 때만 재생 ───────── */
   document.querySelectorAll('[data-sim]').forEach(sim => {
     if ('IntersectionObserver' in window) {
