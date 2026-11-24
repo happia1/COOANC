@@ -274,6 +274,55 @@
     } else if (!reduced) { start(); }
   });
 
+  /* ───────── 단계 카드 줄: 좌우로 넘기고, 보이는 카드의 애니메이션만 처음부터 재생 ───────── */
+  document.querySelectorAll('[data-cardrail]').forEach(rail => {
+    const track = rail.querySelector('[data-ct]');
+    const prev = rail.querySelector('[data-ct-prev]');
+    const next = rail.querySelector('[data-ct-next]');
+    const upd = () => {
+      prev.disabled = track.scrollLeft <= 2;
+      next.disabled = track.scrollLeft + track.clientWidth >= track.scrollWidth - 2;
+    };
+    prev.addEventListener('click', () => track.scrollBy({ left: -track.clientWidth * 0.8, behavior }));
+    next.addEventListener('click', () => track.scrollBy({ left: track.clientWidth * 0.8, behavior }));
+    track.addEventListener('scroll', () => requestAnimationFrame(upd), { passive: true });
+    window.addEventListener('resize', upd);
+    upd();
+    // 도식 크기 맞추기
+    const fit = () => track.querySelectorAll('.step-scale').forEach(box => {
+      const w = box.clientWidth;
+      if (!w) return;
+      const k = Math.min(1, w / 346);
+      box.style.setProperty('--k', k.toFixed(4));
+      box.style.setProperty('--x', Math.max(0, (w - 346 * k) / 2).toFixed(1) + 'px');
+    });
+    fit();
+    window.addEventListener('resize', fit);
+    if ('ResizeObserver' in window) new ResizeObserver(fit).observe(track);
+    const sims = [...track.querySelectorAll('[data-step-sim]')];
+    if (!sims.length) return;
+    const RATES = [2.2, 2.2, 2.2, 1.8, 1.8, 2.2];
+    const anims = el => el.getAnimations({ subtree: true }).filter(a => 'animationName' in a);
+    const inCard = new Set();
+    let railVisible = false;
+    const apply = () => sims.forEach((s, k) => {
+      const on = railVisible && inCard.has(s) && !document.hidden;
+      if (on && !s.dataset.playing) {
+        s.dataset.playing = '1';
+        anims(s).forEach(a => { a.currentTime = 0; a.playbackRate = RATES[k] || 2.2; a.play(); });
+      } else if (!on && s.dataset.playing) {
+        delete s.dataset.playing;
+        anims(s).forEach(a => a.pause());
+      }
+    });
+    sims.forEach(s => anims(s).forEach(a => a.pause()));
+    if ('IntersectionObserver' in window) {
+      const io = new IntersectionObserver(es => { es.forEach(e => { if (e.isIntersecting) inCard.add(e.target); else inCard.delete(e.target); }); apply(); }, { root: track, threshold: 0.6 });
+      sims.forEach(s => io.observe(s));
+      new IntersectionObserver(es => { railVisible = es[0].isIntersecting; apply(); }).observe(rail);
+    } else { railVisible = true; sims.forEach(s => inCard.add(s)); apply(); }
+  });
+
   /* ───────── 12시 전 오후 카드 시연: 화면에 보일 때만 재생 ───────── */
   document.querySelectorAll('[data-sim]').forEach(sim => {
     if ('IntersectionObserver' in window) {
