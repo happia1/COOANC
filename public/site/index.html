@@ -20,8 +20,8 @@
 <meta name="theme-color" content="#515CD6">
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
-<link rel="stylesheet" href="/site/css/style.css?v=20261124-23">
-<link rel="stylesheet" href="/site/css/home.css?v=20261124-23">
+<link rel="stylesheet" href="/site/css/style.css?v=20261124-24">
+<link rel="stylesheet" href="/site/css/home.css?v=20261124-24">
 </head>
 <body class="site-home">
 <a class="skip-link" href="#main">본문 바로가기</a>
@@ -69,13 +69,14 @@
 
 <section class="empathy-section" aria-labelledby="empathy-title">
   <div class="wrap">
-    <span class="eyebrow">어느 집에나 있는 하루</span>
     <h2 id="empathy-title">어려운 말도 아닌데,<br>오늘도 몇 번이나 말했나요?</h2>
     <div class="everyday-scenes">
-      <article><img src="/site/assets/app/wake.webp" alt="" width="120" height="120" loading="lazy"><p>“이제 일어나야지.”</p><span>등원 준비부터</span></article>
-      <article><img src="/site/assets/app/gargle.webp" alt="" width="120" height="120" loading="lazy"><p>“씻고 와야지.”</p><span>매일 하는 작은 일까지</span></article>
-      <article><img src="/site/assets/app/comb-hair.webp" alt="" width="120" height="120" loading="lazy"><p>“준비 다 했니?”</p><span>같은 말을 또 한 번</span></article>
+      <article><img src="/site/assets/app/comb-hair.webp" alt="" width="120" height="120" loading="lazy"><p>“준비 다 했니?”</p></article>
     </div>
+    <details class="why-more">
+      <summary>같은 말, 왜 점점 힘들까요?</summary>
+      <div><p>같은 말을 매일 하다 보면 말하는 사람도 지치기 쉬워요. 아이에게도 같은 말이 계속 들리면, 의미 있는 말보다 귀에 익은 소리처럼 흘려듣게 될 수 있어요.</p></div>
+    </details>
     <p class="section-lead">시키는 말보다, 해낸 순간을 함께해요.</p>
   </div>
 </section>
@@ -83,7 +84,7 @@
 <section class="demo-section" id="try" aria-labelledby="try-title">
   <div class="wrap demo-grid">
     <div class="demo-copy">
-      <h2 id="try-title"><span class="nb">이제, 잔소리 대신</span> <span class="nb">쿠앵크를 켜세요</span></h2>
+      <h2 id="try-title"><span class="nb">이제, 잔소리 대신</span> <span class="nb"><span class="brandword"><i class="bw-1">쿠</i><i class="bw-2">앵</i><i class="bw-3">크</i></span>를 켜세요!</span></h2>
       <p class="section-lead">오늘의 미션 카드를 옆으로 넘기고, 해낸 카드를 눌러 보세요.</p>
     </div>
 
@@ -95,17 +96,20 @@
         <img class="tablet-character" src="/site/assets/app/bunny-front.webp" alt="" width="243" height="537">
         <img class="tablet-piggy" src="/site/assets/icons/rewards/piggy_bank14.webp" alt="" width="141" height="149">
         <img class="tablet-plant" src="/site/assets/icons/plant/4.webp" alt="" width="337" height="465">
-        <div class="tablet-legend" aria-label="카드 색 안내"><span><i class="lg lg-am"></i>분홍 오전</span><span><i class="lg lg-pm"></i>파랑 오후</span></div>
         <div class="tablet-icons"><img src="/site/assets/icons/ui/icon-gift.webp" alt="" width="40" height="40"><img src="/site/assets/icons/ui/icon-chest.webp" alt="" width="40" height="40"><img src="/site/assets/icons/ui/icon-basket.webp" alt="" width="40" height="40"></div>
         <div class="tablet-missions">
           <div class="tablet-missions-head">
             <strong>오늘의 미션</strong><span class="demo-count" data-demo-count>0 / 5</span>
-            <div class="demo-arrows"><button type="button" data-rail-prev aria-label="이전 미션 카드"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button><button type="button" data-rail-next aria-label="다음 미션 카드"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div>
           </div>
-          <div class="demo-rail" data-demo-rail tabindex="0" aria-label="오늘의 미션 카드, 옆으로 넘겨 보세요"><button class="demo-card" type="button" data-mission="일어나기" aria-label="일어나기 완료하기, 크레딧 10과 하트 1 받기"><img class="demo-finger" data-demo-finger src="/site/assets/app/finger-down.webp" alt="" aria-hidden="true" width="120" height="169"><img src="/site/assets/app/wake.webp" alt="" width="384" height="384" loading="lazy"><span class="demo-name">일어나기</span><span class="demo-reward"><i><img src="/site/assets/app/coin.webp" alt="" width="20" height="20">10</i><i><img src="/site/assets/app/heart.webp" alt="" width="20" height="20">1</i></span></button><button class="demo-card" type="button" data-mission="아침 먹기" aria-label="아침 먹기 완료하기, 크레딧 10과 하트 1 받기"><img src="/site/assets/app/breakfast.webp" alt="" width="384" height="384" loading="lazy"><span class="demo-name">아침 먹기</span><span class="demo-reward"><i><img src="/site/assets/app/coin.webp" alt="" width="20" height="20">10</i><i><img src="/site/assets/app/heart.webp" alt="" width="20" height="20">1</i></span></button><button class="demo-card" type="button" data-mission="가글하기" aria-label="가글하기 완료하기, 크레딧 10과 하트 1 받기"><img src="/site/assets/app/gargle.webp" alt="" width="384" height="384" loading="lazy"><span class="demo-name">가글하기</span><span class="demo-reward"><i><img src="/site/assets/app/coin.webp" alt="" width="20" height="20">10</i><i><img src="/site/assets/app/heart.webp" alt="" width="20" height="20">1</i></span></button><button class="demo-card" type="button" data-mission="머리 빗기" aria-label="머리 빗기 완료하기, 크레딧 10과 하트 1 받기"><img src="/site/assets/app/comb-hair.webp" alt="" width="384" height="384" loading="lazy"><span class="demo-name">머리 빗기</span><span class="demo-reward"><i><img src="/site/assets/app/coin.webp" alt="" width="20" height="20">10</i><i><img src="/site/assets/app/heart.webp" alt="" width="20" height="20">1</i></span></button><button class="demo-card" type="button" data-mission="세수하기" aria-label="세수하기 완료하기, 크레딧 10과 하트 1 받기"><img src="/site/assets/app/wash-face.webp" alt="" width="384" height="384" loading="lazy"><span class="demo-name">세수하기</span><span class="demo-reward"><i><img src="/site/assets/app/coin.webp" alt="" width="20" height="20">10</i><i><img src="/site/assets/app/heart.webp" alt="" width="20" height="20">1</i></span></button><span class="demo-divider" role="separator" aria-hidden="true"></span><button class="demo-card is-pm" type="button" data-block="pm" aria-label="그릇 치우기, 오후 미션"><span class="demo-badge">오후</span><img src="/site/assets/app/clear-dishes.webp" alt="" width="384" height="384" loading="lazy"><span class="demo-name">그릇 치우기</span><span class="demo-reward"><i><img src="/site/assets/app/coin.webp" alt="" width="20" height="20">10</i><i><img src="/site/assets/app/heart.webp" alt="" width="20" height="20">1</i></span></button></div>
+          <div class="demo-rail-wrap">
+          <div class="demo-hint" data-demo-hint aria-hidden="true"><p class="demo-tip">카드를 눌러보세요!<small>분홍은 오전, 파랑은 오후에 하는 카드예요</small></p><img class="demo-finger" src="/site/assets/app/finger-down.webp" alt="" width="120" height="169"></div>
+          <button type="button" class="demo-nav demo-nav-prev" data-rail-prev aria-label="이전 미션 카드"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button><button type="button" class="demo-nav demo-nav-next" data-rail-next aria-label="다음 미션 카드"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          <div class="demo-rail" data-demo-rail tabindex="0" aria-label="오늘의 미션 카드, 옆으로 넘겨 보세요"><button class="demo-card" type="button" data-mission="일어나기" aria-label="일어나기 완료하기, 크레딧 10과 하트 1 받기"><img src="/site/assets/app/wake.webp" alt="" width="384" height="384" loading="lazy"><span class="demo-name">일어나기</span><span class="demo-reward"><i><img src="/site/assets/app/coin.webp" alt="" width="20" height="20">10</i><i><img src="/site/assets/app/heart.webp" alt="" width="20" height="20">1</i></span></button><button class="demo-card" type="button" data-mission="아침 먹기" aria-label="아침 먹기 완료하기, 크레딧 10과 하트 1 받기"><img src="/site/assets/app/breakfast.webp" alt="" width="384" height="384" loading="lazy"><span class="demo-name">아침 먹기</span><span class="demo-reward"><i><img src="/site/assets/app/coin.webp" alt="" width="20" height="20">10</i><i><img src="/site/assets/app/heart.webp" alt="" width="20" height="20">1</i></span></button><button class="demo-card" type="button" data-mission="가글하기" aria-label="가글하기 완료하기, 크레딧 10과 하트 1 받기"><img src="/site/assets/app/gargle.webp" alt="" width="384" height="384" loading="lazy"><span class="demo-name">가글하기</span><span class="demo-reward"><i><img src="/site/assets/app/coin.webp" alt="" width="20" height="20">10</i><i><img src="/site/assets/app/heart.webp" alt="" width="20" height="20">1</i></span></button><button class="demo-card" type="button" data-mission="머리 빗기" aria-label="머리 빗기 완료하기, 크레딧 10과 하트 1 받기"><img src="/site/assets/app/comb-hair.webp" alt="" width="384" height="384" loading="lazy"><span class="demo-name">머리 빗기</span><span class="demo-reward"><i><img src="/site/assets/app/coin.webp" alt="" width="20" height="20">10</i><i><img src="/site/assets/app/heart.webp" alt="" width="20" height="20">1</i></span></button><button class="demo-card" type="button" data-mission="세수하기" aria-label="세수하기 완료하기, 크레딧 10과 하트 1 받기"><img src="/site/assets/app/wash-face.webp" alt="" width="384" height="384" loading="lazy"><span class="demo-name">세수하기</span><span class="demo-reward"><i><img src="/site/assets/app/coin.webp" alt="" width="20" height="20">10</i><i><img src="/site/assets/app/heart.webp" alt="" width="20" height="20">1</i></span></button><span class="demo-divider" role="separator" aria-hidden="true"></span><button class="demo-card is-pm" type="button" data-block="pm" aria-label="그릇 치우기, 오후 미션"><img src="/site/assets/app/clear-dishes.webp" alt="" width="384" height="384" loading="lazy"><span class="demo-name">그릇 치우기</span><span class="demo-reward"><i><img src="/site/assets/app/coin.webp" alt="" width="20" height="20">10</i><i><img src="/site/assets/app/heart.webp" alt="" width="20" height="20">1</i></span></button><button class="demo-card is-pm" type="button" data-block="pm" aria-label="수저 놓기, 오후 미션"><img src="/site/assets/app/set-cutlery.webp" alt="" width="384" height="384" loading="lazy"><span class="demo-name">수저 놓기</span><span class="demo-reward"><i><img src="/site/assets/app/coin.webp" alt="" width="20" height="20">10</i><i><img src="/site/assets/app/heart.webp" alt="" width="20" height="20">1</i></span></button><button class="demo-card is-pm" type="button" data-block="pm" aria-label="인사하기, 오후 미션"><img src="/site/assets/app/say-hello.webp" alt="" width="384" height="384" loading="lazy"><span class="demo-name">인사하기</span><span class="demo-reward"><i><img src="/site/assets/app/coin.webp" alt="" width="20" height="20">10</i><i><img src="/site/assets/app/heart.webp" alt="" width="20" height="20">1</i></span></button><button class="demo-card is-pm" type="button" data-block="pm" aria-label="밥 다 먹기, 오후 미션"><img src="/site/assets/app/meal-finished.webp" alt="" width="384" height="384" loading="lazy"><span class="demo-name">밥 다 먹기</span><span class="demo-reward"><i><img src="/site/assets/app/coin.webp" alt="" width="20" height="20">10</i><i><img src="/site/assets/app/heart.webp" alt="" width="20" height="20">1</i></span></button></div>
+          </div>
         </div>
       </div></div>
       <figcaption>
+        <p class="demo-legend" aria-label="카드 색 안내"><span><i class="lg lg-am"></i>분홍 · 오전</span><span><i class="lg lg-pm"></i>파랑 · 오후</span></p>
         <p class="demo-status" data-demo-status role="status" aria-live="polite">카드를 눌러 보세요.</p>
         <button type="button" class="btn btn-ghost btn-sm demo-reset" data-demo-reset hidden>다시 체험하기</button>
         <noscript><p class="demo-note">자바스크립트를 켜면 카드를 눌러 체험할 수 있어요.</p></noscript>
@@ -306,9 +310,8 @@
 
 <section class="evidence-section" id="design" aria-labelledby="design-title">
   <div class="wrap">
-    <span class="eyebrow">아이를 이해하는 설계</span>
     <h2 id="design-title">스스로 하는 힘도,<br>연습하며 자랍니다.</h2>
-    <p class="section-lead">반복할 기회, 아이의 선택, 구체적인 응원.</p>
+    <p class="section-lead">반복할 기회와 아이의 선택, 구체적인 응원의 기회를 반영한 ‘아이를 이해하는 설계’예요.</p>
     <div class="ev-rail">
       <div class="ev-track" data-ev-track tabindex="0" aria-label="설계 원칙 세 가지, 옆으로 넘겨 보세요">
         <article class="ev-card"><img class="ev-icon" src="/site/assets/icons/ui/icon-mission.webp" alt="" width="56" height="56" loading="lazy"><h3>일상에서 반복할 기회</h3><p>자기조절과 실행기능은 연습과 피드백을 통해 발달합니다. 일관된 일과와 어른의 지원이 도움이 됩니다.</p><a href="https://developingchild.harvard.edu/resources/report/three-principles-to-improve-outcomes-for-children-and-families/" target="_blank" rel="noopener">하버드 아동발달센터 · 연구 종합 <svg class="ico" aria-hidden="true"><use href="#i-ext"/></svg></a></article>
@@ -372,7 +375,7 @@
   </div>
   <div class="wrap copyright">© 2026 COOANC. All rights reserved.</div>
 </footer>
-<script src="/site/js/main.js?v=20261124-23" defer></script>
-<script src="/site/js/home-demo.js?v=20261124-23" defer></script>
+<script src="/site/js/main.js?v=20261124-24" defer></script>
+<script src="/site/js/home-demo.js?v=20261124-24" defer></script>
 </body>
 </html>

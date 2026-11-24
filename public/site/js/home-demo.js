@@ -66,14 +66,14 @@
   if (root) {
     const rail = root.querySelector('[data-demo-rail]');
     const cards = [...root.querySelectorAll('.demo-card[data-mission]')];
-    const pmCard = root.querySelector('.demo-card[data-block="pm"]');
+    const pmCards = [...root.querySelectorAll('.demo-card[data-block="pm"]')];
     const divider = root.querySelector('.demo-divider');
     const count = root.querySelector('[data-demo-count]');
     const credit = root.querySelector('[data-demo-credit]');
     const heart = root.querySelector('[data-demo-heart]');
     const status = root.querySelector('[data-demo-status]');
     const reset = root.querySelector('[data-demo-reset]');
-    const finger = root.querySelector('[data-demo-finger]'); // 카드를 누르도록 유도하는 손가락
+    const finger = root.querySelector('[data-demo-hint]'); // 카드를 누르도록 유도하는 손가락과 말풍선
     const refresh = bindRail(rail, root.querySelector('[data-rail-prev]'), root.querySelector('[data-rail-next]'));
     let completed = 0;
     let taps = [];
@@ -120,10 +120,12 @@
       complete(card);
     }));
 
-    pmCard?.addEventListener('click', () => {
+    pmCards.forEach(pmCard => pmCard.addEventListener('click', () => {
+      if (finger) finger.hidden = true;
       status.textContent = '오후 미션은 낮 12시 이후에 할 수 있어요.';
       openDialog(dlgPm, pmCard);
-    });
+    }));
+    rail?.addEventListener('scroll', () => { if (finger && rail.scrollLeft > 8) finger.hidden = true; }, { passive: true });
 
     dlgRapid?.querySelector('[data-dlg-confirm]')?.addEventListener('click', () => {
       const card = pending; pending = null;
