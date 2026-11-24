@@ -574,3 +574,10 @@
 .empathy-section { padding-bottom:64px; }
 .demo-status:empty { min-height:0; }
 @media(max-width:699px) { .empathy-section { padding-bottom:48px; } }
+
+/* 부모님 이야기 흐름 속 갤러리 사진 */
+.voices-track .flow-set { align-items:center; }
+.voice-photo { position:relative; flex:0 0 auto; height:300px; margin:0; padding:5px; border-radius:22px; background:#fff; box-shadow:0 10px 24px -12px #29344666, 0 0 0 1px #e3e8f2; overflow:hidden; }
+.voice-photo img { display:block; height:100%; width:auto; max-width:none; border-radius:17px; object-fit:cover; }
+.voice-photo figcaption { position:absolute; left:14px; bottom:14px; right:14px; width:fit-content; max-width:calc(100% - 28px); padding:5px 12px; border-radius:100px; background:#ffffffe8; color:var(--ink); font-size:.8125rem; font-weight:700; line-height:1.4; backdrop-filter:blur(4px); }
+.voices-track { padding-block:6px 16px; }
