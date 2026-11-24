@@ -213,19 +213,11 @@
 .viz-grow { background:#f1f5ee; display:flex; justify-content:center; align-items:center; gap:6cqw; padding-top:6cqw; }
 .gr-col { width:38cqw; display:flex; flex-direction:column; align-items:center; gap:1cqw; text-align:center; }
 .gr-art { position:relative; width:34cqw; height:34cqw; }
-.gr-art img { position:absolute; inset:0; width:100%; height:100%; max-width:none; object-fit:contain; opacity:0; }
+.gr-art img { position:absolute; inset:0; width:100%; height:100%; max-width:none; object-fit:contain; opacity:0; transform-origin:50% 100%; }
 .gr-col b { margin-top:1cqw; font-size:max(14px,4.2cqw); font-weight:800; color:var(--ink); }
 .gr-col span { font-size:max(12px,3.2cqw); color:var(--slate); }
 .gr-p1 { animation:gr-a 9s ease-in-out infinite both; } .gr-p2 { animation:gr-b 9s ease-in-out infinite both; } .gr-p3 { animation:gr-c 9s ease-in-out infinite both; }
 .gr-t1 { animation:gt-a 9s ease-in-out infinite both; } .gr-t2 { animation:gt-b 9s ease-in-out infinite both; } .gr-t3 { animation:gt-c 9s ease-in-out infinite both; } .gr-t4 { animation:gt-d 9s ease-in-out infinite both; }
-@keyframes gr-a { 0%,26% { opacity:1; } 32%,94% { opacity:0; } 98%,100% { opacity:1; } }
-@keyframes gr-b { 0%,26% { opacity:0; } 32%,58% { opacity:1; } 64%,100% { opacity:0; } }
-@keyframes gr-c { 0%,58% { opacity:0; transform:scale(.94); } 66%,92% { opacity:1; transform:scale(1); } 97%,100% { opacity:0; } }
-@keyframes gt-a { 0%,18% { opacity:1; } 24%,94% { opacity:0; } 98%,100% { opacity:1; } }
-@keyframes gt-b { 0%,18% { opacity:0; } 24%,42% { opacity:1; } 48%,100% { opacity:0; } }
-@keyframes gt-c { 0%,42% { opacity:0; } 48%,66% { opacity:1; } 72%,100% { opacity:0; } }
-@keyframes gt-d { 0%,66% { opacity:0; transform:scale(.94); } 74%,92% { opacity:1; transform:scale(1); } 97%,100% { opacity:0; } }
-@media(prefers-reduced-motion:reduce) { .gr-p1,.gr-p2,.gr-t1,.gr-t2,.gr-t3 { opacity:0 !important; } .gr-p3,.gr-t4 { opacity:1 !important; } }
 
 /* 접이식 장면 보기 (서비스 소개) */
 .viz-toggle { margin-top:16px; border-top:1px solid #0000001a; }
@@ -298,3 +290,25 @@ button.rc-to:hover .rc-txt b, button.rc-to:focus-visible .rc-txt b { text-decora
 .rc-txt { display:flex; flex-direction:column; }
 .viz-toggle .viz-shop { aspect-ratio:100/54; }
 .viz-toggle .viz-shop .sh-view { top:12cqw; }
+
+/* 저금통·화분: 절반 크기에서 시작해 한 단계씩 커져요 */
+@keyframes gr-a { 0%,26% { opacity:1; transform:scale(.5); } 32%,94% { opacity:0; transform:scale(.5); } 98%,100% { opacity:1; transform:scale(.5); } }
+@keyframes gr-b { 0%,26% { opacity:0; transform:scale(.62); } 32%,58% { opacity:1; transform:scale(.75); } 64%,100% { opacity:0; transform:scale(.8); } }
+@keyframes gr-c { 0%,58% { opacity:0; transform:scale(.85); } 66%,92% { opacity:1; transform:scale(1); } 97%,100% { opacity:0; transform:scale(1); } }
+@keyframes gt-a { 0%,18% { opacity:1; transform:scale(.5); } 24%,94% { opacity:0; transform:scale(.5); } 98%,100% { opacity:1; transform:scale(.5); } }
+@keyframes gt-b { 0%,18% { opacity:0; transform:scale(.55); } 24%,42% { opacity:1; transform:scale(.65); } 48%,100% { opacity:0; transform:scale(.7); } }
+@keyframes gt-c { 0%,42% { opacity:0; transform:scale(.72); } 48%,66% { opacity:1; transform:scale(.82); } 72%,100% { opacity:0; transform:scale(.88); } }
+@keyframes gt-d { 0%,66% { opacity:0; transform:scale(.9); } 74%,92% { opacity:1; transform:scale(1); } 97%,100% { opacity:0; transform:scale(1); } }
+@media(prefers-reduced-motion:reduce) { .gr-p1,.gr-p2,.gr-t1,.gr-t2,.gr-t3 { opacity:0 !important; } .gr-p3,.gr-t4 { opacity:1 !important; transform:none !important; } }
+
+/* 크레딧 선택: 손가락이 저금통, 마켓을 차례로 눌러요 */
+.rc-finger { left:14cqw; top:-9.5cqw; width:8cqw; }
+.rc-f-top { animation:rc-f1 9s ease-in-out infinite both; }
+.rc-f-bottom { animation:rc-f2 9s ease-in-out infinite both; }
+.rc-to-top { animation:rc-hi1 9s ease-in-out infinite both; border-radius:3cqw; }
+.rc-to-bottom { animation:rc-hi2 9s ease-in-out infinite both; border-radius:3cqw; }
+@keyframes rc-f1 { 0%,8% { opacity:0; transform:translateY(4cqw); } 14% { opacity:1; transform:translateY(0); } 24% { opacity:1; transform:translateY(0); } 27% { opacity:1; transform:translateY(1.6cqw) scale(.93); } 31% { opacity:1; transform:translateY(0); } 38%,100% { opacity:0; transform:translateY(0); } }
+@keyframes rc-f2 { 0%,48% { opacity:0; transform:translateY(4cqw); } 54% { opacity:1; transform:translateY(0); } 64% { opacity:1; transform:translateY(0); } 67% { opacity:1; transform:translateY(1.6cqw) scale(.93); } 71% { opacity:1; transform:translateY(0); } 78%,100% { opacity:0; transform:translateY(0); } }
+@keyframes rc-hi1 { 0%,25% { background:transparent; } 28%,40% { background:#fff4cc; } 46%,100% { background:transparent; } }
+@keyframes rc-hi2 { 0%,65% { background:transparent; } 68%,80% { background:#fff4cc; } 86%,100% { background:transparent; } }
+@media(prefers-reduced-motion:reduce) { .rc-finger { display:none; } }

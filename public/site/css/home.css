@@ -384,3 +384,8 @@
 .demo-section { background:#fdf1ea; }
 .site-home .home-hero h1 { font-size:clamp(2.375rem,1.7rem + 3.6vw,3.75rem); line-height:1.18; letter-spacing:-.035em; }
 .hero-copy>p { font-weight:600; }
+
+.flow-bar { display:flex; align-items:center; justify-content:center; gap:10px; margin-top:12px; }
+.flow-bar .flow-caption { flex:1; margin-top:0; min-width:0; }
+.flow-arrow { flex:0 0 auto; width:44px; height:44px; display:grid; place-items:center; border:1px solid #ccd4e1; border-radius:50%; background:#fff; color:#454fc3; cursor:pointer; }
+.flow-arrow svg { width:20px; height:20px; }

@@ -221,7 +221,8 @@
     const scenes = [...fp.querySelectorAll('[data-scene]')];
     const dots = [...fp.querySelectorAll('[data-flow-dot]')];
     const cap = fp.querySelector('[data-flow-caption]');
-    const RATE = 2.2, STEP = 4600;
+    const BASE_RATE = 2.2;
+    const rateOf = s => Number(s.dataset.rate) || BASE_RATE;
     let i = 0, timer = null, first = true;
     // 장면 자체의 페이드(트랜지션)는 건드리지 않고, 안쪽 CSS 애니메이션만 멈추거나 처음부터 재생합니다.
     const cssAnims = el => el.getAnimations({ subtree: true }).filter(a => 'animationName' in a);
@@ -241,13 +242,30 @@
         const s = scenes[n];
         s.classList.add('is-active');
         s.setAttribute('aria-hidden', 'false');
-        cssAnims(s).forEach(a => { a.currentTime = 0; a.playbackRate = RATE; a.play(); });
+        cssAnims(s).forEach(a => { a.currentTime = 0; a.playbackRate = rateOf(s); a.play(); });
       };
       if (first) { first = false; go(); } else { swap = setTimeout(go, 200); }
     }
-    const stop = () => { clearInterval(timer); timer = null; };
-    const start = () => { stop(); if (!reduced) timer = setInterval(() => show((i + 1) % scenes.length), STEP); };
+    const stop = () => { clearTimeout(timer); timer = null; };
+    // 장면마다 재생 속도가 달라서, 그 장면이 끝날 때쯤 다음 장면으로 넘어갑니다.
+    const start = () => {
+      stop();
+      if (reduced) return;
+      const tick = () => { show((i + 1) % scenes.length); timer = setTimeout(tick, 9000 / rateOf(scenes[i]) + 500); };
+      timer = setTimeout(tick, 9000 / rateOf(scenes[i]) + 500);
+    };
     dots.forEach((d, k) => d.addEventListener('click', () => { show(k); if (timer) start(); }));
+    const step = d => { show((i + d + scenes.length) % scenes.length); if (timer) start(); };
+    fp.querySelector('[data-flow-prev]')?.addEventListener('click', () => step(-1));
+    fp.querySelector('[data-flow-next]')?.addEventListener('click', () => step(1));
+    // 손가락으로 좌우로 밀어 넘기기
+    let sx = 0, sy = 0;
+    const stage = fp.querySelector('.flow-stage');
+    stage?.addEventListener('touchstart', e => { sx = e.touches[0].clientX; sy = e.touches[0].clientY; }, { passive: true });
+    stage?.addEventListener('touchend', e => {
+      const dx = e.changedTouches[0].clientX - sx, dy = e.changedTouches[0].clientY - sy;
+      if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.5) step(dx < 0 ? 1 : -1);
+    }, { passive: true });
     show(0);
     if (!reduced && 'IntersectionObserver' in window) {
       new IntersectionObserver(es => { if (es[0].isIntersecting && !document.hidden) start(); else stop(); }).observe(fp);
