@@ -3,7 +3,8 @@
   const dlg = document.getElementById('feature-dialog');
   if (!dlg) return;
   const body = dlg.querySelector('[data-fd-body]');
-  const noEl = dlg.querySelector('[data-fd-no]');
+  const titleEl = dlg.querySelector('[data-fd-title]');
+  const iconEl = dlg.querySelector('[data-fd-icon]');
   const countEl = dlg.querySelector('[data-fd-count]');
   const contents = [...document.querySelectorAll('[data-feature-content]')];
   const supportsModal = typeof dlg.showModal === 'function';
@@ -14,10 +15,8 @@
     const src = contents[current];
     body.innerHTML = '';
     [...src.children].forEach(n => body.appendChild(n.cloneNode(true)));
-    const h = body.querySelector('h2');
-    if (h) h.id = 'feature-dialog-title';
-    dlg.style.setProperty('--accent', src.style.getPropertyValue('--accent'));
-    noEl.textContent = String(current + 1).padStart(2, '0');
+    titleEl.textContent = src.dataset.featureName || '';
+    iconEl.src = src.dataset.featureIcon || '';
     countEl.textContent = `${current + 1} / ${contents.length}`;
     body.scrollTop = 0;
     dlg.scrollTop = 0;
@@ -58,4 +57,20 @@
       if (dot) dot.click();
     }
   });
+  // 카드 줄: 좌우 버튼으로 넘기기
+  const rail = document.querySelector('[data-feat-rail]');
+  if (rail) {
+    const prev = document.querySelector('[data-feat-prev]');
+    const next = document.querySelector('[data-feat-next]');
+    const upd = () => {
+      prev.disabled = rail.scrollLeft <= 2;
+      next.disabled = rail.scrollLeft + rail.clientWidth >= rail.scrollWidth - 2;
+    };
+    const go = d => rail.scrollBy({ left: d * rail.clientWidth * 0.8, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+    prev.addEventListener('click', () => go(-1));
+    next.addEventListener('click', () => go(1));
+    rail.addEventListener('scroll', () => requestAnimationFrame(upd), { passive: true });
+    window.addEventListener('resize', upd);
+    upd();
+  }
 })();
