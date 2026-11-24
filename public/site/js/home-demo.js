@@ -149,8 +149,7 @@
   }
 
   /* ───────── 안전장치 설명 슬라이더 ───────── */
-  const fs = document.querySelector('[data-fslider]');
-  if (fs) {
+  document.querySelectorAll('[data-fslider]').forEach(fs => {
     const track = fs.querySelector('[data-fs-track]');
     const slides = [...track.children];
     const dots = [...fs.querySelectorAll('[data-fs-dot]')];
@@ -165,7 +164,7 @@
     dots.forEach((d, k) => d.addEventListener('click', () => {
       track.scrollTo({ left: slides[k].offsetLeft - track.offsetLeft, behavior });
     }));
-  }
+  });
 
   /* ───────── 흐르는 카드 (금융역량 관련자료, 부모님 이야기) ─────────
      마우스를 올리거나 손가락으로 만지거나 키보드로 들어오면 멈추고, 직접 넘겨 볼 수 있습니다.
