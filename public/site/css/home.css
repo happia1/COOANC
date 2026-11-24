@@ -21,7 +21,7 @@
 .site-home .nav-inner { height:68px; gap:20px; }
 .site-home .brand-logo { width:136px; height:auto; }
 .site-home .nav-links { margin-left:auto; font-size:0.875rem; gap:20px; }
-.site-home .nav-toggle { width:44px; height:44px; display:grid; place-items:center; }
+@media(max-width:859px){ .site-home .nav-toggle { width:44px; height:44px; display:grid; place-items:center; } }
 @media(min-width:640px){ .site-home .nav-inner { height:76px; } .site-home .brand-logo { width:150px; } }
 .site-home .btn { min-height:48px; border-radius:12px; gap:10px; box-shadow:none; }
 .site-home .btn-primary { background:var(--indigo); }
@@ -33,7 +33,7 @@
 .text-link { display:inline-flex; align-items:center; gap:8px; min-height:44px; font-size:0.9375rem; font-weight:700; color:var(--indigo-deep); text-decoration:underline; }
 
 /* ── 히어로 ── */
-.home-hero { padding:32px 0 300px; }
+.home-hero { padding:32px 0 calc(89.8% + 16px); }
 .hero-grid { display:block; }
 .hero-copy { max-width:620px; position:relative; }
 .hero-copy em { color:var(--indigo); font-style:normal; }
@@ -42,8 +42,8 @@
 .hero-copy>small { display:block; margin-top:16px; font-size:0.875rem; color:var(--slate); max-width:46ch; line-height:1.6; }
 .hero-actions { display:flex; flex-wrap:wrap; gap:12px; margin-top:28px; }
 .hero-art { position:absolute; inset:0; z-index:-2; }
-.hero-art img { position:absolute; display:block; left:0; right:0; bottom:0; width:100%; height:300px; object-fit:cover; object-position:50% 100%;
-  -webkit-mask-image:linear-gradient(180deg,transparent 0%,#000 38%); mask-image:linear-gradient(180deg,transparent 0%,#000 38%); }
+.hero-art img { position:absolute; display:block; left:0; right:0; bottom:0; width:100%; height:auto;
+  -webkit-mask-image:linear-gradient(180deg,transparent 0%,#000 8%); mask-image:linear-gradient(180deg,transparent 0%,#000 8%); }
 
 /* ── 미션 체험: 서비스 소개의 '오늘의 미션' 태블릿 화면을 그대로 옮기고, 카드만 한 줄 슬라이드로 ── */
 .demo-section { padding:56px 0 var(--sec-focal); }
@@ -238,12 +238,11 @@
   .future-grid { grid-template-columns:minmax(0,1.3fr) minmax(0,1fr); }
  .story-grid { grid-template-columns:minmax(0,1fr) minmax(0,1.1fr); gap:56px; }
 }
-@media(max-width:1023px) { .site-home .nav-cta { display:none; } }
 @media(min-width:720px) {
  .home-hero { min-height:540px; display:flex; align-items:center; padding:56px 0; }
  .hero-grid { width:100%; }
  .hero-copy { max-width:min(600px,54%); }
- .hero-art img { left:auto; right:0; top:0; bottom:auto; width:auto; height:100%; object-fit:initial;
+ .hero-art img { left:auto; right:0; top:0; bottom:auto; width:auto; height:100%;
    -webkit-mask-image:linear-gradient(90deg,transparent 0%,#000 32%); mask-image:linear-gradient(90deg,transparent 0%,#000 32%); }
  .home-hero::after { content:''; position:absolute; inset:0; z-index:-1; pointer-events:none;
    background:linear-gradient(90deg,rgb(var(--head-rgb)/.9) 0%,rgb(var(--head-rgb)/.65) 40%,rgb(var(--head-rgb)/0) 66%); }
@@ -252,8 +251,7 @@
  .site-home .wrap { padding-inline:22px; }
  .site-home h1 { font-size:var(--fs-display); }
  .hero-copy>p { font-size:1rem; margin-top:16px; }
- .hero-actions { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:22px; }
- .hero-actions .btn { padding-inline:10px; font-size:0.9375rem; }
+ .hero-actions { display:grid; grid-template-columns:1fr; margin-top:22px; }
  .demo-section { padding-block:40px var(--sec-focal-m); }
  .honesty-section,.how-section,.future-section,.story-section { padding-block:var(--sec-m); }
  .faq-section { padding-bottom:var(--sec-tail-m); }
