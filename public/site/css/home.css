@@ -127,10 +127,10 @@
 .fslider-arrows svg { width:20px; height:20px; }
 .fslider-track { display:flex; gap:16px; overflow-x:auto; scroll-snap-type:x mandatory; scrollbar-width:none; -webkit-overflow-scrolling:touch; border-radius:16px; }
 .fslider-track::-webkit-scrollbar { display:none; }
-.fslide { flex:0 0 100%; scroll-snap-align:start; display:grid; gap:20px; align-items:center; padding:22px 18px; background:#fff; border-radius:16px; }
+.fslide { flex:0 0 100%; scroll-snap-align:start; display:grid; gap:20px; align-items:center; padding:4px 2px; }
 .fslide-text h3 { font-size:1.25rem; line-height:1.4; }
 .fslide-text p { margin-top:10px; font-size:1rem; line-height:1.75; color:var(--slate); }
-.fslide-visual { min-width:0; display:flex; flex-direction:column; align-items:center; justify-content:center; background:#f6f8fc; border-radius:14px; padding:18px 12px; }
+.fslide-visual { min-width:0; display:flex; flex-direction:column; align-items:center; justify-content:center; }
 .mrow { display:flex; align-items:stretch; justify-content:center; gap:10px; width:100%; }
 .mc { flex:0 1 112px; min-width:0; display:flex; flex-direction:column; align-items:center; gap:4px; padding:10px 6px; border:1px solid; border-radius:14px; }
 .mc>img { width:64px; height:64px; object-fit:contain; }
@@ -143,8 +143,7 @@
 .mrow-legend { display:flex; gap:18px; justify-content:center; margin-top:14px; font-size:.875rem; font-weight:700; color:var(--ink); }
 .mrow-legend span { display:inline-flex; align-items:center; gap:8px; }
 .mrow-legend .swatch { width:18px; height:18px; border-radius:6px; }
-.popup-replica { width:100%; padding:18px; border-radius:12px; background:#4d5463; display:flex; justify-content:center; }
-.popup-card { width:min(100%,260px); display:flex; flex-direction:column; align-items:center; padding:22px 18px 18px; border-radius:22px; background:#fff; text-align:center; box-shadow:0 12px 30px -8px #0008; }
+.popup-card { width:min(100%,264px); display:flex; flex-direction:column; align-items:center; padding:22px 18px 18px; border-radius:22px; background:#fff; text-align:center; box-shadow:0 14px 34px -14px #29344655; }
 .popup-card img { width:104px; height:104px; object-fit:contain; margin-bottom:6px; }
 .pc-title { font-size:1.375rem; font-weight:900; color:#111827; line-height:1.3; }
 .pc-detail { margin:4px 0 16px; font-size:.875rem; font-weight:600; line-height:1.5; color:#4b5563; }
@@ -159,7 +158,6 @@
 .fslider-dots button { width:44px; height:44px; border:0; background:transparent; cursor:pointer; display:grid; place-items:center; }
 .fslider-dots button::before { content:''; width:10px; height:10px; border-radius:50%; background:#c3cbe0; }
 .fslider-dots button[aria-selected="true"]::before { background:var(--indigo); width:26px; border-radius:6px; }
-.honesty-close { margin-top:20px; max-width:62ch; padding:18px 20px; background:#fff; border-radius:16px; font-size:1.0625rem; font-weight:600; color:var(--ink); line-height:1.75; }
 
 /* ── 사용 방식 ── */
 .how-section { padding:var(--sec) 0 var(--sec); }
@@ -231,8 +229,8 @@
 
 @media(min-width:720px) {
  .how-steps { grid-template-columns:repeat(3,minmax(0,1fr)); gap:28px; }
- .fslide { grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:36px; padding:32px; }
- .fslide-visual { padding:24px; min-height:260px; }
+ .fslide { grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:48px; padding:8px 4px; }
+ .fslide-visual { min-height:260px; }
  .fslide-text h3 { font-size:1.5rem; }
 }
 @media(min-width:900px) {

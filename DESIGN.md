@@ -205,6 +205,8 @@ components:
 
 ### Named Rules
 **The Role Scale Rule.** 글자 크기는 위 토큰 역할에서만 고른다. 새 크기가 필요하면 페이지에서 px를 쓰지 말고 역할을 먼저 정한다.
+**The Widow Rule.** 문단 끝에 단어 하나만 남기지 않는다. `main.js`가 마지막 두 단어를 줄바꿈 없는 공백으로 묶고, 넘치면 되돌린다. `text-wrap: pretty`는 보조 수단이다.
+**The Flat Box Rule.** 박스는 두 겹까지만 쓴다(카드와 그 안의 버튼). 카드 안의 패널 안의 카드는 만들지 않는다.
 **The Keep-All Rule.** 한글 줄바꿈은 어절 단위(`keep-all`)로 하고 제목은 `text-wrap: balance`를 쓴다.
 **The Jua Accent Rule.** Jua는 워드마크와 한두 줄의 포인트에만 쓴다. 본문과 정보 문장에 쓰지 않는다.
 
