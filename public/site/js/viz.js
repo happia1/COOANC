@@ -12,6 +12,8 @@
     const index = () => Math.min(slides.length - 1, Math.round(track.scrollLeft / Math.max(1, track.clientWidth + 20)));
     const sync = () => {
       const i = index();
+      // 장면마다 높이가 달라 아래에 빈 공간이 남지 않도록 현재 장면 높이에 맞춥니다.
+      if (slides[i].offsetHeight > 0) track.style.height = slides[i].offsetHeight + 'px';
       if (countEl) countEl.textContent = `${i + 1} / ${slides.length}`;
       dots.forEach((d, k) => d.setAttribute('aria-selected', String(k === i)));
       if (prev) prev.disabled = track.scrollLeft <= 2;
@@ -23,6 +25,7 @@
     track.addEventListener('scroll', () => requestAnimationFrame(sync), { passive: true });
     window.addEventListener('resize', sync);
     dots.forEach((d, k) => d.addEventListener('click', () => track.scrollTo({ left: slides[k].offsetLeft - track.offsetLeft, behavior })));
+    fs.closest('details')?.addEventListener('toggle', () => requestAnimationFrame(sync));
     sync();
   });
   document.querySelectorAll('[data-sim]').forEach(sim => {

@@ -222,19 +222,28 @@
     const dots = [...fp.querySelectorAll('[data-flow-dot]')];
     const cap = fp.querySelector('[data-flow-caption]');
     const RATE = 2.2, STEP = 4600;
-    let i = 0, timer = null;
+    let i = 0, timer = null, first = true;
+    // 장면 자체의 페이드(트랜지션)는 건드리지 않고, 안쪽 CSS 애니메이션만 멈추거나 처음부터 재생합니다.
+    const cssAnims = el => el.getAnimations({ subtree: true }).filter(a => 'animationName' in a);
+    let swap = null;
     function show(n) {
       i = n;
-      scenes.forEach((s, k) => {
-        const on = k === n;
-        s.classList.toggle('is-active', on);
-        s.setAttribute('aria-hidden', String(!on));
-        s.getAnimations({ subtree: true }).forEach(a => {
-          if (on) { a.currentTime = 0; a.playbackRate = RATE; a.play(); } else { a.pause(); }
-        });
+      clearTimeout(swap);
+      // 먼저 이전 장면을 걷어내고, 다 사라진 뒤에 다음 장면을 처음부터 재생해 장면이 겹쳐 보이지 않게 합니다.
+      scenes.forEach(s => {
+        s.classList.remove('is-active');
+        s.setAttribute('aria-hidden', 'true');
+        cssAnims(s).forEach(a => a.pause());
       });
       dots.forEach((d, k) => d.setAttribute('aria-selected', String(k === n)));
       if (cap) cap.textContent = scenes[n].dataset.caption || '';
+      const go = () => {
+        const s = scenes[n];
+        s.classList.add('is-active');
+        s.setAttribute('aria-hidden', 'false');
+        cssAnims(s).forEach(a => { a.currentTime = 0; a.playbackRate = RATE; a.play(); });
+      };
+      if (first) { first = false; go(); } else { swap = setTimeout(go, 200); }
     }
     const stop = () => { clearInterval(timer); timer = null; };
     const start = () => { stop(); if (!reduced) timer = setInterval(() => show((i + 1) % scenes.length), STEP); };

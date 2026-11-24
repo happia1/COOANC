@@ -371,9 +371,9 @@
 /* 홈 요약 플레이어: 여섯 장면이 영상처럼 이어져요 */
 .flow-section { padding:var(--sec) 0; background:#fffefb; }
 .flow-player { max-width:520px; margin:28px auto 0; text-align:center; }
-.flow-stage { position:relative; aspect-ratio:5/4; }
-.flow-scene { position:absolute; inset:0; opacity:0; pointer-events:none; transition:opacity .35s ease; }
-.flow-scene.is-active { opacity:1; pointer-events:auto; }
+.flow-stage { position:relative; aspect-ratio:10/7; }
+.flow-scene { position:absolute; inset:0; opacity:0; visibility:hidden; pointer-events:none; transition:opacity .18s ease, visibility 0s .18s; }
+.flow-scene.is-active { opacity:1; visibility:visible; pointer-events:auto; transition:opacity .22s ease, visibility 0s; }
 .flow-scene .viz { width:100%; height:100%; aspect-ratio:auto; }
 .flow-caption { margin-top:16px; min-height:1.8em; font-size:1.0625rem; font-weight:700; color:var(--ink); }
 .flow-dots { margin-top:0; }
