@@ -73,6 +73,7 @@
     const heart = root.querySelector('[data-demo-heart]');
     const status = root.querySelector('[data-demo-status]');
     const reset = root.querySelector('[data-demo-reset]');
+    const finger = root.querySelector('[data-demo-finger]'); // 카드를 누르도록 유도하는 손가락
     const refresh = bindRail(rail, root.querySelector('[data-rail-prev]'), root.querySelector('[data-rail-next]'));
     let completed = 0;
     let taps = [];
@@ -105,6 +106,7 @@
 
     cards.forEach(card => card.addEventListener('click', () => {
       if (card.disabled) return;
+      if (finger) finger.hidden = true; // 한 번 눌러 보면 손가락은 사라집니다
       const now = Date.now();
       taps = taps.filter(t => now - t < 3000);
       taps.push(now);
@@ -139,6 +141,7 @@
       completed = 0; taps = [];
       cards.forEach(card => { card.disabled = false; card.hidden = false; card.classList.remove('is-completing'); });
       rail.scrollLeft = 0;
+      if (finger) finger.hidden = false;
       render();
       status.textContent = '다시 시작해요. 카드를 눌러 보세요.';
     });
@@ -164,44 +167,58 @@
     }));
   }
 
-  /* ───────── 금융역량 관련자료: 한 줄로 천천히 흐르는 카드 ─────────
+  /* ───────── 흐르는 카드 (금융역량 관련자료, 부모님 이야기) ─────────
      마우스를 올리거나 손가락으로 만지거나 키보드로 들어오면 멈추고, 직접 넘겨 볼 수 있습니다.
      모션 줄이기 설정에서는 흐르지 않고 직접 넘기기만 합니다. */
-  const flow = document.querySelector('[data-flow-track]');
-  if (flow) {
+  document.querySelectorAll('[data-flow-track]').forEach(flow => {
     const set = flow.querySelector('.flow-set');
-    if (!reduced && set) {
+    if (reduced || !set) return;
+    const gap = parseFloat(getComputedStyle(flow).columnGap) || 12;
+    const loop = () => set.offsetWidth + gap;
+    // 화면보다 짧은 카드 묶음은 끊김 없이 이어지도록 복제본을 충분히 붙입니다.
+    let guard = 0;
+    do {
       const clone = set.cloneNode(true);
       clone.setAttribute('aria-hidden', 'true');
       clone.querySelectorAll('a').forEach(a => { a.tabIndex = -1; });
       flow.appendChild(clone);
-      const gap = parseFloat(getComputedStyle(flow).columnGap) || 12;
-      const SPEED = 22; // px/초
-      let pos = 0, last = 0, held = false, visible = false, resumeTimer = null;
-      const hold = () => { held = true; clearTimeout(resumeTimer); };
-      const release = (delay) => { clearTimeout(resumeTimer); resumeTimer = setTimeout(() => { pos = flow.scrollLeft; held = false; }, delay); };
-      flow.addEventListener('mouseenter', hold);
-      flow.addEventListener('mouseleave', () => release(300));
-      flow.addEventListener('focusin', hold);
-      flow.addEventListener('focusout', () => release(300));
-      flow.addEventListener('touchstart', hold, { passive: true });
-      flow.addEventListener('touchend', () => release(2500), { passive: true });
-      flow.addEventListener('wheel', () => { hold(); release(2500); }, { passive: true });
-      if ('IntersectionObserver' in window) {
-        new IntersectionObserver(es => { visible = es[0].isIntersecting; }).observe(flow);
-      } else { visible = true; }
-      function tick(ts) {
-        const dt = last ? Math.min(0.1, (ts - last) / 1000) : 0;
-        last = ts;
-        if (!held && visible && !document.hidden) {
-          pos += SPEED * dt;
-          const loop = set.offsetWidth + gap;
-          if (pos >= loop) pos -= loop;
-          flow.scrollLeft = pos;
-        }
-        requestAnimationFrame(tick);
+      guard += 1;
+    } while (flow.scrollWidth < flow.clientWidth + loop() + 4 && guard < 6);
+    const SPEED = 22; // px/초
+    let pos = 0, last = 0, held = false, visible = false, resumeTimer = null;
+    const hold = () => { held = true; clearTimeout(resumeTimer); };
+    const release = (delay) => { clearTimeout(resumeTimer); resumeTimer = setTimeout(() => { pos = flow.scrollLeft; held = false; }, delay); };
+    flow.addEventListener('mouseenter', hold);
+    flow.addEventListener('mouseleave', () => release(300));
+    flow.addEventListener('focusin', hold);
+    flow.addEventListener('focusout', () => release(300));
+    flow.addEventListener('touchstart', hold, { passive: true });
+    flow.addEventListener('touchend', () => release(2500), { passive: true });
+    flow.addEventListener('wheel', () => { hold(); release(2500); }, { passive: true });
+    if ('IntersectionObserver' in window) {
+      new IntersectionObserver(es => { visible = es[0].isIntersecting; }).observe(flow);
+    } else { visible = true; }
+    function tick(ts) {
+      const dt = last ? Math.min(0.1, (ts - last) / 1000) : 0;
+      last = ts;
+      if (!held && visible && !document.hidden) {
+        pos += SPEED * dt;
+        if (pos >= loop()) pos -= loop();
+        flow.scrollLeft = pos;
       }
       requestAnimationFrame(tick);
     }
-  }
+    requestAnimationFrame(tick);
+  });
+
+  /* ───────── 설계 원칙 카드 (좌우 넘기기) ───────── */
+  const ev = document.querySelector('[data-ev-track]');
+  if (ev) bindRail(ev, document.querySelector('[data-ev-prev]'), document.querySelector('[data-ev-next]'));
+
+  /* ───────── 12시 전 오후 카드 시연: 화면에 보일 때만 재생 ───────── */
+  document.querySelectorAll('[data-sim]').forEach(sim => {
+    if ('IntersectionObserver' in window) {
+      new IntersectionObserver(es => sim.classList.toggle('is-playing', es[0].isIntersecting && !document.hidden)).observe(sim);
+    } else { sim.classList.add('is-playing'); }
+  });
 })();

@@ -179,7 +179,7 @@ document.querySelectorAll('[data-copy-email]').forEach(button=>{
 // 문단 마지막 두 단어를 줄바꿈 없는 공백으로 묶어, 어떤 브라우저에서도 마지막 줄에 단어 하나만 남지 않게 합니다.
 // 묶은 결과가 가로로 넘치면 되돌립니다. 브라우저의 text-wrap: pretty는 보조 수단입니다.
 (function(){
-  const sel = 'main p, main li, main h1, main h2, main h3, main h4, main summary, main figcaption, main blockquote, main small, main .hl, .site-footer p';
+  const sel = 'main p, main li, main h1, main h2, main h3, main h4, main summary, main figcaption, main blockquote, main small, main .hl, main .everyday-scenes span, .site-footer p';
   function glue(el){
     if(el.querySelector('p,ul,ol,div,section,article,figure,table,details')) return;
     const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
@@ -193,7 +193,14 @@ document.querySelectorAll('[data-copy-email]').forEach(button=>{
     if(idx <= 0) return;
     const before = t;
     last.textContent = core.slice(0, idx) + '\u00A0' + core.slice(idx + 1) + t.slice(end);
-    if(el.scrollWidth > el.clientWidth + 1) last.textContent = before; // 넘치면 원래대로
+    if(el.scrollWidth > el.clientWidth + 1){ last.textContent = before; return; } // 넘치면 원래대로
+    // 묶은 두 단어가 한 줄에 못 들어가 글자 중간에서 끊기면 원래대로
+    const gluedStart = idx - (core.slice(0, idx).length - core.slice(0, idx).replace(/\S+$/, '').length);
+    const rg = document.createRange();
+    rg.setStart(last, Math.max(0, gluedStart));
+    rg.setEnd(last, core.length);
+    const tops = new Set([...rg.getClientRects()].map(r => Math.round(r.top)));
+    if(tops.size > 1) last.textContent = before;
   }
   document.querySelectorAll(sel).forEach(glue);
 })();
