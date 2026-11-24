@@ -311,7 +311,3 @@
 .utility-capture figcaption{font-size:0.875rem;color:#536176;text-align:center;margin-top:10px;}
 @media(max-width:959px){.utility-with-capture{grid-template-columns:1fr;}.utility-capture{width:100%;max-width:310px;margin:auto;}}
 
-/* 홈으로 옮긴 미션 체험을 가리키는 카드 */
-.try-pointer { display:flex; align-items:center; min-height:240px; padding:32px; background:#eef5f6; border-radius:20px; }
-.try-pointer .btn { margin-top:18px; }
-.try-pointer h3 { letter-spacing:-.03em; }
