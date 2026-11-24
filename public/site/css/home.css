@@ -389,4 +389,10 @@
 .flow-bar .flow-caption { flex:1; margin-top:0; min-width:0; }
 .flow-arrow { flex:0 0 auto; width:44px; height:44px; display:grid; place-items:center; border:1px solid #ccd4e1; border-radius:50%; background:#fff; color:#454fc3; cursor:pointer; }
 .flow-arrow svg { width:20px; height:20px; }
-.future-body { margin-top:14px; font-size:1rem; line-height:1.8; }
+
+.future-body { max-width:34ch; margin:0 auto; text-align:center; font-size:1rem; line-height:1.8; color:#4d4a45; }
+.flow-card { flex:0 0 232px; gap:2px; padding:12px 14px; }
+.flow-body { position:relative; margin-top:4px; }
+.flow-body .flow-desc { margin:0; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.flow-body .flow-link { position:absolute; right:0; bottom:0; margin:0; padding:0 0 0 22px; min-height:0; align-self:auto; background:linear-gradient(90deg,#fffaf200 0,#fffaf2 55%); line-height:1.6; font-size:.875rem; }
+.flow-body .flow-link::before { content:''; position:absolute; inset:-12px -8px -12px 8px; }
