@@ -444,3 +444,7 @@
 .step-scale { position:relative; display:block; width:100%; height:calc(242px * var(--k,1)); margin-top:auto; padding-top:0; }
 .step-scale > .viz { position:absolute; top:0; left:var(--x,0); width:346px; height:242px; aspect-ratio:auto; transform:scale(var(--k,1)); transform-origin:0 0; }
 .step-scale > * { width:346px; }
+
+.hero-kicker { margin:0 0 10px; font-size:.875rem; font-weight:800; letter-spacing:.02em; color:#6a5af0; }
+.hero-copy > .hero-kicker { font-size:.875rem; margin-top:0; }
+.site-home .home-hero h1 { font-size:clamp(1.5rem,7vw,3rem); }
