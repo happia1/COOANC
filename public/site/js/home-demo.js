@@ -156,10 +156,12 @@
     const slides = [...track.children];
     const dots = [...fs.querySelectorAll('[data-fs-dot]')];
     const countEl = fs.querySelector('[data-fs-count]');
+    const titleEl = fs.querySelector('[data-fs-title]');
     const index = () => Math.min(slides.length - 1, Math.round(track.scrollLeft / Math.max(1, track.clientWidth + 16)));
     const sync = () => {
       const i = index();
-      countEl.textContent = `${i + 1} / ${slides.length}`;
+      if (countEl) countEl.textContent = `${i + 1} / ${slides.length}`;
+      if (titleEl) titleEl.textContent = slides[i].querySelector('h3')?.textContent || '';
       dots.forEach((d, k) => d.setAttribute('aria-selected', String(k === i)));
     };
     bindRail(track, fs.querySelector('[data-fs-prev]'), fs.querySelector('[data-fs-next]'), sync);

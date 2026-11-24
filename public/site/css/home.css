@@ -176,7 +176,6 @@
   -webkit-mask-image:linear-gradient(90deg,transparent 0,#000 28px,#000 calc(100% - 28px),transparent 100%); mask-image:linear-gradient(90deg,transparent 0,#000 28px,#000 calc(100% - 28px),transparent 100%); }
 .flow-track::-webkit-scrollbar { display:none; }
 .flow-set { display:flex; gap:12px; flex:0 0 auto; }
-.flow-card { flex:0 0 252px; display:flex; flex-direction:column; gap:4px; padding:14px 14px 8px; background:#fffaf2; border:1px solid #e3d9c6; border-radius:14px; }
 .flow-src { font-size:.9375rem; font-weight:800; color:var(--ink); line-height:1.4; }
 .flow-level { align-self:flex-start; margin-top:2px; padding:2px 10px; border-radius:100px; background:#f2e8d3; color:#5f4a1e; font-size:.8125rem; }
 .flow-desc { margin-top:6px; font-size:.875rem; line-height:1.6; color:#4d4a45; }
@@ -391,8 +390,27 @@
 .flow-arrow svg { width:20px; height:20px; }
 
 .future-body { max-width:34ch; margin:0 auto; text-align:center; font-size:1rem; line-height:1.8; color:#4d4a45; }
-.flow-card { flex:0 0 232px; gap:2px; padding:12px 14px; }
-.flow-body { position:relative; margin-top:4px; }
-.flow-body .flow-desc { margin:0; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
-.flow-body .flow-link { position:absolute; right:0; bottom:0; margin:0; padding:0 0 0 22px; min-height:0; align-self:auto; background:linear-gradient(90deg,#fffaf200 0,#fffaf2 55%); line-height:1.6; font-size:.875rem; }
+
+/* 근거 카드: 왼쪽 위 분류 · 가운데 핵심 문구 · 작은 설명 · 오른쪽 아래 출처 */
+.flow-card { flex:0 0 232px; display:flex; flex-direction:column; gap:6px; padding:12px 14px 10px; background:#fffaf2; border:1px solid #e3d9c6; border-radius:14px; }
+.flow-card .flow-level { align-self:flex-start; margin:0; padding:2px 10px; font-size:.75rem; }
+.flow-core { position:relative; margin:2px 0 0; padding:0 4px; text-align:center; font-size:.9375rem; font-weight:800; line-height:1.45; color:var(--ink); text-wrap:balance; }
+.flow-core::before { content:'“'; display:block; margin-bottom:-6px; font-size:1.75rem; line-height:1; color:#c9b58e; }
+.flow-body { position:relative; margin:0; }
+.flow-body .flow-desc { margin:0; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; font-size:.75rem; line-height:1.55; color:#6b665c; text-align:center; }
+.flow-body .flow-link { position:absolute; right:0; bottom:0; margin:0; padding:0 0 0 20px; background:linear-gradient(90deg,#fffaf200 0,#fffaf2 55%); line-height:1.55; font-size:.75rem; }
 .flow-body .flow-link::before { content:''; position:absolute; inset:-12px -8px -12px 8px; }
+.flow-card .flow-src { align-self:flex-end; margin:0; font-size:.75rem; font-weight:700; color:#8a8170; }
+
+/* 슬라이더 머리: 제목 양옆 화살표 + 점, 그 아래에 설명 */
+.fslider-head { display:flex; align-items:center; justify-content:center; gap:10px; }
+.fslider-title { flex:1; min-width:0; margin:0; text-align:center; font-size:1.0625rem; font-weight:700; color:var(--ink); text-wrap:balance; }
+.fslider-titled .fslider-dots { margin-top:0; }
+.fslider-titled .fslide-text h3 { display:none; }
+.fslider-titled .fslide-text p { margin-top:0; }
+.flow-player > .flow-bar { margin-top:0; margin-bottom:0; }
+.flow-player > .flow-dots { margin-bottom:12px; }
+.future-body { font-size:.875rem; line-height:1.75; }
+
+.site-home .home-hero h1 { font-size:clamp(1.625rem,7.2vw,3.25rem); white-space:nowrap; letter-spacing:-.04em; }
+.hero-copy>p { text-wrap:balance; }
