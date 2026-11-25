@@ -1,0 +1,12 @@
+User-agent: *
+Allow: /site/
+Disallow: /api/
+Disallow: /admin
+Disallow: /parent
+Disallow: /auth
+Disallow: /login
+Disallow: /signup
+Disallow: /onboarding
+Disallow: /settings
+
+Sitemap: https://cooanc.vercel.app/sitemap.xml
