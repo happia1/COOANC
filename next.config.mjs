@@ -47,7 +47,12 @@ function supabaseStorageRemotePatterns() {
 const nextConfig = {
   /** 예전 디바이스 모드 설정 URL(/setup) — 라우트 파일 제거 후 루트로 보냄 */
   async redirects() {
-    return [{ source: '/setup', destination: '/', permanent: false }]
+    return [
+      { source: '/setup', destination: '/', permanent: false },
+      /** 통합된 옛 페이지 — 검색엔진에 영구 이동(301 계열)으로 알려 줍니다 */
+      { source: '/site/blog.html', destination: '/site/about.html#blog', permanent: true },
+      { source: '/site/faq.html', destination: '/site/contact.html', permanent: true },
+    ]
   },
   /**
    * 정적 에셋 캐시:
