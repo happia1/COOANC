@@ -51,9 +51,25 @@ const nextConfig = {
       { source: '/setup', destination: '/', permanent: false },
       /** 통합된 옛 페이지 — 검색엔진에 영구 이동(301 계열)으로 알려 줍니다 */
       { source: '/site/index.html', destination: '/site', permanent: true },
-      { source: '/site/blog.html', destination: '/site/about.html#blog', permanent: true },
-      { source: '/site/faq.html', destination: '/site/contact.html', permanent: true },
+      { source: '/site/blog.html', destination: '/site/about#blog', permanent: true },
+      { source: '/site/faq.html', destination: '/site/contact', permanent: true },
+      { source: '/site/features.html', destination: '/site/features', permanent: true },
+      { source: '/site/guide.html', destination: '/site/guide', permanent: true },
+      { source: '/site/about.html', destination: '/site/about', permanent: true },
+      { source: '/site/contact.html', destination: '/site/contact', permanent: true },
     ]
+  },
+  /** 주소 끝의 .html 없이 열리게 — 내부적으로 실제 HTML 파일을 보여 줍니다 */
+  async rewrites() {
+    return {
+      beforeFiles: [
+        { source: '/site', destination: '/site/index.html' },
+        { source: '/site/features', destination: '/site/features.html' },
+        { source: '/site/guide', destination: '/site/guide.html' },
+        { source: '/site/about', destination: '/site/about.html' },
+        { source: '/site/contact', destination: '/site/contact.html' },
+      ],
+    }
   },
   /**
    * 정적 에셋 캐시:

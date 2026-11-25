@@ -28,7 +28,7 @@ document.querySelectorAll('[data-cta-install]').forEach(el=>{
     <h2>지금 바로 시작해보세요!</h2>
     <div style="margin-top:22px;">
       <a class="btn btn-primary" href="https://cooanc.vercel.app/">쿠앵크 시작하기</a>
-      <p class="free-note">홈 화면에 추가하는 방법 · <a href="/site/guide.html" style="text-decoration:underline;">가이드 보기</a></p>
+      <p class="free-note">홈 화면에 추가하는 방법 · <a href="/site/guide" style="text-decoration:underline;">가이드 보기</a></p>
     </div>
   `;
 });
